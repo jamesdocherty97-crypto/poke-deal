@@ -1,6 +1,6 @@
 # Pokémon Dealer OS
 
-Command centre for running a Pokémon card dealing business: **value → buy → stock → price → list → sell → book profit**. UK-relevant, GBP-native, built to be extended for months.
+Command centre for running a Pokémon card dealing business: **value → buy → stock → price → list → sell → book profit → reprice**. UK-relevant, GBP-native, built to be extended for months.
 
 This repo is the **frame** — the architecture and one working vertical slice, built by Claude Opus 4.8 as senior engineer. Breadth is handed to Codex (see `CODEX_BACKLOG.md`). Decisions already made are in `DECISIONS.md`. Full rationale is in the project brief.
 
@@ -13,12 +13,12 @@ The whole spine runs **offline, with no API keys** (fixture mode):
 ```bash
 npm install            # full install (Next, Prisma, etc.)
 npm run demo           # search → cleaned GBP comps → suggested price → stock it → profit projection
-npm test               # 22 unit tests on the cleaning, currency & pricing engines
+npm test               # unit tests on cleaning, currency, pricing, comps, inventory, metrics and alerts
 ```
 
 `npm run demo` output (fixture data) proves the core: a Charizard ex is valued from messy mixed-currency sales (lots dropped, wrong grades excluded, outliers stripped), priced for sale, added to inventory, and its margin projected.
 
-To run the UI slice: `npm run dev` then open `/` — a comp-lookup page hitting `GET /api/comps`.
+To run the app: `npm run dev` then open `/` — the mobile-first PWA shell covers acquire, stock, listings and P&L.
 
 ---
 
@@ -45,7 +45,7 @@ src/lib/catalog/
 src/lib/db/prisma.ts           Shared lazy Prisma client.
 src/lib/dealer/metrics.ts      Pure P&L, sell-through and stock-age metrics.
 src/app/                       Mobile-first PWA shell + /api/comps, /api/inventory, /api/listings,
-                               /api/dashboard and mark-sold/acquire actions.
+                               /api/dashboard, mark-sold/acquire, listing lifecycle and alerts.
 prisma/schema.prisma           Full domain model: Card, InventoryItem, Listing, Sale, CompResult, …
 ```
 
@@ -103,5 +103,7 @@ Money is stored as **GBP pence (Int)** throughout to avoid float drift.
 - [x] Persist headline comps to `CompResult` on lookup
 - [x] Mobile-first PWA app shell
 - [x] Mark-sold flow with `Sale` creation and P&L dashboard
+- [x] Listing lifecycle controls for DRAFT/ACTIVE/ENDED
 - [x] RAW comps prefer provider smartMarketPrice when available
+- [x] Repricing recommendations + Discord notifier interface
 - [ ] Everything in `CODEX_BACKLOG.md`

@@ -15,7 +15,7 @@ You are the senior engineer continuing a well-architected codebase. Build breadt
 - **Comp engine**: `CompService` → `PokemonPriceTrackerSource` (live, API v2, key in `.env`). Returns GBP `CompResult` per grade from eBay aggregates. Pure cleaning engine in `src/lib/comps/cleaning.ts`. 45 tests pass; `npm run build` passes.
 - **Database**: Neon Postgres (cloud, Frankfurt), schema migrated. Prisma. Money stored as **GBP pence (Int)**.
 - **APIs**: `GET /api/comps`, `GET/POST /api/inventory`, `POST /api/inventory/acquire`, `GET /api/listings`, `GET /api/dashboard`, `PATCH/DELETE /api/inventory/[id]`, and `POST /api/inventory/[id]/sell`. All verified returning live data and persisting to Neon.
-- **UI**: Mobile-first PWA shell with Acquire, Stock, Listings and P&L tabs. Acquire can live-price + stock + draft-list; Stock can mark sold; P&L shows realized profit, margin, sell-through and ageing stock.
+- **UI**: Mobile-first PWA shell with Acquire, Stock, Listings and P&L tabs. Acquire can live-price + stock + draft-list; Stock can mark sold; Listings can edit price/channel/state; P&L shows realized profit, margin, sell-through, ageing stock and repricing alerts.
 - **Auth**: `src/middleware.ts` HTTP Basic gate, active only when `APP_PASSWORD` is set (so it's off locally, on in production).
 - **Keys in `.env`** (do NOT print or commit): `POKEMON_TCG_API_KEY`, `POKEMON_PRICE_TRACKER_API_KEY` (Pro), `DATABASE_URL` (Neon).
 
@@ -47,7 +47,7 @@ Design for one-handed phone use at a card fair.
 ### 3. Close the dealer loop
 - **Mark sold** → create `Sale` (use `realizedProfit`), flip item to SOLD.
 - **P&L dashboard**: realized profit, margins, sell-through, ageing stock, best/worst movers.
-- Listing lifecycle across channels (eBay automatable later via Sell API; others manual/export).
+- **Done:** listing lifecycle across channels for manual tracking: drafts can be activated, active listings can be ended, and sold listings are set via the sale workflow.
 
 ### 4. Data quality on comps (real issue found in testing)
 - The eBay **`ungraded`** bucket is noisy — for some cards the "raw" median is wildly high (mislabelled/graded sales leaking in). For RAW, prefer the provider's `smartMarketPrice` and/or the TCGPlayer `prices.market` baseline, and cross-check; surface low confidence when sources disagree.
@@ -56,7 +56,7 @@ Design for one-handed phone use at a card fair.
 
 ### 5. Depth (high value, in any order)
 - **"Should I grade this?" EV calculator** (raw vs PSA-10 × grade odds − grading/postage), using comps + PSA pop.
-- **Repricing + alerts**: `Watch`/`Alert` models; price-drop (sourcing) and reprice (stock) triggers; deliver via **Discord webhook** behind a `Notifier` interface.
+- **Partly done:** repricing trigger + Discord delivery behind a `Notifier` interface. Still missing persisted `Watch`/`Alert` workflows and scheduled delivery.
 - **Daily snapshot job** → `PriceSnapshot` → inventory-value-over-time charts.
 - **Set gap-finder**; **books CSV export**.
 - **PSA cert lookup** adapter (free API; key optional).
@@ -68,7 +68,7 @@ Design for one-handed phone use at a card fair.
 ## Known cleanup from the setup session
 - **Done:** the 2 setup-session inventory rows (Charizard ex PSA_10, £900 cost) were deleted from Neon. Inventory/listings were checked clean after smoke tests.
 - Commit the `prisma/migrations/` folder (created by `migrate dev`).
-- Current workspace note: this folder is not a Git checkout, and `gh`/`vercel` CLIs are not installed here. Deployment needs a GitHub repo/remote or authenticated deployment tooling.
+- Current workspace note: this folder is now a local Git repo with committed migrations/app work, but it has no GitHub remote. `gh` and `vercel` CLIs are not installed here, so deployment needs a GitHub repo/remote or authenticated deployment tooling.
 - James should manually **revoke the orphaned Pokemon Price Tracker key** named `pokemon-dealer-os` in their dashboard (a second key `pdos-live` is the one in `.env`).
 
 ## Verification protocol (do this before calling anything done)

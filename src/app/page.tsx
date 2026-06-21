@@ -6,6 +6,7 @@ type View = "acquire" | "inventory" | "listings" | "pnl";
 type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
+type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
 
 type CompResult = {
   source: string;
@@ -56,11 +57,14 @@ type InventoryItem = {
 type Listing = {
   id: string;
   channel: Channel;
-  state: "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
+  state: ListingState;
   title: string | null;
+  externalUrl: string | null;
   suggestedPrice: number | null;
   listPrice: number | null;
   createdAt: string;
+  listedAt: string | null;
+  endedAt: string | null;
   item?: InventoryItem;
 };
 
@@ -131,6 +135,12 @@ export default function Home() {
   const [fees, setFees] = useState("");
   const [postage, setPostage] = useState("1.20");
   const [saleChannel, setSaleChannel] = useState<Channel>("EBAY");
+  const [repriceMessage, setRepriceMessage] = useState<string | null>(null);
+  const [editingListingId, setEditingListingId] = useState<string | null>(null);
+  const [listingPrice, setListingPrice] = useState("");
+  const [listingState, setListingState] = useState<Exclude<ListingState, "SOLD">>("DRAFT");
+  const [listingChannel, setListingChannel] = useState<Channel>("EBAY");
+  const [listingExternalUrl, setListingExternalUrl] = useState("");
 
   useEffect(() => {
     void refreshAll();
@@ -298,6 +308,86 @@ export default function Home() {
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "delete failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function openListingEditor(listing: Listing) {
+    setEditingListingId(listing.id);
+    setListingPrice(penceToPounds(listing.listPrice ?? listing.suggestedPrice ?? 0));
+    setListingState(listing.state === "SOLD" ? "ENDED" : listing.state);
+    setListingChannel(listing.channel);
+    setListingExternalUrl(listing.externalUrl ?? "");
+  }
+
+  async function patchListing(
+    listing: Listing,
+    patch: Partial<{
+      channel: Channel;
+      state: Exclude<ListingState, "SOLD">;
+      listPricePence: number | null;
+      externalUrl: string | null;
+    }>,
+    message = "Listing updated.",
+  ) {
+    setBusy(`listing-${listing.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/listings/${listing.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "listing update failed");
+      setNotice(message);
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "listing update failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveListing(event: FormEvent) {
+    event.preventDefault();
+    const listing = listings.find((row) => row.id === editingListingId);
+    if (!listing) return;
+    await patchListing(
+      listing,
+      {
+        channel: listingChannel,
+        state: listingState,
+        listPricePence: poundsToPence(listingPrice),
+        externalUrl: listingExternalUrl.trim() || null,
+      },
+      "Listing saved.",
+    );
+    setEditingListingId(null);
+  }
+
+  async function checkReprices() {
+    setBusy("reprice");
+    setError(null);
+    setRepriceMessage(null);
+    try {
+      const res = await fetch("/api/alerts/reprice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notify: true, limit: 10, thresholdPct: 10 }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "reprice check failed");
+      const count = payload.recommendations?.length ?? 0;
+      setRepriceMessage(
+        count === 0
+          ? "No repricing alerts right now."
+          : `${count} repricing alert${count === 1 ? "" : "s"} found${payload.notified ? " and sent" : ""}.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "reprice check failed");
     } finally {
       setBusy(null);
     }
@@ -518,17 +608,56 @@ export default function Home() {
             <Metric label="Sold" value={String(dashboard?.listingsByState.SOLD ?? 0)} />
           </div>
           {listings.map((listing) => (
-            <article className="item-row" key={listing.id}>
-              <div>
-                <h3>{listing.title ?? listing.item?.card.name ?? "Untitled listing"}</h3>
-                <p>{channelLabel(listing.channel)} · {listing.state}</p>
-              </div>
-              <div className="row-money">
-                {gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}
-              </div>
-            </article>
+            <ListingRow
+              key={listing.id}
+              listing={listing}
+              busy={busy}
+              onEdit={openListingEditor}
+              onState={(state) =>
+                patchListing(
+                  listing,
+                  { state },
+                  state === "ACTIVE" ? "Listing activated." : "Listing ended.",
+                )
+              }
+            />
           ))}
           {listings.length === 0 && <EmptyState text="No listings yet. Acquire can create draft listings automatically." />}
+          {editingListingId && (
+            <form className="sell-sheet" onSubmit={saveListing}>
+              <div className="panel-heading">
+                <h2>Edit listing</h2>
+                <button className="ghost-button" type="button" onClick={() => setEditingListingId(null)}>Close</button>
+              </div>
+              <div className="form-grid">
+                <label>
+                  List GBP
+                  <input inputMode="decimal" value={listingPrice} onChange={(event) => setListingPrice(event.target.value)} />
+                </label>
+                <label>
+                  Channel
+                  <select value={listingChannel} onChange={(event) => setListingChannel(event.target.value as Channel)}>
+                    {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label>
+                State
+                <select value={listingState} onChange={(event) => setListingState(event.target.value as Exclude<ListingState, "SOLD">)}>
+                  <option value="DRAFT">draft</option>
+                  <option value="ACTIVE">active</option>
+                  <option value="ENDED">ended</option>
+                </select>
+              </label>
+              <label>
+                Listing URL
+                <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
+              </label>
+              <button className="primary-action" type="submit" disabled={busy === `listing-${editingListingId}`}>
+                {busy === `listing-${editingListingId}` ? "Saving..." : "Save listing"}
+              </button>
+            </form>
+          )}
         </section>
       )}
 
@@ -552,6 +681,10 @@ export default function Home() {
               <Metric label="Active cost" value={gbp(dashboard?.metrics.activeCostPence ?? 0)} />
               <Metric label="45d+ stock" value={String(dashboard?.metrics.agedStockCount ?? 0)} />
             </div>
+            <button className="primary-action" type="button" onClick={checkReprices} disabled={busy === "reprice"}>
+              {busy === "reprice" ? "Checking..." : "Check + alert Discord"}
+            </button>
+            {repriceMessage && <p className="hint">{repriceMessage}</p>}
           </section>
           <section className="panel">
             <div className="panel-heading">
@@ -637,6 +770,56 @@ function InventoryRow({
   );
 }
 
+function ListingRow({
+  listing,
+  busy,
+  onEdit,
+  onState,
+}: {
+  listing: Listing;
+  busy: string | null;
+  onEdit: (listing: Listing) => void;
+  onState: (state: Exclude<ListingState, "SOLD">) => void;
+}) {
+  const card = listing.item?.card;
+  const title = listing.title ?? card?.name ?? "Untitled listing";
+  const price = listing.listPrice ?? listing.suggestedPrice ?? 0;
+  const isBusy = busy === `listing-${listing.id}`;
+
+  return (
+    <article className="item-row">
+      {card?.imageUrl ? <img src={card.imageUrl} alt="" className="card-thumb" /> : <div className="card-thumb blank" />}
+      <div className="item-main">
+        <div className="item-title-line">
+          <h3>{title}</h3>
+          <span className={`pill ${listingTone(listing.state)}`}>{listing.state.toLowerCase()}</span>
+        </div>
+        <p>
+          {channelLabel(listing.channel)}
+          {listing.item ? ` · ${listing.item.grade.replace(/_/g, " ")}` : ""}
+          {listing.externalUrl ? " · URL saved" : ""}
+        </p>
+        <p>{gbp(price)}</p>
+        <div className="row-actions">
+          <button type="button" onClick={() => onEdit(listing)} disabled={isBusy || listing.state === "SOLD"}>
+            Edit
+          </button>
+          {listing.state !== "ACTIVE" && listing.state !== "SOLD" && (
+            <button type="button" onClick={() => onState("ACTIVE")} disabled={isBusy}>
+              Activate
+            </button>
+          )}
+          {listing.state === "ACTIVE" && (
+            <button type="button" onClick={() => onState("ENDED")} disabled={isBusy}>
+              End
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function Metric({ label, value, tone }: { label: string; value: string; tone?: "good" }) {
   return (
     <div className={`metric ${tone ?? ""}`}>
@@ -669,6 +852,13 @@ function statusTone(status: ItemStatus): string {
   if (status === "SOLD") return "good";
   if (status === "RESERVED") return "warn";
   if (status === "LISTED") return "info";
+  return "";
+}
+
+function listingTone(state: ListingState): string {
+  if (state === "SOLD") return "good";
+  if (state === "ACTIVE") return "info";
+  if (state === "ENDED") return "warn";
   return "";
 }
 
