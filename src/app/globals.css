@@ -226,6 +226,7 @@ label {
   z-index: 1;
   display: grid;
   place-items: center;
+  align-self: stretch;
 }
 
 .hero-card-art img {
@@ -241,6 +242,18 @@ label {
 .hero-card-art .card-back {
   width: 86px;
   height: 86px;
+}
+
+.hero-card-art .set-mark {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  max-width: 82px;
+  max-height: 34px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
 }
 
 .status-strip,
@@ -455,16 +468,63 @@ label {
 }
 
 .deal-card span,
-.grade-verdict span {
+.grade-verdict span,
+.catalog-strip span {
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
 }
 
 .deal-card strong,
-.grade-verdict strong {
+.grade-verdict strong,
+.catalog-strip strong {
   overflow-wrap: anywhere;
   font-size: 16px;
+}
+
+.catalog-strip {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 74px;
+  gap: 10px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 203, 5, 0.2);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.38);
+  padding: 8px;
+}
+
+.catalog-strip div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.catalog-strip small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.catalog-art {
+  width: 42px;
+  height: 58px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 5px;
+  background: var(--panel-2);
+}
+
+.catalog-art.blank {
+  border-style: dashed;
+}
+
+.catalog-set-logo {
+  width: 74px;
+  height: 38px;
+  object-fit: contain;
+  justify-self: end;
+  filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.36));
 }
 
 .deal-card.good strong {
@@ -645,6 +705,13 @@ label {
   .hero-card-art img {
     width: 124px;
     height: 174px;
+  }
+
+  .hero-card-art .set-mark {
+    width: auto;
+    height: auto;
+    max-width: 128px;
+    max-height: 52px;
   }
 
   .workspace {

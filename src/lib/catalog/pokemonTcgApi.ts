@@ -11,6 +11,7 @@ type PokemonTcgSet = {
   name?: unknown;
   printedTotal?: unknown;
   total?: unknown;
+  images?: { symbol?: unknown; logo?: unknown };
 };
 
 type PokemonTcgCardPayload = {
@@ -112,6 +113,8 @@ export function mapPokemonTcgCard(card: unknown): CatalogCard | null {
     number,
     rarity: readString(payload?.rarity),
     imageUrl: readString(payload?.images?.large) ?? readString(payload?.images?.small),
+    setLogoUrl: readString(payload?.set?.images?.logo),
+    setSymbolUrl: readString(payload?.set?.images?.symbol),
     tcgApiId: id,
   };
 }

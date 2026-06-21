@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     let notified = false;
     if (notify && recommendations.length > 0) {
       await notifierFromEnv().notify({
-        title: "Pokemon Dealer OS repricing",
+        title: "Pokémon Dealer OS repricing",
         body: formatRepriceDigest(recommendations),
       });
       notified = Boolean(process.env.DISCORD_WEBHOOK_URL?.trim());

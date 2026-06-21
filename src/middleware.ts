@@ -26,7 +26,7 @@ export function middleware(req: NextRequest) {
 
   return new NextResponse("Authentication required", {
     status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Pokemon Dealer OS", charset="UTF-8"' },
+    headers: { "WWW-Authenticate": 'Basic realm="Pokémon Dealer OS", charset="UTF-8"' },
   });
 }
 

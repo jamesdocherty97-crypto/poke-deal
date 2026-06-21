@@ -14,6 +14,8 @@ type CatalogCard = {
   number?: string;
   rarity?: string;
   imageUrl?: string;
+  setLogoUrl?: string;
+  setSymbolUrl?: string;
   tcgApiId?: string;
 };
 
@@ -201,6 +203,8 @@ export default function Home() {
     activeInventory.find((item) => item.card.imageUrl)?.card.imageUrl ??
     listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
     null;
+  const catalogCard = comp?.catalog ?? null;
+  const setMarkUrl = catalogCard?.setLogoUrl ?? catalogCard?.setSymbolUrl ?? null;
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
     : "loading deck";
@@ -500,6 +504,7 @@ export default function Home() {
         </div>
         <div className="hero-card-art" aria-hidden="true">
           {spotlightImage ? <img src={spotlightImage} alt="" /> : <span className="card-back" />}
+          {setMarkUrl && <img className="set-mark" src={setMarkUrl} alt="" />}
         </div>
       </section>
 
@@ -571,6 +576,24 @@ export default function Home() {
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
               </div>
+              {catalogCard && (
+                <div className="catalog-strip">
+                  {catalogCard.imageUrl ? (
+                    <img className="catalog-art" src={catalogCard.imageUrl} alt={`${catalogCard.name} card art`} />
+                  ) : (
+                    <span className="catalog-art blank" aria-hidden="true" />
+                  )}
+                  <div>
+                    <span>TCG catalog</span>
+                    <strong>{catalogCard.name}</strong>
+                    <small>
+                      {catalogCard.setName}
+                      {catalogCard.number ? ` #${catalogCard.number}` : ""}
+                    </small>
+                  </div>
+                  {setMarkUrl && <img className="catalog-set-logo" src={setMarkUrl} alt={`${catalogCard.setName} logo`} />}
+                </div>
+              )}
               {headline.raw?.chosenPriceSource === "smartMarketPrice" && (
                 <p className="hint">
                   RAW is using the provider smart price to reduce noisy ungraded eBay leakage.

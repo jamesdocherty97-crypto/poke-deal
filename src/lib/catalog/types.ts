@@ -9,6 +9,8 @@ export interface CatalogCard {
   number?: string;
   rarity?: string;
   imageUrl?: string;
+  setLogoUrl?: string;
+  setSymbolUrl?: string;
   tcgApiId?: string;
 }
 

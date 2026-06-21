@@ -38,6 +38,10 @@ test("mapPokemonTcgCard maps catalog fields and reconstructs full collector numb
       id: "sv3pt5",
       name: "Scarlet & Violet 151",
       printedTotal: 165,
+      images: {
+        logo: "https://images.pokemontcg.io/sv3pt5/logo.png",
+        symbol: "https://images.pokemontcg.io/sv3pt5/symbol.png",
+      },
     },
   });
 
@@ -45,6 +49,8 @@ test("mapPokemonTcgCard maps catalog fields and reconstructs full collector numb
   assert.equal(card?.setCode, "sv3pt5");
   assert.equal(card?.number, "199/165");
   assert.equal(card?.imageUrl, "https://images.pokemontcg.io/sv3pt5/199_hires.png");
+  assert.equal(card?.setLogoUrl, "https://images.pokemontcg.io/sv3pt5/logo.png");
+  assert.equal(card?.setSymbolUrl, "https://images.pokemontcg.io/sv3pt5/symbol.png");
 });
 
 test("PokemonTcgApiCatalogSource searches cards and sends API key header when present", async () => {
