@@ -1,0 +1,20 @@
+# Resolved Decisions
+
+The six open decisions from the brief (§11), settled so the build can proceed without re-litigating them. Change here if you disagree — but treat this as the source of truth Codex builds against.
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | Hosting | **Local-first dev; deploy-ready for Vercel + Neon later** | No always-on cost while building. Nothing in the architecture blocks deployment; the worker just needs a host when alerts go live. |
+| 2 | Alert channel | **Discord webhook + in-app** | Zero approval friction, free, trivial to POST to. Email/Telegram can be added behind the same `Notifier` interface later. |
+| 3 | Channels at launch | **Model all four (eBay, Cardmarket, Vinted, In-person). Automate eBay only.** | eBay Sell API is open for your own listings; the others have no open listing API, so they're tracked + export/draft. Modelling all four now avoids a schema migration later. |
+| 4 | Card scope | **English-only in v1; Japanese later** | Keeps catalog matching and comp parsing simpler. The `Card` model carries a `language` field so JP is additive, not a rewrite. |
+| 5 | History backfill | **Accumulate forward + daily snapshots. No paid backfill day one.** | Keeps API credit burn near zero. Trend/portfolio history builds itself from the daily snapshot job. |
+| 6 | Books export | **Plain CSV v1** | Imports into anything (Xero, QuickBooks, a spreadsheet, an accountant's inbox). A targeted integration can come later if needed. |
+
+## Engineering stances taken in the frame
+
+- **GBP is the only currency below the adapter boundary.** Every source converts at ingestion via `toGBP()`. No EUR/USD leaks downstream.
+- **No comp is ever a bare number.** A `CompResult` always carries `sampleSize`, `windowDays`, and outlier count. The UI must surface confidence.
+- **The cleaning engine is pure and dependency-free.** No DB, no network, no framework imports — so it's fast to test and impossible to break by accident. This is the app's core IP.
+- **Sources are swappable and degrade gracefully.** Missing API key → the adapter runs in fixture mode rather than throwing, so the whole spine is demoable offline.
+- **The domain is card-agnostic.** Inventory/Listing/Sale reference a generic `Card`, so sports cards (§9) slot in without touching the dealer loop.

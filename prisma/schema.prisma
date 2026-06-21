@@ -1,0 +1,258 @@
+// Pokémon Dealer OS — data model
+// The dealer loop: value -> buy -> stock -> price -> list -> sell -> book profit.
+// All monetary values are stored in GBP pence (integers) to avoid float drift.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Catalog
+// ─────────────────────────────────────────────────────────────
+
+/// A canonical card in the catalog. Card-agnostic on purpose so sports cards slot in later.
+model Card {
+  id          String   @id @default(cuid())
+  game        Game     @default(POKEMON)
+  language    Language @default(EN)
+
+  name        String
+  setName     String
+  setCode     String?
+  number      String? // collector number within the set, e.g. "058/198"
+  rarity      String?
+  imageUrl    String?
+
+  // External catalog references, for adapter lookups.
+  tcgApiId    String? @unique // pokemontcg.io id
+  cardmarketId String?
+
+  inventory   InventoryItem[]
+  comps       CompResult[]
+  snapshots   PriceSnapshot[]
+  watches     Watch[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([game, language])
+  @@index([name])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Inventory (the Fat Lava Ledger job, done properly)
+// ─────────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id            String          @id @default(cuid())
+  card          Card            @relation(fields: [cardId], references: [id])
+  cardId        String
+
+  grade         Grade           @default(RAW)
+  graderCert    String? // PSA/BGS/CGC cert number when graded
+  condition     String? // free-text for raw nuance ("NM", "light edgewear")
+  quantity      Int             @default(1)
+
+  costBasis     Int // GBP pence — what I paid, per unit
+  acquiredFrom  String? // source: "eBay", "card fair", "collection buy", etc.
+  acquiredAt    DateTime        @default(now())
+  location      String? // bin / box / shelf reference
+
+  status        InventoryStatus @default(IN_STOCK)
+
+  listings      Listing[]
+  sales         Sale[]
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([status])
+  @@index([cardId, grade])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Listings (track across channels; automate eBay only)
+// ─────────────────────────────────────────────────────────────
+
+model Listing {
+  id             String        @id @default(cuid())
+  item           InventoryItem @relation(fields: [itemId], references: [id])
+  itemId         String
+
+  channel        Channel
+  state          ListingState  @default(DRAFT)
+
+  title          String?
+  description    String?
+  suggestedPrice Int? // GBP pence — from the comp engine
+  listPrice      Int? // GBP pence — what I actually listed at
+  externalRef    String? // eBay listing/offer id etc.
+  externalUrl    String?
+
+  listedAt       DateTime?
+  endedAt        DateTime?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([channel, state])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sales (book the profit)
+// ─────────────────────────────────────────────────────────────
+
+model Sale {
+  id          String        @id @default(cuid())
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+  itemId      String
+
+  channel     Channel
+  salePrice   Int // GBP pence — gross
+  fees        Int           @default(0) // GBP pence — channel + payment fees
+  postage     Int           @default(0) // GBP pence — cost to me, net of what buyer paid
+  soldAt      DateTime      @default(now())
+
+  // realized profit = salePrice - fees - postage - (item.costBasis) ; computed in service layer
+  createdAt   DateTime      @default(now())
+
+  @@index([soldAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Market data captured over time
+// ─────────────────────────────────────────────────────────────
+
+/// A cleaned comp result, persisted for history/audit. Mirrors lib/comps CompResult.
+model CompResult {
+  id             String   @id @default(cuid())
+  card           Card     @relation(fields: [cardId], references: [id])
+  cardId         String
+
+  grade          Grade
+  source         String // adapter name, e.g. "pokemon-price-tracker"
+  currency       String   @default("GBP")
+
+  medianPence    Int
+  meanPence      Int
+  lowPence       Int
+  highPence      Int
+  sampleSize     Int
+  windowDays     Int
+  trendPct       Float?
+  outliersRemoved Int     @default(0)
+
+  asOf           DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([cardId, grade, asOf])
+}
+
+/// Daily snapshot of stock value, so portfolio/trend history builds itself.
+model PriceSnapshot {
+  id          String   @id @default(cuid())
+  card        Card     @relation(fields: [cardId], references: [id])
+  cardId      String
+  grade       Grade
+  marketPence Int // GBP pence — the headline comp value on this day
+  takenAt     DateTime @default(now())
+
+  @@index([takenAt])
+  @@unique([cardId, grade, takenAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Alerts / sourcing
+// ─────────────────────────────────────────────────────────────
+
+model Watch {
+  id          String   @id @default(cuid())
+  card        Card     @relation(fields: [cardId], references: [id])
+  cardId      String
+  grade       Grade    @default(RAW)
+  targetPence Int // notify when market dips below this
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  alerts      Alert[]
+
+  @@index([active])
+}
+
+model Alert {
+  id         String    @id @default(cuid())
+  watch      Watch     @relation(fields: [watchId], references: [id])
+  watchId    String
+  kind       AlertKind
+  message    String
+  pence      Int?
+  firedAt    DateTime  @default(now())
+  delivered  Boolean   @default(false)
+
+  @@index([delivered])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Game {
+  POKEMON
+  SOCCER // reserved for future (see brief §9)
+}
+
+enum Language {
+  EN
+  JP
+}
+
+enum Grade {
+  RAW
+  PSA_1
+  PSA_2
+  PSA_3
+  PSA_4
+  PSA_5
+  PSA_6
+  PSA_7
+  PSA_8
+  PSA_9
+  PSA_10
+  BGS_9
+  BGS_9_5
+  BGS_10
+  CGC_9
+  CGC_9_5
+  CGC_10
+}
+
+enum InventoryStatus {
+  IN_STOCK
+  LISTED
+  SOLD
+  RESERVED
+}
+
+enum Channel {
+  EBAY
+  CARDMARKET
+  VINTED
+  IN_PERSON
+}
+
+enum ListingState {
+  DRAFT
+  ACTIVE
+  SOLD
+  ENDED
+}
+
+enum AlertKind {
+  PRICE_DROP // watchlist target hit (sourcing)
+  REPRICE // owned stock should be repriced
+}

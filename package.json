@@ -1,0 +1,34 @@
+{
+  "name": "pokemon-dealer-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Command centre for running a Pokémon card dealing business: value, stock, price, list, sell, book profit.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "demo": "node --import tsx src/demo.ts",
+    "test": "node --import tsx --test src/lib/comps/cleaning.test.ts src/lib/comps/currency.test.ts src/lib/comps/pricing.test.ts src/lib/comps/sources/pokemonPriceTracker.test.ts src/lib/catalog/pokemonTcgApi.test.ts src/lib/inventory/prismaInventoryRepo.test.ts src/lib/comps/prismaCompResultRepo.test.ts src/lib/dealer/metrics.test.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
+    "prisma": "^5.18.0",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

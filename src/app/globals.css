@@ -1,0 +1,413 @@
+:root {
+  color-scheme: dark;
+  --bg: #101114;
+  --surface: #181b20;
+  --surface-2: #20242b;
+  --line: #303640;
+  --text: #f2f4f7;
+  --muted: #a3acb8;
+  --blue: #5b8cff;
+  --green: #5bc88a;
+  --yellow: #d5b45f;
+  --red: #ef6f6c;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111318;
+  color: var(--text);
+  padding: 10px 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.app-shell {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: 16px 14px 104px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  background: rgba(16, 17, 20, 0.94);
+  backdrop-filter: blur(16px);
+}
+
+.topbar h1,
+.panel h2,
+.section-heading h2 {
+  margin: 0;
+}
+
+.topbar h1 {
+  font-size: clamp(24px, 8vw, 38px);
+  line-height: 1.05;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.icon-button {
+  width: 44px;
+  min-width: 44px;
+}
+
+.status-strip,
+.detail-grid,
+.form-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.status-strip {
+  margin: 4px 0 14px;
+}
+
+.metric,
+.panel,
+.item-row,
+.sell-sheet,
+.notice {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.metric {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.metric span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.metric strong {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+}
+
+.metric.good strong,
+.pill.good {
+  color: var(--green);
+}
+
+.workspace {
+  display: grid;
+  gap: 12px;
+}
+
+.panel,
+.sell-sheet {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.panel-heading,
+.section-heading,
+.item-title-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.muted,
+.item-row p,
+.hint,
+.empty-state {
+  color: var(--muted);
+}
+
+.segmented {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.segmented button,
+.bottom-nav button {
+  min-height: 40px;
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+.segmented .selected,
+.bottom-nav .active,
+.primary-action {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: white;
+}
+
+.primary-action {
+  width: 100%;
+  min-height: 48px;
+  font-weight: 800;
+}
+
+.comp-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comp-hero h2 {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pill.warn {
+  color: var(--yellow);
+}
+
+.pill.info {
+  color: var(--blue);
+}
+
+.pill.danger,
+.danger-text {
+  color: var(--red);
+}
+
+.notice {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+.notice.success {
+  border-color: rgba(91, 200, 138, 0.45);
+  color: var(--green);
+}
+
+.notice.danger {
+  border-color: rgba(239, 111, 108, 0.5);
+  color: var(--red);
+}
+
+.item-row {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 12px;
+  padding: 10px;
+}
+
+.item-row h3,
+.item-row p {
+  margin: 0;
+}
+
+.item-row h3 {
+  font-size: 16px;
+}
+
+.item-main {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.card-thumb {
+  width: 58px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.card-thumb.blank {
+  border: 1px dashed var(--line);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.row-actions button,
+.ghost-button,
+.danger-button {
+  min-height: 36px;
+  padding: 7px 10px;
+}
+
+.danger-button {
+  color: var(--red);
+}
+
+.row-money {
+  align-self: center;
+  justify-self: end;
+  font-weight: 800;
+}
+
+.mini-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mini-row:first-of-type {
+  border-top: 0;
+}
+
+.empty-state {
+  margin: 0;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.sell-sheet {
+  position: fixed;
+  right: 12px;
+  bottom: 82px;
+  left: 12px;
+  z-index: 20;
+  box-shadow: var(--shadow);
+}
+
+.bottom-nav {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  max-width: 720px;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(24, 27, 32, 0.96);
+  padding: 6px;
+  backdrop-filter: blur(16px);
+}
+
+@media (min-width: 760px) {
+  .app-shell {
+    padding: 24px 24px 112px;
+  }
+
+  .workspace {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .workspace > .section-heading,
+  .workspace > .detail-grid {
+    grid-column: 1 / -1;
+  }
+
+  .sell-sheet {
+    right: calc(50% - 360px);
+    left: auto;
+    width: 420px;
+  }
+}
+
+@media (max-width: 390px) {
+  .status-strip,
+  .detail-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .segmented {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 759px) {
+  .lookup-panel {
+    margin-bottom: 72px;
+  }
+}
