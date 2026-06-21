@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { CompService } from "@/lib/comps/compService";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
+import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import type { CardRef, Grade } from "@/lib/domain/types";
 
 export const runtime = "nodejs";
@@ -26,7 +27,10 @@ export async function GET(request: Request) {
   const grade = (searchParams.get("grade") as Grade | null) ?? "RAW";
 
   try {
-    const result = await CompService.default().lookup(card, { grade });
+    const [result, catalog] = await Promise.all([
+      CompService.default().lookup(card, { grade }),
+      new PokemonTcgApiCatalogSource().resolve(card).catch(() => null),
+    ]);
     if (process.env.DATABASE_URL) {
       await new PrismaCompResultRepo().create(result.headline).catch((err) => {
         console.warn(
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
         );
       });
     }
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, catalog });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "lookup failed" },

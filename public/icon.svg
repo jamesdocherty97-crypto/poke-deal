@@ -1,8 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#101114"/>
-  <rect x="72" y="92" width="368" height="328" rx="42" fill="#181b20" stroke="#303640" stroke-width="18"/>
-  <path d="M96 226h320" stroke="#5b8cff" stroke-width="24" stroke-linecap="round"/>
-  <circle cx="256" cy="226" r="60" fill="#101114" stroke="#f2f4f7" stroke-width="22"/>
-  <circle cx="256" cy="226" r="24" fill="#5bc88a"/>
-  <path d="M144 330h224" stroke="#d5b45f" stroke-width="26" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Pokemon Dealer OS">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="440" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a75bb"/>
+      <stop offset=".48" stop-color="#111827"/>
+      <stop offset="1" stop-color="#ef3340"/>
+    </linearGradient>
+    <linearGradient id="foil" x1="146" y1="118" x2="366" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff6a8"/>
+      <stop offset=".28" stop-color="#58d7ff"/>
+      <stop offset=".55" stop-color="#b388ff"/>
+      <stop offset=".82" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#ffcb05"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="86" fill="url(#bg)"/>
+  <path d="M54 106h404" stroke="#ffcb05" stroke-width="24" stroke-linecap="round" opacity=".9"/>
+  <rect x="142" y="92" width="228" height="328" rx="28" fill="#f8fbff" opacity=".96"/>
+  <rect x="166" y="120" width="180" height="156" rx="20" fill="url(#foil)"/>
+  <rect x="166" y="300" width="180" height="24" rx="12" fill="#2a75bb"/>
+  <rect x="166" y="340" width="128" height="20" rx="10" fill="#ef3340"/>
+  <circle cx="256" cy="226" r="118" fill="#f8fbff" stroke="#101827" stroke-width="18"/>
+  <path d="M139 226a118 118 0 0 1 234 0Z" fill="#ef3340"/>
+  <path d="M138 226h236" stroke="#101827" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="256" cy="226" r="48" fill="#f8fbff" stroke="#101827" stroke-width="18"/>
+  <circle cx="256" cy="226" r="18" fill="#ffcb05"/>
+  <path d="M352 348c34 0 62 26 62 58h-72c0-18-14-32-32-32v-26Z" fill="#ffcb05"/>
 </svg>

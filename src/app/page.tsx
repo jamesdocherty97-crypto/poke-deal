@@ -8,6 +8,15 @@ type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
 
+type CatalogCard = {
+  name: string;
+  setName: string;
+  number?: string;
+  rarity?: string;
+  imageUrl?: string;
+  tcgApiId?: string;
+};
+
 type CompResult = {
   source: string;
   grade: string;
@@ -26,7 +35,12 @@ type CompResult = {
   };
 };
 
-type Reconciled = { headline: CompResult; all: CompResult[]; sourcesDisagree: boolean };
+type Reconciled = {
+  headline: CompResult;
+  all: CompResult[];
+  sourcesDisagree: boolean;
+  catalog?: CatalogCard | null;
+};
 type Suggestion = {
   pricePence: number;
   strategy: string;
@@ -110,6 +124,12 @@ type SaleSummary = {
 
 const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
+const quickHunts = [
+  { name: "Charizard ex", setName: "151", number: "199/165" },
+  { name: "Pikachu ex", setName: "Surging Sparks", number: "238/191" },
+  { name: "Mew ex", setName: "Paldean Fates", number: "232/091" },
+  { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" },
+];
 
 export default function Home() {
   const [view, setView] = useState<View>("acquire");
@@ -141,6 +161,10 @@ export default function Home() {
   const [listingState, setListingState] = useState<Exclude<ListingState, "SOLD">>("DRAFT");
   const [listingChannel, setListingChannel] = useState<Channel>("EBAY");
   const [listingExternalUrl, setListingExternalUrl] = useState("");
+  const [cardArtUrl, setCardArtUrl] = useState<string | null>(null);
+  const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
+  const [gradeOdds, setGradeOdds] = useState("45");
+  const [gradingCost, setGradingCost] = useState("19.99");
 
   useEffect(() => {
     void refreshAll();
@@ -156,6 +180,30 @@ export default function Home() {
   );
   const headline = comp?.headline ?? null;
   const confidenceLabel = headline ? compConfidence(headline, comp?.sourcesDisagree ?? false) : null;
+  const deal = useMemo(
+    () => (headline ? judgeDeal(headline, poundsToPence(cost), poundsToPence(postage)) : null),
+    [headline, cost, postage],
+  );
+  const gradeEv = useMemo(
+    () =>
+      headline && gradeComp
+        ? calculateGradeEv({
+            rawPence: headline.medianPence,
+            psa10Pence: gradeComp.medianPence,
+            oddsPct: Number(gradeOdds),
+            gradingCostPence: poundsToPence(gradingCost),
+          })
+        : null,
+    [headline, gradeComp, gradeOdds, gradingCost],
+  );
+  const spotlightImage =
+    cardArtUrl ??
+    activeInventory.find((item) => item.card.imageUrl)?.card.imageUrl ??
+    listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
+    null;
+  const chaseLine = dashboard
+    ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
+    : "loading deck";
 
   async function refreshAll() {
     setError(null);
@@ -196,6 +244,8 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "lookup failed");
       setComp(payload);
+      setCardArtUrl(payload.catalog?.imageUrl ?? null);
+      setGradeComp(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "lookup failed");
     } finally {
@@ -235,6 +285,18 @@ export default function Home() {
     } finally {
       setBusy(null);
     }
+  }
+
+  function chooseQuickHunt(card: (typeof quickHunts)[number]) {
+    setName(card.name);
+    setSetNameValue(card.setName);
+    setNumber(card.number);
+    setComp(null);
+    setSuggestion(null);
+    setCardArtUrl(null);
+    setGradeComp(null);
+    setNotice(null);
+    setError(null);
   }
 
   function openSell(item: InventoryItem) {
@@ -393,17 +455,53 @@ export default function Home() {
     }
   }
 
+  async function lookupGradeEv() {
+    setBusy("grade-ev");
+    setError(null);
+    try {
+      const qs = new URLSearchParams({
+        name,
+        set: setNameValue,
+        number,
+        grade: "PSA_10",
+      });
+      const res = await fetch(`/api/comps?${qs}`);
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "grade check failed");
+      setGradeComp(payload.headline);
+      if (!cardArtUrl) setCardArtUrl(payload.catalog?.imageUrl ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "grade check failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Pokemon Dealer OS</p>
+        <div className="brand-lockup">
+          <span className="app-mark" aria-hidden="true" />
+          <div>
+          <p className="eyebrow">Pokémon Dealer OS</p>
           <h1>{viewTitle(view)}</h1>
+          </div>
         </div>
         <button className="icon-button" type="button" onClick={refreshAll} aria-label="Refresh data">
-          R
+          ↻
         </button>
       </header>
+
+      <section className="hero-board" aria-label="Dealer command board">
+        <div className="hero-copy">
+          <p className="eyebrow">Card fair mode</p>
+          <strong>{chaseLine}</strong>
+          <span>GBP comps, stock, listings and profit in one pocket.</span>
+        </div>
+        <div className="hero-card-art" aria-hidden="true">
+          {spotlightImage ? <img src={spotlightImage} alt="" /> : <span className="card-back" />}
+        </div>
+      </section>
 
       <section className="status-strip" aria-label="Business summary">
         <Metric label="Stock" value={String(dashboard?.metrics.stockCount ?? activeInventory.length)} />
@@ -420,6 +518,13 @@ export default function Home() {
             <div className="panel-heading">
               <h2>Fast comp</h2>
               <span className="muted">Live GBP valuation</span>
+            </div>
+            <div className="quick-hunts" aria-label="Quick card picks">
+              {quickHunts.map((card) => (
+                <button key={`${card.name}-${card.number}`} type="button" onClick={() => chooseQuickHunt(card)}>
+                  {card.name}
+                </button>
+              ))}
             </div>
             <label>
               Card
@@ -453,7 +558,7 @@ export default function Home() {
           </form>
 
           {headline && (
-            <section className="panel">
+            <section className="panel comp-panel">
               <div className="comp-hero">
                 <div>
                   <p className="eyebrow">{headline.source}</p>
@@ -476,6 +581,50 @@ export default function Home() {
               )}
               {comp?.sourcesDisagree && (
                 <p className="hint danger-text">Sources disagree materially. Treat this as a check-before-buy price.</p>
+              )}
+              {deal && (
+                <div className={`deal-card ${deal.tone}`}>
+                  <div>
+                    <span>Deal judge</span>
+                    <strong>{deal.label}</strong>
+                  </div>
+                  <div>
+                    <span>Net profit</span>
+                    <strong>{gbp(deal.expectedProfitPence)}</strong>
+                  </div>
+                  <div>
+                    <span>Target buy</span>
+                    <strong>{gbp(deal.targetBuyPence)}</strong>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {headline && grade === "RAW" && (
+            <section className="panel grade-lab">
+              <div className="panel-heading">
+                <h2>Grade lab</h2>
+                <span className="muted">RAW to PSA 10 EV</span>
+              </div>
+              <div className="form-grid">
+                <label>
+                  PSA 10 odds %
+                  <input inputMode="decimal" value={gradeOdds} onChange={(event) => setGradeOdds(event.target.value)} />
+                </label>
+                <label>
+                  Grade cost GBP
+                  <input inputMode="decimal" value={gradingCost} onChange={(event) => setGradingCost(event.target.value)} />
+                </label>
+              </div>
+              <button className="secondary-action" type="button" onClick={lookupGradeEv} disabled={busy === "grade-ev"}>
+                {busy === "grade-ev" ? "Checking slab..." : "Check PSA 10 EV"}
+              </button>
+              {gradeEv && gradeComp && (
+                <div className={`grade-verdict ${gradeEv.liftPence >= 0 ? "good" : "warn"}`}>
+                  <span>PSA 10 comp {gbp(gradeComp.medianPence)}</span>
+                  <strong>{gradeEv.liftPence >= 0 ? "+" : ""}{gbp(gradeEv.liftPence)} EV lift</strong>
+                </div>
               )}
             </section>
           )}
@@ -706,10 +855,10 @@ export default function Home() {
       )}
 
       <nav className="bottom-nav" aria-label="Primary">
-        <TabButton active={view === "acquire"} label="Acquire" onClick={() => setView("acquire")} />
-        <TabButton active={view === "inventory"} label="Stock" onClick={() => setView("inventory")} />
-        <TabButton active={view === "listings"} label="Listings" onClick={() => setView("listings")} />
-        <TabButton active={view === "pnl"} label="P&L" onClick={() => setView("pnl")} />
+        <TabButton active={view === "acquire"} label="Catch" onClick={() => setView("acquire")} />
+        <TabButton active={view === "inventory"} label="Dex" onClick={() => setView("inventory")} />
+        <TabButton active={view === "listings"} label="Market" onClick={() => setView("listings")} />
+        <TabButton active={view === "pnl"} label="Loot" onClick={() => setView("pnl")} />
       </nav>
     </main>
   );
@@ -848,6 +997,52 @@ function compConfidence(comp: CompResult, sourcesDisagree: boolean): { label: st
   return { label: "Usable", tone: "good" };
 }
 
+function judgeDeal(
+  comp: CompResult,
+  costBasisPence: number,
+  postagePence: number,
+): {
+  label: string;
+  tone: "good" | "warn" | "danger";
+  expectedProfitPence: number;
+  targetBuyPence: number;
+} {
+  if (comp.sampleSize === 0 || comp.medianPence <= 0) {
+    return { label: "No signal", tone: "danger", expectedProfitPence: 0, targetBuyPence: 0 };
+  }
+  const fees = Math.round(comp.medianPence * 0.128) + 30;
+  const net = comp.medianPence - fees - postagePence;
+  const expectedProfitPence = net - costBasisPence;
+  const targetBuyPence = Math.max(0, Math.round(net * 0.7));
+  const roi = costBasisPence > 0 ? expectedProfitPence / costBasisPence : 0;
+  if (expectedProfitPence > 0 && roi >= 0.35 && comp.sampleSize >= 3) {
+    return { label: "Catch", tone: "good", expectedProfitPence, targetBuyPence };
+  }
+  if (expectedProfitPence > 0 && roi >= 0.1) {
+    return { label: "Watch", tone: "warn", expectedProfitPence, targetBuyPence };
+  }
+  return { label: "Pass", tone: "danger", expectedProfitPence, targetBuyPence };
+}
+
+function calculateGradeEv({
+  rawPence,
+  psa10Pence,
+  oddsPct,
+  gradingCostPence,
+}: {
+  rawPence: number;
+  psa10Pence: number;
+  oddsPct: number;
+  gradingCostPence: number;
+}): { liftPence: number; expectedValuePence: number } {
+  const odds = Math.max(0, Math.min(100, Number.isFinite(oddsPct) ? oddsPct : 0)) / 100;
+  const expectedValuePence = Math.round(psa10Pence * odds + rawPence * (1 - odds) - gradingCostPence);
+  return {
+    expectedValuePence,
+    liftPence: expectedValuePence - rawPence,
+  };
+}
+
 function statusTone(status: ItemStatus): string {
   if (status === "SOLD") return "good";
   if (status === "RESERVED") return "warn";
@@ -863,10 +1058,10 @@ function listingTone(state: ListingState): string {
 }
 
 function viewTitle(view: View): string {
-  if (view === "acquire") return "Buy well, price fast";
-  if (view === "inventory") return "Inventory";
-  if (view === "listings") return "Listings";
-  return "Profit and loss";
+  if (view === "acquire") return "Catch the deal";
+  if (view === "inventory") return "Dealer Pokédex";
+  if (view === "listings") return "PokéMart";
+  return "Loot report";
 }
 
 function channelLabel(channel: Channel): string {
