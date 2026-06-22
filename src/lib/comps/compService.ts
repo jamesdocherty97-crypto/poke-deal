@@ -50,9 +50,39 @@ export class CompService {
 
 /** Largest confident sample wins; fall back to largest sample of any. */
 export function pickHeadline(results: CompResult[]): CompResult {
+  const rawHeadline = pickRawHeadline(results);
+  if (rawHeadline) return rawHeadline;
+
   const confident = results.filter((r) => isConfident(r));
   const pool = confident.length > 0 ? confident : results;
   return pool.reduce((best, r) => (r.sampleSize > best.sampleSize ? r : best));
+}
+
+function pickRawHeadline(results: CompResult[]): CompResult | null {
+  const rawResults = results.filter((r) => r.grade === "RAW" && r.medianPence > 0);
+  if (rawResults.length === 0) return null;
+
+  const smart = rawResults.find((result) => readRawString(result, "chosenPriceSource") === "smartMarketPrice");
+  if (smart) return smart;
+
+  const catalogBaseline = rawResults.find((result) => readRawString(result, "kind") === "catalog-market-baseline");
+  if (!catalogBaseline) return null;
+
+  const strongestRawBucket = rawResults
+    .filter(
+      (result) =>
+        result.source !== catalogBaseline.source && readRawString(result, "chosenPriceSource") !== "smartMarketPrice",
+    )
+    .reduce<CompResult | null>((best, result) => (!best || result.sampleSize > best.sampleSize ? result : best), null);
+
+  if (!strongestRawBucket) return catalogBaseline;
+  return detectDisagreement([strongestRawBucket, catalogBaseline]) ? catalogBaseline : null;
+}
+
+function readRawString(result: CompResult, key: string): string | null {
+  if (!result.raw || typeof result.raw !== "object") return null;
+  const value = (result.raw as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
 }
 
 /** Material disagreement = spread of medians >15% of the smallest non-zero median. */
