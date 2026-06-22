@@ -64,6 +64,52 @@ test("buildPokemonPriceTrackerSearch expands prefixed subset numbers for provide
   assert.equal(normalizeProviderCollectorNumber("199/165", "151"), "199/165");
 });
 
+test("buildPokemonPriceTrackerSearch leaves promo-style prefixed numbers as printed", () => {
+  assert.equal(
+    buildPokemonPriceTrackerSearch({
+      name: "Charizard VSTAR",
+      setName: "SWSH Promos",
+      number: "SWSH262",
+    }),
+    "Charizard VSTAR SWSH262",
+  );
+  assert.equal(
+    buildPokemonPriceTrackerSearch({
+      name: "Pikachu with Grey Felt Hat",
+      setName: "SV Promos",
+      number: "SVP085",
+    }),
+    "Pikachu with Grey Felt Hat SVP085",
+  );
+});
+
+test("buildPokemonPriceTrackerSearch handles common gallery and shiny-vault inputs", () => {
+  assert.equal(
+    buildPokemonPriceTrackerSearch({
+      name: "Giratina VSTAR",
+      setName: "Crown Zenith",
+      number: "GG69/70",
+    }),
+    "Giratina VSTAR GG69/GG70",
+  );
+  assert.equal(
+    buildPokemonPriceTrackerSearch({
+      name: "Charizard GX",
+      setName: "Hidden Fates",
+      number: "SV49",
+    }),
+    "Charizard GX SV49/SV94",
+  );
+  assert.equal(
+    buildPokemonPriceTrackerSearch({
+      name: "Umbreon VMAX",
+      setName: "Brilliant Stars",
+      number: "TG23",
+    }),
+    "Umbreon VMAX TG23/TG30",
+  );
+});
+
 test("PokemonPriceTrackerSource live requests use provider-style prefixed numbers", async () => {
   let requestedUrlString: string | null = null;
   const fetchImpl = (async (url: string | URL | Request) => {

@@ -56,6 +56,11 @@ test("resolveSetIdForCard uses prefixed collector numbers to choose gallery subs
   assert.equal(resolveSetIdForCard("Lost Origin", "066/196"), "swsh11");
 });
 
+test("resolveSetIdForCard does not treat promo prefixes as gallery subsets", () => {
+  assert.equal(resolveSetIdForCard("SWSH Promos", "SWSH262"), "swshp");
+  assert.equal(resolveSetIdForCard("SV Promos", "SVP085"), "svp");
+});
+
 test("getRelatedSubsetIds exposes attached high-volume subsets", () => {
   assert.deepEqual(getRelatedSubsetIds("swsh11"), ["swsh11tg"]);
   assert.deepEqual(getRelatedSubsetIds("swsh12pt5"), ["swsh12pt5gg"]);

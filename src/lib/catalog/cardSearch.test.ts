@@ -55,6 +55,33 @@ test("rankCatalogCards treats shortened prefixed subset totals as equivalent", (
   assert.ok(scoreCatalogCardForSearch("Gengar TG06/30", gengar) > 0);
 });
 
+test("rankCatalogCards understands promo collector numbers typed alongside names", () => {
+  const mixed: CatalogCard[] = [
+    {
+      game: "POKEMON",
+      language: "EN",
+      name: "Charizard VSTAR",
+      setName: "SWSH Black Star Promos",
+      setCode: "swshp",
+      number: "SWSH262",
+    },
+    {
+      game: "POKEMON",
+      language: "EN",
+      name: "Charizard VSTAR",
+      setName: "Crown Zenith",
+      setCode: "swsh12pt5",
+      number: "18/159",
+    },
+  ];
+
+  assert.deepEqual(parseCardSearchQuery("Charizard VSTAR SWSH262"), {
+    name: "Charizard VSTAR",
+    number: "SWSH262",
+  });
+  assert.equal(rankCatalogCards("Charizard VSTAR SWSH262", mixed, { setName: "SWSH Promos" })[0]?.setCode, "swshp");
+});
+
 test("rankCatalogCards applies cached set aliases to card suggestion context", () => {
   const mixed: CatalogCard[] = [
     { game: "POKEMON", language: "EN", name: "Umbreon VMAX", setName: "Brilliant Stars", setCode: "swsh9", number: "TG23/TG30" },

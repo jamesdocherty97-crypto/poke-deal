@@ -122,6 +122,7 @@ export function normalizeProviderCollectorNumber(
   const [left, right] = trimmed.split("/").map((part) => part.trim());
   const prefix = readPrefixedCollectorPrefix(left);
   if (!prefix) return trimmed;
+  if (!shouldMirrorProviderPrefix(prefix, setName)) return trimmed;
 
   if (right) {
     return /^\d+$/.test(right) ? `${left}/${prefix}${right}` : `${left}/${right}`;
@@ -130,6 +131,17 @@ export function normalizeProviderCollectorNumber(
   const setId = resolveSetIdForCard(setName, left);
   const set = setId ? getSetById(setId) : undefined;
   return set?.printedTotal ? `${left}/${prefix}${set.printedTotal}` : left;
+}
+
+function shouldMirrorProviderPrefix(prefix: string, setName: string | undefined): boolean {
+  const normalizedSet = setName?.toLowerCase() ?? "";
+  return (
+    ["TG", "GG", "SV", "RC"].includes(prefix) ||
+    normalizedSet.includes("trainer gallery") ||
+    normalizedSet.includes("galarian gallery") ||
+    normalizedSet.includes("shiny vault") ||
+    normalizedSet.includes("radiant collection")
+  );
 }
 
 function readPrefixedCollectorPrefix(value: string | undefined): string | null {
