@@ -138,6 +138,16 @@ label {
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.34);
 }
 
+.brand-set-logo {
+  width: auto;
+  height: auto;
+  max-width: 82px;
+  max-height: 34px;
+  margin-left: 2px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.42));
+}
+
 .app-mark::after,
 .card-back::after {
   position: absolute;

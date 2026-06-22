@@ -368,6 +368,7 @@ export default function Home() {
     cardArtUrl ??
     activeInventory.find((item) => item.card.imageUrl)?.card.imageUrl ??
     listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
+    quickHunts[0]?.imageUrl ??
     null;
   const catalogCard = comp?.catalog ?? null;
   const selectedSet = useMemo(() => findSelectedSet([...popularSets, ...setSuggestions], setNameValue), [
@@ -800,9 +801,16 @@ export default function Home() {
             <span className="app-mark" aria-hidden="true" />
           )}
           <div>
-          <p className="eyebrow">Pokémon Dealer OS</p>
-          <h1>{viewTitle(view)}</h1>
+            <p className="eyebrow">Pokémon Dealer OS</p>
+            <h1>{viewTitle(view)}</h1>
           </div>
+          {setMarkUrl && (
+            <img
+              className="brand-set-logo"
+              src={setMarkUrl}
+              alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+            />
+          )}
         </div>
         <button className="icon-button" type="button" onClick={refreshAll} aria-label="Refresh data">
           ↻
