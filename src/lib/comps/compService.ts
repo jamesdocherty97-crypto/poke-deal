@@ -8,6 +8,7 @@ import type { CompSource } from "./CompSource.js";
 import { isConfident } from "./cleaning.js";
 import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
+import { PokeTraceSource } from "./sources/pokeTrace.js";
 
 export interface ReconciledComp {
   /** The single comp to act on. */
@@ -23,7 +24,7 @@ export class CompService {
 
   /** Default wiring. Add PokeTrace etc. here as adapters are built. */
   static default(): CompService {
-    return new CompService([new PokemonPriceTrackerSource(), new PokemonTcgMarketSource()]);
+    return new CompService([new PokemonPriceTrackerSource(), new PokeTraceSource(), new PokemonTcgMarketSource()]);
   }
 
   /** Names + live status of configured sources (for diagnostics / UI). */
@@ -65,18 +66,20 @@ function pickRawHeadline(results: CompResult[]): CompResult | null {
   const smart = rawResults.find((result) => readRawString(result, "chosenPriceSource") === "smartMarketPrice");
   if (smart) return smart;
 
-  const catalogBaseline = rawResults.find((result) => readRawString(result, "kind") === "catalog-market-baseline");
-  if (!catalogBaseline) return null;
+  const baseline = rawResults.find((result) =>
+    ["catalog-market-baseline", "market-baseline"].includes(readRawString(result, "kind") ?? ""),
+  );
+  if (!baseline) return null;
 
   const strongestRawBucket = rawResults
     .filter(
       (result) =>
-        result.source !== catalogBaseline.source && readRawString(result, "chosenPriceSource") !== "smartMarketPrice",
+        result.source !== baseline.source && readRawString(result, "chosenPriceSource") !== "smartMarketPrice",
     )
     .reduce<CompResult | null>((best, result) => (!best || result.sampleSize > best.sampleSize ? result : best), null);
 
-  if (!strongestRawBucket) return catalogBaseline;
-  return detectDisagreement([strongestRawBucket, catalogBaseline]) ? catalogBaseline : null;
+  if (!strongestRawBucket) return baseline;
+  return detectDisagreement([strongestRawBucket, baseline]) ? baseline : null;
 }
 
 function readRawString(result: CompResult, key: string): string | null {

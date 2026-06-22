@@ -1843,14 +1843,17 @@ function buildCompReceipt(comp: Reconciled): Array<{
 function receiptRank(result: CompResult, headline: CompResult): number {
   if (result.source === headline.source) return 0;
   if (result.source === "owned-sales") return 1;
-  if (result.source === "pokemon-tcg-market") return 2;
-  return 3;
+  if (result.source === "poketrace") return 2;
+  if (result.source === "pokemon-tcg-market") return 3;
+  return 4;
 }
 
 function sourceLabel(source: string, headline: boolean): string {
   const label =
     source === "pokemon-price-tracker"
       ? "Price Tracker"
+      : source === "poketrace"
+        ? "PokeTrace"
       : source === "pokemon-tcg-market"
         ? "Catalog"
         : source === "owned-sales"
@@ -1861,6 +1864,12 @@ function sourceLabel(source: string, headline: boolean): string {
 
 function compBasis(result: CompResult): string {
   if (result.source === "owned-sales") return "Your sold prices";
+  if (result.source === "poketrace") {
+    const raw = result.raw as { priceSource?: string; tier?: string; kind?: string } | undefined;
+    const source = raw?.priceSource === "tcgplayer" ? "TCGPlayer" : raw?.priceSource === "ebay" ? "eBay" : "PokeTrace";
+    const tier = raw?.tier ? raw.tier.replace(/_/g, " ") : result.grade.replace(/_/g, " ");
+    return raw?.kind === "market-baseline" ? `${source} ${tier} baseline` : `${source} ${tier} aggregate`;
+  }
   if (result.raw?.kind === "catalog-market-baseline") {
     return result.raw.chosenSignal?.label ?? "TCGPlayer/Cardmarket baseline";
   }
@@ -1885,7 +1894,7 @@ function receiptTone(result: CompResult, headline: CompResult, sourcesDisagree: 
   if (result.source === headline.source && !sourcesDisagree) return "good";
   if (sourcesDisagree && result.source === headline.source) return "warn";
   if (result.sampleSize < 3) return "warn";
-  if (result.source === "pokemon-tcg-market") return "info";
+  if (result.source === "pokemon-tcg-market" || result.source === "poketrace") return "info";
   return "";
 }
 

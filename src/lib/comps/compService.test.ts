@@ -61,6 +61,23 @@ test("pickHeadline uses catalog market baseline when raw eBay bucket disagrees w
   assert.equal(pickHeadline([noisyRaw, catalogBaseline]), catalogBaseline);
 });
 
+test("pickHeadline uses PokeTrace raw market baseline when ordinary raw buckets disagree", () => {
+  const noisyRaw = comp({
+    source: "pokemon-price-tracker",
+    medianPence: 11000,
+    sampleSize: 20,
+    raw: { chosenPriceSource: "medianPrice" },
+  });
+  const pokeTraceBaseline = comp({
+    source: "poketrace",
+    medianPence: 2600,
+    sampleSize: 12,
+    raw: { kind: "market-baseline", priceSource: "tcgplayer", tier: "NEAR_MINT" },
+  });
+
+  assert.equal(pickHeadline([noisyRaw, pokeTraceBaseline]), pokeTraceBaseline);
+});
+
 test("pickHeadline keeps confident graded comps on sample size", () => {
   const psaSmall = comp({ grade: "PSA_10", medianPence: 11000, sampleSize: 4 });
   const psaLarge = comp({ grade: "PSA_10", medianPence: 11500, sampleSize: 10 });

@@ -1,0 +1,59 @@
+{
+  "data": [
+    {
+      "id": "019bff77-befa-771d-bab0-f5909f0a78c9",
+      "name": "Charizard ex",
+      "cardNumber": "199/165",
+      "set": { "slug": "scarlet-violet-151", "name": "151" },
+      "variant": "Holofoil",
+      "rarity": "Special Illustration Rare",
+      "productType": "single",
+      "productFamily": "card",
+      "image": "https://cdn.poketrace.com/cards/charizard-ex.webp",
+      "game": "pokemon",
+      "market": "US",
+      "currency": "USD",
+      "refs": { "tcgplayerId": "123456", "cardmarketId": null },
+      "prices": {
+        "ebay": {
+          "NEAR_MINT": {
+            "avg": 94,
+            "low": 80,
+            "high": 120,
+            "saleCount": 24,
+            "approxSaleCount": true,
+            "avg7d": 92,
+            "avg30d": 88
+          },
+          "PSA_10": {
+            "avg": 520,
+            "low": 480,
+            "high": 575,
+            "saleCount": 18,
+            "approxSaleCount": true,
+            "avg7d": 510,
+            "avg30d": 500
+          }
+        },
+        "tcgplayer": {
+          "NEAR_MINT": {
+            "avg": 86,
+            "low": 78,
+            "high": 96,
+            "saleCount": 73,
+            "approxSaleCount": false,
+            "avg7d": 84,
+            "avg30d": 80
+          }
+        }
+      },
+      "gradedOptions": ["PSA_10", "PSA_9"],
+      "conditionOptions": ["NEAR_MINT", "LIGHTLY_PLAYED"],
+      "topPrice": 520,
+      "totalSaleCount": 115,
+      "hasGraded": true,
+      "lastUpdated": "2026-01-29T12:00:00Z"
+    }
+  ],
+  "pagination": { "hasMore": false, "count": 1 }
+}

@@ -105,5 +105,6 @@ Money is stored as **GBP pence (Int)** throughout to avoid float drift.
 - [x] Mark-sold flow with `Sale` creation and P&L dashboard
 - [x] Listing lifecycle controls for DRAFT/ACTIVE/ENDED
 - [x] RAW comps prefer provider smartMarketPrice when available
+- [x] Optional PokeTrace source for secondary raw/graded cross-checks
 - [x] Repricing recommendations + Discord notifier interface
 - [ ] Everything in `CODEX_BACKLOG.md`
