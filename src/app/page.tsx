@@ -32,6 +32,16 @@ type CatalogPriceSignal = {
   url?: string;
 };
 
+type OwnedSaleCompRow = {
+  id: string;
+  itemId: string;
+  salePricePence: number;
+  feesPence: number;
+  postagePence: number;
+  costBasisPence: number;
+  soldAt: string;
+};
+
 // Bundled offline set catalog (see src/lib/catalog/setCatalog.ts) -- powers
 // set autocomplete and the "popular sets" quick-pick chips below.
 type CatalogSet = {
@@ -39,6 +49,7 @@ type CatalogSet = {
   name: string;
   ptcgoCode?: string;
   symbolUrl?: string;
+  logoUrl?: string;
 };
 
 type CompResult = {
@@ -59,6 +70,7 @@ type CompResult = {
     kind?: string;
     caveat?: string;
     chosenSignal?: CatalogPriceSignal;
+    sales?: OwnedSaleCompRow[];
   };
 };
 
@@ -152,10 +164,30 @@ type SaleSummary = {
 const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const quickHunts = [
-  { name: "Charizard ex", setName: "151", number: "199/165" },
-  { name: "Pikachu ex", setName: "Surging Sparks", number: "238/191" },
-  { name: "Mew ex", setName: "Paldean Fates", number: "232/091" },
-  { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" },
+  {
+    name: "Charizard ex",
+    setName: "151",
+    number: "199/165",
+    imageUrl: "https://images.pokemontcg.io/sv3pt5/199_hires.png",
+  },
+  {
+    name: "Pikachu ex",
+    setName: "Surging Sparks",
+    number: "238/191",
+    imageUrl: "https://images.pokemontcg.io/sv8/238_hires.png",
+  },
+  {
+    name: "Mew ex",
+    setName: "Paldean Fates",
+    number: "232/091",
+    imageUrl: "https://images.pokemontcg.io/sv4pt5/232_hires.png",
+  },
+  {
+    name: "Umbreon VMAX",
+    setName: "Evolving Skies",
+    number: "215/203",
+    imageUrl: "https://images.pokemontcg.io/swsh7/215_hires.png",
+  },
 ];
 
 export default function Home() {
@@ -273,9 +305,17 @@ export default function Home() {
     listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
     null;
   const catalogCard = comp?.catalog ?? null;
-  const setMarkUrl = catalogCard?.setLogoUrl ?? catalogCard?.setSymbolUrl ?? null;
+  const selectedSet = useMemo(() => findSelectedSet([...popularSets, ...setSuggestions], setNameValue), [
+    popularSets,
+    setNameValue,
+    setSuggestions,
+  ]);
+  const setMarkUrl =
+    catalogCard?.setLogoUrl ?? catalogCard?.setSymbolUrl ?? selectedSet?.logoUrl ?? selectedSet?.symbolUrl ?? null;
   const marketBaseline =
     comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
+  const ownedSalesComp =
+    comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
     : "loading deck";
@@ -368,7 +408,7 @@ export default function Home() {
     setNumber(card.number);
     setComp(null);
     setSuggestion(null);
-    setCardArtUrl(null);
+    setCardArtUrl(card.imageUrl);
     setGradeComp(null);
     setNotice(null);
     setError(null);
@@ -581,7 +621,11 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-lockup">
-          <span className="app-mark" aria-hidden="true" />
+          {spotlightImage ? (
+            <img className="app-mark app-mark-image" src={spotlightImage} alt="" />
+          ) : (
+            <span className="app-mark" aria-hidden="true" />
+          )}
           <div>
           <p className="eyebrow">Pokémon Dealer OS</p>
           <h1>{viewTitle(view)}</h1>
@@ -623,7 +667,8 @@ export default function Home() {
             <div className="quick-hunts" aria-label="Quick card picks">
               {quickHunts.map((card) => (
                 <button key={`${card.name}-${card.number}`} type="button" onClick={() => chooseQuickHunt(card)}>
-                  {card.name}
+                  <img src={card.imageUrl} alt="" />
+                  <span>{card.name}</span>
                 </button>
               ))}
             </div>
@@ -689,7 +734,8 @@ export default function Home() {
               <div className="set-chip-row" aria-label="Popular sets">
                 {popularSets.map((set) => (
                   <button key={set.id} type="button" onClick={() => chooseSet(set)}>
-                    {set.name}
+                    {set.logoUrl || set.symbolUrl ? <img src={set.logoUrl ?? set.symbolUrl} alt="" /> : null}
+                    <span>{set.name}</span>
                   </button>
                 ))}
               </div>
@@ -730,6 +776,24 @@ export default function Home() {
                   <span>Catalog baseline</span>
                   <strong>{gbp(marketBaseline.medianPence)}</strong>
                   <small>{marketBaseline.raw?.chosenSignal?.label ?? "TCGPlayer/Cardmarket"}</small>
+                </div>
+              )}
+              {ownedSalesComp && (
+                <div className="owned-sales-signal">
+                  <div>
+                    <span>Owned sales</span>
+                    <strong>{gbp(ownedSalesComp.medianPence)}</strong>
+                    <small>
+                      {ownedSalesComp.sampleSize} sold · latest {shortDate(ownedSalesComp.asOf)}
+                    </small>
+                  </div>
+                  <div className="owned-sale-list">
+                    {(ownedSalesComp.raw?.sales ?? []).slice(0, 3).map((sale) => (
+                      <span key={sale.id}>
+                        {gbp(sale.salePricePence)} · {shortDate(sale.soldAt)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
               {catalogCard && (
@@ -1251,6 +1315,22 @@ function viewTitle(view: View): string {
 
 function channelLabel(channel: Channel): string {
   return channel.replace("_", "-").toLowerCase();
+}
+
+function shortDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
+function findSelectedSet(sets: CatalogSet[], value: string): CatalogSet | null {
+  const query = value.trim().toLowerCase();
+  if (!query) return null;
+  return (
+    sets.find((set) => set.name.toLowerCase() === query || set.ptcgoCode?.toLowerCase() === query) ??
+    sets.find((set) => set.name.toLowerCase().includes(query)) ??
+    null
+  );
 }
 
 function gbp(pence: number): string {

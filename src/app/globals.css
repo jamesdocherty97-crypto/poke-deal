@@ -128,6 +128,16 @@ label {
   height: 42px;
 }
 
+.app-mark-image {
+  width: 42px;
+  height: 58px;
+  border: 2px solid rgba(255, 255, 255, 0.44);
+  border-radius: 6px;
+  background: var(--panel-2);
+  object-fit: cover;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.34);
+}
+
 .app-mark::after,
 .card-back::after {
   position: absolute;
@@ -368,13 +378,31 @@ label {
 }
 
 .quick-hunts button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   min-height: 38px;
-  padding: 8px;
+  padding: 6px 8px;
   border-color: rgba(255, 203, 5, 0.26);
   background: rgba(255, 203, 5, 0.1);
   color: #fff4b0;
   font-size: 12px;
   font-weight: 900;
+  text-align: left;
+}
+
+.quick-hunts button img {
+  width: 30px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.quick-hunts button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .set-field {
@@ -453,15 +481,25 @@ label {
 }
 
 .set-chip-row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   flex: 0 0 auto;
   min-height: 34px;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-color: rgba(42, 117, 187, 0.4);
   background: rgba(42, 117, 187, 0.16);
   color: #cfe6ff;
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.set-chip-row button img {
+  width: auto;
+  height: 18px;
+  max-width: 70px;
+  object-fit: contain;
 }
 
 .segmented {
@@ -573,6 +611,45 @@ label {
 
 .market-signal small {
   grid-column: 1 / -1;
+}
+
+.owned-sales-signal {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  border-radius: 8px;
+  background: rgba(52, 211, 153, 0.1);
+  padding: 10px;
+}
+
+.owned-sales-signal div {
+  display: grid;
+  gap: 3px;
+}
+
+.owned-sales-signal span,
+.owned-sales-signal small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.owned-sales-signal strong {
+  color: var(--green);
+  font-size: 20px;
+}
+
+.owned-sale-list {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.owned-sale-list span {
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  border-radius: 999px;
+  background: rgba(3, 8, 20, 0.35);
+  padding: 5px 7px;
 }
 
 .deal-card div,

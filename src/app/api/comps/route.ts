@@ -4,10 +4,12 @@
 import { NextResponse } from "next/server";
 import { CompService } from "@/lib/comps/compService";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
+import { OwnedSalesSource, type OwnedSalesDb } from "@/lib/comps/sources/ownedSales";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
 import { PokemonTcgMarketSource } from "@/lib/comps/sources/pokemonTcgMarket";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import type { CatalogCard, CatalogSource } from "@/lib/catalog/types";
+import { getPrisma } from "@/lib/db/prisma";
 import type { CardRef, Grade } from "@/lib/domain/types";
 
 export const runtime = "nodejs";
@@ -36,6 +38,7 @@ export async function GET(request: Request) {
     const compService = new CompService([
       new PokemonPriceTrackerSource(),
       new PokemonTcgMarketSource(catalog ? fixedCatalogSource(catalogSource.live, catalog) : catalogSource),
+      ...(process.env.DATABASE_URL ? [new OwnedSalesSource(getPrisma() as unknown as OwnedSalesDb)] : []),
     ]);
     const result = await compService.lookup(compCard, { grade });
     if (process.env.DATABASE_URL) {
