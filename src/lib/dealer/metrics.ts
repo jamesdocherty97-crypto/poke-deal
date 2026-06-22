@@ -50,6 +50,12 @@ export interface DealerSaleSummary {
   soldAt: string;
 }
 
+export interface ProfitTrendPoint {
+  date: string;
+  profitPence: number;
+  cumulativeProfitPence: number;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const AGED_STOCK_DAYS = 45;
 
@@ -118,6 +124,28 @@ export function summarizeSale(sale: DealerSaleMetricItem): DealerSaleSummary {
   };
 }
 
+export function buildProfitTrend(
+  sales: Array<Pick<DealerSaleSummary, "profitPence" | "soldAt">>,
+  maxPoints = 8,
+): ProfitTrendPoint[] {
+  const dailyProfit = new Map<string, number>();
+  for (const sale of sales) {
+    const date = dateKey(sale.soldAt);
+    if (!date) continue;
+    dailyProfit.set(date, (dailyProfit.get(date) ?? 0) + sale.profitPence);
+  }
+
+  let cumulativeProfitPence = 0;
+  const points = [...dailyProfit.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, profitPence]) => {
+      cumulativeProfitPence += profitPence;
+      return { date, profitPence, cumulativeProfitPence };
+    });
+
+  return points.slice(-Math.max(1, maxPoints));
+}
+
 function countByStatus(items: DealerInventoryMetricItem[], status: DealerStatus): number {
   return items
     .filter((item) => item.status === status)
@@ -132,4 +160,10 @@ function ageDays(createdAt: string, now: Date): number {
 
 function roundPct(value: number): number {
   return Math.round(value * 1000) / 10;
+}
+
+function dateKey(value: string): string | null {
+  const time = Date.parse(value);
+  if (Number.isNaN(time)) return null;
+  return new Date(time).toISOString().slice(0, 10);
 }

@@ -345,6 +345,18 @@ label {
   line-height: 1.05;
 }
 
+.metric.loading {
+  opacity: 0.72;
+}
+
+.metric.loading strong i {
+  display: block;
+  width: min(84px, 100%);
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 203, 5, 0.18), rgba(255, 255, 255, 0.08));
+}
+
 .metric.good strong,
 .pill.good,
 .grade-verdict.good strong {
@@ -628,6 +640,86 @@ label {
   font-size: 12px;
   font-weight: 900;
   text-decoration: none;
+}
+
+.pnl-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.pnl-summary.empty .detail-grid {
+  opacity: 0.62;
+}
+
+.pnl-empty-note,
+.profit-sparkline {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(255, 203, 5, 0.2);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 10px;
+}
+
+.pnl-empty-note strong,
+.profit-sparkline strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.pnl-empty-note span,
+.profit-sparkline span,
+.profit-sparkline small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.profit-sparkline {
+  grid-template-columns: minmax(0, 0.72fr) minmax(120px, 1fr);
+  align-items: center;
+  border-color: rgba(52, 211, 153, 0.26);
+  background:
+    linear-gradient(120deg, rgba(52, 211, 153, 0.12), transparent 54%),
+    rgba(3, 8, 20, 0.34);
+}
+
+.profit-sparkline div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.profit-sparkline svg {
+  width: 100%;
+  height: 72px;
+  overflow: visible;
+}
+
+.profit-sparkline .zero-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.profit-sparkline .spark-area {
+  fill: rgba(52, 211, 153, 0.12);
+  stroke: none;
+}
+
+.profit-sparkline .spark-line {
+  fill: none;
+  stroke: var(--green);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.profit-sparkline circle {
+  fill: var(--yellow);
+  stroke: rgba(3, 8, 20, 0.86);
+  stroke-width: 2;
 }
 
 .portfolio-panel {
@@ -1407,6 +1499,7 @@ label {
 
   .workspace > .section-heading,
   .workspace > .dex-controls,
+  .workspace > .pnl-summary,
   .workspace > .detail-grid {
     grid-column: 1 / -1;
   }
@@ -1449,6 +1542,10 @@ label {
 
   .dex-controls .search-control {
     grid-column: 1 / -1;
+  }
+
+  .profit-sparkline {
+    grid-template-columns: 1fr;
   }
 }
 

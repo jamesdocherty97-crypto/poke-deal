@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeDealerMetrics, summarizeSale } from "./metrics.js";
+import { buildProfitTrend, computeDealerMetrics, summarizeSale } from "./metrics.js";
 
 const NOW = new Date("2026-06-21T12:00:00.000Z");
 
@@ -80,4 +80,34 @@ test("computeDealerMetrics summarizes stock, sales, age and movers", () => {
   assert.equal(metrics.agedStockCount, 1);
   assert.equal(metrics.bestSale?.name, "Venusaur ex");
   assert.equal(metrics.worstSale?.profitPence, 800);
+});
+
+test("buildProfitTrend aggregates daily profit into a cumulative trend", () => {
+  const points = buildProfitTrend([
+    { profitPence: 500, soldAt: "2026-06-21T10:00:00.000Z" },
+    { profitPence: -150, soldAt: "2026-06-21T13:00:00.000Z" },
+    { profitPence: 900, soldAt: "2026-06-22T10:00:00.000Z" },
+    { profitPence: 400, soldAt: "not a date" },
+  ]);
+
+  assert.deepEqual(points, [
+    { date: "2026-06-21", profitPence: 350, cumulativeProfitPence: 350 },
+    { date: "2026-06-22", profitPence: 900, cumulativeProfitPence: 1250 },
+  ]);
+});
+
+test("buildProfitTrend limits to the latest points without losing cumulative history", () => {
+  const points = buildProfitTrend(
+    [
+      { profitPence: 100, soldAt: "2026-06-18T10:00:00.000Z" },
+      { profitPence: 200, soldAt: "2026-06-19T10:00:00.000Z" },
+      { profitPence: 300, soldAt: "2026-06-20T10:00:00.000Z" },
+    ],
+    2,
+  );
+
+  assert.deepEqual(points, [
+    { date: "2026-06-19", profitPence: 200, cumulativeProfitPence: 300 },
+    { date: "2026-06-20", profitPence: 300, cumulativeProfitPence: 600 },
+  ]);
 });

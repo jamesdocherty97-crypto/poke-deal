@@ -8,6 +8,7 @@ import {
   type ListingSort,
   type ListingStateFilter,
 } from "@/lib/dealer/tableControls";
+import { buildProfitTrend, type ProfitTrendPoint } from "@/lib/dealer/metrics";
 
 type View = "acquire" | "inventory" | "listings" | "pnl";
 type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
@@ -409,6 +410,9 @@ export default function Home() {
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
   const compReceipt = useMemo(() => (comp ? buildCompReceipt(comp) : []), [comp]);
   const compSpreadPct = useMemo(() => (comp ? medianSpreadPct(comp.all) : null), [comp]);
+  const dashboardLoading = dashboard === null;
+  const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
+  const profitTrend = useMemo(() => buildProfitTrend(dashboard?.recentSales ?? []), [dashboard?.recentSales]);
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
     : "loading deck";
@@ -928,9 +932,14 @@ export default function Home() {
       </section>
 
       <section className="status-strip" aria-label="Business summary">
-        <Metric label="Stock" value={String(dashboard?.metrics.stockCount ?? activeInventory.length)} />
-        <Metric label="Listed" value={String(dashboard?.metrics.listedCount ?? 0)} />
-        <Metric label="Profit" value={gbp(dashboard?.metrics.realizedProfitPence ?? 0)} tone="good" />
+        <Metric label="Stock" value={String(dashboard?.metrics.stockCount ?? 0)} loading={dashboardLoading} />
+        <Metric label="Listed" value={String(dashboard?.metrics.listedCount ?? 0)} loading={dashboardLoading} />
+        <Metric
+          label="Profit"
+          value={gbp(dashboard?.metrics.realizedProfitPence ?? 0)}
+          tone="good"
+          loading={dashboardLoading}
+        />
       </section>
 
       {notice && <div className="notice success">{notice}</div>}
@@ -1472,15 +1481,39 @@ export default function Home() {
 
       {view === "pnl" && (
         <section className="workspace">
-          <div className="detail-grid">
-            <Metric label="Revenue" value={gbp(dashboard?.metrics.realizedRevenuePence ?? 0)} />
-            <Metric label="Profit" value={gbp(dashboard?.metrics.realizedProfitPence ?? 0)} tone="good" />
-            <Metric
-              label="Margin"
-              value={dashboard?.metrics.realizedMarginPct == null ? "n/a" : `${dashboard.metrics.realizedMarginPct}%`}
-            />
-            <Metric label="Sell-through" value={`${dashboard?.metrics.sellThroughPct ?? 0}%`} />
-          </div>
+          <section className={`pnl-summary ${noBookedSales ? "empty" : ""}`}>
+            <div className="detail-grid">
+              <Metric
+                label="Revenue"
+                value={gbp(dashboard?.metrics.realizedRevenuePence ?? 0)}
+                loading={dashboardLoading}
+              />
+              <Metric
+                label="Profit"
+                value={gbp(dashboard?.metrics.realizedProfitPence ?? 0)}
+                tone="good"
+                loading={dashboardLoading}
+              />
+              <Metric
+                label="Margin"
+                value={dashboard?.metrics.realizedMarginPct == null ? "n/a" : `${dashboard.metrics.realizedMarginPct}%`}
+                loading={dashboardLoading}
+              />
+              <Metric
+                label="Sell-through"
+                value={`${dashboard?.metrics.sellThroughPct ?? 0}%`}
+                loading={dashboardLoading}
+              />
+            </div>
+            {noBookedSales ? (
+              <div className="pnl-empty-note">
+                <strong>Nothing booked yet</strong>
+                <span>Mark a stocked card sold from Dex and Loot will start tracking revenue, profit and margin.</span>
+              </div>
+            ) : profitTrend.length > 0 ? (
+              <ProfitSparkline points={profitTrend} />
+            ) : null}
+          </section>
           <div className="export-actions single" aria-label="Books export">
             <a className="export-link" href="/api/export/books" download>
               Books CSV
@@ -1838,11 +1871,53 @@ function WatchHitRow({ hit }: { hit: WatchHit }) {
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: "good" }) {
+function Metric({
+  label,
+  value,
+  tone,
+  loading = false,
+}: {
+  label: string;
+  value: string;
+  tone?: "good";
+  loading?: boolean;
+}) {
   return (
-    <div className={`metric ${tone ?? ""}`}>
+    <div className={`metric ${tone ?? ""} ${loading ? "loading" : ""}`} aria-busy={loading ? "true" : undefined}>
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong>{loading ? <i aria-hidden="true" /> : value}</strong>
+    </div>
+  );
+}
+
+function ProfitSparkline({ points }: { points: ProfitTrendPoint[] }) {
+  const width = 240;
+  const height = 72;
+  const padding = 8;
+  const coords = sparklineCoords(points, width, height, padding);
+  const path =
+    coords.length === 1
+      ? `M ${padding} ${coords[0]?.y ?? height / 2} L ${width - padding} ${coords[0]?.y ?? height / 2}`
+      : coords.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const latest = points.at(-1);
+  const first = points[0];
+  const zeroY = sparklineY(0, points, height, padding);
+
+  return (
+    <div className="profit-sparkline">
+      <div>
+        <span>Profit trend</span>
+        <strong>{latest ? gbp(latest.cumulativeProfitPence) : "n/a"}</strong>
+        {first && latest && <small>{shortDate(first.date)} to {shortDate(latest.date)}</small>}
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cumulative profit trend">
+        <path className="zero-line" d={`M ${padding} ${zeroY} L ${width - padding} ${zeroY}`} />
+        <path className="spark-area" d={`${path} L ${width - padding} ${height - padding} L ${padding} ${height - padding} Z`} />
+        <path className="spark-line" d={path} />
+        {coords.map((point) => (
+          <circle key={`${point.x}-${point.y}`} cx={point.x} cy={point.y} r="3" />
+        ))}
+      </svg>
     </div>
   );
 }
@@ -2068,6 +2143,28 @@ function medianSpreadPct(results: CompResult[]): number | null {
 function trendBarWidth(point: PortfolioPoint, points: PortfolioPoint[]): number {
   const max = Math.max(...points.map((row) => row.marketValuePence), 1);
   return Math.max(8, Math.round((point.marketValuePence / max) * 100));
+}
+
+function sparklineCoords(
+  points: ProfitTrendPoint[],
+  width: number,
+  height: number,
+  padding: number,
+): Array<{ x: number; y: number }> {
+  const drawableWidth = width - padding * 2;
+  return points.map((point, index) => ({
+    x: points.length === 1 ? width - padding : padding + (drawableWidth * index) / (points.length - 1),
+    y: sparklineY(point.cumulativeProfitPence, points, height, padding),
+  }));
+}
+
+function sparklineY(value: number, points: ProfitTrendPoint[], height: number, padding: number): number {
+  const values = points.flatMap((point) => [point.cumulativeProfitPence, 0]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const drawableHeight = height - padding * 2;
+  return padding + ((max - value) / span) * drawableHeight;
 }
 
 function ageLabel(value: string): string {
