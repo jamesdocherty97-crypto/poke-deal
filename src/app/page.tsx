@@ -172,6 +172,32 @@ type RepriceRecommendation = {
   reason: string;
 };
 
+type WatchRecord = {
+  id: string;
+  grade: string;
+  targetPence: number;
+  active: boolean;
+  createdAt: string;
+  card: {
+    name: string;
+    setName: string;
+    number: string | null;
+    imageUrl: string | null;
+  };
+  alerts?: Array<{ id: string; message: string; pence: number | null; firedAt: string; delivered: boolean }>;
+};
+
+type WatchHit = {
+  watchId: string;
+  cardName: string;
+  grade: string;
+  targetPence: number;
+  marketPence: number;
+  sampleSize: number;
+  windowDays: number;
+  message: string;
+};
+
 type PortfolioPoint = {
   date: string;
   marketValuePence: number;
@@ -236,6 +262,7 @@ export default function Home() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioHistory | null>(null);
+  const [watches, setWatches] = useState<WatchRecord[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -248,6 +275,11 @@ export default function Home() {
   const [repriceRecommendations, setRepriceRecommendations] = useState<RepriceRecommendation[]>([]);
   const [repriceCheckedAt, setRepriceCheckedAt] = useState<string | null>(null);
   const [discordReady, setDiscordReady] = useState<boolean | null>(null);
+  const [watchTarget, setWatchTarget] = useState("15.00");
+  const [watchHits, setWatchHits] = useState<WatchHit[]>([]);
+  const [watchMessage, setWatchMessage] = useState<string | null>(null);
+  const [watchCheckedAt, setWatchCheckedAt] = useState<string | null>(null);
+  const [watchDiscordReady, setWatchDiscordReady] = useState<boolean | null>(null);
   const [editingListingId, setEditingListingId] = useState<string | null>(null);
   const [listingPrice, setListingPrice] = useState("");
   const [listingState, setListingState] = useState<Exclude<ListingState, "SOLD">>("DRAFT");
@@ -358,24 +390,28 @@ export default function Home() {
   async function refreshAll() {
     setError(null);
     try {
-      const [inventoryRes, listingsRes, dashboardRes, portfolioRes] = await Promise.all([
+      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes] = await Promise.all([
         fetch("/api/inventory"),
         fetch("/api/listings"),
         fetch("/api/dashboard"),
         fetch("/api/snapshots/portfolio"),
+        fetch("/api/watches"),
       ]);
       const inventoryJson = await readJson(inventoryRes);
       const listingsJson = await readJson(listingsRes);
       const dashboardJson = await readJson(dashboardRes);
       const portfolioJson = await readJson(portfolioRes);
+      const watchesJson = await readJson(watchesRes);
       if (!inventoryRes.ok) throw new Error(inventoryJson.error ?? "inventory failed");
       if (!listingsRes.ok) throw new Error(listingsJson.error ?? "listings failed");
       if (!dashboardRes.ok) throw new Error(dashboardJson.error ?? "dashboard failed");
       if (!portfolioRes.ok) throw new Error(portfolioJson.error ?? "snapshot history failed");
+      if (!watchesRes.ok) throw new Error(watchesJson.error ?? "watches failed");
       setInventory(inventoryJson.items);
       setListings(listingsJson.listings);
       setDashboard(dashboardJson);
       setPortfolio(portfolioJson);
+      setWatches(watchesJson.watches ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "refresh failed");
     }
@@ -436,6 +472,31 @@ export default function Home() {
       setView("inventory");
     } catch (err) {
       setError(err instanceof Error ? err.message : "acquire failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function createWatch() {
+    setBusy("watch-create");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/watches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card: { name, setName: setNameValue, number },
+          grade,
+          targetPence: poundsToPence(watchTarget),
+        }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "watch create failed");
+      setNotice(`Watching ${name} at ${gbp(poundsToPence(watchTarget))}.`);
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "watch create failed");
     } finally {
       setBusy(null);
     }
@@ -673,6 +734,35 @@ export default function Home() {
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "snapshot failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function checkWatches() {
+    setBusy("watch-check");
+    setError(null);
+    setWatchMessage(null);
+    try {
+      const res = await fetch("/api/watches/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notify: true, limit: 10 }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "watch check failed");
+      const hits = (payload.hits ?? []) as WatchHit[];
+      setWatchHits(hits);
+      setWatchCheckedAt(payload.checkedAt ?? new Date().toISOString());
+      setWatchDiscordReady(Boolean(payload.notifierConfigured));
+      setWatchMessage(
+        hits.length === 0
+          ? "No sourcing targets hit right now."
+          : `${hits.length} sourcing target${hits.length === 1 ? "" : "s"} hit${payload.notified ? " and sent" : ""}.`,
+      );
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "watch check failed");
     } finally {
       setBusy(null);
     }
@@ -983,6 +1073,28 @@ export default function Home() {
             </section>
           )}
 
+          {headline && (
+            <section className="panel watch-panel">
+              <div className="panel-heading">
+                <h2>Buy target</h2>
+                <span className="muted">{watches.filter((watch) => watch.active).length} watched</span>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Target GBP
+                  <input inputMode="decimal" value={watchTarget} onChange={(event) => setWatchTarget(event.target.value)} />
+                </label>
+                <label>
+                  Target grade
+                  <input value={grade.replace(/_/g, " ")} readOnly />
+                </label>
+              </div>
+              <button className="secondary-action" type="button" onClick={createWatch} disabled={busy === "watch-create"}>
+                {busy === "watch-create" ? "Saving watch..." : "Watch for buy price"}
+              </button>
+            </section>
+          )}
+
           <form className="panel" onSubmit={acquire}>
             <div className="panel-heading">
               <h2>Just bought it</h2>
@@ -1221,6 +1333,35 @@ export default function Home() {
             </button>
             {portfolio?.checkedAt && <p className="hint">Last valued {ageLabel(portfolio.checkedAt)}.</p>}
           </section>
+          <section className="panel watch-panel">
+            <div className="panel-heading">
+              <h2>Buy watches</h2>
+              <span className="muted">{watches.filter((watch) => watch.active).length} active</span>
+            </div>
+            <button className="primary-action" type="button" onClick={checkWatches} disabled={busy === "watch-check"}>
+              {busy === "watch-check" ? "Checking..." : "Check buy targets"}
+            </button>
+            {watchMessage && <p className="hint">{watchMessage}</p>}
+            {(watchCheckedAt || watchDiscordReady !== null) && (
+              <div className="alert-status">
+                <span>{watchCheckedAt ? `Checked ${ageLabel(watchCheckedAt)}` : "Not checked"}</span>
+                <strong>{watchDiscordReady ? "Discord ready" : "In-app only"}</strong>
+              </div>
+            )}
+            {watchHits.length > 0 ? (
+              <div className="watch-hit-list">
+                {watchHits.map((hit) => (
+                  <WatchHitRow key={hit.watchId} hit={hit} />
+                ))}
+              </div>
+            ) : (
+              <div className="watch-list">
+                {watches.filter((watch) => watch.active).slice(0, 5).map((watch) => (
+                  <WatchRow key={watch.id} watch={watch} />
+                ))}
+              </div>
+            )}
+          </section>
           <section className="panel">
             <div className="panel-heading">
               <h2>Stock health</h2>
@@ -1419,6 +1560,37 @@ function RepriceActionRow({
         >
           {busy ? "Saving..." : "Apply"}
         </button>
+      </div>
+    </article>
+  );
+}
+
+function WatchRow({ watch }: { watch: WatchRecord }) {
+  const latest = watch.alerts?.[0];
+  return (
+    <article className="watch-row">
+      {watch.card.imageUrl ? <img src={watch.card.imageUrl} alt="" /> : <span aria-hidden="true" />}
+      <div>
+        <strong>{watch.card.name}</strong>
+        <span>
+          {watch.card.number ?? "no number"} · {watch.grade.replace(/_/g, " ")} · target {gbp(watch.targetPence)}
+        </span>
+        {latest && <small>Last hit {shortDate(latest.firedAt)} at {latest.pence ? gbp(latest.pence) : "n/a"}</small>}
+      </div>
+    </article>
+  );
+}
+
+function WatchHitRow({ hit }: { hit: WatchHit }) {
+  return (
+    <article className="watch-hit-row">
+      <div>
+        <strong>{hit.cardName}</strong>
+        <span>{hit.grade.replace(/_/g, " ")} · {hit.sampleSize}/{hit.windowDays}d</span>
+      </div>
+      <div>
+        <strong>{gbp(hit.marketPence)}</strong>
+        <span>target {gbp(hit.targetPence)}</span>
       </div>
     </article>
   );

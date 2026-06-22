@@ -9,7 +9,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "demo": "node --import tsx src/demo.ts",
-    "test": "node --import tsx --test src/lib/comps/cleaning.test.ts src/lib/comps/currency.test.ts src/lib/comps/pricing.test.ts src/lib/comps/sources/pokemonPriceTracker.test.ts src/lib/comps/sources/pokemonTcgMarket.test.ts src/lib/comps/sources/ownedSales.test.ts src/lib/catalog/cardSearch.test.ts src/lib/catalog/fuzzy.test.ts src/lib/catalog/pokemonTcgApi.test.ts src/lib/catalog/setCatalog.test.ts src/lib/inventory/prismaInventoryRepo.test.ts src/lib/comps/prismaCompResultRepo.test.ts src/lib/dealer/metrics.test.ts src/lib/alerts/repricing.test.ts src/lib/exports/csv.test.ts src/lib/snapshots/portfolio.test.ts",
+    "test": "node --import tsx --test src/lib/comps/cleaning.test.ts src/lib/comps/currency.test.ts src/lib/comps/pricing.test.ts src/lib/comps/sources/pokemonPriceTracker.test.ts src/lib/comps/sources/pokemonTcgMarket.test.ts src/lib/comps/sources/ownedSales.test.ts src/lib/catalog/cardSearch.test.ts src/lib/catalog/fuzzy.test.ts src/lib/catalog/pokemonTcgApi.test.ts src/lib/catalog/setCatalog.test.ts src/lib/inventory/prismaInventoryRepo.test.ts src/lib/comps/prismaCompResultRepo.test.ts src/lib/dealer/metrics.test.ts src/lib/alerts/repricing.test.ts src/lib/alerts/watchlist.test.ts src/lib/exports/csv.test.ts src/lib/snapshots/portfolio.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio"
