@@ -4,7 +4,8 @@ import { resolveSetIdForCard } from "./setCatalog.js";
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js";
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
-const SELECT_FIELDS = "id,name,number,rarity,images,set,tcgplayer,cardmarket";
+const CARD_IDENTITY_FIELDS = "id,name,number,rarity,images,set";
+const MARKET_SELECT_FIELDS = `${CARD_IDENTITY_FIELDS},tcgplayer,cardmarket`;
 const DEFAULT_FETCH_TIMEOUT_MS = 4000;
 const REQUEST_CACHE_TTL_MS = 30 * 60 * 1000;
 const NULL_CACHE_TTL_MS = 60 * 1000;
@@ -64,7 +65,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
 
     if (card.tcgApiId) {
       const json = await this.request(`/cards/${encodeURIComponent(card.tcgApiId)}`, {
-        select: SELECT_FIELDS,
+        select: MARKET_SELECT_FIELDS,
       });
       return mapPokemonTcgCard(readDataObject(json));
     }
@@ -85,7 +86,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       const json = await this.request("/cards", {
         q,
         pageSize: "10",
-        select: SELECT_FIELDS,
+        select: MARKET_SELECT_FIELDS,
       });
       const cards = readDataArray(json);
       if (cards.length > 0) {
@@ -108,7 +109,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       const json = await this.request("/cards", {
         q,
         pageSize: String(Math.min(Math.max(limit, 1), 25)),
-        select: SELECT_FIELDS,
+        select: CARD_IDENTITY_FIELDS,
       });
       const cards = rankPokemonTcgCards(readDataArray(json), card, resolvedSetId);
       if (cards.length > 0) return cards.slice(0, limit);
@@ -142,6 +143,10 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
   }
 
   private cacheKey(url: URL): string | null {
+    const select = url.searchParams.get("select") ?? "";
+    if (select.includes("tcgplayer") || select.includes("cardmarket")) {
+      return null;
+    }
     return this.baseUrl === BASE_URL ? url.toString() : null;
   }
 }

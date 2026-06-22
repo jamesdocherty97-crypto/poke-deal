@@ -299,20 +299,59 @@ test("PokemonTcgApiCatalogSource fetches by tcgApiId when supplied", async () =>
   );
 });
 
-test("PokemonTcgApiCatalogSource caches default API responses and uses timeout signals", async () => {
+test("PokemonTcgApiCatalogSource caches metadata-only search responses and uses timeout signals", async () => {
   let calls = 0;
-  const fetchImpl = (async (_url: URL, init?: RequestInit) => {
+  const fetchImpl = (async (url: URL, init?: RequestInit) => {
     calls += 1;
     assert.ok(init?.signal, "catalog requests should carry a timeout signal");
+    assert.equal(url.searchParams.get("select"), "id,name,number,rarity,images,set");
+    return {
+      ok: true,
+      async json() {
+        return {
+          data: [
+            {
+              id: "cache-test-card",
+              name: "Cache Test Card",
+              number: "1",
+              set: { id: "base1", name: "Base", printedTotal: 102 },
+            },
+          ],
+        };
+      },
+    } as Response;
+  }) as typeof fetch;
+
+  const source = new PokemonTcgApiCatalogSource("secret", fetchImpl);
+  const card = { name: "Cache Test Card" };
+
+  const first = await source.search(card);
+  const second = await source.search(card);
+
+  assert.equal(first[0]?.tcgApiId, "cache-test-card");
+  assert.equal(second[0]?.tcgApiId, "cache-test-card");
+  assert.equal(calls, 1);
+});
+
+test("PokemonTcgApiCatalogSource does not cache price-bearing resolve responses", async () => {
+  let calls = 0;
+  const fetchImpl = (async (url: URL, init?: RequestInit) => {
+    calls += 1;
+    assert.ok(init?.signal, "catalog requests should carry a timeout signal");
+    assert.equal(url.searchParams.get("select"), "id,name,number,rarity,images,set,tcgplayer,cardmarket");
     return {
       ok: true,
       async json() {
         return {
           data: {
-            id: "cache-test-card",
-            name: "Cache Test Card",
+            id: "fresh-price-card",
+            name: "Fresh Price Card",
             number: "1",
             set: { id: "base1", name: "Base", printedTotal: 102 },
+            tcgplayer: {
+              updatedAt: "2026/06/23",
+              prices: { normal: { market: calls } },
+            },
           },
         };
       },
@@ -320,12 +359,10 @@ test("PokemonTcgApiCatalogSource caches default API responses and uses timeout s
   }) as typeof fetch;
 
   const source = new PokemonTcgApiCatalogSource("secret", fetchImpl);
-  const card = { name: "Cache Test Card", tcgApiId: "cache-test-card" };
+  const first = await source.resolve({ name: "Fresh Price Card", tcgApiId: "fresh-price-card" });
+  const second = await source.resolve({ name: "Fresh Price Card", tcgApiId: "fresh-price-card" });
 
-  const first = await source.resolve(card);
-  const second = await source.resolve(card);
-
-  assert.equal(first?.tcgApiId, "cache-test-card");
-  assert.equal(second?.tcgApiId, "cache-test-card");
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
+  assert.equal(first?.priceSignals?.find((signal) => signal.kind === "market")?.originalAmount, 1);
+  assert.equal(second?.priceSignals?.find((signal) => signal.kind === "market")?.originalAmount, 2);
 });
