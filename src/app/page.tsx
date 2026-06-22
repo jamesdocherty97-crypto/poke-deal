@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type SyntheticEvent, useEffect, useMemo, useState } from "react";
 import {
   buildInventoryView,
   buildListingView,
@@ -893,7 +893,7 @@ export default function Home() {
       <header className="topbar">
         <div className="brand-lockup">
           {spotlightImage ? (
-            <img className="app-mark app-mark-image" src={spotlightImage} alt="" />
+            <CardImage src={spotlightImage} className="app-mark app-mark-image" fallbackClassName="app-mark" alt="" />
           ) : (
             <span className="app-mark" aria-hidden="true" />
           )}
@@ -906,6 +906,7 @@ export default function Home() {
               className="brand-set-logo"
               src={setMarkUrl}
               alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+              onError={hideBrokenImage}
             />
           )}
         </div>
@@ -921,8 +922,8 @@ export default function Home() {
           <span>GBP comps, stock, listings and profit in one pocket.</span>
         </div>
         <div className="hero-card-art" aria-hidden="true">
-          {spotlightImage ? <img src={spotlightImage} alt="" /> : <span className="card-back" />}
-          {setMarkUrl && <img className="set-mark" src={setMarkUrl} alt="" />}
+          <CardImage src={spotlightImage} fallbackClassName="card-back" alt="" />
+          {setMarkUrl && <img className="set-mark" src={setMarkUrl} alt="" onError={hideBrokenImage} />}
         </div>
       </section>
 
@@ -945,7 +946,7 @@ export default function Home() {
             <div className="quick-hunts" aria-label="Quick card picks">
               {quickHunts.map((card) => (
                 <button key={`${card.name}-${card.number}`} type="button" onClick={() => chooseQuickHunt(card)}>
-                  <img src={card.imageUrl} alt="" />
+                  <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
                   <span>{card.name}</span>
                 </button>
               ))}
@@ -969,7 +970,9 @@ export default function Home() {
                       className="suggestion-item card-option"
                       onClick={() => chooseCard(card)}
                     >
-                      {card.imageUrl ? <img src={card.imageUrl} alt="" /> : null}
+                      {card.imageUrl ? (
+                        <CardImage src={card.imageUrl} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
+                      ) : null}
                       <span>{card.name}</span>
                       <small>
                         {card.setName}
@@ -995,7 +998,7 @@ export default function Home() {
                   <div className="set-suggestions" role="listbox" aria-label="Set suggestions">
                     {setSuggestions.map((set) => (
                       <button key={set.id} type="button" className="suggestion-item" onClick={() => chooseSet(set)}>
-                        {set.symbolUrl ? <img src={set.symbolUrl} alt="" /> : null}
+                        {set.symbolUrl ? <img src={set.symbolUrl} alt="" onError={hideBrokenImage} /> : null}
                         <span>{set.name}</span>
                         {set.ptcgoCode && <small>{set.ptcgoCode}</small>}
                       </button>
@@ -1012,7 +1015,9 @@ export default function Home() {
               <div className="set-chip-row" aria-label="Popular sets">
                 {popularSets.map((set) => (
                   <button key={set.id} type="button" onClick={() => chooseSet(set)}>
-                    {set.logoUrl || set.symbolUrl ? <img src={set.logoUrl ?? set.symbolUrl} alt="" /> : null}
+                    {set.logoUrl || set.symbolUrl ? (
+                      <img src={set.logoUrl ?? set.symbolUrl} alt="" onError={hideBrokenImage} />
+                    ) : null}
                     <span>{set.name}</span>
                   </button>
                 ))}
@@ -1044,6 +1049,22 @@ export default function Home() {
                 </div>
                 <span className={`pill ${confidenceLabel?.tone ?? ""}`}>{confidenceLabel?.label}</span>
               </div>
+              {deal && (
+                <div className={`deal-banner ${deal.tone}`}>
+                  <div>
+                    <span>Deal judge</span>
+                    <strong>{deal.label}</strong>
+                  </div>
+                  <div>
+                    <span>Net profit</span>
+                    <strong>{gbp(deal.expectedProfitPence)}</strong>
+                  </div>
+                  <div>
+                    <span>Target buy</span>
+                    <strong>{gbp(deal.targetBuyPence)}</strong>
+                  </div>
+                </div>
+              )}
               <div className="detail-grid">
                 <Metric label="Range" value={`${gbp(headline.lowPence)}-${gbp(headline.highPence)}`} />
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
@@ -1098,11 +1119,12 @@ export default function Home() {
               )}
               {catalogCard && (
                 <div className="catalog-strip">
-                  {catalogCard.imageUrl ? (
-                    <img className="catalog-art" src={catalogCard.imageUrl} alt={`${catalogCard.name} card art`} />
-                  ) : (
-                    <span className="catalog-art blank" aria-hidden="true" />
-                  )}
+                  <CardImage
+                    src={catalogCard.imageUrl ?? null}
+                    className="catalog-art"
+                    fallbackClassName="catalog-art blank"
+                    alt={`${catalogCard.name} card art`}
+                  />
                   <div>
                     <span>TCG catalog</span>
                     <strong>{catalogCard.name}</strong>
@@ -1111,7 +1133,14 @@ export default function Home() {
                       {catalogCard.number ? ` #${catalogCard.number}` : ""}
                     </small>
                   </div>
-                  {setMarkUrl && <img className="catalog-set-logo" src={setMarkUrl} alt={`${catalogCard.setName} logo`} />}
+                  {setMarkUrl && (
+                    <img
+                      className="catalog-set-logo"
+                      src={setMarkUrl}
+                      alt={`${catalogCard.setName} logo`}
+                      onError={hideBrokenImage}
+                    />
+                  )}
                 </div>
               )}
               {headline.raw?.chosenPriceSource === "smartMarketPrice" && (
@@ -1131,22 +1160,6 @@ export default function Home() {
               {comp?.sourcesDisagree && (
                 <p className="hint danger-text">Sources disagree materially. Treat this as a check-before-buy price.</p>
               )}
-              {deal && (
-                <div className={`deal-card ${deal.tone}`}>
-                  <div>
-                    <span>Deal judge</span>
-                    <strong>{deal.label}</strong>
-                  </div>
-                  <div>
-                    <span>Net profit</span>
-                    <strong>{gbp(deal.expectedProfitPence)}</strong>
-                  </div>
-                  <div>
-                    <span>Target buy</span>
-                    <strong>{gbp(deal.targetBuyPence)}</strong>
-                  </div>
-                </div>
-              )}
             </section>
           )}
 
@@ -1162,8 +1175,8 @@ export default function Home() {
                   <input inputMode="decimal" value={gradeOdds} onChange={(event) => setGradeOdds(event.target.value)} />
                 </label>
                 <label>
-                  Grade cost GBP
-                  <input inputMode="decimal" value={gradingCost} onChange={(event) => setGradingCost(event.target.value)} />
+                  Grade cost
+                  <MoneyInput value={gradingCost} onChange={setGradingCost} />
                 </label>
               </div>
               <button className="secondary-action" type="button" onClick={lookupGradeEv} disabled={busy === "grade-ev"}>
@@ -1186,8 +1199,8 @@ export default function Home() {
               </div>
               <div className="form-grid">
                 <label>
-                  Target GBP
-                  <input inputMode="decimal" value={watchTarget} onChange={(event) => setWatchTarget(event.target.value)} />
+                  Target
+                  <MoneyInput value={watchTarget} onChange={setWatchTarget} />
                 </label>
                 <label>
                   Target grade
@@ -1207,8 +1220,8 @@ export default function Home() {
             </div>
             <div className="form-grid">
               <label>
-                Cost GBP
-                <input inputMode="decimal" value={cost} onChange={(event) => setCost(event.target.value)} />
+                Cost
+                <MoneyInput value={cost} onChange={setCost} />
               </label>
               <label>
                 Strategy
@@ -1298,18 +1311,18 @@ export default function Home() {
               </div>
               <div className="form-grid">
                 <label>
-                  Sale GBP
-                  <input inputMode="decimal" value={salePrice} onChange={(event) => setSalePrice(event.target.value)} />
+                  Sale
+                  <MoneyInput value={salePrice} onChange={setSalePrice} />
                 </label>
                 <label>
-                  Fees GBP
-                  <input inputMode="decimal" value={fees} onChange={(event) => setFees(event.target.value)} />
+                  Fees
+                  <MoneyInput value={fees} onChange={setFees} />
                 </label>
               </div>
               <div className="form-grid">
                 <label>
-                  Postage GBP
-                  <input inputMode="decimal" value={postage} onChange={(event) => setPostage(event.target.value)} />
+                  Postage
+                  <MoneyInput value={postage} onChange={setPostage} />
                 </label>
                 <label>
                   Channel
@@ -1427,8 +1440,8 @@ export default function Home() {
               </div>
               <div className="form-grid">
                 <label>
-                  List GBP
-                  <input inputMode="decimal" value={listingPrice} onChange={(event) => setListingPrice(event.target.value)} />
+                  List price
+                  <MoneyInput value={listingPrice} onChange={setListingPrice} />
                 </label>
                 <label>
                   Channel
@@ -1630,7 +1643,7 @@ function InventoryRow({
   const sale = item.sales[0];
   return (
     <article className="item-row">
-      {item.card.imageUrl ? <img src={item.card.imageUrl} alt="" className="card-thumb" /> : <div className="card-thumb blank" />}
+      <CardImage src={item.card.imageUrl} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
       <div className="item-main">
         <div className="item-title-line">
           <h3>{item.card.name}</h3>
@@ -1689,7 +1702,7 @@ function ListingRow({
 
   return (
     <article className="item-row">
-      {card?.imageUrl ? <img src={card.imageUrl} alt="" className="card-thumb" /> : <div className="card-thumb blank" />}
+      <CardImage src={card?.imageUrl ?? null} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
       <div className="item-main">
         <div className="item-title-line">
           <h3>{title}</h3>
@@ -1780,7 +1793,7 @@ function WatchRow({
   const latest = watch.alerts?.[0];
   return (
     <article className={`watch-row ${watch.active ? "" : "inactive"}`}>
-      {watch.card.imageUrl ? <img src={watch.card.imageUrl} alt="" /> : <span aria-hidden="true" />}
+      <CardImage src={watch.card.imageUrl} className="watch-card-art" fallbackClassName="watch-card-art blank" alt="" />
       <div className="watch-main">
         <div className="watch-title-line">
           <strong>{watch.card.name}</strong>
@@ -1792,13 +1805,8 @@ function WatchRow({
         {latest && <small>Last hit {shortDate(latest.firedAt)} at {latest.pence ? gbp(latest.pence) : "n/a"}</small>}
         <div className="watch-controls">
           <label>
-            Target GBP
-            <input
-              inputMode="decimal"
-              value={editValue}
-              onChange={(event) => onEditValue(event.target.value)}
-              disabled={busy}
-            />
+            Target
+            <MoneyInput value={editValue} onChange={onEditValue} disabled={busy} />
           </label>
           <button type="button" onClick={onSave} disabled={busy}>
             Save
@@ -1851,6 +1859,39 @@ function EmptyState({ text }: { text: string }) {
   return <p className="empty-state">{text}</p>;
 }
 
+function MoneyInput({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <span className="money-input">
+      <span aria-hidden="true">£</span>
+      <input inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+    </span>
+  );
+}
+
+function CardImage({
+  src,
+  alt,
+  className,
+  fallbackClassName,
+}: {
+  src?: string | null;
+  alt: string;
+  className?: string;
+  fallbackClassName: string;
+}) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (!src || failedSrc === src) return <span className={fallbackClassName} aria-hidden="true" />;
+  return <img className={className} src={src} alt={alt} onError={() => setFailedSrc(src)} />;
+}
+
 function GradeBadge({ grade }: { grade: string }) {
   return <span className={`grade-badge ${gradeTone(grade)}`}>{grade.replace(/_/g, " ")}</span>;
 }
@@ -1864,6 +1905,10 @@ function compConfidence(comp: CompResult, sourcesDisagree: boolean): { label: st
   if (sourcesDisagree) return { label: "Cross-check", tone: "warn" };
   if (comp.sampleSize < 3) return { label: "Thin", tone: "warn" };
   return { label: "Usable", tone: "good" };
+}
+
+function hideBrokenImage(event: SyntheticEvent<HTMLImageElement>) {
+  event.currentTarget.hidden = true;
 }
 
 function judgeDeal(

@@ -79,6 +79,26 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.16);
 }
 
+.money-input {
+  position: relative;
+  display: block;
+}
+
+.money-input span {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  z-index: 1;
+  color: var(--yellow);
+  font-size: 14px;
+  font-weight: 1000;
+  transform: translateY(-50%);
+}
+
+.money-input input {
+  padding-left: 30px;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -435,12 +455,19 @@ label {
   text-align: left;
 }
 
-.quick-hunts button img {
+.quick-hunts button img,
+.quick-card-art {
   width: 30px;
   height: 42px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 5px;
+  background: var(--panel-2);
   object-fit: cover;
+}
+
+.quick-card-art.blank,
+.suggestion-card-art.blank {
+  border-style: dashed;
 }
 
 .quick-hunts button span {
@@ -500,11 +527,13 @@ label {
   min-height: 52px;
 }
 
-.suggestion-item.card-option img {
+.suggestion-item.card-option img,
+.suggestion-card-art {
   width: 30px;
   height: 42px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 5px;
+  background: var(--panel-2);
   object-fit: cover;
 }
 
@@ -761,12 +790,36 @@ label {
   color: var(--danger);
 }
 
-.deal-card {
+.deal-banner {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.4);
+  padding: 11px;
+}
+
+.deal-banner.good {
+  border-color: rgba(52, 211, 153, 0.42);
+  background:
+    linear-gradient(120deg, rgba(52, 211, 153, 0.2), transparent 58%),
+    rgba(3, 8, 20, 0.42);
+}
+
+.deal-banner.warn {
+  border-color: rgba(255, 203, 5, 0.42);
+  background:
+    linear-gradient(120deg, rgba(255, 203, 5, 0.18), transparent 58%),
+    rgba(3, 8, 20, 0.42);
+}
+
+.deal-banner.danger {
+  border-color: rgba(251, 113, 133, 0.42);
+  background:
+    linear-gradient(120deg, rgba(251, 113, 133, 0.18), transparent 58%),
+    rgba(3, 8, 20, 0.42);
 }
 
 .market-signal {
@@ -909,13 +962,13 @@ label {
   padding: 5px 7px;
 }
 
-.deal-card div,
+.deal-banner div,
 .grade-verdict {
   display: grid;
   gap: 3px;
 }
 
-.deal-card span,
+.deal-banner span,
 .grade-verdict span,
 .catalog-strip span {
   color: var(--muted);
@@ -923,7 +976,7 @@ label {
   font-weight: 800;
 }
 
-.deal-card strong,
+.deal-banner strong,
 .grade-verdict strong,
 .catalog-strip strong {
   overflow-wrap: anywhere;
@@ -975,15 +1028,15 @@ label {
   filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.36));
 }
 
-.deal-card.good strong {
+.deal-banner.good strong {
   color: var(--green);
 }
 
-.deal-card.warn strong {
+.deal-banner.warn strong {
   color: var(--yellow);
 }
 
-.deal-card.danger strong {
+.deal-banner.danger strong {
   color: var(--danger);
 }
 
@@ -1369,7 +1422,7 @@ label {
   .status-strip,
   .detail-grid,
   .form-grid,
-  .deal-card {
+  .deal-banner {
     grid-template-columns: 1fr;
   }
 
