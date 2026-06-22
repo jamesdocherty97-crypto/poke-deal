@@ -9,6 +9,14 @@ import {
   type ListingStateFilter,
 } from "@/lib/dealer/tableControls";
 import { buildProfitTrend, type ProfitTrendPoint } from "@/lib/dealer/metrics";
+import {
+  DEFAULT_QUICK_HUNTS,
+  parseQuickHunts,
+  pinQuickHunt,
+  removeQuickHunt,
+  serializeQuickHunts,
+  type QuickHuntCard,
+} from "@/lib/dealer/quickHunts";
 
 type View = "acquire" | "inventory" | "listings" | "pnl";
 type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
@@ -227,32 +235,7 @@ type PortfolioHistory = {
 const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
-const quickHunts = [
-  {
-    name: "Charizard ex",
-    setName: "151",
-    number: "199/165",
-    imageUrl: "https://images.pokemontcg.io/sv3pt5/199_hires.png",
-  },
-  {
-    name: "Pikachu ex",
-    setName: "Surging Sparks",
-    number: "238/191",
-    imageUrl: "https://images.pokemontcg.io/sv8/238_hires.png",
-  },
-  {
-    name: "Mew ex",
-    setName: "Paldean Fates",
-    number: "232/091",
-    imageUrl: "https://images.pokemontcg.io/sv4pt5/232_hires.png",
-  },
-  {
-    name: "Umbreon VMAX",
-    setName: "Evolving Skies",
-    number: "215/203",
-    imageUrl: "https://images.pokemontcg.io/swsh7/215_hires.png",
-  },
-];
+const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
 
 export default function Home() {
   const [view, setView] = useState<View>("acquire");
@@ -318,10 +301,19 @@ export default function Home() {
   const [listingQuery, setListingQuery] = useState("");
   const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("ALL");
   const [listingSort, setListingSort] = useState<ListingSort>("newest");
+  const [quickHunts, setQuickHunts] = useState<QuickHuntCard[]>(DEFAULT_QUICK_HUNTS);
 
   useEffect(() => {
     void refreshAll();
     void loadPopularSets();
+  }, []);
+
+  useEffect(() => {
+    try {
+      setQuickHunts(parseQuickHunts(window.localStorage.getItem(QUICK_HUNTS_STORAGE_KEY)));
+    } catch {
+      setQuickHunts(DEFAULT_QUICK_HUNTS);
+    }
   }, []);
 
   // Set autocomplete: search-as-you-type against the bundled offline set
@@ -617,13 +609,48 @@ export default function Home() {
     }
   }
 
-  function chooseQuickHunt(card: (typeof quickHunts)[number]) {
+  function persistQuickHunts(next: QuickHuntCard[]) {
+    setQuickHunts(next);
+    try {
+      window.localStorage.setItem(QUICK_HUNTS_STORAGE_KEY, serializeQuickHunts(next));
+    } catch {
+      // Local storage is a convenience; the fixed defaults still make the
+      // acquire flow usable if the browser blocks persistence.
+    }
+  }
+
+  function pinCurrentQuickHunt() {
+    const next = pinQuickHunt(quickHunts, {
+      name,
+      setName: setNameValue,
+      number,
+      imageUrl: cardArtUrl ?? catalogCard?.imageUrl ?? undefined,
+    });
+    persistQuickHunts(next);
+    setNotice(`${name.trim()} pinned to quick hunts.`);
+    setError(null);
+  }
+
+  function removePinnedQuickHunt(card: QuickHuntCard) {
+    const next = removeQuickHunt(quickHunts, card);
+    persistQuickHunts(next.length > 0 ? next : DEFAULT_QUICK_HUNTS);
+    setNotice(`${card.name} removed from quick hunts.`);
+    setError(null);
+  }
+
+  function resetQuickHunts() {
+    persistQuickHunts(DEFAULT_QUICK_HUNTS);
+    setNotice("Quick hunts reset.");
+    setError(null);
+  }
+
+  function chooseQuickHunt(card: QuickHuntCard) {
     setName(card.name);
     setSetNameValue(card.setName);
     setNumber(card.number);
     setComp(null);
     setSuggestion(null);
-    setCardArtUrl(card.imageUrl);
+    setCardArtUrl(card.imageUrl ?? null);
     setGradeComp(null);
     setNotice(null);
     setError(null);
@@ -1028,12 +1055,35 @@ export default function Home() {
               <h2>Fast comp</h2>
               <span className="muted">Live GBP valuation</span>
             </div>
+            <div className="quick-hunt-toolbar" aria-label="Quick hunt controls">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={pinCurrentQuickHunt}
+                disabled={!name.trim() || !setNameValue.trim() || !number.trim()}
+              >
+                Pin current
+              </button>
+              <button className="ghost-button" type="button" onClick={resetQuickHunts}>
+                Reset
+              </button>
+            </div>
             <div className="quick-hunts" aria-label="Quick card picks">
               {quickHunts.map((card) => (
-                <button key={`${card.name}-${card.number}`} type="button" onClick={() => chooseQuickHunt(card)}>
-                  <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
-                  <span>{card.name}</span>
-                </button>
+                <article className="quick-hunt-card" key={`${card.name}-${card.setName}-${card.number}`}>
+                  <button className="quick-hunt-pick" type="button" onClick={() => chooseQuickHunt(card)}>
+                    <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
+                    <span>{card.name}</span>
+                  </button>
+                  <button
+                    className="quick-hunt-remove danger-button"
+                    type="button"
+                    onClick={() => removePinnedQuickHunt(card)}
+                    aria-label={`Remove ${card.name} quick hunt`}
+                  >
+                    x
+                  </button>
+                </article>
               ))}
             </div>
             <label className="set-field">
