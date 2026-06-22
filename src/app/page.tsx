@@ -17,6 +17,7 @@ import {
   serializeQuickHunts,
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
+import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
 import { estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
@@ -322,6 +323,7 @@ export default function Home() {
   const [watchCheckedAt, setWatchCheckedAt] = useState<string | null>(null);
   const [watchDiscordReady, setWatchDiscordReady] = useState<boolean | null>(null);
   const [editingListingId, setEditingListingId] = useState<string | null>(null);
+  const [creatingListingItemId, setCreatingListingItemId] = useState<string | null>(null);
   const [listingPrice, setListingPrice] = useState("");
   const [listingState, setListingState] = useState<Exclude<ListingState, "SOLD">>("DRAFT");
   const [listingChannel, setListingChannel] = useState<Channel>("EBAY");
@@ -439,6 +441,10 @@ export default function Home() {
     () => inventory.find((item) => item.id === sellingId) ?? null,
     [inventory, sellingId],
   );
+  const creatingListingItem = useMemo(
+    () => inventory.find((item) => item.id === creatingListingItemId) ?? null,
+    [creatingListingItemId, inventory],
+  );
   const salePreview = useMemo(() => {
     if (!sellingItem) return null;
     const salePricePence = poundsToPence(salePrice);
@@ -506,7 +512,9 @@ export default function Home() {
   const draftListingCount = Number(dashboard?.listingsByState.DRAFT ?? 0);
   const activeListingCount = Number(dashboard?.listingsByState.ACTIVE ?? 0);
   const activeWatchCount = watches.filter((watch) => watch.active).length;
-  const unlistedStockCount = activeInventory.filter((item) => item.listings.length === 0).length;
+  const unlistedStockCount = activeInventory.filter(
+    (item) => !item.listings.some((listing) => listing.state === "DRAFT" || listing.state === "ACTIVE"),
+  ).length;
   const todayActions = useMemo(
     () =>
       buildTodayActions({
@@ -703,6 +711,67 @@ export default function Home() {
     }
   }
 
+  async function stockWithoutComp() {
+    setBusy("manual-stock");
+    setError(null);
+    setNotice(null);
+    const costBasisPence = poundsToPence(cost);
+    const draftDefaults = buildListingDraftDefaults({
+      card: { name, number },
+      grade,
+      costBasis: costBasisPence,
+    });
+
+    try {
+      const res = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card: { name, setName: setNameValue, number },
+          grade,
+          costBasisPence,
+          acquiredFrom: source || undefined,
+          location: location || undefined,
+          status: "IN_STOCK",
+        }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "manual stock failed");
+
+      let listingCreated = false;
+      if (payload.item?.id) {
+        const listingRes = await fetch("/api/listings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemId: payload.item.id,
+            channel,
+            state: "DRAFT",
+            listPricePence: draftDefaults.listPricePence,
+          }),
+        });
+        const listingPayload = await readJson(listingRes);
+        if (!listingRes.ok) {
+          console.warn("[manual stock] draft listing skipped:", listingPayload.error ?? "listing create failed");
+        } else {
+          listingCreated = true;
+        }
+      }
+
+      setNotice(
+        listingCreated
+          ? `Stocked manually. Drafted at ${gbp(draftDefaults.listPricePence)}.`
+          : "Stocked manually. Add a listing from Stock when ready.",
+      );
+      await refreshAll();
+      setView("inventory");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "manual stock failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function createWatch() {
     setBusy("watch-create");
     setError(null);
@@ -881,6 +950,7 @@ export default function Home() {
     const estimate = estimateSaleCosts(nextChannel, price);
     setSellingId(item.id);
     setEditingItemId(null);
+    setCreatingListingItemId(null);
     setSalePrice(penceToPounds(price));
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
@@ -902,6 +972,7 @@ export default function Home() {
   function openInventoryEditor(item: InventoryItem) {
     setEditingItemId(item.id);
     setSellingId(null);
+    setCreatingListingItemId(null);
     setItemQuantity(String(item.quantity));
     setItemCost(penceToPounds(item.costBasis));
     setItemSource(item.acquiredFrom ?? "");
@@ -998,6 +1069,65 @@ export default function Home() {
     }
   }
 
+  function openListingCreator(item: InventoryItem) {
+    const defaults = buildListingDraftDefaults({
+      card: item.card,
+      grade: item.grade,
+      costBasis: item.costBasis,
+    });
+    setCreatingListingItemId(item.id);
+    setEditingListingId(null);
+    setSellingId(null);
+    setListingPrice(penceToPounds(defaults.listPricePence));
+    setListingState("DRAFT");
+    setListingChannel(item.listings[0]?.channel ?? "EBAY");
+    setListingExternalUrl("");
+    setError(null);
+    setNotice(null);
+  }
+
+  async function createListing(event: FormEvent) {
+    event.preventDefault();
+    const item = inventory.find((row) => row.id === creatingListingItemId);
+    if (!item) return;
+    setBusy(`create-listing-${item.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId: item.id,
+          channel: listingChannel,
+          state: listingState === "ACTIVE" ? "ACTIVE" : "DRAFT",
+          listPricePence: poundsToPence(listingPrice),
+          externalUrl: listingExternalUrl.trim() || null,
+        }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "listing create failed");
+      setNotice(`${item.card.name} listing ${listingState === "ACTIVE" ? "activated" : "drafted"}.`);
+      setCreatingListingItemId(null);
+      await refreshAll();
+      setView("listings");
+      setListingStateFilter(listingState === "ACTIVE" ? "ACTIVE" : "DRAFT");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "listing create failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function listInventoryItem(item: InventoryItem) {
+    const listing = item.listings.find((row) => row.state !== "SOLD" && row.state !== "ENDED") ?? item.listings[0];
+    if (!listing) {
+      openListingCreator(item);
+      return;
+    }
+    await patchListing(listing, { state: "ACTIVE" }, "Listing activated.");
+  }
+
   function requestDeleteItem(item: InventoryItem) {
     setDeleteTarget({ kind: "inventory", item });
   }
@@ -1031,6 +1161,7 @@ export default function Home() {
 
   function openListingEditor(listing: Listing) {
     setEditingListingId(listing.id);
+    setCreatingListingItemId(null);
     setListingPrice(penceToPounds(listing.listPrice ?? listing.suggestedPrice ?? 0));
     setListingState(listing.state === "SOLD" ? "ENDED" : listing.state);
     setListingChannel(listing.channel);
@@ -1775,6 +1906,9 @@ export default function Home() {
             <button className="primary-action" type="submit" disabled={busy === "acquire"}>
               {busy === "acquire" ? "Stocking..." : "Acquire + price"}
             </button>
+            <button className="secondary-action" type="button" onClick={stockWithoutComp} disabled={busy === "manual-stock"}>
+              {busy === "manual-stock" ? "Stocking..." : "Stock now, price later"}
+            </button>
             {suggestion && (
               <p className="hint">
                 Suggested list price {gbp(suggestion.pricePence)}. {suggestion.rationale}
@@ -1818,6 +1952,7 @@ export default function Home() {
               busy={busy}
               onEdit={openInventoryEditor}
               onSell={openSell}
+              onList={listInventoryItem}
               onStatus={updateStatus}
               onDelete={requestDeleteItem}
             />
@@ -1956,6 +2091,44 @@ export default function Home() {
             </form>
           )}
 
+          {creatingListingItemId && creatingListingItem && (
+            <form className="sell-sheet" onSubmit={createListing}>
+              <div className="panel-heading">
+                <div>
+                  <h2>Create listing</h2>
+                  <span className="muted">{creatingListingItem.card.name} · cost {gbp(creatingListingItem.costBasis)}</span>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setCreatingListingItemId(null)}>Close</button>
+              </div>
+              <div className="form-grid">
+                <label>
+                  List price
+                  <MoneyInput value={listingPrice} onChange={setListingPrice} />
+                </label>
+                <label>
+                  Channel
+                  <select value={listingChannel} onChange={(event) => setListingChannel(event.target.value as Channel)}>
+                    {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label>
+                State
+                <select value={listingState} onChange={(event) => setListingState(event.target.value as Exclude<ListingState, "SOLD">)}>
+                  <option value="DRAFT">draft</option>
+                  <option value="ACTIVE">active</option>
+                </select>
+              </label>
+              <label>
+                Listing URL
+                <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
+              </label>
+              <button className="primary-action" type="submit" disabled={busy === `create-listing-${creatingListingItemId}`}>
+                {busy === `create-listing-${creatingListingItemId}` ? "Saving..." : "Create listing"}
+              </button>
+            </form>
+          )}
+
           {soldInventory.length > 0 && (
             <>
               <div className="section-heading">
@@ -1969,6 +2142,7 @@ export default function Home() {
                   busy={busy}
                   onEdit={openInventoryEditor}
                   onSell={openSell}
+                  onList={listInventoryItem}
                   onStatus={updateStatus}
                   onDelete={requestDeleteItem}
                 />
@@ -2307,6 +2481,7 @@ function InventoryRow({
   busy,
   onEdit,
   onSell,
+  onList,
   onStatus,
   onDelete,
 }: {
@@ -2314,6 +2489,7 @@ function InventoryRow({
   busy: string | null;
   onEdit: (item: InventoryItem) => void;
   onSell: (item: InventoryItem) => void;
+  onList: (item: InventoryItem) => void;
   onStatus: (item: InventoryItem, status: ItemStatus) => void;
   onDelete: (item: InventoryItem) => void;
 }) {
@@ -2404,8 +2580,12 @@ function InventoryRow({
               </button>
             )}
             {item.status === "IN_STOCK" && (
-              <button type="button" onClick={() => onStatus(item, "LISTED")} disabled={busy === `status-${item.id}`}>
-                List
+              <button
+                type="button"
+                onClick={() => onList(item)}
+                disabled={busy === `status-${item.id}` || busy?.startsWith("listing-") || busy?.startsWith("create-listing-")}
+              >
+                {listing ? "Activate" : "Draft"}
               </button>
             )}
             {item.status !== "RESERVED" && item.status !== "SOLD" && (
