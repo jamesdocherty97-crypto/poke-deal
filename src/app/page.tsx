@@ -276,6 +276,7 @@ export default function Home() {
   const [repriceCheckedAt, setRepriceCheckedAt] = useState<string | null>(null);
   const [discordReady, setDiscordReady] = useState<boolean | null>(null);
   const [watchTarget, setWatchTarget] = useState("15.00");
+  const [watchEdits, setWatchEdits] = useState<Record<string, string>>({});
   const [watchHits, setWatchHits] = useState<WatchHit[]>([]);
   const [watchMessage, setWatchMessage] = useState<string | null>(null);
   const [watchCheckedAt, setWatchCheckedAt] = useState<string | null>(null);
@@ -412,7 +413,13 @@ export default function Home() {
       setListings(listingsJson.listings);
       setDashboard(dashboardJson);
       setPortfolio(portfolioJson);
-      setWatches(watchesJson.watches ?? []);
+      const nextWatches = (watchesJson.watches ?? []) as WatchRecord[];
+      setWatches(nextWatches);
+      setWatchEdits((current) => {
+        const next: Record<string, string> = {};
+        for (const watch of nextWatches) next[watch.id] = current[watch.id] ?? penceToPounds(watch.targetPence);
+        return next;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "refresh failed");
     }
@@ -495,9 +502,75 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "watch create failed");
       setNotice(`Watching ${name} at ${gbp(poundsToPence(watchTarget))}.`);
+      if (payload.watch?.id) {
+        setWatchEdits((current) => ({ ...current, [payload.watch.id]: penceToPounds(payload.watch.targetPence) }));
+      }
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "watch create failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function patchWatch(
+    watch: WatchRecord,
+    patch: Partial<{ targetPence: number; active: boolean; grade: Grade }>,
+    message: string,
+  ) {
+    setBusy(`watch-${watch.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/watches/${watch.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "watch update failed");
+      const updated = payload.watch as WatchRecord;
+      setWatches((rows) => rows.map((row) => (row.id === updated.id ? updated : row)));
+      setWatchEdits((current) => ({ ...current, [updated.id]: penceToPounds(updated.targetPence) }));
+      if (patch.active === false) setWatchHits((rows) => rows.filter((hit) => hit.watchId !== watch.id));
+      setNotice(message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "watch update failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveWatchTarget(watch: WatchRecord) {
+    const value = watchEdits[watch.id] ?? penceToPounds(watch.targetPence);
+    const targetPence = poundsToPence(value);
+    if (targetPence <= 0) {
+      setError("Enter a buy target above £0.");
+      return;
+    }
+    await patchWatch(watch, { targetPence }, `Updated target for ${watch.card.name} to ${gbp(targetPence)}.`);
+  }
+
+  async function deleteWatch(watch: WatchRecord) {
+    const ok = window.confirm(`Delete watch for ${watch.card.name} ${watch.grade.replace(/_/g, " ")}?`);
+    if (!ok) return;
+    setBusy(`watch-${watch.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/watches/${watch.id}`, { method: "DELETE" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "watch delete failed");
+      setWatches((rows) => rows.filter((row) => row.id !== watch.id));
+      setWatchEdits((current) => {
+        const next = { ...current };
+        delete next[watch.id];
+        return next;
+      });
+      setWatchHits((rows) => rows.filter((hit) => hit.watchId !== watch.id));
+      setNotice("Watch deleted.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "watch delete failed");
     } finally {
       setBusy(null);
     }
@@ -1364,9 +1437,25 @@ export default function Home() {
               </div>
             ) : (
               <div className="watch-list">
-                {watches.filter((watch) => watch.active).slice(0, 5).map((watch) => (
-                  <WatchRow key={watch.id} watch={watch} />
+                {watches.slice(0, 6).map((watch) => (
+                  <WatchRow
+                    key={watch.id}
+                    watch={watch}
+                    editValue={watchEdits[watch.id] ?? penceToPounds(watch.targetPence)}
+                    busy={busy === `watch-${watch.id}`}
+                    onEditValue={(value) => setWatchEdits((current) => ({ ...current, [watch.id]: value }))}
+                    onSave={() => saveWatchTarget(watch)}
+                    onToggle={() =>
+                      patchWatch(
+                        watch,
+                        { active: !watch.active },
+                        watch.active ? `${watch.card.name} watch paused.` : `${watch.card.name} watch resumed.`,
+                      )
+                    }
+                    onDelete={() => deleteWatch(watch)}
+                  />
                 ))}
+                {watches.length === 0 && <p className="empty-state">No buy watches yet.</p>}
               </div>
             )}
           </section>
@@ -1573,17 +1662,56 @@ function RepriceActionRow({
   );
 }
 
-function WatchRow({ watch }: { watch: WatchRecord }) {
+function WatchRow({
+  watch,
+  editValue,
+  busy,
+  onEditValue,
+  onSave,
+  onToggle,
+  onDelete,
+}: {
+  watch: WatchRecord;
+  editValue: string;
+  busy: boolean;
+  onEditValue: (value: string) => void;
+  onSave: () => void;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
   const latest = watch.alerts?.[0];
   return (
-    <article className="watch-row">
+    <article className={`watch-row ${watch.active ? "" : "inactive"}`}>
       {watch.card.imageUrl ? <img src={watch.card.imageUrl} alt="" /> : <span aria-hidden="true" />}
-      <div>
-        <strong>{watch.card.name}</strong>
+      <div className="watch-main">
+        <div className="watch-title-line">
+          <strong>{watch.card.name}</strong>
+          <span className={`pill ${watch.active ? "good" : ""}`}>{watch.active ? "active" : "paused"}</span>
+        </div>
         <span>
-          {watch.card.number ?? "no number"} · {watch.grade.replace(/_/g, " ")} · target {gbp(watch.targetPence)}
+          {watch.card.number ?? "no number"} · {watch.grade.replace(/_/g, " ")}
         </span>
         {latest && <small>Last hit {shortDate(latest.firedAt)} at {latest.pence ? gbp(latest.pence) : "n/a"}</small>}
+        <div className="watch-controls">
+          <label>
+            Target GBP
+            <input
+              inputMode="decimal"
+              value={editValue}
+              onChange={(event) => onEditValue(event.target.value)}
+              disabled={busy}
+            />
+          </label>
+          <button type="button" onClick={onSave} disabled={busy}>
+            Save
+          </button>
+          <button type="button" onClick={onToggle} disabled={busy}>
+            {watch.active ? "Pause" : "Resume"}
+          </button>
+          <button className="danger-button" type="button" onClick={onDelete} disabled={busy}>
+            Delete
+          </button>
+        </div>
       </div>
     </article>
   );
