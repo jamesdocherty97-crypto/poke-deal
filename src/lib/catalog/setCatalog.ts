@@ -23,6 +23,8 @@
 // To freshen the snapshot later, re-fetch /v2/sets and regenerate the
 // SET_SNAPSHOT array below -- no other code needs to change.
 
+import { normalizeSearchText, scoreSearchText, tokenizeSearchText, tokenMatches } from "./fuzzy.js";
+
 export interface CatalogSet {
   id: string;
   name: string;
@@ -280,23 +282,6 @@ const POPULAR_SET_IDS = [
 // Normalization + matching
 // ---------------------------------------------------------------------------
 
-/** Lowercase, strip diacritics/punctuation, collapse whitespace. */
-function normalize(input: string): string {
-  return input
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function tokenize(input: string): string[] {
-  const norm = normalize(input);
-  return norm ? norm.split(" ") : [];
-}
-
 function releaseTime(set: CatalogSet): number {
   if (!set.releaseDate) return 0;
   const t = Date.parse(set.releaseDate);
@@ -305,14 +290,8 @@ function releaseTime(set: CatalogSet): number {
 
 // Tokenize every set name once at module load -- 173 short strings, trivial cost.
 const SET_NAME_TOKENS = new Map<string, string[]>(
-  SET_SNAPSHOT.map((set) => [set.id, tokenize(set.name)]),
+  SET_SNAPSHOT.map((set) => [set.id, tokenizeSearchText(set.name)]),
 );
-
-/** A query token matches a candidate token if equal, or as a prefix (length >= 3) to tolerate partial typing/plurals. */
-function tokensMatch(queryToken: string, candidateToken: string): boolean {
-  if (queryToken === candidateToken) return true;
-  return queryToken.length >= 3 && candidateToken.startsWith(queryToken);
-}
 
 /**
  * Rank candidate sets against freeform input. Combines, in priority order:
@@ -327,7 +306,7 @@ export function searchSets(query: string, limit = 8): CatalogSet[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const norm = normalize(trimmed);
+  const norm = normalizeSearchText(trimmed);
   if (!norm) return [];
 
   const scores = new Map<string, number>();
@@ -349,24 +328,27 @@ export function searchSets(query: string, limit = 8): CatalogSet[] {
     if (set.ptcgoCode && set.ptcgoCode.toUpperCase() === upperTrimmed) {
       bump(set.id, 900);
     }
-    if (normalize(set.name) === norm) {
+    if (normalizeSearchText(set.name) === norm) {
       bump(set.id, 880);
     }
   }
 
-  const queryTokens = tokenize(trimmed);
+  const queryTokens = tokenizeSearchText(trimmed);
   if (queryTokens.length > 0) {
     for (const set of SET_SNAPSHOT) {
       const candidateTokens = SET_NAME_TOKENS.get(set.id) ?? [];
       if (candidateTokens.length === 0) continue;
       const allMatched = queryTokens.every((qt) =>
-        candidateTokens.some((ct) => tokensMatch(qt, ct)),
+        candidateTokens.some((ct) => tokenMatches(qt, ct)),
       );
       if (allMatched) {
         const extra = candidateTokens.length - queryTokens.length;
         const score = Math.max(500 - extra * 40, 50);
         bump(set.id, score);
       }
+
+      const fuzzyScore = scoreSearchText(trimmed, set.name);
+      if (fuzzyScore > 0) bump(set.id, fuzzyScore);
     }
   }
 

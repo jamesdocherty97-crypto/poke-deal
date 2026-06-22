@@ -85,6 +85,27 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     return null;
   }
 
+  async search(card: CardRef, limit = 10): Promise<CatalogCard[]> {
+    if ((card.game && card.game !== "POKEMON") || (card.language && card.language !== "EN")) {
+      return [];
+    }
+
+    const queries = buildPokemonTcgSearchQueries(card);
+    if (queries.length === 0) return [];
+    const resolvedSetId = resolveSetId(card.setName);
+
+    for (const q of queries) {
+      const json = await this.request("/cards", {
+        q,
+        pageSize: String(Math.min(Math.max(limit, 1), 25)),
+        select: SELECT_FIELDS,
+      });
+      const cards = rankPokemonTcgCards(readDataArray(json), card, resolvedSetId);
+      if (cards.length > 0) return cards.slice(0, limit);
+    }
+    return [];
+  }
+
   private async request(path: string, params: Record<string, string>): Promise<unknown> {
     try {
       const url = new URL(`${this.baseUrl}${path}`);
@@ -244,14 +265,18 @@ export function pickBestPokemonTcgCard(
   target: CardRef,
   resolvedSetId?: string,
 ): CatalogCard | null {
-  const mapped = cards
-    .map(mapPokemonTcgCard)
-    .filter((card): card is CatalogCard => card != null);
-  if (mapped.length === 0) return null;
+  return rankPokemonTcgCards(cards, target, resolvedSetId)[0] ?? null;
+}
 
-  return mapped.reduce((best, card) =>
-    scoreCatalogCard(card, target, resolvedSetId) > scoreCatalogCard(best, target, resolvedSetId) ? card : best,
-  );
+export function rankPokemonTcgCards(
+  cards: unknown[],
+  target: CardRef,
+  resolvedSetId?: string,
+): CatalogCard[] {
+  return cards
+    .map(mapPokemonTcgCard)
+    .filter((card): card is CatalogCard => card != null)
+    .sort((a, b) => scoreCatalogCard(b, target, resolvedSetId) - scoreCatalogCard(a, target, resolvedSetId));
 }
 
 export function normalizeCollectorNumber(number: string | undefined): string | undefined {

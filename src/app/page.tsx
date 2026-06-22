@@ -195,6 +195,8 @@ export default function Home() {
   const [popularSets, setPopularSets] = useState<CatalogSet[]>([]);
   const [setSuggestions, setSetSuggestions] = useState<CatalogSet[]>([]);
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
+  const [cardSuggestions, setCardSuggestions] = useState<CatalogCard[]>([]);
+  const [cardSuggestionsOpen, setCardSuggestionsOpen] = useState(false);
 
   useEffect(() => {
     void refreshAll();
@@ -220,6 +222,24 @@ export default function Home() {
     }, 150);
     return () => clearTimeout(handle);
   }, [setNameValue, setSuggestionsOpen, popularSets]);
+
+  useEffect(() => {
+    if (!cardSuggestionsOpen) return;
+    const query = name.trim();
+    if (!query) {
+      setCardSuggestions([]);
+      return;
+    }
+    const handle = setTimeout(() => {
+      const qs = new URLSearchParams({ q: query, limit: "8" });
+      if (setNameValue.trim()) qs.set("set", setNameValue.trim());
+      fetch(`/api/catalog/cards?${qs}`)
+        .then(readJson)
+        .then((payload) => setCardSuggestions(payload.cards ?? []))
+        .catch(() => {});
+    }, 180);
+    return () => clearTimeout(handle);
+  }, [name, setNameValue, cardSuggestionsOpen]);
 
   const activeInventory = useMemo(
     () => inventory.filter((item) => item.status !== "SOLD"),
@@ -368,6 +388,15 @@ export default function Home() {
   function chooseSet(set: CatalogSet) {
     setSetNameValue(set.name);
     setSetSuggestionsOpen(false);
+  }
+
+  function chooseCard(card: CatalogCard) {
+    setName(card.name);
+    setSetNameValue(card.setName);
+    if (card.number) setNumber(card.number);
+    if (card.imageUrl) setCardArtUrl(card.imageUrl);
+    setCardSuggestionsOpen(false);
+    setError(null);
   }
 
   function openSell(item: InventoryItem) {
@@ -598,9 +627,35 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <label>
+            <label className="set-field">
               Card
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Card name" />
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                onFocus={() => setCardSuggestionsOpen(true)}
+                onBlur={() => setTimeout(() => setCardSuggestionsOpen(false), 150)}
+                placeholder="Charizard, Moonbreon, Mr Mime..."
+                autoComplete="off"
+              />
+              {cardSuggestionsOpen && cardSuggestions.length > 0 && (
+                <div className="set-suggestions card-suggestions" role="listbox" aria-label="Card suggestions">
+                  {cardSuggestions.map((card) => (
+                    <button
+                      key={card.tcgApiId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
+                      type="button"
+                      className="suggestion-item card-option"
+                      onClick={() => chooseCard(card)}
+                    >
+                      {card.imageUrl ? <img src={card.imageUrl} alt="" /> : null}
+                      <span>{card.name}</span>
+                      <small>
+                        {card.setName}
+                        {card.number ? ` #${card.number}` : ""}
+                      </small>
+                    </button>
+                  ))}
+                </div>
+              )}
             </label>
             <div className="form-grid">
               <label className="set-field">

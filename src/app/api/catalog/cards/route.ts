@@ -1,0 +1,106 @@
+import { NextResponse } from "next/server";
+import { rankCatalogCards } from "@/lib/catalog/cardSearch";
+import { searchChaseCards } from "@/lib/catalog/chaseCards";
+import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
+import { toCardData } from "@/lib/catalog/prismaCardCache";
+import type { CatalogCard } from "@/lib/catalog/types";
+import { getPrisma } from "@/lib/db/prisma";
+import type { Game, Language } from "@/lib/domain/types";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type DbCard = {
+  id: string;
+  game: Game;
+  language: Language;
+  name: string;
+  setName: string;
+  setCode: string | null;
+  number: string | null;
+  rarity: string | null;
+  imageUrl: string | null;
+  tcgApiId: string | null;
+};
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const q = searchParams.get("q") ?? "";
+  const setName = searchParams.get("set") ?? undefined;
+  const limitParam = Number(searchParams.get("limit"));
+  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 20) : 8;
+
+  if (!q.trim()) return NextResponse.json({ cards: [] });
+
+  const localCards = await findLocalCards(q, setName).catch(() => []);
+  const localRanked = rankCatalogCards(q, localCards, { setName, limit });
+
+  let liveCards: CatalogCard[] = [];
+  if (localRanked.length < limit) {
+    const source = new PokemonTcgApiCatalogSource();
+    liveCards = await source.search({ name: q, setName, game: "POKEMON", language: "EN" }, limit).catch(() => []);
+    await cacheCatalogCards(liveCards).catch((err) => {
+      console.warn("[catalog/cards] live card cache skipped:", err instanceof Error ? err.message : "unknown error");
+    });
+  }
+
+  const chaseCards = searchChaseCards(q, setName, limit);
+  const cards = rankCatalogCards(q, [...localRanked, ...liveCards, ...chaseCards], { setName, limit });
+  return NextResponse.json({ cards });
+}
+
+async function findLocalCards(q: string, setName: string | undefined): Promise<CatalogCard[]> {
+  const db = getPrisma();
+  const containsMatches = await db.card.findMany({
+    where: {
+      game: "POKEMON",
+      language: "EN",
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        { number: { contains: q, mode: "insensitive" } },
+        ...(setName ? [{ setName: { contains: setName, mode: "insensitive" as const } }] : []),
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 120,
+  });
+
+  const recentMatches = await db.card.findMany({
+    where: {
+      game: "POKEMON",
+      language: "EN",
+      ...(setName ? { setName: { contains: setName, mode: "insensitive" as const } } : {}),
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 120,
+  });
+
+  return [...containsMatches, ...recentMatches].map(dbCardToCatalogCard);
+}
+
+async function cacheCatalogCards(cards: CatalogCard[]): Promise<void> {
+  const db = getPrisma();
+  for (const card of cards) {
+    if (!card.tcgApiId) continue;
+    const data = toCardData(card);
+    await db.card.upsert({
+      where: { tcgApiId: card.tcgApiId },
+      create: data,
+      update: data,
+    });
+  }
+}
+
+function dbCardToCatalogCard(card: DbCard): CatalogCard {
+  return {
+    game: card.game,
+    language: card.language,
+    name: card.name,
+    setName: card.setName,
+    setCode: card.setCode ?? undefined,
+    number: card.number ?? undefined,
+    rarity: card.rarity ?? undefined,
+    imageUrl: card.imageUrl ?? undefined,
+    tcgApiId: card.tcgApiId ?? undefined,
+  };
+}

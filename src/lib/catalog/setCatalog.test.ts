@@ -49,6 +49,11 @@ test("searchSets ranks the exact set above longer sets that merely contain the s
   assert.equal(looseResults[0]?.id, "base1");
 });
 
+test("searchSets tolerates common typos", () => {
+  assert.equal(searchSets("Evolvng Skies")[0]?.id, "swsh7");
+  assert.equal(searchSets("Paldean Fate")[0]?.id, "sv4pt5");
+});
+
 test("searchSets returns nothing for blank queries", () => {
   assert.deepEqual(searchSets(""), []);
   assert.deepEqual(searchSets("   "), []);

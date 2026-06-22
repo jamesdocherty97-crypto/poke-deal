@@ -203,6 +203,36 @@ test("PokemonTcgApiCatalogSource falls back to looser queries when the most spec
   assert.equal(queriesSeen[1], 'name:"Charizard" set.id:base1');
 });
 
+test("PokemonTcgApiCatalogSource searches and ranks multiple cards", async () => {
+  const fetchImpl = (async () => ({
+    ok: true,
+    async json() {
+      return {
+        data: [
+          {
+            id: "swsh4-25",
+            name: "Charizard",
+            number: "25",
+            set: { id: "swsh4", name: "Vivid Voltage", printedTotal: 185 },
+          },
+          {
+            id: "base1-4",
+            name: "Charizard",
+            number: "4",
+            set: { id: "base1", name: "Base", printedTotal: 102 },
+          },
+        ],
+      };
+    },
+  }) as Response) as typeof fetch;
+
+  const source = new PokemonTcgApiCatalogSource(undefined, fetchImpl, "https://api.example.test/v2");
+  const cards = await source.search({ name: "Charizard", setName: "base set" }, 5);
+
+  assert.equal(cards[0]?.tcgApiId, "base1-4");
+  assert.equal(cards[0]?.number, "4/102");
+});
+
 test("PokemonTcgApiCatalogSource fetches by tcgApiId when supplied", async () => {
   const calls: string[] = [];
   const fetchImpl = (async (url: URL) => {
