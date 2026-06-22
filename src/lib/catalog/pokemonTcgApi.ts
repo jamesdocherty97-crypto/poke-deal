@@ -1,6 +1,6 @@
 import type { CardRef } from "../domain/types.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../comps/currency.js";
-import { resolveSetId } from "./setCatalog.js";
+import { resolveSetIdForCard } from "./setCatalog.js";
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js";
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
@@ -72,7 +72,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     const queries = buildPokemonTcgSearchQueries(card);
     if (queries.length === 0) return null;
 
-    const resolvedSetId = resolveSetId(card.setName);
+    const resolvedSetId = resolveSetIdForCard(card.setName, card.number);
 
     // Progressive relaxation: try the most specific query first (name +
     // number + set), then fall back through looser combinations. This is
@@ -102,7 +102,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
 
     const queries = buildPokemonTcgSearchQueries(card);
     if (queries.length === 0) return [];
-    const resolvedSetId = resolveSetId(card.setName);
+    const resolvedSetId = resolveSetIdForCard(card.setName, card.number);
 
     for (const q of queries) {
       const json = await this.request("/cards", {
@@ -185,7 +185,7 @@ export function buildPokemonTcgSearchQueries(card: CardRef): string[] {
   const number = normalizeCollectorNumber(card.number);
   const numberTerm = number ? `number:${quoteQueryValue(number)}` : undefined;
 
-  const resolvedSetId = resolveSetId(card.setName);
+  const resolvedSetId = resolveSetIdForCard(card.setName, card.number);
   const setTerm = resolvedSetId ? `set.id:${resolvedSetId}` : undefined;
 
   const levels: Array<Array<string | undefined>> = [
@@ -221,7 +221,7 @@ export function mapPokemonTcgCard(card: unknown): CatalogCard | null {
 
   const apiNumber = readString(payload?.number);
   const printedTotal = readPositiveInt(payload?.set?.printedTotal) ?? readPositiveInt(payload?.set?.total);
-  const number = apiNumber ? formatCollectorNumber(apiNumber, printedTotal) : undefined;
+  const number = apiNumber ? formatCollectorNumber(apiNumber, printedTotal, payload?.set) : undefined;
 
   return {
     game: "POKEMON",
@@ -331,9 +331,31 @@ export function normalizeCollectorNumber(number: string | undefined): string | u
   return beforeSlash;
 }
 
-function formatCollectorNumber(number: string, printedTotal: number | undefined): string {
+function formatCollectorNumber(
+  number: string,
+  printedTotal: number | undefined,
+  set: PokemonTcgSet | undefined,
+): string {
   if (number.includes("/") || !printedTotal) return number;
+  const prefixed = number.match(/^([A-Za-z]{1,4})\d+$/);
+  if (prefixed) {
+    const prefix = prefixed[1]!.toUpperCase();
+    return shouldMirrorPrefixInPrintedTotal(prefix, set)
+      ? `${number}/${prefix}${printedTotal}`
+      : number;
+  }
   return `${number}/${printedTotal}`;
+}
+
+function shouldMirrorPrefixInPrintedTotal(prefix: string, set: PokemonTcgSet | undefined): boolean {
+  const setName = readString(set?.name)?.toLowerCase() ?? "";
+  return (
+    ["TG", "GG", "SV", "RC"].includes(prefix) ||
+    setName.includes("trainer gallery") ||
+    setName.includes("galarian gallery") ||
+    setName.includes("shiny vault") ||
+    setName.includes("radiant collection")
+  );
 }
 
 function scoreCatalogCard(card: CatalogCard, target: CardRef, resolvedSetId?: string): number {

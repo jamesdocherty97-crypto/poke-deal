@@ -2,7 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { gradeToProviderKey, mapCardAggregateToComp, PokemonPriceTrackerSource } from "./pokemonPriceTracker.js";
+import {
+  buildPokemonPriceTrackerSearch,
+  gradeToProviderKey,
+  mapCardAggregateToComp,
+  normalizeProviderCollectorNumber,
+  PokemonPriceTrackerSource,
+} from "./pokemonPriceTracker.js";
 import type { CardRef } from "../../domain/types.js";
 
 const fixture = JSON.parse(
@@ -36,6 +42,42 @@ test("RAW prefers smartMarketPrice from noisy ungraded aggregate, converted to G
   assert.equal(c.asOf, "2026-06-21T21:46:14.427Z");
   assert.equal((c.raw as { chosenPriceSource?: string; marketPrice7Day?: number }).chosenPriceSource, "smartMarketPrice");
   assert.equal((c.raw as { marketPrice7Day?: number }).marketPrice7Day, 453.7475);
+});
+
+test("buildPokemonPriceTrackerSearch expands prefixed subset numbers for provider matching", () => {
+  assert.equal(
+    buildPokemonPriceTrackerSearch({
+      name: "Gengar",
+      setName: "Lost Origin Trainer Gallery",
+      number: "TG06/30",
+    }),
+    "Gengar TG06/TG30",
+  );
+  assert.equal(
+    buildPokemonPriceTrackerSearch({
+      name: "Gengar",
+      setName: "Lost Origin",
+      number: "TG06",
+    }),
+    "Gengar TG06/TG30",
+  );
+  assert.equal(normalizeProviderCollectorNumber("199/165", "151"), "199/165");
+});
+
+test("PokemonPriceTrackerSource live requests use provider-style prefixed numbers", async () => {
+  let requestedUrlString: string | null = null;
+  const fetchImpl = (async (url: string | URL | Request) => {
+    requestedUrlString = String(url);
+    return new Response(JSON.stringify(fixture), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
+  await source.lookup({ name: "Gengar", setName: "Lost Origin", number: "TG06/30" }, { grade: "RAW" });
+
+  assert.ok(requestedUrlString);
+  const requestedUrl = new URL(requestedUrlString);
+  assert.equal(requestedUrl.searchParams.get("search"), "Gengar TG06/TG30");
+  assert.equal(requestedUrl.searchParams.get("limit"), "1");
 });
 
 test("PSA_10 maps from 'psa10' aggregate", () => {

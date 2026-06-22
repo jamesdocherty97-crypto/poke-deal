@@ -123,6 +123,17 @@ const CHASE_CARDS: CatalogCard[] = [
     imageUrl: "https://images.pokemontcg.io/swsh11/186_hires.png",
     tcgApiId: "swsh11-186",
   },
+  {
+    game: "POKEMON",
+    language: "EN",
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    setCode: "swsh11tg",
+    number: "TG06/TG30",
+    rarity: "Trainer Gallery Rare Holo",
+    imageUrl: "https://images.pokemontcg.io/swsh11tg/TG06_hires.png",
+    tcgApiId: "swsh11tg-TG06",
+  },
 ];
 
 export function getChaseCards(): CatalogCard[] {

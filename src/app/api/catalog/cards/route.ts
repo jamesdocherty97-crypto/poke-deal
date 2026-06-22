@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { rankCatalogCards } from "@/lib/catalog/cardSearch";
+import { parseCardSearchQuery, rankCatalogCards, type ParsedCardSearchQuery } from "@/lib/catalog/cardSearch";
 import { searchChaseCards } from "@/lib/catalog/chaseCards";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { toCardData } from "@/lib/catalog/prismaCardCache";
@@ -32,13 +32,17 @@ export async function GET(request: Request) {
 
   if (!q.trim()) return NextResponse.json({ cards: [] });
 
-  const localCards = await findLocalCards(q, setName).catch(() => []);
+  const parsedQuery = parseCardSearchQuery(q);
+  const localCards = await findLocalCards(q, setName, parsedQuery).catch(() => []);
   const localRanked = rankCatalogCards(q, localCards, { setName, limit });
 
   let liveCards: CatalogCard[] = [];
   if (localRanked.length < limit) {
     const source = new PokemonTcgApiCatalogSource();
-    liveCards = await source.search({ name: q, setName, game: "POKEMON", language: "EN" }, limit).catch(() => []);
+    const liveName = parsedQuery.name || q;
+    liveCards = await source
+      .search({ name: liveName, number: parsedQuery.number, setName, game: "POKEMON", language: "EN" }, limit)
+      .catch(() => []);
     await cacheCatalogCards(liveCards).catch((err) => {
       console.warn("[catalog/cards] live card cache skipped:", err instanceof Error ? err.message : "unknown error");
     });
@@ -49,15 +53,22 @@ export async function GET(request: Request) {
   return NextResponse.json({ cards });
 }
 
-async function findLocalCards(q: string, setName: string | undefined): Promise<CatalogCard[]> {
+async function findLocalCards(
+  q: string,
+  setName: string | undefined,
+  parsedQuery: ParsedCardSearchQuery,
+): Promise<CatalogCard[]> {
   const db = getPrisma();
+  const nameQuery = parsedQuery.name || q;
   const containsMatches = await db.card.findMany({
     where: {
       game: "POKEMON",
       language: "EN",
       OR: [
         { name: { contains: q, mode: "insensitive" } },
+        ...(nameQuery !== q ? [{ name: { contains: nameQuery, mode: "insensitive" as const } }] : []),
         { number: { contains: q, mode: "insensitive" } },
+        ...(parsedQuery.number ? [{ number: { contains: parsedQuery.number, mode: "insensitive" as const } }] : []),
         ...(setName ? [{ setName: { contains: setName, mode: "insensitive" as const } }] : []),
       ],
     },

@@ -581,7 +581,8 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "acquire failed");
       setSuggestion(payload.suggestion);
-      setComp({ headline: payload.comp, all: [payload.comp], sourcesDisagree: false });
+      setComp(payload.comps ?? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false });
+      if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
       setNotice(`Stocked. List at ${gbp(payload.suggestion.pricePence)}.`);
       await refreshAll();
       setView("inventory");
@@ -1430,7 +1431,7 @@ export default function Home() {
               )}
               {headline.raw?.kind === "catalog-market-baseline" && (
                 <p className="hint">
-                  Using a catalog market baseline because sold comp data is thin or missing.
+                  Using a catalog market baseline because raw sold data is thin, missing, or materially above market.
                   {headline.raw.caveat ? ` ${headline.raw.caveat}` : ""}
                 </p>
               )}

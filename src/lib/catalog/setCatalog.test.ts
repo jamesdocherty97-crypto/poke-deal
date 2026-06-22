@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getAllSets, getPopularSets, getSetById, resolveSetId, searchSets } from "./setCatalog.js";
+import {
+  getAllSets,
+  getPopularSets,
+  getRelatedSubsetIds,
+  getSetById,
+  resolveSetId,
+  resolveSetIdForCard,
+  searchSets,
+} from "./setCatalog.js";
 
 test("resolveSetId fixes the reported bug: 'base set' resolves to the 1999 Base set", () => {
   // The API's literal set name is just "Base" -- a phrase query for
@@ -40,6 +48,20 @@ test("resolveSetId handles dealer shorthand for current chase sets and subsets",
   assert.equal(resolveSetId("sv promos"), "svp");
 });
 
+test("resolveSetIdForCard uses prefixed collector numbers to choose gallery subsets", () => {
+  assert.equal(resolveSetIdForCard("Lost Origin", "TG06/TG30"), "swsh11tg");
+  assert.equal(resolveSetIdForCard("Lost Origin", "TG06"), "swsh11tg");
+  assert.equal(resolveSetIdForCard("Crown Zenith", "GG70/GG70"), "swsh12pt5gg");
+  assert.equal(resolveSetIdForCard("Hidden Fates", "SV49/SV94"), "sma");
+  assert.equal(resolveSetIdForCard("Lost Origin", "066/196"), "swsh11");
+});
+
+test("getRelatedSubsetIds exposes attached high-volume subsets", () => {
+  assert.deepEqual(getRelatedSubsetIds("swsh11"), ["swsh11tg"]);
+  assert.deepEqual(getRelatedSubsetIds("swsh12pt5"), ["swsh12pt5gg"]);
+  assert.deepEqual(getRelatedSubsetIds("base1"), []);
+});
+
 test("resolveSetId returns undefined for unresolvable input and empty/blank input", () => {
   assert.equal(resolveSetId("this is not a real pokemon set at all"), undefined);
   assert.equal(resolveSetId(""), undefined);
@@ -72,9 +94,11 @@ test("searchSets returns nothing for blank queries", () => {
 
 test("getPopularSets returns the curated quick-pick list in order", () => {
   const popular = getPopularSets();
-  assert.ok(popular.length >= 35);
-  assert.equal(popular[0]?.id, "base1");
+  assert.ok(popular.length >= 70);
+  assert.equal(popular[0]?.id, "sv8pt5");
   assert.ok(popular.some((set) => set.id === "swsh12pt5gg"));
+  assert.ok(popular.some((set) => set.id === "swsh11tg"));
+  assert.ok(popular.some((set) => set.id === "swsh12tg"));
   assert.ok(popular.some((set) => set.id === "sv8"));
   assert.ok(popular.some((set) => set.id === "sv10"));
   assert.ok(popular.every((set) => typeof set.name === "string" && set.name.length > 0));

@@ -12,6 +12,7 @@
 // in current live responses; the mapper also accepts the older object-shaped data fixture.
 
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
+import { getSetById, resolveSetIdForCard } from "../../catalog/setCatalog.js";
 import type { CompSource } from "../CompSource.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
@@ -56,7 +57,7 @@ export class PokemonPriceTrackerSource implements CompSource {
   private async fetchCard(card: CardRef, windowDays: number): Promise<unknown | null> {
     // BILLING: credits are charged on the requested `limit` (default 50!) — pass limit=1.
     const days = Math.min(Math.max(windowDays, 1), 180); // Pro plan caps history at 180d
-    const search = [card.name, card.number].filter(Boolean).join(" ");
+    const search = buildPokemonPriceTrackerSearch(card);
     const params = new URLSearchParams({
       language: "english",
       search,
@@ -104,6 +105,36 @@ export function gradeToProviderKey(grade: Grade): string {
   const company = parts[0]!.toLowerCase();
   const num = parts.slice(1).join("_"); // "9_5", "10", "9"
   return `${company}${num}`; // "bgs9_5", "psa10", "psa9"
+}
+
+export function buildPokemonPriceTrackerSearch(card: CardRef): string {
+  const number = normalizeProviderCollectorNumber(card.number, card.setName);
+  return [card.name, number].filter(Boolean).join(" ");
+}
+
+export function normalizeProviderCollectorNumber(
+  number: string | undefined,
+  setName: string | undefined,
+): string | undefined {
+  const trimmed = number?.trim();
+  if (!trimmed) return undefined;
+
+  const [left, right] = trimmed.split("/").map((part) => part.trim());
+  const prefix = readPrefixedCollectorPrefix(left);
+  if (!prefix) return trimmed;
+
+  if (right) {
+    return /^\d+$/.test(right) ? `${left}/${prefix}${right}` : `${left}/${right}`;
+  }
+
+  const setId = resolveSetIdForCard(setName, left);
+  const set = setId ? getSetById(setId) : undefined;
+  return set?.printedTotal ? `${left}/${prefix}${set.printedTotal}` : left;
+}
+
+function readPrefixedCollectorPrefix(value: string | undefined): string | null {
+  const match = value?.match(/^([A-Za-z]{1,4})\d+$/);
+  return match?.[1]?.toUpperCase() ?? null;
 }
 
 function emptyComp(ctx: MapContext): CompResult {

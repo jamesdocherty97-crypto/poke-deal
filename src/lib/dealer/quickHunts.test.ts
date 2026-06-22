@@ -25,7 +25,7 @@ test("pinQuickHunt puts the selected card first and trims whitespace", () => {
     imageUrl: "https://images.pokemontcg.io/swsh12pt5gg/GG69_hires.png",
     setMarkUrl: "https://images.pokemontcg.io/swsh12pt5gg/logo.png",
   });
-  assert.equal(pinned.length, 5);
+  assert.equal(pinned.length, Math.min(DEFAULT_QUICK_HUNTS.length + 1, 6));
 });
 
 test("pinQuickHunt promotes duplicates and keeps source-backed images", () => {
@@ -60,7 +60,7 @@ test("removeQuickHunt removes by card identity", () => {
     number: "238/191",
   });
 
-  assert.deepEqual(removed.map((card) => card.name), ["Charizard ex", "Mew ex", "Umbreon VMAX"]);
+  assert.deepEqual(removed.map((card) => card.name), ["Charizard ex", "Mew ex", "Umbreon VMAX", "Gengar"]);
 });
 
 test("parseQuickHunts reads persisted cards and falls back on bad data", () => {

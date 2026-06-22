@@ -5,9 +5,14 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { CompService } from "@/lib/comps/compService";
+import {
+  catalogToCardRef,
+  createAppCompService,
+  resolveCatalogCard,
+} from "@/lib/comps/appCompLookup";
 import { PrismaInventoryRepo } from "@/lib/inventory/prismaInventoryRepo";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
+import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { acquireToInventory } from "@/lib/inventory/inventoryService";
 import { getPrisma } from "@/lib/db/prisma";
 import type { CardRef } from "@/lib/domain/types";
@@ -58,8 +63,12 @@ export async function POST(request: Request) {
   const card: CardRef = { ...d.card, game: "POKEMON", language: "EN" };
 
   try {
+    const catalogSource = new PokemonTcgApiCatalogSource();
+    const catalog = await resolveCatalogCard(card, catalogSource);
+    const compCard = catalog ? catalogToCardRef(catalog, card) : card;
+
     // 1. live comp for this card+grade
-    const comps = await CompService.default().lookup(card, { grade: d.grade });
+    const comps = await createAppCompService(catalogSource, catalog).lookup(compCard, { grade: d.grade });
 
     // 2. persist comp history (best-effort)
     if (process.env.DATABASE_URL) {
@@ -70,7 +79,7 @@ export async function POST(request: Request) {
 
     // 3. stock it + compute the suggested list price (valuing and pricing are one pipeline)
     const { item, suggestion } = await acquireToInventory(new PrismaInventoryRepo(), {
-      card,
+      card: compCard,
       grade: d.grade,
       costBasisPence: d.costBasisPence,
       quantity: d.quantity,
@@ -84,7 +93,7 @@ export async function POST(request: Request) {
     // 4. create a DRAFT listing at the suggested price (best-effort; never fails the acquire)
     let listing: { id: string; channel: string; suggestedPrice: number | null } | null = null;
     if (d.createListing) {
-      const title = [card.name, card.number, d.grade === "RAW" ? "" : d.grade.replace(/_/g, " ")]
+      const title = [compCard.name, compCard.number, d.grade === "RAW" ? "" : d.grade.replace(/_/g, " ")]
         .filter(Boolean)
         .join(" ");
       listing = await getPrisma()
@@ -104,7 +113,7 @@ export async function POST(request: Request) {
         });
     }
 
-    return NextResponse.json({ item, suggestion, comp: comps.headline, listing }, { status: 201 });
+    return NextResponse.json({ item, suggestion, comp: comps.headline, comps, catalog, listing }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "acquire failed" },

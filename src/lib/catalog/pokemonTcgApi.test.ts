@@ -42,6 +42,21 @@ test("buildPokemonTcgSearchQueries produces progressively looser fallback levels
   ]);
 });
 
+test("buildPokemonTcgSearchQueries uses prefixed numbers to resolve attached gallery subsets", () => {
+  const queries = buildPokemonTcgSearchQueries({
+    name: "Gengar",
+    setName: "Lost Origin",
+    number: "TG06/TG30",
+  });
+
+  assert.deepEqual(queries, [
+    'name:"Gengar" number:"TG06" set.id:swsh11tg',
+    'name:"Gengar" set.id:swsh11tg',
+    'name:"Gengar" number:"TG06"',
+    'name:"Gengar"',
+  ]);
+});
+
 test("buildPokemonTcgSearchQueries drops the set term entirely when it can't be resolved", () => {
   const queries = buildPokemonTcgSearchQueries({
     name: "Charizard",
@@ -123,6 +138,28 @@ test("mapPokemonTcgCard maps catalog fields and reconstructs full collector numb
   assert.equal(bestSignal?.kind, "trendPrice");
   assert.equal(bestSignal?.pricePence, Math.round((198.75 / 1.17) * 100));
   assert.ok(card?.priceSignals?.some((signal) => signal.source === "tcgplayer" && signal.kind === "market"));
+});
+
+test("mapPokemonTcgCard preserves printed prefixed subset collector numbers", () => {
+  const card = mapPokemonTcgCard({
+    id: "swsh11tg-TG06",
+    name: "Gengar",
+    number: "TG06",
+    rarity: "Trainer Gallery Rare Holo",
+    images: {
+      large: "https://images.pokemontcg.io/swsh11tg/TG06_hires.png",
+    },
+    set: {
+      id: "swsh11tg",
+      name: "Lost Origin Trainer Gallery",
+      printedTotal: 30,
+    },
+  });
+
+  assert.equal(card?.tcgApiId, "swsh11tg-TG06");
+  assert.equal(card?.setCode, "swsh11tg");
+  assert.equal(card?.number, "TG06/TG30");
+  assert.equal(card?.imageUrl, "https://images.pokemontcg.io/swsh11tg/TG06_hires.png");
 });
 
 test("PokemonTcgApiCatalogSource searches cards and sends API key header when present", async () => {

@@ -349,52 +349,129 @@ const SET_ALIASES: Record<string, string> = {
 // Curated set of well-known / heavily-traded sets spanning vintage WOTC
 // through current-era chase sets, for "popular sets" quick-pick UI chips.
 const POPULAR_SET_IDS = [
+  // Daily dealer flow: newest and most commonly comped modern sets first.
+  "sv8pt5",
+  "sv8",
+  "sv7",
+  "sv6",
+  "sv5",
+  "sv4pt5",
+  "sv4",
+  "sv3pt5",
+  "sv3",
+  "sv2",
+  "sv1",
+  "sv10",
+  "sv9",
+  "zsv10pt5",
+  "rsv10pt5",
+  "me1",
+  "me2",
+  "me2pt5",
+  "me3",
+  "me4",
+
+  // Sword & Shield high-volume and chase sets, including their subsets.
+  "swsh12pt5",
+  "swsh12pt5gg",
+  "swsh12",
+  "swsh12tg",
+  "swsh11",
+  "swsh11tg",
+  "pgo",
+  "swsh10",
+  "swsh10tg",
+  "swsh9",
+  "swsh9tg",
+  "swsh8",
+  "swsh7",
+  "swsh6",
+  "swsh5",
+  "swsh4",
+  "swsh35",
+  "swsh3",
+  "swsh2",
+  "swsh1",
+  "swsh45",
+  "swsh45sv",
+  "cel25",
+  "cel25c",
+  "swshp",
+
+  // Sun & Moon / XY sets that still come up constantly in collections.
+  "sm12",
+  "sm115",
+  "sma",
+  "sm11",
+  "sm10",
+  "sm9",
+  "sm8",
+  "sm75",
+  "sm7",
+  "sm6",
+  "sm5",
+  "sm4",
+  "sm3",
+  "sm2",
+  "sm1",
+  "xy12",
+  "xy11",
+  "xy10",
+  "xy9",
+  "xy8",
+  "xy7",
+  "xy6",
+  "xy5",
+  "xy4",
+  "xy3",
+  "xy2",
+  "xy1",
+  "xyp",
+
+  // Vintage and older high-value staples.
   "base1",
   "base2",
   "base3",
   "base5",
-  "neo1",
-  "neo4",
+  "base4",
   "gym1",
   "gym2",
+  "neo1",
+  "neo2",
+  "neo3",
+  "neo4",
+  "base6",
   "ecard1",
   "ecard2",
   "ecard3",
   "ex1",
   "ex7",
   "ex8",
+  "ex13",
+  "ex14",
+  "ex15",
+  "ex16",
   "dp1",
   "pl1",
   "bw1",
-  "xy1",
-  "xy12",
-  "sm1",
-  "sm9",
-  "sm10",
-  "sm115",
-  "sma",
-  "sm12",
-  "swsh1",
-  "swsh7",
-  "swsh45",
-  "swsh45sv",
-  "cel25",
-  "swsh9",
-  "swsh11",
-  "swsh12pt5",
-  "swsh12pt5gg",
-  "sv1",
-  "sv3pt5",
-  "sv4pt5",
-  "sv8",
-  "sv8pt5",
-  "sv10",
-  "zsv10pt5",
-  "rsv10pt5",
-  "me1",
-  "me2pt5",
-  "me4",
+  "bwp",
 ];
+
+const SUBSET_BY_PARENT_AND_PREFIX: Record<string, Partial<Record<string, string>>> = {
+  sm115: { SV: "sma" },
+  swsh45: { SV: "swsh45sv" },
+  swsh9: { TG: "swsh9tg" },
+  swsh10: { TG: "swsh10tg" },
+  swsh11: { TG: "swsh11tg" },
+  swsh12: { TG: "swsh12tg" },
+  swsh12pt5: { GG: "swsh12pt5gg" },
+};
+
+const PREFIXED_SUBSET_IDS = new Set(
+  Object.values(SUBSET_BY_PARENT_AND_PREFIX)
+    .flatMap((byPrefix) => Object.values(byPrefix))
+    .filter((id): id is string => Boolean(id)),
+);
 
 // ---------------------------------------------------------------------------
 // Normalization + matching
@@ -485,6 +562,30 @@ export function resolveSetId(query: string | undefined): string | undefined {
   return searchSets(query, 1)[0]?.id;
 }
 
+/**
+ * Resolve a set for a card lookup, using alphanumeric collector numbers to
+ * steer parent sets into their attached subsets. Example: dealers often type
+ * set "Lost Origin" with number "TG06"; the actual API set is
+ * "Lost Origin Trainer Gallery" (swsh11tg).
+ */
+export function resolveSetIdForCard(setName: string | undefined, number: string | undefined): string | undefined {
+  const setId = resolveSetId(setName);
+  if (!setId) return undefined;
+
+  const prefix = collectorNumberPrefix(number);
+  if (!prefix) return setId;
+
+  return SUBSET_BY_PARENT_AND_PREFIX[setId]?.[prefix] ?? setId;
+}
+
+export function getRelatedSubsetIds(setId: string): string[] {
+  return Object.values(SUBSET_BY_PARENT_AND_PREFIX[setId] ?? {}).filter((id): id is string => Boolean(id));
+}
+
+export function isPrefixedSubsetId(setId: string | undefined): boolean {
+  return Boolean(setId && PREFIXED_SUBSET_IDS.has(setId));
+}
+
 /** Curated, era-spanning list of popular/heavily-traded sets for quick-pick UI chips. */
 export function getPopularSets(limit = POPULAR_SET_IDS.length): CatalogSet[] {
   const byId = new Map(SET_SNAPSHOT.map((set) => [set.id, set]));
@@ -500,4 +601,11 @@ export function getAllSets(): CatalogSet[] {
 
 export function getSetById(id: string): CatalogSet | undefined {
   return SET_SNAPSHOT.find((set) => set.id === id);
+}
+
+function collectorNumberPrefix(number: string | undefined): string | undefined {
+  const beforeSlash = number?.trim().split("/")[0]?.trim();
+  if (!beforeSlash) return undefined;
+  const match = beforeSlash.match(/^([A-Za-z]{1,4})\d+$/);
+  return match?.[1]?.toUpperCase();
 }

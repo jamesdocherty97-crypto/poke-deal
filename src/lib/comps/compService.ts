@@ -64,11 +64,17 @@ function pickRawHeadline(results: CompResult[]): CompResult | null {
   if (rawResults.length === 0) return null;
 
   const smart = rawResults.find((result) => readRawString(result, "chosenPriceSource") === "smartMarketPrice");
-  if (smart) return smart;
-
   const baseline = rawResults.find((result) =>
     ["catalog-market-baseline", "market-baseline"].includes(readRawString(result, "kind") ?? ""),
   );
+
+  if (smart) {
+    if (baseline && detectDisagreement([smart, baseline])) {
+      return smart.medianPence <= baseline.medianPence ? smart : baseline;
+    }
+    return smart;
+  }
+
   if (!baseline) return null;
 
   const strongestRawBucket = rawResults

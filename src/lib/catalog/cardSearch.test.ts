@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rankCatalogCards, scoreCatalogCardForSearch } from "./cardSearch.js";
+import { parseCardSearchQuery, rankCatalogCards, scoreCatalogCardForSearch } from "./cardSearch.js";
 import { searchChaseCards } from "./chaseCards.js";
 import type { CatalogCard } from "./types.js";
 
@@ -22,6 +22,37 @@ test("rankCatalogCards uses set context to prefer the right card", () => {
   ];
 
   assert.equal(rankCatalogCards("Charizard", mixed, { setName: "base set" })[0]?.setName, "Base");
+});
+
+test("rankCatalogCards understands collector numbers typed alongside names", () => {
+  const mixed: CatalogCard[] = [
+    { game: "POKEMON", language: "EN", name: "Gengar", setName: "Lost Origin", setCode: "swsh11", number: "66/196" },
+    {
+      game: "POKEMON",
+      language: "EN",
+      name: "Gengar",
+      setName: "Lost Origin Trainer Gallery",
+      setCode: "swsh11tg",
+      number: "TG06/TG30",
+    },
+  ];
+
+  assert.deepEqual(parseCardSearchQuery("Gengar TG06"), { name: "Gengar", number: "TG06" });
+  assert.equal(rankCatalogCards("Gengar TG06", mixed, { setName: "Lost Origin" })[0]?.setCode, "swsh11tg");
+  assert.equal(scoreCatalogCardForSearch("TG06", mixed[1]!), 650);
+});
+
+test("rankCatalogCards treats shortened prefixed subset totals as equivalent", () => {
+  const gengar: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    setCode: "swsh11tg",
+    number: "TG06/TG30",
+  };
+
+  assert.ok(scoreCatalogCardForSearch("Gengar TG06/30", gengar) > 0);
 });
 
 test("rankCatalogCards applies cached set aliases to card suggestion context", () => {

@@ -61,6 +61,44 @@ test("pickHeadline uses catalog market baseline when raw eBay bucket disagrees w
   assert.equal(pickHeadline([noisyRaw, catalogBaseline]), catalogBaseline);
 });
 
+test("pickHeadline uses the lower RAW signal when smart price and market baseline disagree", () => {
+  const smartRaw = comp({
+    source: "pokemon-price-tracker",
+    medianPence: 6500,
+    sampleSize: 75,
+    raw: { chosenPriceSource: "smartMarketPrice" },
+  });
+  const catalogBaseline = comp({
+    source: "pokemon-tcg-market",
+    medianPence: 4200,
+    sampleSize: 1,
+    windowDays: 30,
+    raw: { kind: "catalog-market-baseline" },
+  });
+
+  assert.equal(detectDisagreement([smartRaw, catalogBaseline]), true);
+  assert.equal(pickHeadline([smartRaw, catalogBaseline]), catalogBaseline);
+});
+
+test("pickHeadline keeps smart RAW when it agrees with the market baseline", () => {
+  const smartRaw = comp({
+    source: "pokemon-price-tracker",
+    medianPence: 4400,
+    sampleSize: 75,
+    raw: { chosenPriceSource: "smartMarketPrice" },
+  });
+  const catalogBaseline = comp({
+    source: "pokemon-tcg-market",
+    medianPence: 4200,
+    sampleSize: 1,
+    windowDays: 30,
+    raw: { kind: "catalog-market-baseline" },
+  });
+
+  assert.equal(detectDisagreement([smartRaw, catalogBaseline]), false);
+  assert.equal(pickHeadline([smartRaw, catalogBaseline]), smartRaw);
+});
+
 test("pickHeadline uses PokeTrace raw market baseline when ordinary raw buckets disagree", () => {
   const noisyRaw = comp({
     source: "pokemon-price-tracker",

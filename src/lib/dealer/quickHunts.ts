@@ -35,6 +35,13 @@ export const DEFAULT_QUICK_HUNTS: QuickHuntCard[] = [
     imageUrl: "https://images.pokemontcg.io/swsh7/215_hires.png",
     setMarkUrl: "https://images.pokemontcg.io/swsh7/logo.png",
   },
+  {
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    number: "TG06/TG30",
+    imageUrl: "https://images.pokemontcg.io/swsh11tg/TG06_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/swsh11tg/logo.png",
+  },
 ];
 
 export function pinQuickHunt(

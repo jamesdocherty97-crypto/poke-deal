@@ -7,6 +7,11 @@ export interface CardSearchOptions {
   limit?: number;
 }
 
+export interface ParsedCardSearchQuery {
+  name: string;
+  number?: string;
+}
+
 export function rankCatalogCards(
   query: string,
   cards: CatalogCard[],
@@ -27,8 +32,10 @@ export function rankCatalogCards(
 }
 
 export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setName?: string): number {
-  const nameScore = scoreSearchText(query, card.name);
-  const numberScore = card.number && normalizeSearchText(query) === normalizeSearchText(card.number) ? 650 : 0;
+  const parsed = parseCardSearchQuery(query);
+  const nameScore = parsed.name ? scoreSearchText(parsed.name, card.name) : 0;
+  const numberScore = parsed.number && card.number && sameCollectorNumber(parsed.number, card.number) ? 650 : 0;
+  if (parsed.name && nameScore === 0) return 0;
   if (nameScore === 0 && numberScore === 0) return 0;
 
   let score = nameScore * 4 + numberScore;
@@ -40,6 +47,21 @@ export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setN
   if (card.imageUrl) score += 8;
   if (card.tcgApiId) score += 10;
   return score;
+}
+
+export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
+  const trimmed = query.trim().replace(/\s+/g, " ");
+  if (!trimmed) return { name: "" };
+
+  const wholeNumber = readCollectorNumber(trimmed);
+  if (wholeNumber) return { name: "", number: wholeNumber };
+
+  const trailing = trimmed.match(/^(.*?)\s+#?([A-Za-z]{1,5}\d{1,4}(?:\/[A-Za-z]{0,5}\d{1,4})?|\d{1,4}\/\d{1,4})$/);
+  const name = trailing?.[1]?.trim();
+  const number = readCollectorNumber(trailing?.[2]);
+  if (name && number) return { name, number };
+
+  return { name: trimmed };
 }
 
 function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
@@ -74,6 +96,32 @@ function dedupeCards(cards: CatalogCard[]): CatalogCard[] {
     result.push(card);
   }
   return result;
+}
+
+function sameCollectorNumber(queryNumber: string, cardNumber: string): boolean {
+  const query = normalizeCollectorNumberForSearch(queryNumber);
+  const card = normalizeCollectorNumberForSearch(cardNumber);
+  return query === card || query === card.split("/")[0];
+}
+
+function normalizeCollectorNumberForSearch(number: string): string {
+  const trimmed = number.trim();
+  const parts = trimmed.split("/").map((part) => normalizeSearchText(part));
+  const left = parts[0] ?? "";
+  const right = parts[1];
+  if (!right) return left;
+
+  const prefix = left.match(/^([a-z]{1,5})\d+$/)?.[1];
+  if (prefix && /^\d+$/.test(right)) return `${left}/${prefix}${right}`;
+  return `${left}/${right}`;
+}
+
+function readCollectorNumber(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return /^(?:[A-Za-z]{1,5}\d{1,4}|\d{1,4})(?:\/[A-Za-z]{0,5}\d{1,4})?$/.test(trimmed)
+    ? trimmed
+    : undefined;
 }
 
 function tieBreakCard(a: CatalogCard, b: CatalogCard): number {
