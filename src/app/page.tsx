@@ -172,6 +172,24 @@ type RepriceRecommendation = {
   reason: string;
 };
 
+type PortfolioPoint = {
+  date: string;
+  marketValuePence: number;
+  snapshotCount: number;
+};
+
+type PortfolioHistory = {
+  points: PortfolioPoint[];
+  latest: PortfolioPoint | null;
+  previous: PortfolioPoint | null;
+  changePence: number | null;
+  changePct: number | null;
+  written?: number;
+  skipped?: number;
+  scannedCount?: number;
+  checkedAt?: string;
+};
+
 const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const quickHunts = [
@@ -217,6 +235,7 @@ export default function Home() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [portfolio, setPortfolio] = useState<PortfolioHistory | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -339,20 +358,24 @@ export default function Home() {
   async function refreshAll() {
     setError(null);
     try {
-      const [inventoryRes, listingsRes, dashboardRes] = await Promise.all([
+      const [inventoryRes, listingsRes, dashboardRes, portfolioRes] = await Promise.all([
         fetch("/api/inventory"),
         fetch("/api/listings"),
         fetch("/api/dashboard"),
+        fetch("/api/snapshots/portfolio"),
       ]);
       const inventoryJson = await readJson(inventoryRes);
       const listingsJson = await readJson(listingsRes);
       const dashboardJson = await readJson(dashboardRes);
+      const portfolioJson = await readJson(portfolioRes);
       if (!inventoryRes.ok) throw new Error(inventoryJson.error ?? "inventory failed");
       if (!listingsRes.ok) throw new Error(listingsJson.error ?? "listings failed");
       if (!dashboardRes.ok) throw new Error(dashboardJson.error ?? "dashboard failed");
+      if (!portfolioRes.ok) throw new Error(portfolioJson.error ?? "snapshot history failed");
       setInventory(inventoryJson.items);
       setListings(listingsJson.listings);
       setDashboard(dashboardJson);
+      setPortfolio(portfolioJson);
     } catch (err) {
       setError(err instanceof Error ? err.message : "refresh failed");
     }
@@ -628,6 +651,31 @@ export default function Home() {
       `Repriced ${recommendation.cardName} to ${gbp(recommendation.suggestedPricePence)}.`,
     );
     setRepriceRecommendations((rows) => rows.filter((row) => row.itemId !== recommendation.itemId));
+  }
+
+  async function takePortfolioSnapshot() {
+    setBusy("snapshot");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/snapshots/portfolio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 25 }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "snapshot failed");
+      setPortfolio(payload);
+      setNotice(
+        payload.written > 0
+          ? `Snapshot saved for ${payload.written} stock line${payload.written === 1 ? "" : "s"}.`
+          : "No stock values were updated.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "snapshot failed");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function lookupGradeEv() {
@@ -1140,6 +1188,39 @@ export default function Home() {
               Books CSV
             </a>
           </div>
+          <section className="panel portfolio-panel">
+            <div className="panel-heading">
+              <h2>Stock value</h2>
+              <span className="muted">
+                {portfolio?.latest ? `${portfolio.latest.snapshotCount} priced` : "No snapshot"}
+              </span>
+            </div>
+            <div className="portfolio-value">
+              <strong>{gbp(portfolio?.latest?.marketValuePence ?? 0)}</strong>
+              <span className={portfolio?.changePence == null ? "" : portfolio.changePence >= 0 ? "good" : "warn"}>
+                {portfolio?.changePence == null
+                  ? "Take a snapshot to start the trend."
+                  : `${portfolio.changePence >= 0 ? "+" : ""}${gbp(portfolio.changePence)} (${portfolio.changePct}%)`}
+              </span>
+            </div>
+            {portfolio?.points.length ? (
+              <div className="portfolio-trend" aria-label="Portfolio value history">
+                {portfolio.points.slice(-7).map((point) => (
+                  <div className="trend-row" key={point.date}>
+                    <span>{shortDate(point.date)}</span>
+                    <div>
+                      <i style={{ width: `${trendBarWidth(point, portfolio.points)}%` }} />
+                    </div>
+                    <strong>{gbp(point.marketValuePence)}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <button className="secondary-action" type="button" onClick={takePortfolioSnapshot} disabled={busy === "snapshot"}>
+              {busy === "snapshot" ? "Valuing stock..." : "Snapshot stock value"}
+            </button>
+            {portfolio?.checkedAt && <p className="hint">Last valued {ageLabel(portfolio.checkedAt)}.</p>}
+          </section>
           <section className="panel">
             <div className="panel-heading">
               <h2>Stock health</h2>
@@ -1506,6 +1587,11 @@ function medianSpreadPct(results: CompResult[]): number | null {
   const min = Math.min(...medians);
   const max = Math.max(...medians);
   return Math.round(((max - min) / min) * 100);
+}
+
+function trendBarWidth(point: PortfolioPoint, points: PortfolioPoint[]): number {
+  const max = Math.max(...points.map((row) => row.marketValuePence), 1);
+  return Math.max(8, Math.round((point.marketValuePence / max) * 100));
 }
 
 function ageLabel(value: string): string {

@@ -558,6 +558,74 @@ label {
   text-decoration: none;
 }
 
+.portfolio-panel {
+  background:
+    linear-gradient(115deg, rgba(52, 211, 153, 0.16), transparent 50%),
+    var(--panel);
+}
+
+.portfolio-value {
+  display: grid;
+  gap: 4px;
+}
+
+.portfolio-value strong {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.portfolio-value span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.portfolio-value span.good {
+  color: var(--green);
+}
+
+.portfolio-value span.warn {
+  color: var(--yellow);
+}
+
+.portfolio-trend {
+  display: grid;
+  gap: 7px;
+}
+
+.trend-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 76px;
+  gap: 8px;
+  align-items: center;
+}
+
+.trend-row span,
+.trend-row strong {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.trend-row strong {
+  justify-self: end;
+  color: var(--ink);
+}
+
+.trend-row div {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.trend-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green), #88c8ff);
+}
+
 .comp-hero {
   display: flex;
   align-items: flex-start;
