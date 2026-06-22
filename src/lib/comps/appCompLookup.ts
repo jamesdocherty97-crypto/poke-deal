@@ -39,7 +39,7 @@ export function createAppCompService(
   ]);
 }
 
-function fixedCatalogSource(live: boolean, catalog: CatalogCard): CatalogSource {
+export function fixedCatalogSource(live: boolean, catalog: CatalogCard): CatalogSource {
   return {
     name: "request-catalog",
     live,

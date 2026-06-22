@@ -8,6 +8,7 @@ import { z } from "zod";
 import {
   catalogToCardRef,
   createAppCompService,
+  fixedCatalogSource,
   resolveCatalogCard,
 } from "@/lib/comps/appCompLookup";
 import { PrismaInventoryRepo } from "@/lib/inventory/prismaInventoryRepo";
@@ -78,7 +79,11 @@ export async function POST(request: Request) {
     }
 
     // 3. stock it + compute the suggested list price (valuing and pricing are one pipeline)
-    const { item, suggestion } = await acquireToInventory(new PrismaInventoryRepo(), {
+    const inventoryRepo = new PrismaInventoryRepo(
+      undefined,
+      catalog ? fixedCatalogSource(catalogSource.live, catalog) : undefined,
+    );
+    const { item, suggestion } = await acquireToInventory(inventoryRepo, {
       card: compCard,
       grade: d.grade,
       costBasisPence: d.costBasisPence,
