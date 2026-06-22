@@ -15,6 +15,7 @@ test("pinQuickHunt puts the selected card first and trims whitespace", () => {
     setName: " Crown Zenith ",
     number: " GG69/GG70 ",
     imageUrl: " https://images.pokemontcg.io/swsh12pt5gg/GG69_hires.png ",
+    setMarkUrl: " https://images.pokemontcg.io/swsh12pt5gg/logo.png ",
   });
 
   assert.deepEqual(pinned[0], {
@@ -22,15 +23,17 @@ test("pinQuickHunt puts the selected card first and trims whitespace", () => {
     setName: "Crown Zenith",
     number: "GG69/GG70",
     imageUrl: "https://images.pokemontcg.io/swsh12pt5gg/GG69_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/swsh12pt5gg/logo.png",
   });
   assert.equal(pinned.length, 5);
 });
 
-test("pinQuickHunt promotes duplicates instead of adding another copy", () => {
+test("pinQuickHunt promotes duplicates and keeps source-backed images", () => {
   const pinned = pinQuickHunt(DEFAULT_QUICK_HUNTS, { name: "Mew ex", setName: "Paldean Fates", number: "232/091" });
 
   assert.equal(pinned[0]?.name, "Mew ex");
   assert.equal(pinned[0]?.imageUrl, DEFAULT_QUICK_HUNTS[2]?.imageUrl);
+  assert.equal(pinned[0]?.setMarkUrl, DEFAULT_QUICK_HUNTS[2]?.setMarkUrl);
   assert.equal(pinned.length, DEFAULT_QUICK_HUNTS.length);
   assert.equal(pinned.filter((card) => card.name === "Mew ex").length, 1);
 });
@@ -62,13 +65,26 @@ test("removeQuickHunt removes by card identity", () => {
 
 test("parseQuickHunts reads persisted cards and falls back on bad data", () => {
   const persisted = serializeQuickHunts([
-    { name: "Lugia V", setName: "Silver Tempest", number: "186/195" },
+    { name: "Lugia V", setName: "Silver Tempest", number: "186/195", setMarkUrl: " https://images.pokemontcg.io/swsh12/logo.png " },
     { name: "Lugia V", setName: "Silver Tempest", number: "186/195" },
     { name: "", setName: "Silver Tempest", number: "186/195" },
   ]);
 
   assert.deepEqual(parseQuickHunts(persisted), [
-    { name: "Lugia V", setName: "Silver Tempest", number: "186/195" },
+    {
+      name: "Lugia V",
+      setName: "Silver Tempest",
+      number: "186/195",
+      setMarkUrl: "https://images.pokemontcg.io/swsh12/logo.png",
+    },
   ]);
   assert.deepEqual(parseQuickHunts("{nope}"), DEFAULT_QUICK_HUNTS);
+});
+
+test("parseQuickHunts backfills built-in card images for older saved picks", () => {
+  const persisted = JSON.stringify([{ name: "Charizard ex", setName: "151", number: "199/165" }]);
+  const parsed = parseQuickHunts(persisted);
+
+  assert.equal(parsed[0]?.imageUrl, DEFAULT_QUICK_HUNTS[0]?.imageUrl);
+  assert.equal(parsed[0]?.setMarkUrl, DEFAULT_QUICK_HUNTS[0]?.setMarkUrl);
 });

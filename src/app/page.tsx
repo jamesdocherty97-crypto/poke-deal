@@ -392,12 +392,6 @@ export default function Home() {
         : null,
     [headline, gradeComp, gradeOdds, gradingCost],
   );
-  const spotlightImage =
-    cardArtUrl ??
-    activeInventory.find((item) => item.card.imageUrl)?.card.imageUrl ??
-    listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
-    quickHunts[0]?.imageUrl ??
-    null;
   const catalogCard = comp?.catalog ?? null;
   const selectedSet = useMemo(() => findSelectedSet([...popularSets, ...setSuggestions], setNameValue), [
     popularSets,
@@ -406,6 +400,20 @@ export default function Home() {
   ]);
   const setMarkUrl =
     catalogCard?.setLogoUrl ?? catalogCard?.setSymbolUrl ?? selectedSet?.logoUrl ?? selectedSet?.symbolUrl ?? null;
+  const matchingQuickHunt = quickHunts.find(
+    (card) =>
+      card.name.trim().toLowerCase() === name.trim().toLowerCase() &&
+      card.setName.trim().toLowerCase() === setNameValue.trim().toLowerCase() &&
+      card.number.trim().toLowerCase() === number.trim().toLowerCase(),
+  );
+  const selectedCardImage = cardArtUrl ?? catalogCard?.imageUrl ?? matchingQuickHunt?.imageUrl ?? null;
+  const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
+  const spotlightImage =
+    selectedCardImage ??
+    activeInventory.find((item) => item.card.imageUrl)?.card.imageUrl ??
+    listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
+    quickHunts[0]?.imageUrl ??
+    null;
   const marketBaseline =
     comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
   const ownedSalesComp =
@@ -624,7 +632,8 @@ export default function Home() {
       name,
       setName: setNameValue,
       number,
-      imageUrl: cardArtUrl ?? catalogCard?.imageUrl ?? undefined,
+      imageUrl: selectedCardImage ?? undefined,
+      setMarkUrl: selectedCardMarkUrl ?? undefined,
     });
     persistQuickHunts(next);
     setNotice(`${name.trim()} pinned to quick hunts.`);
@@ -1008,10 +1017,10 @@ export default function Home() {
             <p className="eyebrow">Pokémon Dealer OS</p>
             <h1>{viewTitle(view)}</h1>
           </div>
-          {setMarkUrl && (
+          {selectedCardMarkUrl && (
             <img
               className="brand-set-logo"
-              src={setMarkUrl}
+              src={selectedCardMarkUrl}
               alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
               onError={hideBrokenImage}
             />
@@ -1030,7 +1039,7 @@ export default function Home() {
         </div>
         <div className="hero-card-art" aria-hidden="true">
           <CardImage src={spotlightImage} fallbackClassName="card-back" alt="" />
-          {setMarkUrl && <img className="set-mark" src={setMarkUrl} alt="" onError={hideBrokenImage} />}
+          {selectedCardMarkUrl && <img className="set-mark" src={selectedCardMarkUrl} alt="" onError={hideBrokenImage} />}
         </div>
       </section>
 
@@ -1072,7 +1081,12 @@ export default function Home() {
               {quickHunts.map((card) => (
                 <article className="quick-hunt-card" key={`${card.name}-${card.setName}-${card.number}`}>
                   <button className="quick-hunt-pick" type="button" onClick={() => chooseQuickHunt(card)}>
-                    <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
+                    <span className="quick-art-stack">
+                      <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
+                      {card.setMarkUrl && (
+                        <img className="quick-set-mark" src={card.setMarkUrl} alt="" onError={hideBrokenImage} />
+                      )}
+                    </span>
                     <span>{card.name}</span>
                   </button>
                   <button
@@ -1085,6 +1099,32 @@ export default function Home() {
                   </button>
                 </article>
               ))}
+            </div>
+            <div className="selected-card-strip" aria-label="Selected card">
+              <CardImage
+                src={selectedCardImage}
+                className="selected-card-art"
+                fallbackClassName="selected-card-art blank"
+                alt={`${name} card art`}
+              />
+              <div>
+                <span>Current card</span>
+                <strong>{name}</strong>
+                <small>
+                  {setNameValue}
+                  {number ? ` #${number}` : ""}
+                  {" · "}
+                  {grade.replace(/_/g, " ")}
+                </small>
+              </div>
+              {selectedCardMarkUrl && (
+                <img
+                  className="selected-set-mark"
+                  src={selectedCardMarkUrl}
+                  alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+                  onError={hideBrokenImage}
+                />
+              )}
             </div>
             <label className="set-field">
               Card

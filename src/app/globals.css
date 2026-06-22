@@ -466,7 +466,7 @@ label {
 
 .quick-hunt-pick {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   min-height: 38px;
@@ -489,7 +489,14 @@ label {
   font-weight: 1000;
 }
 
-.quick-hunts button img,
+.quick-art-stack {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 44px;
+  place-items: center;
+}
+
 .quick-card-art {
   width: 30px;
   height: 42px;
@@ -504,9 +511,79 @@ label {
   border-style: dashed;
 }
 
+.quick-set-mark {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  width: auto;
+  height: auto;
+  max-width: 30px;
+  max-height: 14px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+}
+
 .quick-hunt-pick span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.selected-card-strip {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 76px;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 203, 5, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(110deg, rgba(255, 203, 5, 0.12), rgba(42, 117, 187, 0.12)),
+    rgba(3, 8, 20, 0.42);
+  padding: 9px;
+}
+
+.selected-card-strip div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.selected-card-strip span,
+.selected-card-strip small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.selected-card-strip strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.08;
+}
+
+.selected-card-art {
+  width: 48px;
+  height: 66px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  background: var(--panel-2);
+  object-fit: cover;
+}
+
+.selected-card-art.blank {
+  border-style: dashed;
+}
+
+.selected-set-mark {
+  width: auto;
+  height: auto;
+  max-width: 76px;
+  max-height: 36px;
+  justify-self: end;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.42));
 }
 
 .set-field {
