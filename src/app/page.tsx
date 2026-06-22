@@ -1044,10 +1044,13 @@ export default function Home() {
       setWatchHits(hits);
       setWatchCheckedAt(payload.checkedAt ?? new Date().toISOString());
       setWatchDiscordReady(Boolean(payload.notifierConfigured));
+      const alertsCreated = Number(payload.alertsCreated ?? hits.length);
       setWatchMessage(
         hits.length === 0
           ? "No sourcing targets hit right now."
-          : `${hits.length} sourcing target${hits.length === 1 ? "" : "s"} hit${payload.notified ? " and sent" : ""}.`,
+          : alertsCreated === 0
+            ? `${hits.length} sourcing target${hits.length === 1 ? "" : "s"} still hit. No duplicate alert sent.`
+            : `${hits.length} sourcing target${hits.length === 1 ? "" : "s"} hit; ${alertsCreated} new alert${alertsCreated === 1 ? "" : "s"}${payload.notified ? " sent" : ""}.`,
       );
       await refreshAll();
     } catch (err) {

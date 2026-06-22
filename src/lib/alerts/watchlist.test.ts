@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkWatch, formatWatchDigest } from "./watchlist.js";
+import { checkWatch, formatWatchDigest, shouldCreateWatchAlert } from "./watchlist.js";
 import type { CompResult } from "../domain/types.js";
 
 const comp: CompResult = {
@@ -59,4 +59,41 @@ test("formatWatchDigest is compact for notifier delivery", () => {
   });
   assert.equal(formatWatchDigest(hit ? [hit] : []), hit?.message);
   assert.equal(formatWatchDigest([]), "No sourcing targets hit right now.");
+});
+
+test("shouldCreateWatchAlert suppresses duplicate hits inside the cooldown", () => {
+  const hit = checkWatch({
+    watchId: "watch_1",
+    cardName: "Charizard ex",
+    grade: "RAW",
+    targetPence: 3500,
+    comp,
+  });
+  assert.ok(hit);
+
+  assert.equal(shouldCreateWatchAlert(hit, null, new Date("2026-06-22T12:00:00.000Z")), true);
+  assert.equal(
+    shouldCreateWatchAlert(
+      hit,
+      { pence: 3000, firedAt: "2026-06-22T09:00:00.000Z" },
+      new Date("2026-06-22T12:00:00.000Z"),
+    ),
+    false,
+  );
+  assert.equal(
+    shouldCreateWatchAlert(
+      hit,
+      { pence: 2900, firedAt: "2026-06-22T09:00:00.000Z" },
+      new Date("2026-06-22T12:00:00.000Z"),
+    ),
+    true,
+  );
+  assert.equal(
+    shouldCreateWatchAlert(
+      hit,
+      { pence: 3000, firedAt: "2026-06-21T10:00:00.000Z" },
+      new Date("2026-06-22T12:00:00.000Z"),
+    ),
+    true,
+  );
 });

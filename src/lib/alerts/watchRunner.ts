@@ -2,7 +2,7 @@ import { CompService } from "../comps/compService.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
 import { notifierFromEnv } from "./notifier.js";
-import { checkWatch, formatWatchDigest, type WatchHit } from "./watchlist.js";
+import { checkWatch, formatWatchDigest, shouldCreateWatchAlert, type WatchHit } from "./watchlist.js";
 
 export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: boolean; limit?: number }) {
   const notifierConfigured = Boolean(process.env.DISCORD_WEBHOOK_URL?.trim());
@@ -19,12 +19,15 @@ export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: b
   const prisma = getPrisma();
   const watches = await prisma.watch.findMany({
     where: { active: true },
-    include: { card: true },
+    include: { card: true, alerts: { orderBy: { firedAt: "desc" }, take: 1 } },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
   const compService = CompService.default();
   const hits: WatchHit[] = [];
+  const alertHits: WatchHit[] = [];
+  const alertIds: string[] = [];
+  const checkedAt = new Date();
 
   for (const watch of watches) {
     const card: CardRef = {
@@ -45,30 +48,40 @@ export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: b
       comp: comps.headline,
     });
     if (!hit) continue;
+    hits.push(hit);
 
-    await prisma.alert.create({
+    if (!shouldCreateWatchAlert(hit, watch.alerts[0] ?? null, checkedAt)) continue;
+
+    const alert = await prisma.alert.create({
       data: {
         watchId: watch.id,
         kind: "PRICE_DROP",
         message: hit.message,
         pence: hit.marketPence,
-        delivered: notify && notifierConfigured,
+        delivered: false,
       },
     });
-    hits.push(hit);
+    alertIds.push(alert.id);
+    alertHits.push(hit);
   }
 
   let notified = false;
-  if (notify && hits.length > 0) {
+  if (notify && notifierConfigured && alertHits.length > 0) {
     await notifierFromEnv().notify({
       title: "Pokémon Dealer OS sourcing targets",
-      body: formatWatchDigest(hits),
+      body: formatWatchDigest(alertHits),
     });
-    notified = notifierConfigured;
+    notified = true;
+    await prisma.alert.updateMany({
+      where: { id: { in: alertIds } },
+      data: { delivered: true },
+    });
   }
 
   return {
     hits,
+    alertsCreated: alertHits.length,
+    suppressedCount: hits.length - alertHits.length,
     notified,
     notifierConfigured,
     scannedCount: watches.length,
