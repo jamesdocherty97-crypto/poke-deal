@@ -58,8 +58,8 @@ Grounded in the current `src/app/page.tsx` / `globals.css`. The app already has 
 
 **Nice to have:**
 11. [x] Make "quick hunts" (currently 4 hardcoded chase cards in `page.tsx`) user-editable — pin your own most-searched cards instead of a static Charizard/Pikachu/Mew/Umbreon list that may not reflect what this dealer actually deals in.
-12. Pull-to-refresh on mobile alongside the existing manual refresh icon button.
-13. Auto-dismissing toast-style notices instead of the persistent top-of-page `.notice` banner, which otherwise lingers until the next action clears it.
+12. [x] Pull-to-refresh on mobile alongside the existing manual refresh icon button.
+13. [x] Auto-dismissing toast-style notices instead of the persistent top-of-page `.notice` banner, which otherwise lingers until the next action clears it.
 14. Arrow-key navigation through the set-autocomplete dropdown (`.set-suggestions`) for desktop/keyboard users — currently mouse/touch only.
 
 ## Note on `tsconfig.check.json` (audit follow-up, 2026-06-21)

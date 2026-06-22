@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, type SyntheticEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildInventoryView,
   buildListingView,
@@ -17,6 +17,7 @@ import {
   serializeQuickHunts,
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
+import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
 
 type View = "acquire" | "inventory" | "listings" | "pnl";
 type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
@@ -239,6 +240,11 @@ const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
 
+type RefreshOptions = {
+  toast?: boolean;
+  user?: boolean;
+};
+
 export default function Home() {
   const [view, setView] = useState<View>("acquire");
   const [name, setName] = useState("Charizard ex");
@@ -257,6 +263,9 @@ export default function Home() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioHistory | null>(null);
   const [watches, setWatches] = useState<WatchRecord[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [userRefreshing, setUserRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -305,6 +314,8 @@ export default function Home() {
   const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("ALL");
   const [listingSort, setListingSort] = useState<ListingSort>("newest");
   const [quickHunts, setQuickHunts] = useState<QuickHuntCard[]>(DEFAULT_QUICK_HUNTS);
+  const pullStartY = useRef<number | null>(null);
+  const pullTracking = useRef(false);
 
   useEffect(() => {
     void refreshAll();
@@ -318,6 +329,18 @@ export default function Home() {
       setQuickHunts(DEFAULT_QUICK_HUNTS);
     }
   }, []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const handle = window.setTimeout(() => setNotice(null), 4200);
+    return () => window.clearTimeout(handle);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!error) return;
+    const handle = window.setTimeout(() => setError(null), 6500);
+    return () => window.clearTimeout(handle);
+  }, [error]);
 
   // Set autocomplete: search-as-you-type against the bundled offline set
   // catalog while the Set field is focused. Falls back to the curated
@@ -431,7 +454,9 @@ export default function Home() {
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
     : "loading deck";
 
-  async function refreshAll() {
+  async function refreshAll(options: RefreshOptions = {}) {
+    setRefreshing(true);
+    if (options.user) setUserRefreshing(true);
     setError(null);
     try {
       const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes] = await Promise.all([
@@ -462,9 +487,48 @@ export default function Home() {
         for (const watch of nextWatches) next[watch.id] = current[watch.id] ?? penceToPounds(watch.targetPence);
         return next;
       });
+      if (options.toast) setNotice("Refreshed.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "refresh failed");
+    } finally {
+      setRefreshing(false);
+      if (options.user) setUserRefreshing(false);
     }
+  }
+
+  function startPullRefresh(event: TouchEvent<HTMLElement>) {
+    if (refreshing || window.scrollY > 0) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    pullStartY.current = touch.clientY;
+    pullTracking.current = false;
+  }
+
+  function movePullRefresh(event: TouchEvent<HTMLElement>) {
+    const startY = pullStartY.current;
+    const touch = event.touches[0];
+    if (startY == null || !touch) return;
+
+    const deltaY = touch.clientY - startY;
+    if (deltaY <= 0) {
+      pullTracking.current = false;
+      setPullDistance(0);
+      return;
+    }
+
+    if (window.scrollY > 0 && !pullTracking.current) return;
+
+    const distance = pullRefreshDistance(deltaY);
+    if (distance > 6) pullTracking.current = true;
+    setPullDistance(distance);
+  }
+
+  function finishPullRefresh() {
+    const shouldRefresh = shouldTriggerPullRefresh(pullDistance) && !refreshing;
+    pullStartY.current = null;
+    pullTracking.current = false;
+    setPullDistance(0);
+    if (shouldRefresh) void refreshAll({ toast: true, user: true });
   }
 
   async function lookup(event?: FormEvent) {
@@ -1013,8 +1077,26 @@ export default function Home() {
     }
   }
 
+  const pullReady = shouldTriggerPullRefresh(pullDistance);
+  const pullVisible = userRefreshing || pullDistance > 0;
+  const pullOffset = pullVisible ? Math.round(pullRefreshProgress(pullDistance) * 16) : -64;
+
   return (
-    <main className="app-shell">
+    <main
+      className="app-shell"
+      onTouchStart={startPullRefresh}
+      onTouchMove={movePullRefresh}
+      onTouchEnd={finishPullRefresh}
+      onTouchCancel={finishPullRefresh}
+    >
+      <div
+        className={`pull-refresh ${pullVisible ? "visible" : ""} ${pullReady ? "ready" : ""} ${userRefreshing ? "refreshing" : ""}`}
+        style={{ transform: `translate(-50%, ${pullOffset}px)` }}
+        aria-hidden={!pullVisible}
+      >
+        <span className="pull-refresh-dot" aria-hidden="true" />
+        <span>{userRefreshing ? "Refreshing" : pullReady ? "Release to refresh" : "Pull to refresh"}</span>
+      </div>
       <header className="topbar">
         <div className="brand-lockup">
           {spotlightImage ? (
@@ -1035,8 +1117,16 @@ export default function Home() {
             />
           )}
         </div>
-        <button className="icon-button" type="button" onClick={refreshAll} aria-label="Refresh data">
-          ↻
+        <button
+          className={`icon-button ${refreshing ? "is-loading" : ""}`}
+          type="button"
+          onClick={() => void refreshAll({ toast: true, user: true })}
+          disabled={refreshing}
+          aria-label={refreshing ? "Refreshing data" : "Refresh data"}
+        >
+          <span className="refresh-icon" aria-hidden="true">
+            ↻
+          </span>
         </button>
       </header>
 
@@ -1063,8 +1153,10 @@ export default function Home() {
         />
       </section>
 
-      {notice && <div className="notice success">{notice}</div>}
-      {error && <div className="notice danger">{error}</div>}
+      <div className="toast-stack" aria-live="polite" aria-atomic="true">
+        {notice && <Toast tone="success" message={notice} onDismiss={() => setNotice(null)} />}
+        {error && <Toast tone="danger" message={error} onDismiss={() => setError(null)} />}
+      </div>
 
       {view === "acquire" && (
         <section className="workspace">
@@ -2140,6 +2232,25 @@ function WatchHitRow({ hit }: { hit: WatchHit }) {
         <span>target {gbp(hit.targetPence)}</span>
       </div>
     </article>
+  );
+}
+
+function Toast({
+  tone,
+  message,
+  onDismiss,
+}: {
+  tone: "success" | "danger";
+  message: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className={`notice ${tone}`} role={tone === "danger" ? "alert" : "status"}>
+      <span>{message}</span>
+      <button className="toast-close" type="button" onClick={onDismiss} aria-label="Dismiss message">
+        ×
+      </button>
+    </div>
   );
 }
 
