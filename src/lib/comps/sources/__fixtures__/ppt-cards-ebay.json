@@ -1,45 +1,132 @@
 {
-  "_note": "Real (trimmed) Pokemon Price Tracker v2 /cards?includeEbay=true response, captured 2026-06-21. Used to pin mapCardAggregateToComp. Prices are USD.",
-  "data": {
-    "name": "Charizard ex - 199/165",
-    "setName": "SV: Scarlet & Violet 151",
-    "cardNumber": "199/165",
-    "prices": { "market": 464.86, "low": 289.99 },
-    "ebay": {
-      "updatedAt": "2026-06-20T07:09:08.010Z",
-      "totalSales": 1192,
-      "salesByGrade": {
-        "ungraded": {
-          "count": 248,
-          "averagePrice": 443.9269124423963,
-          "medianPrice": 400,
-          "minPrice": 2,
-          "maxPrice": 1100,
-          "marketTrend": "up",
-          "lastMarketUpdate": "2026-06-20T07:09:08.004Z",
-          "smartMarketPrice": { "price": 392.5, "confidence": "medium", "method": "7day_filtered_weighted", "daysUsed": 7 }
-        },
-        "psa9": {
-          "count": 334,
-          "averagePrice": 365.78955089820363,
-          "medianPrice": 382.5,
-          "minPrice": 190,
-          "maxPrice": 608.58,
-          "marketTrend": "up",
-          "lastMarketUpdate": "2026-06-20T07:09:08.003Z",
-          "smartMarketPrice": { "price": 427.73, "confidence": "high", "method": "7day_filtered_weighted", "daysUsed": 7 }
-        },
-        "psa10": {
-          "count": 249,
-          "averagePrice": 1391.4934136546185,
-          "medianPrice": 1349,
-          "minPrice": 310,
-          "maxPrice": 2397.6,
-          "marketTrend": "up",
-          "lastMarketUpdate": "2026-06-20T07:09:08.002Z",
-          "smartMarketPrice": { "price": 1550, "confidence": "high", "method": "14day_filtered_weighted", "daysUsed": 14 }
+  "_note": "Real trimmed Pokemon Price Tracker v2 /cards?includeEbay=true response, captured 2026-06-22 with limit=1. Used to pin mapCardAggregateToComp. Prices are USD.",
+  "metadata": {
+    "total": 55,
+    "limit": 1
+  },
+  "data": [
+    {
+      "id": "696e440852d86878bfd57fab",
+      "name": "Charizard ex - 199/165",
+      "setName": "SV: Scarlet & Violet 151",
+      "cardNumber": "199/165",
+      "totalSetNumber": null,
+      "prices": {
+        "market": 461.59,
+        "low": 329.99,
+        "sellers": 103,
+        "listings": 0,
+        "primaryPrinting": "Holofoil",
+        "lastUpdated": "2026-06-21T20:31:05.134Z",
+        "variants": {
+          "Holofoil": {
+            "Near Mint Holofoil": {
+              "price": 461.59,
+              "listings": null,
+              "priceString": "$461.59",
+              "lastUpdated": "2026-06-22T22:19:07.896Z"
+            }
+          }
+        }
+      },
+      "ebay": {
+        "updatedAt": "2026-06-21T21:46:14.429Z",
+        "dateRangeStart": "2025-11-26T00:00:00.000Z",
+        "dateRangeEnd": "2026-06-20T00:00:00.000Z",
+        "totalSales": 1194,
+        "salesByGrade": {
+          "ungraded": {
+            "count": 248,
+            "averagePrice": 443.9269124423963,
+            "medianPrice": 400,
+            "minPrice": 2,
+            "maxPrice": 1100,
+            "marketTrend": "up",
+            "lastMarketUpdate": "2026-06-21T21:46:14.427Z",
+            "marketPrice7Day": 453.7475,
+            "marketPriceMedian7Day": 449.995,
+            "dailyVolume7Day": 0.5714285714285714,
+            "smartMarketPrice": {
+              "price": 392.5,
+              "confidence": "medium",
+              "method": "7day_filtered_weighted",
+              "daysUsed": 7
+            }
+          },
+          "psa9": {
+            "count": 336,
+            "averagePrice": 366.2907738095238,
+            "medianPrice": 392.5,
+            "minPrice": 190,
+            "maxPrice": 608.58,
+            "marketTrend": "up",
+            "lastMarketUpdate": "2026-06-21T21:46:14.426Z",
+            "marketPrice7Day": 457.2311111111111,
+            "marketPriceMedian7Day": 449.99,
+            "dailyVolume7Day": 1.2857142857142858,
+            "smartMarketPrice": {
+              "price": 432.5,
+              "confidence": "high",
+              "method": "7day_filtered_weighted",
+              "daysUsed": 7
+            }
+          },
+          "psa10": {
+            "count": 249,
+            "averagePrice": 1391.4934136546185,
+            "medianPrice": 1349,
+            "minPrice": 310,
+            "maxPrice": 2397.6,
+            "marketTrend": "up",
+            "lastMarketUpdate": "2026-06-21T21:46:14.426Z",
+            "marketPrice7Day": 1550,
+            "marketPriceMedian7Day": 1550,
+            "dailyVolume7Day": 0.2857142857142857,
+            "smartMarketPrice": {
+              "price": 1508.12,
+              "confidence": "medium",
+              "method": "14day_filtered_weighted",
+              "daysUsed": 14
+            }
+          },
+          "bgs9_5": {
+            "count": 27,
+            "averagePrice": 780.5562962962963,
+            "medianPrice": 749.99,
+            "minPrice": 499.99,
+            "maxPrice": 1200,
+            "marketTrend": "stable",
+            "lastMarketUpdate": "2026-06-21T21:46:14.426Z",
+            "marketPrice7Day": 700,
+            "marketPriceMedian7Day": 700,
+            "dailyVolume7Day": 0.14285714285714285,
+            "smartMarketPrice": {
+              "price": 639,
+              "confidence": "medium",
+              "method": "14day_filtered_weighted",
+              "daysUsed": 14
+            }
+          },
+          "cgc10": {
+            "count": 69,
+            "averagePrice": 778.7660317460318,
+            "medianPrice": 800,
+            "minPrice": 450,
+            "maxPrice": 1100,
+            "marketTrend": "up",
+            "lastMarketUpdate": "2026-06-21T21:46:14.427Z",
+            "marketPrice7Day": null,
+            "marketPriceMedian7Day": null,
+            "dailyVolume7Day": null,
+            "smartMarketPrice": {
+              "price": 832.5,
+              "confidence": "high",
+              "method": "30day_filtered_weighted",
+              "daysUsed": 30
+            }
+          }
         }
       }
     }
-  }
+  ]
 }

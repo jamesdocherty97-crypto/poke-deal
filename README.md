@@ -72,7 +72,7 @@ The frame runs without any of these (fixture mode). Add them to `.env` (copy fro
 | **Discord webhook** | Price/repricing alerts | Free | Server Settings → Integrations → Webhooks |
 | **Postgres** | Storage | Free local / Neon free tier | docker or https://neon.tech |
 
-**First thing to do when you have a Pokemon Price Tracker key:** set `POKEMON_PRICE_TRACKER_API_KEY`, then confirm the live response shape against their docs and tighten `mapResponseToRawSales()` in `sources/pokemonPriceTracker.ts` (it's written defensively and marked TODO). Everything else already cleans identically.
+**Pokemon Price Tracker live path:** set `POKEMON_PRICE_TRACKER_API_KEY` to use the live v2 adapter. The response shape is pinned in `src/lib/comps/sources/__fixtures__/ppt-cards-ebay.json`; the adapter requests `limit=1` to keep credit usage low and maps provider aggregates into GBP `CompResult`s without caching stale prices as truth.
 
 ---
 

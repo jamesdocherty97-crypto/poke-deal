@@ -7,8 +7,9 @@
 //     "smartMarketPrice"), NOT individual sales — so we map the aggregate straight to a
 //     CompResult instead of fabricating raw sales. Prices are USD → converted to GBP.
 //
-// Verified against the live v2 response on 2026-06-21 (see __fixtures__/ppt-cards-ebay.json).
-// Grade sales (incl. "ungraded" = RAW) live at: data.ebay.salesByGrade[<providerKey>].
+// Verified against the live v2 response on 2026-06-22 (see __fixtures__/ppt-cards-ebay.json).
+// Grade sales (incl. "ungraded" = RAW) live at: data[0].ebay.salesByGrade[<providerKey>]
+// in current live responses; the mapper also accepts the older object-shaped data fixture.
 
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
 import type { CompSource } from "../CompSource.js";

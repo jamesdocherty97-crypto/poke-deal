@@ -13,7 +13,7 @@ Ordered build plan for Pokémon Dealer OS. The **frame is done**: domain model, 
 1. [x] **PrismaInventoryRepo** implementing `InventoryRepo` against `prisma/schema.prisma`. Swapped into app persistence via `GET/POST /api/inventory`.
 2. [x] **Catalog adapter** for the Pokémon TCG API: resolve a `CardRef` (name/set/number) to a real `Card` row with image + `tcgApiId`. Cache to DB.
 3. [x] **Persist comps**: write each headline `CompResult` to the `CompResult` table on lookup (audit + history).
-4. [ ] Wire the real `POKEMON_PRICE_TRACKER_API_KEY` path: confirm live response shape, tighten `mapResponseToRawSales()`, add a captured-response fixture test.
+4. [x] Wire the real `POKEMON_PRICE_TRACKER_API_KEY` path: confirmed live v2 response shape, pinned `limit=1` captured fixture, and tightened aggregate mapping tests.
 
 ## Phase 2 — close the dealer loop
 5. **Inventory CRUD UI**: add/edit/list stock (card, grade, cost basis, qty, location, source, status). Add/list/edit are now in the app; bulk intake form remains.

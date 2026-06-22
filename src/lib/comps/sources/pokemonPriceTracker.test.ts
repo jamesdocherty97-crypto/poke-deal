@@ -24,6 +24,8 @@ test("gradeToProviderKey maps our grades to provider keys", () => {
 });
 
 test("RAW prefers smartMarketPrice from noisy ungraded aggregate, converted to GBP", () => {
+  assert.equal(Array.isArray(fixture.data), true, "captured v2 response should be array-shaped");
+  assert.equal(fixture.metadata.limit, 1, "fixture should pin the low-credit request shape");
   const c = mapCardAggregateToComp(fixture, ctx("RAW"));
   assert.equal(c.currency, "GBP");
   assert.equal(c.sampleSize, 248);
@@ -31,21 +33,33 @@ test("RAW prefers smartMarketPrice from noisy ungraded aggregate, converted to G
   assert.equal(c.meanPence, usdToPence(443.9269124423963));
   assert.equal(c.lowPence, usdToPence(2));
   assert.equal(c.highPence, usdToPence(1100));
-  assert.equal(c.asOf, "2026-06-20T07:09:08.004Z");
-  assert.equal((c.raw as { chosenPriceSource?: string }).chosenPriceSource, "smartMarketPrice");
+  assert.equal(c.asOf, "2026-06-21T21:46:14.427Z");
+  assert.equal((c.raw as { chosenPriceSource?: string; marketPrice7Day?: number }).chosenPriceSource, "smartMarketPrice");
+  assert.equal((c.raw as { marketPrice7Day?: number }).marketPrice7Day, 453.7475);
 });
 
 test("PSA_10 maps from 'psa10' aggregate", () => {
   const c = mapCardAggregateToComp(fixture, ctx("PSA_10"));
   assert.equal(c.sampleSize, 249);
   assert.equal(c.medianPence, usdToPence(1349)); // ~106220
+  assert.equal((c.raw as { smartMarketPrice?: { price?: number } }).smartMarketPrice?.price, 1508.12);
   assert.ok(c.medianPence > c.lowPence && c.highPence > c.medianPence);
 });
 
 test("PSA_9 maps from 'psa9' aggregate", () => {
   const c = mapCardAggregateToComp(fixture, ctx("PSA_9"));
-  assert.equal(c.sampleSize, 334);
-  assert.equal(c.medianPence, usdToPence(382.5));
+  assert.equal(c.sampleSize, 336);
+  assert.equal(c.medianPence, usdToPence(392.5));
+});
+
+test("BGS_9_5 and CGC_10 map from current live aggregate keys", () => {
+  const bgs = mapCardAggregateToComp(fixture, ctx("BGS_9_5"));
+  const cgc = mapCardAggregateToComp(fixture, ctx("CGC_10"));
+
+  assert.equal(bgs.sampleSize, 27);
+  assert.equal(bgs.medianPence, usdToPence(749.99));
+  assert.equal(cgc.sampleSize, 69);
+  assert.equal(cgc.medianPence, usdToPence(800));
 });
 
 test("missing grade returns empty result, not an error", () => {
@@ -71,4 +85,24 @@ test("PokemonPriceTrackerSource degrades when live fetch fails or times out", as
 
   assert.equal(comp.sampleSize, 0);
   assert.equal(comp.medianPence, 0);
+});
+
+test("PokemonPriceTrackerSource live requests use the low-credit limit and cap history days", async () => {
+  let requestedUrlString: string | null = null;
+  const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+    assert.ok(init?.signal, "live requests should carry a timeout signal");
+    requestedUrlString = String(url);
+    return new Response(JSON.stringify(fixture), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
+  const comp = await source.lookup(card, { grade: "RAW", windowDays: 365 });
+
+  assert.ok(requestedUrlString);
+  const requestedUrl = new URL(requestedUrlString);
+  assert.equal(comp.sampleSize, 248);
+  assert.equal(requestedUrl.searchParams.get("limit"), "1");
+  assert.equal(requestedUrl.searchParams.get("days"), "180");
+  assert.equal(requestedUrl.searchParams.get("includeEbay"), "true");
+  assert.equal(requestedUrl.searchParams.get("set"), "151");
 });
