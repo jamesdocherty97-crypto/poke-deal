@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { gradeToProviderKey, mapCardAggregateToComp } from "./pokemonPriceTracker.js";
+import { gradeToProviderKey, mapCardAggregateToComp, PokemonPriceTrackerSource } from "./pokemonPriceTracker.js";
 import type { CardRef } from "../../domain/types.js";
 
 const fixture = JSON.parse(
@@ -58,4 +58,17 @@ test("missing grade returns empty result, not an error", () => {
 test("malformed payload returns empty result", () => {
   assert.equal(mapCardAggregateToComp(null, ctx("RAW")).sampleSize, 0);
   assert.equal(mapCardAggregateToComp({ data: {} }, ctx("RAW")).sampleSize, 0);
+});
+
+test("PokemonPriceTrackerSource degrades when live fetch fails or times out", async () => {
+  const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
+    assert.ok(init?.signal, "live requests should carry a timeout signal");
+    throw new Error("network timeout");
+  }) as typeof fetch;
+
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
+  const comp = await source.lookup(card, { grade: "RAW" });
+
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.medianPence, 0);
 });

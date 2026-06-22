@@ -5,8 +5,17 @@ import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js"
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
 const SELECT_FIELDS = "id,name,number,rarity,images,set,tcgplayer,cardmarket";
+const DEFAULT_FETCH_TIMEOUT_MS = 4000;
+const REQUEST_CACHE_TTL_MS = 30 * 60 * 1000;
+const NULL_CACHE_TTL_MS = 60 * 1000;
 
 type FetchLike = typeof fetch;
+type RequestCacheEntry = {
+  value: unknown;
+  expiresAt: number;
+};
+
+const requestCache = new Map<string, RequestCacheEntry>();
 
 type PokemonTcgSet = {
   id?: unknown;
@@ -43,6 +52,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     private readonly apiKey: string | undefined = process.env.POKEMON_TCG_API_KEY,
     private readonly fetchImpl: FetchLike = fetch,
     private readonly baseUrl: string = BASE_URL,
+    private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
   ) {
     this.live = Boolean(apiKey?.trim());
   }
@@ -113,18 +123,46 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
         url.searchParams.set(key, value);
       }
 
+      const cacheKey = this.cacheKey(url);
+      const cached = cacheKey ? readCachedRequest(cacheKey) : undefined;
+      if (cached !== undefined) return cached;
+
       const headers: Record<string, string> = { Accept: "application/json" };
       if (this.apiKey?.trim()) {
         headers["X-Api-Key"] = this.apiKey.trim();
       }
 
-      const res = await this.fetchImpl(url, { headers });
-      if (!res.ok) return null;
-      return res.json();
+      const res = await this.fetchImpl(url, { headers, signal: timeoutSignal(this.fetchTimeoutMs) });
+      const value = res.ok ? await res.json() : null;
+      if (cacheKey) writeCachedRequest(cacheKey, value);
+      return value;
     } catch {
       return null;
     }
   }
+
+  private cacheKey(url: URL): string | null {
+    return this.baseUrl === BASE_URL ? url.toString() : null;
+  }
+}
+
+function readCachedRequest(key: string): unknown | undefined {
+  const cached = requestCache.get(key);
+  if (!cached) return undefined;
+  if (cached.expiresAt <= Date.now()) {
+    requestCache.delete(key);
+    return undefined;
+  }
+  return cached.value;
+}
+
+function writeCachedRequest(key: string, value: unknown): void {
+  const ttl = value == null ? NULL_CACHE_TTL_MS : REQUEST_CACHE_TTL_MS;
+  requestCache.set(key, { value, expiresAt: Date.now() + ttl });
+}
+
+function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
+  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
 }
 
 // Builds a list of progressively looser search queries, most specific

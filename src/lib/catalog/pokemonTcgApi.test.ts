@@ -261,3 +261,34 @@ test("PokemonTcgApiCatalogSource fetches by tcgApiId when supplied", async () =>
     "https://api.example.test/v2/cards/sv3pt5-199?select=id%2Cname%2Cnumber%2Crarity%2Cimages%2Cset%2Ctcgplayer%2Ccardmarket",
   );
 });
+
+test("PokemonTcgApiCatalogSource caches default API responses and uses timeout signals", async () => {
+  let calls = 0;
+  const fetchImpl = (async (_url: URL, init?: RequestInit) => {
+    calls += 1;
+    assert.ok(init?.signal, "catalog requests should carry a timeout signal");
+    return {
+      ok: true,
+      async json() {
+        return {
+          data: {
+            id: "cache-test-card",
+            name: "Cache Test Card",
+            number: "1",
+            set: { id: "base1", name: "Base", printedTotal: 102 },
+          },
+        };
+      },
+    } as Response;
+  }) as typeof fetch;
+
+  const source = new PokemonTcgApiCatalogSource("secret", fetchImpl);
+  const card = { name: "Cache Test Card", tcgApiId: "cache-test-card" };
+
+  const first = await source.resolve(card);
+  const second = await source.resolve(card);
+
+  assert.equal(first?.tcgApiId, "cache-test-card");
+  assert.equal(second?.tcgApiId, "cache-test-card");
+  assert.equal(calls, 1);
+});

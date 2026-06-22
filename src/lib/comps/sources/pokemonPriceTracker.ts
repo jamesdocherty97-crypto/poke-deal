@@ -17,12 +17,17 @@ import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
 import { sampleRawSales } from "./fixtures.js";
 
 const BASE_URL = "https://www.pokemonpricetracker.com/api/v2";
+const DEFAULT_FETCH_TIMEOUT_MS = 6500;
 
 export class PokemonPriceTrackerSource implements CompSource {
   readonly name = "pokemon-price-tracker";
   readonly live: boolean;
 
-  constructor(private readonly apiKey: string | undefined = process.env.POKEMON_PRICE_TRACKER_API_KEY) {
+  constructor(
+    private readonly apiKey: string | undefined = process.env.POKEMON_PRICE_TRACKER_API_KEY,
+    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
+  ) {
     this.live = Boolean(apiKey && apiKey.trim().length > 0);
   }
 
@@ -61,8 +66,9 @@ export class PokemonPriceTrackerSource implements CompSource {
     if (card.setName) params.set("set", card.setName);
 
     try {
-      const res = await fetch(`${BASE_URL}/cards?${params.toString()}`, {
+      const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
         headers: { Authorization: `Bearer ${this.apiKey}`, Accept: "application/json" },
+        signal: timeoutSignal(this.fetchTimeoutMs),
       });
       if (!res.ok) {
         console.warn(`[${this.name}] HTTP ${res.status} — no comp returned`);
@@ -75,6 +81,10 @@ export class PokemonPriceTrackerSource implements CompSource {
       return null;
     }
   }
+}
+
+function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
+  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
 }
 
 // ── Pure mapping (exported for fixture tests) ────────────────────────────────
