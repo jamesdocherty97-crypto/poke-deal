@@ -17,7 +17,8 @@
 // queries. It also powers set autocomplete and "popular sets" UI chips.
 //
 // Fully offline by design: ships a bundled snapshot of all known sets
-// (captured from GET /v2/sets on 2026-06-21, 173 sets) so search,
+// (captured from GET /v2/sets on 2026-06-21 and re-verified on
+// 2026-06-22, 173 sets) so search,
 // autocomplete, and popular-set chips work with zero API key, consistent
 // with this project's fixture/offline-mode convention (see fixtures.ts).
 // To freshen the snapshot later, re-fetch /v2/sets and regenerate the
@@ -38,8 +39,9 @@ export interface CatalogSet {
 }
 
 // ---------------------------------------------------------------------------
-// Bundled snapshot (captured 2026-06-21 from GET /v2/sets, ordered by
-// releaseDate). 173 sets, Base (1999) through Chaos Rising (2026).
+// Bundled snapshot (captured 2026-06-21 from GET /v2/sets, re-verified
+// 2026-06-22, ordered by releaseDate). 173 sets, Base (1999) through
+// Chaos Rising (2026).
 // ---------------------------------------------------------------------------
 const SET_SNAPSHOT: CatalogSet[] = [
   { id: "base1", name: "Base", series: "Base", printedTotal: 102, total: 102, releaseDate: "1999-01-09", ptcgoCode: "BS", symbolUrl: "https://images.pokemontcg.io/base1/symbol.png", logoUrl: "https://images.pokemontcg.io/base1/logo.png" },
@@ -237,6 +239,9 @@ const SET_ALIASES: Record<string, string> = {
   "shadowless base set": "base1",
   "1st edition base set": "base1",
   "first edition base set": "base1",
+  "first ed base set": "base1",
+  "1st ed base set": "base1",
+  "base unlimited": "base1",
 
   // Other nicknames/abbreviations that diverge from the literal name.
   hgss: "hgss1",
@@ -244,12 +249,101 @@ const SET_ALIASES: Record<string, string> = {
   "heartgold and soulsilver": "hgss1",
   "ex base set": "ecard1",
   expedition: "ecard1",
+  "southern island": "si1",
+  "legendary reverse": "base6",
+  "legendary collection reverse": "base6",
   swsh: "swsh1",
+  "sword and shield": "swsh1",
   "scarlet violet base set": "sv1",
+  "scarlet and violet base set": "sv1",
+  "sv base": "sv1",
+  "sv base set": "sv1",
   "sword shield base set": "swsh1",
+  "sword and shield base set": "swsh1",
+  "swsh base": "swsh1",
+  "swsh base set": "swsh1",
   "sun moon base set": "sm1",
+  "sun and moon base set": "sm1",
+  "sm base": "sm1",
   "black white base set": "bw1",
+  "black and white base set": "bw1",
+  "bw base": "bw1",
   "diamond pearl base set": "dp1",
+  "diamond and pearl base set": "dp1",
+  "dp base": "dp1",
+
+  // Current-era shorthand and chase-card dealer nicknames.
+  "sv 151": "sv3pt5",
+  "pokemon 151": "sv3pt5",
+  "scarlet violet 151": "sv3pt5",
+  "scarlet and violet 151": "sv3pt5",
+  "mew 151": "sv3pt5",
+  "evo skies": "swsh7",
+  evoskies: "swsh7",
+  "moonbreon set": "swsh7",
+  moonbreon: "swsh7",
+  "evolving skies moonbreon": "swsh7",
+  "prismatic": "sv8pt5",
+  "prismatic evo": "sv8pt5",
+  "prismatic evos": "sv8pt5",
+  "pris evo": "sv8pt5",
+  "pris evos": "sv8pt5",
+  "paldean fate": "sv4pt5",
+  "paldean fates shiny": "sv4pt5",
+  "destined rivals team rocket": "sv10",
+  "team rocket destined rivals": "sv10",
+
+  // Subsets / galleries that share codes with their parent sets.
+  "hidden fates sv": "sma",
+  "hidden fates shiny": "sma",
+  "hidden fates shiny vault": "sma",
+  "hif shiny vault": "sma",
+  "hif sv": "sma",
+  hif: "sm115",
+  "shining fates sv": "swsh45sv",
+  "shining fates shiny": "swsh45sv",
+  "shining fates shiny vault": "swsh45sv",
+  "shf shiny vault": "swsh45sv",
+  "shf sv": "swsh45sv",
+  shf: "swsh45",
+  "crown zenith gg": "swsh12pt5gg",
+  "crown zenith galarian": "swsh12pt5gg",
+  "crown zenith galarian gallery": "swsh12pt5gg",
+  "cz gg": "swsh12pt5gg",
+  "cz galarian gallery": "swsh12pt5gg",
+  "brilliant stars tg": "swsh9tg",
+  "brs tg": "swsh9tg",
+  "brilliant stars trainer gallery": "swsh9tg",
+  "astral radiance tg": "swsh10tg",
+  "asr tg": "swsh10tg",
+  "astral radiance trainer gallery": "swsh10tg",
+  "lost origin tg": "swsh11tg",
+  "lor tg": "swsh11tg",
+  "lost origin trainer gallery": "swsh11tg",
+  "silver tempest tg": "swsh12tg",
+  "sit tg": "swsh12tg",
+  "silver tempest trainer gallery": "swsh12tg",
+  "celebrations classic": "cel25c",
+  "celebrations classics": "cel25c",
+  "classic collection": "cel25c",
+
+  // Promo shorthand.
+  "wotc promos": "basep",
+  "wizards promos": "basep",
+  "wizards black star": "basep",
+  "dp promos": "dpp",
+  "diamond pearl promos": "dpp",
+  "hgss promos": "hsp",
+  "heartgold soulsilver promos": "hsp",
+  "bw promos": "bwp",
+  "black white promos": "bwp",
+  "xy promos": "xyp",
+  "sun moon promos": "smp",
+  "sm promos": "smp",
+  "swsh promos": "swshp",
+  "sword shield promos": "swshp",
+  "sv promos": "svp",
+  "scarlet violet promos": "svp",
 };
 
 // Curated set of well-known / heavily-traded sets spanning vintage WOTC
@@ -258,24 +352,48 @@ const POPULAR_SET_IDS = [
   "base1",
   "base2",
   "base3",
+  "base5",
   "neo1",
+  "neo4",
   "gym1",
+  "gym2",
   "ecard1",
+  "ecard2",
+  "ecard3",
   "ex1",
+  "ex7",
+  "ex8",
   "dp1",
+  "pl1",
   "bw1",
   "xy1",
+  "xy12",
   "sm1",
+  "sm9",
+  "sm10",
   "sm115",
+  "sma",
+  "sm12",
   "swsh1",
   "swsh7",
   "swsh45",
+  "swsh45sv",
   "cel25",
+  "swsh9",
+  "swsh11",
   "swsh12pt5",
+  "swsh12pt5gg",
   "sv1",
   "sv3pt5",
+  "sv4pt5",
+  "sv8",
   "sv8pt5",
   "sv10",
+  "zsv10pt5",
+  "rsv10pt5",
+  "me1",
+  "me2pt5",
+  "me4",
 ];
 
 // ---------------------------------------------------------------------------

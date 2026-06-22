@@ -29,6 +29,17 @@ test("resolveSetId handles other curated nicknames", () => {
   assert.equal(resolveSetId("heartgold soulsilver"), "hgss1");
 });
 
+test("resolveSetId handles dealer shorthand for current chase sets and subsets", () => {
+  assert.equal(resolveSetId("sv 151"), "sv3pt5");
+  assert.equal(resolveSetId("evo skies"), "swsh7");
+  assert.equal(resolveSetId("moonbreon"), "swsh7");
+  assert.equal(resolveSetId("prismatic"), "sv8pt5");
+  assert.equal(resolveSetId("cz gg"), "swsh12pt5gg");
+  assert.equal(resolveSetId("hidden fates sv"), "sma");
+  assert.equal(resolveSetId("brs tg"), "swsh9tg");
+  assert.equal(resolveSetId("sv promos"), "svp");
+});
+
 test("resolveSetId returns undefined for unresolvable input and empty/blank input", () => {
   assert.equal(resolveSetId("this is not a real pokemon set at all"), undefined);
   assert.equal(resolveSetId(""), undefined);
@@ -61,8 +72,10 @@ test("searchSets returns nothing for blank queries", () => {
 
 test("getPopularSets returns the curated quick-pick list in order", () => {
   const popular = getPopularSets();
-  assert.ok(popular.length >= 15);
+  assert.ok(popular.length >= 35);
   assert.equal(popular[0]?.id, "base1");
+  assert.ok(popular.some((set) => set.id === "swsh12pt5gg"));
+  assert.ok(popular.some((set) => set.id === "sv8"));
   assert.ok(popular.some((set) => set.id === "sv10"));
   assert.ok(popular.every((set) => typeof set.name === "string" && set.name.length > 0));
 });

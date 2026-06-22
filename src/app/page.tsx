@@ -63,6 +63,8 @@ type OwnedSaleCompRow = {
 type CatalogSet = {
   id: string;
   name: string;
+  series?: string;
+  releaseDate?: string;
   ptcgoCode?: string;
   symbolUrl?: string;
   logoUrl?: string;
@@ -292,6 +294,7 @@ export default function Home() {
   const [gradeOdds, setGradeOdds] = useState("45");
   const [gradingCost, setGradingCost] = useState("19.99");
   const [popularSets, setPopularSets] = useState<CatalogSet[]>([]);
+  const [allSets, setAllSets] = useState<CatalogSet[]>([]);
   const [setSuggestions, setSetSuggestions] = useState<CatalogSet[]>([]);
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
   const [cardSuggestions, setCardSuggestions] = useState<CatalogCard[]>([]);
@@ -305,7 +308,7 @@ export default function Home() {
 
   useEffect(() => {
     void refreshAll();
-    void loadPopularSets();
+    void loadSetCatalog();
   }, []);
 
   useEffect(() => {
@@ -318,23 +321,23 @@ export default function Home() {
 
   // Set autocomplete: search-as-you-type against the bundled offline set
   // catalog while the Set field is focused. Falls back to the curated
-  // "popular sets" list when the field is empty, so opening the dropdown
-  // on a blank field is still useful.
+  // "popular sets" list plus newest cached sets when the field is empty,
+  // so opening the dropdown on a blank field is still useful.
   useEffect(() => {
     if (!setSuggestionsOpen) return;
     const query = setNameValue.trim();
     if (!query) {
-      setSetSuggestions(popularSets);
+      setSetSuggestions(buildDefaultSetSuggestions(popularSets, allSets));
       return;
     }
     const handle = setTimeout(() => {
-      fetch(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=6`)
+      fetch(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=16`)
         .then(readJson)
         .then((payload) => setSetSuggestions(payload.sets ?? []))
         .catch(() => {});
     }, 150);
     return () => clearTimeout(handle);
-  }, [setNameValue, setSuggestionsOpen, popularSets]);
+  }, [setNameValue, setSuggestionsOpen, popularSets, allSets]);
 
   useEffect(() => {
     if (!cardSuggestionsOpen) return;
@@ -393,7 +396,8 @@ export default function Home() {
     [headline, gradeComp, gradeOdds, gradingCost],
   );
   const catalogCard = comp?.catalog ?? null;
-  const selectedSet = useMemo(() => findSelectedSet([...popularSets, ...setSuggestions], setNameValue), [
+  const selectedSet = useMemo(() => findSelectedSet([...popularSets, ...setSuggestions, ...allSets], setNameValue), [
+    allSets,
     popularSets,
     setNameValue,
     setSuggestions,
@@ -665,11 +669,16 @@ export default function Home() {
     setError(null);
   }
 
-  async function loadPopularSets() {
+  async function loadSetCatalog() {
     try {
-      const res = await fetch("/api/catalog/sets");
-      const payload = await readJson(res);
-      if (res.ok) setPopularSets(payload.sets ?? []);
+      const [popularRes, allRes] = await Promise.all([
+        fetch("/api/catalog/sets"),
+        fetch("/api/catalog/sets?all=1"),
+      ]);
+      const popularPayload = await readJson(popularRes);
+      const allPayload = await readJson(allRes);
+      if (popularRes.ok) setPopularSets(popularPayload.sets ?? []);
+      if (allRes.ok) setAllSets(allPayload.sets ?? []);
     } catch {
       // Offline/bundled catalog only -- if this somehow fails, the Set
       // field still works as a plain text input, so fail silently.
@@ -1166,7 +1175,7 @@ export default function Home() {
                   onChange={(event) => setSetNameValue(event.target.value)}
                   onFocus={() => setSetSuggestionsOpen(true)}
                   onBlur={() => setTimeout(() => setSetSuggestionsOpen(false), 150)}
-                  placeholder="base set, 151, SVI..."
+                  placeholder="base set, evo skies, PRE..."
                   autoComplete="off"
                 />
                 {setSuggestionsOpen && setSuggestions.length > 0 && (
@@ -1175,7 +1184,7 @@ export default function Home() {
                       <button key={set.id} type="button" className="suggestion-item" onClick={() => chooseSet(set)}>
                         {set.symbolUrl ? <img src={set.symbolUrl} alt="" onError={hideBrokenImage} /> : null}
                         <span>{set.name}</span>
-                        {set.ptcgoCode && <small>{set.ptcgoCode}</small>}
+                        <small>{setMetaLabel(set)}</small>
                       </button>
                     ))}
                   </div>
@@ -2457,11 +2466,28 @@ function shortDate(value: string): string {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
 
+function setMetaLabel(set: CatalogSet): string {
+  const year = set.releaseDate?.slice(0, 4);
+  return [set.ptcgoCode, year].filter(Boolean).join(" · ") || set.series || "set";
+}
+
+function buildDefaultSetSuggestions(popularSets: CatalogSet[], allSets: CatalogSet[], limit = 48): CatalogSet[] {
+  const seen = new Set<string>();
+  const merged: CatalogSet[] = [];
+  for (const set of [...popularSets, ...allSets]) {
+    if (seen.has(set.id)) continue;
+    seen.add(set.id);
+    merged.push(set);
+    if (merged.length >= limit) break;
+  }
+  return merged;
+}
+
 function findSelectedSet(sets: CatalogSet[], value: string): CatalogSet | null {
   const query = value.trim().toLowerCase();
   if (!query) return null;
   return (
-    sets.find((set) => set.name.toLowerCase() === query || set.ptcgoCode?.toLowerCase() === query) ??
+    sets.find((set) => set.id.toLowerCase() === query || set.name.toLowerCase() === query || set.ptcgoCode?.toLowerCase() === query) ??
     sets.find((set) => set.name.toLowerCase().includes(query)) ??
     null
   );

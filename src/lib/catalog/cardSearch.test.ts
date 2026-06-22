@@ -5,9 +5,9 @@ import { searchChaseCards } from "./chaseCards.js";
 import type { CatalogCard } from "./types.js";
 
 const cards: CatalogCard[] = [
-  { game: "POKEMON", language: "EN", name: "Pikachu ex", setName: "Surging Sparks", number: "238/191" },
-  { game: "POKEMON", language: "EN", name: "Charizard ex", setName: "151", number: "199/165" },
-  { game: "POKEMON", language: "EN", name: "Mr. Mime", setName: "Base", number: "22/102" },
+  { game: "POKEMON", language: "EN", name: "Pikachu ex", setName: "Surging Sparks", setCode: "sv8", number: "238/191" },
+  { game: "POKEMON", language: "EN", name: "Charizard ex", setName: "151", setCode: "sv3pt5", number: "199/165" },
+  { game: "POKEMON", language: "EN", name: "Mr. Mime", setName: "Base", setCode: "base1", number: "22/102" },
 ];
 
 test("rankCatalogCards tolerates card-name typos", () => {
@@ -17,11 +17,20 @@ test("rankCatalogCards tolerates card-name typos", () => {
 
 test("rankCatalogCards uses set context to prefer the right card", () => {
   const mixed: CatalogCard[] = [
-    { game: "POKEMON", language: "EN", name: "Charizard", setName: "Base", number: "4/102" },
-    { game: "POKEMON", language: "EN", name: "Charizard", setName: "Vivid Voltage", number: "25/185" },
+    { game: "POKEMON", language: "EN", name: "Charizard", setName: "Base", setCode: "base1", number: "4/102" },
+    { game: "POKEMON", language: "EN", name: "Charizard", setName: "Vivid Voltage", setCode: "swsh4", number: "25/185" },
   ];
 
   assert.equal(rankCatalogCards("Charizard", mixed, { setName: "base set" })[0]?.setName, "Base");
+});
+
+test("rankCatalogCards applies cached set aliases to card suggestion context", () => {
+  const mixed: CatalogCard[] = [
+    { game: "POKEMON", language: "EN", name: "Umbreon VMAX", setName: "Brilliant Stars", setCode: "swsh9", number: "TG23/TG30" },
+    { game: "POKEMON", language: "EN", name: "Umbreon VMAX", setName: "Evolving Skies", setCode: "swsh7", number: "215/203" },
+  ];
+
+  assert.equal(rankCatalogCards("Umbreon VMAX", mixed, { setName: "moonbreon" })[0]?.setCode, "swsh7");
 });
 
 test("scoreCatalogCardForSearch penalizes wrong set context without hiding useful suggestions", () => {

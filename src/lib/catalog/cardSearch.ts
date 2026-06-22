@@ -1,5 +1,6 @@
 import type { CatalogCard } from "./types.js";
 import { normalizeSearchText, scoreSearchText } from "./fuzzy.js";
+import { getSetById, resolveSetId } from "./setCatalog.js";
 
 export interface CardSearchOptions {
   setName?: string;
@@ -32,16 +33,31 @@ export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setN
 
   let score = nameScore * 4 + numberScore;
   if (setName?.trim()) {
-    const setScore = Math.max(
-      scoreSearchText(setName, card.setName),
-      scoreSearchText(setName, card.setCode ?? ""),
-    );
+    const setScore = scoreSetContextForSearch(setName, card);
     if (setScore === 0) score -= 260;
     else score += setScore;
   }
   if (card.imageUrl) score += 8;
   if (card.tcgApiId) score += 10;
   return score;
+}
+
+function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
+  const directScore = Math.max(
+    scoreSearchText(setName, card.setName),
+    scoreSearchText(setName, card.setCode ?? ""),
+  );
+  const resolvedSetId = resolveSetId(setName);
+  if (!resolvedSetId) return directScore;
+
+  const resolvedSet = getSetById(resolvedSetId);
+  const resolvedScore = Math.max(
+    card.setCode === resolvedSetId ? 1000 : 0,
+    resolvedSet ? scoreSearchText(resolvedSet.name, card.setName) : 0,
+    resolvedSet?.ptcgoCode ? scoreSearchText(resolvedSet.ptcgoCode, card.setCode ?? "") : 0,
+  );
+
+  return Math.max(directScore, resolvedScore);
 }
 
 function dedupeCards(cards: CatalogCard[]): CatalogCard[] {
