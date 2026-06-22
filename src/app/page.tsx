@@ -18,6 +18,7 @@ import {
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
+import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 
 type View = "acquire" | "inventory" | "listings" | "pnl";
 type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
@@ -2033,48 +2034,104 @@ function InventoryRow({
 }) {
   const listing = item.listings[0];
   const sale = item.sales[0];
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const swipeDelta = useRef({ x: 0, y: 0 });
+  const canSell = item.status !== "SOLD";
+
+  function startSwipe(event: TouchEvent<HTMLElement>) {
+    if (isInteractiveTarget(event.target)) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    swipeStart.current = { x: touch.clientX, y: touch.clientY };
+    swipeDelta.current = { x: 0, y: 0 };
+  }
+
+  function moveSwipe(event: TouchEvent<HTMLElement>) {
+    const start = swipeStart.current;
+    const touch = event.touches[0];
+    if (!start || !touch) return;
+
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    const offset = inventorySwipeOffset(deltaX, deltaY);
+    swipeDelta.current = { x: deltaX, y: deltaY };
+    setSwipeOffset(offset);
+
+    if (offset !== 0) {
+      setIsSwiping(true);
+      event.stopPropagation();
+    }
+  }
+
+  function finishSwipe(event: TouchEvent<HTMLElement>) {
+    const action = inventorySwipeAction(swipeDelta.current.x, swipeDelta.current.y, { canSell });
+    const wasSwiping = isSwiping;
+    swipeStart.current = null;
+    swipeDelta.current = { x: 0, y: 0 };
+    setSwipeOffset(0);
+    setIsSwiping(false);
+
+    if (wasSwiping) event.stopPropagation();
+    if (action === "sell") onSell(item);
+    if (action === "delete") onDelete(item);
+  }
+
   return (
-    <article className="item-row">
-      <CardImage src={item.card.imageUrl} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
-      <div className="item-main">
-        <div className="item-title-line">
-          <h3>{item.card.name}</h3>
-          <span className="item-badges">
-            <GradeBadge grade={item.grade} />
-            <span className={`pill ${statusTone(item.status)}`}>{item.status.replace(/_/g, " ")}</span>
-          </span>
-        </div>
-        <p>
-          {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
-        </p>
-        <p>
-          {listing ? `Draft ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
-          {sale ? ` · sold ${gbp(sale.salePrice)}` : ""}
-        </p>
-        <div className="row-actions">
-          {item.status !== "SOLD" && (
-            <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
-              Edit
+    <article
+      className={`item-row swipe-row ${isSwiping ? "is-swiping" : ""}`}
+      onTouchStart={startSwipe}
+      onTouchMove={moveSwipe}
+      onTouchEnd={finishSwipe}
+      onTouchCancel={finishSwipe}
+    >
+      <div className="swipe-actions-bg" aria-hidden="true">
+        <span className={`swipe-action sell ${canSell ? "" : "disabled"}`}>Sell</span>
+        <span className="swipe-action delete">Delete</span>
+      </div>
+      <div className="swipe-content" style={{ transform: `translateX(${swipeOffset}px)` }}>
+        <CardImage src={item.card.imageUrl} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
+        <div className="item-main">
+          <div className="item-title-line">
+            <h3>{item.card.name}</h3>
+            <span className="item-badges">
+              <GradeBadge grade={item.grade} />
+              <span className={`pill ${statusTone(item.status)}`}>{item.status.replace(/_/g, " ")}</span>
+            </span>
+          </div>
+          <p>
+            {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
+          </p>
+          <p>
+            {listing ? `Draft ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
+            {sale ? ` · sold ${gbp(sale.salePrice)}` : ""}
+          </p>
+          <div className="row-actions">
+            {item.status !== "SOLD" && (
+              <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
+                Edit
+              </button>
+            )}
+            {item.status !== "SOLD" && (
+              <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
+                Sell
+              </button>
+            )}
+            {item.status === "IN_STOCK" && (
+              <button type="button" onClick={() => onStatus(item, "LISTED")} disabled={busy === `status-${item.id}`}>
+                List
+              </button>
+            )}
+            {item.status !== "RESERVED" && item.status !== "SOLD" && (
+              <button type="button" onClick={() => onStatus(item, "RESERVED")} disabled={busy === `status-${item.id}`}>
+                Hold
+              </button>
+            )}
+            <button className="danger-button" type="button" onClick={() => onDelete(item)} disabled={busy === `delete-${item.id}`}>
+              Delete
             </button>
-          )}
-          {item.status !== "SOLD" && (
-            <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
-              Sell
-            </button>
-          )}
-          {item.status === "IN_STOCK" && (
-            <button type="button" onClick={() => onStatus(item, "LISTED")} disabled={busy === `status-${item.id}`}>
-              List
-            </button>
-          )}
-          {item.status !== "RESERVED" && item.status !== "SOLD" && (
-            <button type="button" onClick={() => onStatus(item, "RESERVED")} disabled={busy === `status-${item.id}`}>
-              Hold
-            </button>
-          )}
-          <button className="danger-button" type="button" onClick={() => onDelete(item)} disabled={busy === `delete-${item.id}`}>
-            Delete
-          </button>
+          </div>
         </div>
       </div>
     </article>
@@ -2252,6 +2309,10 @@ function Toast({
       </button>
     </div>
   );
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && target.closest("button, input, select, textarea, a") != null;
 }
 
 function Metric({

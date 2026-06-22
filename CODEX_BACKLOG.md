@@ -52,7 +52,7 @@ Grounded in the current `src/app/page.tsx` / `globals.css`. The app already has 
 **Worth the extra lift:**
 6. [x] Search/filter/sort on Inventory and Listings (`view === "inventory" | "listings"`). Filter by name/set/grade, sort by age/value, and filter listings by state — fits the "Dex" branding directly and is the first thing that'll matter once stock grows past a screenful.
 7. [x] Grade badges: render `PSA_10` / `BGS_9_5` etc. as a small colored "slab" badge (reusing the `.pill` pattern) instead of plain text in `InventoryRow`/`ListingRow` — graded cards are the highest-value items in the dex and deserve to read faster than the rest.
-8. Swipe-to-sell / swipe-to-delete on inventory rows on mobile, replacing/augmenting the current button row — the layout is already mobile-first (bottom sheet, bottom nav), this is a natural extension.
+8. [x] Swipe-to-sell / swipe-to-delete on inventory rows on mobile, replacing/augmenting the current button row — the layout is already mobile-first (bottom sheet, bottom nav), this is a natural extension.
 9. [x] Replace the native `window.confirm()` on delete with an in-app confirm sheet styled like `.sell-sheet` / the listing editor — a native browser dialog breaks the immersion of an otherwise fully custom UI.
 10. [x] A small profit sparkline in the Loot tab. `dashboard.recentSales` already carries `profitPence` + `soldAt` — a lightweight inline SVG sparkline needs no new dependency and turns a list of numbers into something that reads as a trend at a glance.
 

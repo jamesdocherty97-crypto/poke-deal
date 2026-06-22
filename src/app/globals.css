@@ -1347,6 +1347,70 @@ label {
   padding: 10px;
 }
 
+.item-row.swipe-row {
+  position: relative;
+  display: block;
+  padding: 0;
+  touch-action: pan-y;
+}
+
+.swipe-actions-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.swipe-action {
+  display: grid;
+  width: 42%;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.swipe-action.sell {
+  justify-items: start;
+  background: linear-gradient(90deg, rgba(52, 211, 153, 0.28), transparent);
+  color: var(--green);
+}
+
+.swipe-action.sell.disabled {
+  color: var(--muted);
+  opacity: 0.42;
+}
+
+.swipe-action.delete {
+  justify-items: end;
+  margin-left: auto;
+  background: linear-gradient(270deg, rgba(251, 113, 133, 0.28), transparent);
+  color: var(--danger);
+}
+
+.swipe-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px;
+  transition: transform 0.16s ease;
+  will-change: transform;
+}
+
+.swipe-row.is-swiping .swipe-content {
+  transition: none;
+}
+
 .item-row h3,
 .item-row p {
   margin: 0;
