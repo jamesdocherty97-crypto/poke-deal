@@ -20,8 +20,9 @@ import {
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
 import { estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
+import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
 
-type View = "acquire" | "inventory" | "listings" | "pnl";
+type View = "today" | "acquire" | "inventory" | "listings" | "pnl";
 type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
@@ -237,6 +238,25 @@ type PortfolioHistory = {
   checkedAt?: string;
 };
 
+type SystemStatus = {
+  sources: SystemSource[];
+  summary: {
+    livePrimaryComps: boolean;
+    liveCatalogKey: boolean;
+    secondaryCrossCheck: boolean;
+    alertDelivery: boolean;
+    storedSales: boolean;
+  };
+};
+
+type SystemSource = {
+  id: string;
+  label: string;
+  role: string;
+  status: "ready" | "public" | "fixture" | "missing" | "building";
+  required: boolean;
+};
+
 const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
@@ -250,7 +270,7 @@ type RefreshOptions = {
 };
 
 export default function Home() {
-  const [view, setView] = useState<View>("acquire");
+  const [view, setView] = useState<View>("today");
   const [name, setName] = useState("Charizard ex");
   const [setNameValue, setSetNameValue] = useState("151");
   const [number, setNumber] = useState("199/165");
@@ -267,6 +287,7 @@ export default function Home() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioHistory | null>(null);
   const [watches, setWatches] = useState<WatchRecord[]>([]);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userRefreshing, setUserRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -482,33 +503,65 @@ export default function Home() {
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
     : "loading deck";
+  const draftListingCount = Number(dashboard?.listingsByState.DRAFT ?? 0);
+  const activeListingCount = Number(dashboard?.listingsByState.ACTIVE ?? 0);
+  const activeWatchCount = watches.filter((watch) => watch.active).length;
+  const unlistedStockCount = activeInventory.filter((item) => item.listings.length === 0).length;
+  const todayActions = useMemo(
+    () =>
+      buildTodayActions({
+        stockCount: dashboard?.metrics.stockCount ?? activeInventory.length,
+        activeStockCount: activeInventory.length,
+        soldCount: dashboard?.metrics.soldCount ?? soldInventory.length,
+        draftListings: draftListingCount,
+        activeListings: activeListingCount,
+        activeWatches: activeWatchCount,
+        agedStockCount: dashboard?.metrics.agedStockCount ?? 0,
+        unlistedStockCount,
+      }),
+    [
+      activeInventory.length,
+      activeListingCount,
+      activeWatchCount,
+      dashboard?.metrics.agedStockCount,
+      dashboard?.metrics.soldCount,
+      dashboard?.metrics.stockCount,
+      draftListingCount,
+      soldInventory.length,
+      unlistedStockCount,
+    ],
+  );
 
   async function refreshAll(options: RefreshOptions = {}) {
     setRefreshing(true);
     if (options.user) setUserRefreshing(true);
     setError(null);
     try {
-      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes] = await Promise.all([
+      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes, systemRes] = await Promise.all([
         fetch("/api/inventory"),
         fetch("/api/listings"),
         fetch("/api/dashboard"),
         fetch("/api/snapshots/portfolio"),
         fetch("/api/watches"),
+        fetch("/api/system/status"),
       ]);
       const inventoryJson = await readJson(inventoryRes);
       const listingsJson = await readJson(listingsRes);
       const dashboardJson = await readJson(dashboardRes);
       const portfolioJson = await readJson(portfolioRes);
       const watchesJson = await readJson(watchesRes);
+      const systemJson = await readJson(systemRes);
       if (!inventoryRes.ok) throw new Error(inventoryJson.error ?? "inventory failed");
       if (!listingsRes.ok) throw new Error(listingsJson.error ?? "listings failed");
       if (!dashboardRes.ok) throw new Error(dashboardJson.error ?? "dashboard failed");
       if (!portfolioRes.ok) throw new Error(portfolioJson.error ?? "snapshot history failed");
       if (!watchesRes.ok) throw new Error(watchesJson.error ?? "watches failed");
+      if (!systemRes.ok) throw new Error(systemJson.error ?? "system status failed");
       setInventory(inventoryJson.items);
       setListings(listingsJson.listings);
       setDashboard(dashboardJson);
       setPortfolio(portfolioJson);
+      setSystemStatus(systemJson);
       const nextWatches = (watchesJson.watches ?? []) as WatchRecord[];
       setWatches(nextWatches);
       setWatchEdits((current) => {
@@ -523,6 +576,35 @@ export default function Home() {
       setRefreshing(false);
       if (options.user) setUserRefreshing(false);
     }
+  }
+
+  function openTodayAction(target: TodayActionTarget) {
+    if (target === "buy") {
+      setView("acquire");
+      return;
+    }
+    if (target === "stock") {
+      setInventoryQuery("");
+      setInventorySort("newest");
+      setView("inventory");
+      return;
+    }
+    if (target === "drafts") {
+      setListingStateFilter("DRAFT");
+      setListingSort("newest");
+      setView("listings");
+      return;
+    }
+    if (target === "watches") {
+      setView("pnl");
+      return;
+    }
+    if (target === "reprice") {
+      setView("pnl");
+      void checkReprices();
+      return;
+    }
+    setView("pnl");
   }
 
   function startPullRefresh(event: TouchEvent<HTMLElement>) {
@@ -1205,6 +1287,96 @@ export default function Home() {
         {notice && <Toast tone="success" message={notice} onDismiss={() => setNotice(null)} />}
         {error && <Toast tone="danger" message={error} onDismiss={() => setError(null)} />}
       </div>
+
+      {view === "today" && (
+        <section className="workspace today-workspace">
+          <section className="panel today-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Today</h2>
+                <span className="muted">{todayActions.length} action{todayActions.length === 1 ? "" : "s"}</span>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setView("acquire")}>
+                New buy
+              </button>
+            </div>
+            <div className="today-action-list">
+              {todayActions.map((action) => (
+                <TodayActionButton key={action.id} action={action} onOpen={openTodayAction} />
+              ))}
+            </div>
+          </section>
+
+          <section className="panel setup-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Setup</h2>
+                <span className="muted">{systemStatus?.summary.livePrimaryComps ? "live comps" : "fixture comps"}</span>
+              </div>
+              <span className={`pill ${systemStatus?.summary.secondaryCrossCheck ? "good" : "warn"}`}>
+                {systemStatus?.summary.secondaryCrossCheck ? "cross-check" : "single source"}
+              </span>
+            </div>
+            <div className="source-health-list">
+              {(systemStatus?.sources ?? []).map((source) => (
+                <SourceHealthRow key={source.id} source={source} />
+              ))}
+            </div>
+          </section>
+
+          <section className="panel launch-panel">
+            <div className="panel-heading">
+              <h2>Launch board</h2>
+              <span className="muted">side-hustle basics</span>
+            </div>
+            <div className="setup-step-list">
+              <SetupStep
+                done={(dashboard?.metrics.stockCount ?? 0) > 0}
+                title="Stock ledger"
+                detail={`${dashboard?.metrics.stockCount ?? 0} stocked`}
+                action="Buy"
+                onClick={() => setView("acquire")}
+              />
+              <SetupStep
+                done={listings.length > 0}
+                title="Listing pipeline"
+                detail={`${draftListingCount} draft / ${activeListingCount} active`}
+                action="Listings"
+                onClick={() => setView("listings")}
+              />
+              <SetupStep
+                done={(dashboard?.metrics.soldCount ?? 0) > 0}
+                title="Booked sales"
+                detail={`${dashboard?.metrics.soldCount ?? 0} sold`}
+                action="Stock"
+                onClick={() => setView("inventory")}
+              />
+              <SetupStep
+                done={activeWatchCount > 0}
+                title="Sourcing targets"
+                detail={`${activeWatchCount} active`}
+                action="Targets"
+                onClick={() => setView("pnl")}
+              />
+            </div>
+          </section>
+
+          <section className="panel quick-command-panel">
+            <div className="panel-heading">
+              <h2>Commands</h2>
+              <span className="muted">daily tools</span>
+            </div>
+            <div className="command-grid">
+              <button type="button" onClick={() => setView("acquire")}>Comp buy</button>
+              <button type="button" onClick={() => setView("inventory")}>Sell stock</button>
+              <button type="button" onClick={() => setView("listings")}>List drafts</button>
+              <button type="button" onClick={() => setView("pnl")}>Profit</button>
+              <a className="export-link" href="/api/export/books" download>Books CSV</a>
+              <a className="export-link" href="/api/export/listings?state=DRAFT" download>Draft CSV</a>
+            </div>
+          </section>
+        </section>
+      )}
 
       {view === "acquire" && (
         <section className="workspace">
@@ -2120,9 +2292,10 @@ export default function Home() {
       )}
 
       <nav className="bottom-nav" aria-label="Primary">
+        <TabButton active={view === "today"} label="Today" onClick={() => setView("today")} />
         <TabButton active={view === "acquire"} label="Buy" onClick={() => setView("acquire")} />
         <TabButton active={view === "inventory"} label="Stock" onClick={() => setView("inventory")} />
-        <TabButton active={view === "listings"} label="Listings" onClick={() => setView("listings")} />
+        <TabButton active={view === "listings"} label="List" onClick={() => setView("listings")} />
         <TabButton active={view === "pnl"} label="Profit" onClick={() => setView("pnl")} />
       </nav>
     </main>
@@ -2300,6 +2473,61 @@ function ListingRow({
         </div>
       </div>
     </article>
+  );
+}
+
+function TodayActionButton({
+  action,
+  onOpen,
+}: {
+  action: TodayAction;
+  onOpen: (target: TodayActionTarget) => void;
+}) {
+  return (
+    <button className={`today-action ${action.tone}`} type="button" onClick={() => onOpen(action.target)}>
+      <span>
+        <strong>{action.title}</strong>
+        <small>{action.detail}</small>
+      </span>
+      <b aria-hidden="true">›</b>
+    </button>
+  );
+}
+
+function SourceHealthRow({ source }: { source: SystemSource }) {
+  return (
+    <div className={`source-health-row ${sourceStatusTone(source.status)}`}>
+      <div>
+        <strong>{source.label}</strong>
+        <span>{source.role}</span>
+      </div>
+      <span>{sourceStatusLabel(source.status)}</span>
+    </div>
+  );
+}
+
+function SetupStep({
+  done,
+  title,
+  detail,
+  action,
+  onClick,
+}: {
+  done: boolean;
+  title: string;
+  detail: string;
+  action: string;
+  onClick: () => void;
+}) {
+  return (
+    <div className={`setup-step ${done ? "done" : ""}`}>
+      <span aria-hidden="true">{done ? "✓" : ""}</span>
+      <div>
+        <strong>{title}</strong>
+        <small>{detail}</small>
+      </div>
+      <button type="button" onClick={onClick}>{action}</button>
+    </div>
   );
 }
 
@@ -2734,10 +2962,26 @@ function ageLabel(value: string): string {
 }
 
 function viewTitle(view: View): string {
+  if (view === "today") return "Today";
   if (view === "acquire") return "Buy cards";
   if (view === "inventory") return "Stock";
   if (view === "listings") return "Listings";
   return "Profit";
+}
+
+function sourceStatusLabel(status: SystemSource["status"]): string {
+  if (status === "ready") return "ready";
+  if (status === "public") return "public";
+  if (status === "fixture") return "fixture";
+  if (status === "building") return "building";
+  return "missing";
+}
+
+function sourceStatusTone(status: SystemSource["status"]): string {
+  if (status === "ready" || status === "building") return "good";
+  if (status === "public") return "info";
+  if (status === "fixture") return "warn";
+  return "danger";
 }
 
 function channelLabel(channel: Channel): string {

@@ -6,6 +6,8 @@ export interface QuickHuntCard {
   setMarkUrl?: string;
 }
 
+export const MAX_QUICK_HUNTS = 12;
+
 export const DEFAULT_QUICK_HUNTS: QuickHuntCard[] = [
   {
     name: "Charizard ex",
@@ -42,12 +44,61 @@ export const DEFAULT_QUICK_HUNTS: QuickHuntCard[] = [
     imageUrl: "https://images.pokemontcg.io/swsh11tg/TG06_hires.png",
     setMarkUrl: "https://images.pokemontcg.io/swsh11tg/logo.png",
   },
+  {
+    name: "Greninja ex",
+    setName: "Twilight Masquerade",
+    number: "214/167",
+    imageUrl: "https://images.pokemontcg.io/sv6/214_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/sv6/logo.png",
+  },
+  {
+    name: "Magikarp",
+    setName: "Paldea Evolved",
+    number: "203/193",
+    imageUrl: "https://images.pokemontcg.io/sv2/203_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/sv2/logo.png",
+  },
+  {
+    name: "Giratina VSTAR",
+    setName: "Crown Zenith Galarian Gallery",
+    number: "GG69/GG70",
+    imageUrl: "https://images.pokemontcg.io/swsh12pt5gg/GG69_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/swsh12pt5gg/logo.png",
+  },
+  {
+    name: "Lugia V",
+    setName: "Silver Tempest",
+    number: "186/195",
+    imageUrl: "https://images.pokemontcg.io/swsh12/186_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/swsh12/logo.png",
+  },
+  {
+    name: "Giratina V",
+    setName: "Lost Origin",
+    number: "186/196",
+    imageUrl: "https://images.pokemontcg.io/swsh11/186_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/swsh11/logo.png",
+  },
+  {
+    name: "Pikachu with Grey Felt Hat",
+    setName: "Scarlet & Violet Black Star Promos",
+    number: "SVP085",
+    imageUrl: "https://images.pokemontcg.io/svp/85_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/svp/logo.png",
+  },
+  {
+    name: "Charizard",
+    setName: "Base",
+    number: "4/102",
+    imageUrl: "https://images.pokemontcg.io/base1/4_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/base1/logo.png",
+  },
 ];
 
 export function pinQuickHunt(
   current: readonly QuickHuntCard[],
   card: QuickHuntCard,
-  maxCards = 6,
+  maxCards = MAX_QUICK_HUNTS,
 ): QuickHuntCard[] {
   const normalized = normalizeQuickHunt(card);
   if (!normalized) return current.slice(0, maxCards);
@@ -75,14 +126,14 @@ export function parseQuickHunts(value: string | null, fallback: readonly QuickHu
     const parsed = JSON.parse(value);
     if (!Array.isArray(parsed)) return [...fallback];
     const cards = parsed.map(normalizeQuickHunt).filter((card): card is QuickHuntCard => Boolean(card));
-    return cards.length > 0 ? fillFromFallback(dedupeQuickHunts(cards), fallback).slice(0, 6) : [...fallback];
+    return cards.length > 0 ? fillFromFallback(dedupeQuickHunts(cards), fallback).slice(0, MAX_QUICK_HUNTS) : [...fallback];
   } catch {
     return [...fallback];
   }
 }
 
 export function serializeQuickHunts(cards: readonly QuickHuntCard[]): string {
-  return JSON.stringify(dedupeQuickHunts(cards).slice(0, 6));
+  return JSON.stringify(dedupeQuickHunts(cards).slice(0, MAX_QUICK_HUNTS));
 }
 
 function dedupeQuickHunts(cards: readonly QuickHuntCard[]): QuickHuntCard[] {

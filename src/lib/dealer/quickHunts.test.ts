@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   DEFAULT_QUICK_HUNTS,
+  MAX_QUICK_HUNTS,
   parseQuickHunts,
   pinQuickHunt,
   removeQuickHunt,
@@ -25,7 +26,7 @@ test("pinQuickHunt puts the selected card first and trims whitespace", () => {
     imageUrl: "https://images.pokemontcg.io/swsh12pt5gg/GG69_hires.png",
     setMarkUrl: "https://images.pokemontcg.io/swsh12pt5gg/logo.png",
   });
-  assert.equal(pinned.length, Math.min(DEFAULT_QUICK_HUNTS.length + 1, 6));
+  assert.equal(pinned.length, Math.min(DEFAULT_QUICK_HUNTS.length + 1, MAX_QUICK_HUNTS));
 });
 
 test("pinQuickHunt promotes duplicates and keeps source-backed images", () => {
@@ -60,7 +61,17 @@ test("removeQuickHunt removes by card identity", () => {
     number: "238/191",
   });
 
-  assert.deepEqual(removed.map((card) => card.name), ["Charizard ex", "Mew ex", "Umbreon VMAX", "Gengar"]);
+  assert.equal(removed.length, DEFAULT_QUICK_HUNTS.length - 1);
+  assert.equal(removed.some((card) => card.name === "Pikachu ex"), false);
+  assert.equal(removed[0]?.name, "Charizard ex");
+});
+
+test("DEFAULT_QUICK_HUNTS covers common modern, promo and vintage comp shapes", () => {
+  assert.equal(DEFAULT_QUICK_HUNTS.length, MAX_QUICK_HUNTS);
+  assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.setName.includes("Trainer Gallery") && card.number.startsWith("TG")));
+  assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.setName.includes("Galarian Gallery") && card.number.startsWith("GG")));
+  assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.number.startsWith("SVP")));
+  assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.setName === "Base" && card.number === "4/102"));
 });
 
 test("parseQuickHunts reads persisted cards and falls back on bad data", () => {
@@ -75,6 +86,7 @@ test("parseQuickHunts reads persisted cards and falls back on bad data", () => {
       name: "Lugia V",
       setName: "Silver Tempest",
       number: "186/195",
+      imageUrl: "https://images.pokemontcg.io/swsh12/186_hires.png",
       setMarkUrl: "https://images.pokemontcg.io/swsh12/logo.png",
     },
   ]);

@@ -433,6 +433,10 @@ label {
   gap: 12px;
 }
 
+.today-workspace {
+  gap: 10px;
+}
+
 .panel,
 .sell-sheet {
   display: grid;
@@ -835,6 +839,156 @@ label {
   font-size: 12px;
   font-weight: 900;
   text-decoration: none;
+}
+
+.today-panel {
+  background:
+    linear-gradient(120deg, rgba(52, 211, 153, 0.14), transparent 48%),
+    var(--panel);
+}
+
+.today-action-list,
+.source-health-list,
+.setup-step-list {
+  display: grid;
+  gap: 8px;
+}
+
+.today-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.today-action span,
+.source-health-row div,
+.setup-step div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.today-action strong,
+.source-health-row strong,
+.setup-step strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.12;
+}
+
+.today-action small,
+.source-health-row span,
+.setup-step small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.today-action b {
+  color: var(--yellow);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.today-action.good {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.today-action.warn {
+  border-color: rgba(255, 203, 5, 0.38);
+  background: rgba(255, 203, 5, 0.1);
+}
+
+.today-action.info {
+  border-color: rgba(42, 117, 187, 0.42);
+  background: rgba(42, 117, 187, 0.14);
+}
+
+.source-health-row,
+.setup-step {
+  display: grid;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 9px;
+}
+
+.source-health-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.source-health-row > span {
+  min-height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+
+.source-health-row.good > span,
+.setup-step.done > span {
+  border-color: rgba(52, 211, 153, 0.36);
+  color: var(--green);
+}
+
+.source-health-row.warn > span {
+  border-color: rgba(255, 203, 5, 0.36);
+  color: var(--yellow);
+}
+
+.source-health-row.info > span {
+  border-color: rgba(42, 117, 187, 0.46);
+  color: #88c8ff;
+}
+
+.source-health-row.danger > span {
+  border-color: rgba(251, 113, 133, 0.42);
+  color: var(--danger);
+}
+
+.setup-step {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+}
+
+.setup-step > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(255, 203, 5, 0.3);
+  border-radius: 50%;
+  color: var(--yellow);
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.setup-step button {
+  min-height: 34px;
+  padding: 6px 9px;
+  color: #cfe6ff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.command-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.command-grid button {
+  min-height: 42px;
+  color: #cfe6ff;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .pnl-summary {
@@ -1793,7 +1947,7 @@ label {
   left: 10px;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   max-width: 720px;
   margin: 0 auto;
