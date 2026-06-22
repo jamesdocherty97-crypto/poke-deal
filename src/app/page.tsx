@@ -1062,6 +1062,14 @@ export default function Home() {
             <Metric label="Active" value={String(dashboard?.listingsByState.ACTIVE ?? 0)} />
             <Metric label="Sold" value={String(dashboard?.listingsByState.SOLD ?? 0)} />
           </div>
+          <div className="export-actions" aria-label="Listing exports">
+            <a className="export-link" href="/api/export/listings?state=DRAFT" download>
+              Draft CSV
+            </a>
+            <a className="export-link" href="/api/export/listings" download>
+              All listings CSV
+            </a>
+          </div>
           {listings.map((listing) => (
             <ListingRow
               key={listing.id}
@@ -1126,6 +1134,11 @@ export default function Home() {
               value={dashboard?.metrics.realizedMarginPct == null ? "n/a" : `${dashboard.metrics.realizedMarginPct}%`}
             />
             <Metric label="Sell-through" value={`${dashboard?.metrics.sellThroughPct ?? 0}%`} />
+          </div>
+          <div className="export-actions single" aria-label="Books export">
+            <a className="export-link" href="/api/export/books" download>
+              Books CSV
+            </a>
           </div>
           <section className="panel">
             <div className="panel-heading">

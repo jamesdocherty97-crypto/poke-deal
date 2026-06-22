@@ -535,6 +535,29 @@ label {
   color: #cfe6ff;
 }
 
+.export-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.export-actions.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.export-link {
+  display: grid;
+  min-height: 42px;
+  place-items: center;
+  border: 1px solid rgba(42, 117, 187, 0.46);
+  border-radius: 8px;
+  background: rgba(42, 117, 187, 0.18);
+  color: #cfe6ff;
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
 .comp-hero {
   display: flex;
   align-items: flex-start;
