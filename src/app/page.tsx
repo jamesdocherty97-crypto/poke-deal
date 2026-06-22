@@ -161,6 +161,17 @@ type SaleSummary = {
   soldAt: string;
 };
 
+type RepriceRecommendation = {
+  itemId: string;
+  cardName: string;
+  grade: string;
+  currentPricePence: number;
+  suggestedPricePence: number;
+  movePct: number;
+  confidence: "high" | "low" | "none";
+  reason: string;
+};
+
 const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const quickHunts = [
@@ -215,6 +226,9 @@ export default function Home() {
   const [postage, setPostage] = useState("1.20");
   const [saleChannel, setSaleChannel] = useState<Channel>("EBAY");
   const [repriceMessage, setRepriceMessage] = useState<string | null>(null);
+  const [repriceRecommendations, setRepriceRecommendations] = useState<RepriceRecommendation[]>([]);
+  const [repriceCheckedAt, setRepriceCheckedAt] = useState<string | null>(null);
+  const [discordReady, setDiscordReady] = useState<boolean | null>(null);
   const [editingListingId, setEditingListingId] = useState<string | null>(null);
   const [listingPrice, setListingPrice] = useState("");
   const [listingState, setListingState] = useState<Exclude<ListingState, "SOLD">>("DRAFT");
@@ -584,17 +598,36 @@ export default function Home() {
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "reprice check failed");
-      const count = payload.recommendations?.length ?? 0;
+      const recommendations = (payload.recommendations ?? []) as RepriceRecommendation[];
+      const count = recommendations.length;
+      setRepriceRecommendations(recommendations);
+      setRepriceCheckedAt(payload.checkedAt ?? new Date().toISOString());
+      setDiscordReady(Boolean(payload.notifierConfigured));
       setRepriceMessage(
         count === 0
           ? "No repricing alerts right now."
-          : `${count} repricing alert${count === 1 ? "" : "s"} found${payload.notified ? " and sent" : ""}.`,
+          : `${count} repricing action${count === 1 ? "" : "s"} found${payload.notified ? " and sent" : ""}.`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "reprice check failed");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function applyReprice(recommendation: RepriceRecommendation) {
+    const item = inventory.find((row) => row.id === recommendation.itemId);
+    const listing = item?.listings[0];
+    if (!listing) {
+      setError("No listing found for that stock row.");
+      return;
+    }
+    await patchListing(
+      listing,
+      { listPricePence: recommendation.suggestedPricePence },
+      `Repriced ${recommendation.cardName} to ${gbp(recommendation.suggestedPricePence)}.`,
+    );
+    setRepriceRecommendations((rows) => rows.filter((row) => row.itemId !== recommendation.itemId));
   }
 
   async function lookupGradeEv() {
@@ -1107,6 +1140,25 @@ export default function Home() {
               {busy === "reprice" ? "Checking..." : "Check + alert Discord"}
             </button>
             {repriceMessage && <p className="hint">{repriceMessage}</p>}
+            {(repriceCheckedAt || discordReady !== null) && (
+              <div className="alert-status">
+                <span>{repriceCheckedAt ? `Checked ${ageLabel(repriceCheckedAt)}` : "Not checked"}</span>
+                <strong>{discordReady ? "Discord ready" : "In-app only"}</strong>
+              </div>
+            )}
+            {repriceRecommendations.length > 0 && (
+              <div className="reprice-list">
+                {repriceRecommendations.map((recommendation) => (
+                  <RepriceActionRow
+                    key={recommendation.itemId}
+                    recommendation={recommendation}
+                    busy={busy === `listing-${inventory.find((row) => row.id === recommendation.itemId)?.listings[0]?.id}`}
+                    canApply={Boolean(inventory.find((row) => row.id === recommendation.itemId)?.listings[0])}
+                    onApply={applyReprice}
+                  />
+                ))}
+              </div>
+            )}
           </section>
           <section className="panel">
             <div className="panel-heading">
@@ -1237,6 +1289,42 @@ function ListingRow({
             </button>
           )}
         </div>
+      </div>
+    </article>
+  );
+}
+
+function RepriceActionRow({
+  recommendation,
+  busy,
+  canApply,
+  onApply,
+}: {
+  recommendation: RepriceRecommendation;
+  busy: boolean;
+  canApply: boolean;
+  onApply: (recommendation: RepriceRecommendation) => void;
+}) {
+  return (
+    <article className={`reprice-row ${recommendation.movePct >= 0 ? "raise" : "drop"}`}>
+      <div>
+        <strong>{recommendation.cardName}</strong>
+        <span>
+          {recommendation.grade.replace(/_/g, " ")} · {recommendation.confidence} · {recommendation.movePct > 0 ? "+" : ""}
+          {recommendation.movePct}%
+        </span>
+      </div>
+      <div>
+        <span>
+          {gbp(recommendation.currentPricePence)} → {gbp(recommendation.suggestedPricePence)}
+        </span>
+        <button
+          type="button"
+          onClick={() => onApply(recommendation)}
+          disabled={busy || !canApply}
+        >
+          {busy ? "Saving..." : "Apply"}
+        </button>
       </div>
     </article>
   );

@@ -33,6 +33,7 @@ export async function POST(request: Request) {
 
   try {
     const { notify, limit, thresholdPct } = parsed.data;
+    const notifierConfigured = Boolean(process.env.DISCORD_WEBHOOK_URL?.trim());
     const items = await getPrisma().inventoryItem.findMany({
       where: { status: { in: ["IN_STOCK", "LISTED"] } },
       include: {
@@ -76,10 +77,17 @@ export async function POST(request: Request) {
         title: "Pokémon Dealer OS repricing",
         body: formatRepriceDigest(recommendations),
       });
-      notified = Boolean(process.env.DISCORD_WEBHOOK_URL?.trim());
+      notified = notifierConfigured;
     }
 
-    return NextResponse.json({ recommendations, notified });
+    return NextResponse.json({
+      recommendations,
+      notified,
+      notifierConfigured,
+      scannedCount: items.length,
+      thresholdPct,
+      checkedAt: new Date().toISOString(),
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "reprice check failed" },

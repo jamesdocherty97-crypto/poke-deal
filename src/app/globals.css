@@ -898,6 +898,79 @@ label {
   border-top: 0;
 }
 
+.alert-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(42, 117, 187, 0.28);
+  border-radius: 8px;
+  background: rgba(42, 117, 187, 0.12);
+  padding: 8px 10px;
+}
+
+.alert-status span,
+.alert-status strong,
+.reprice-row span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.alert-status strong {
+  color: #88c8ff;
+}
+
+.reprice-list {
+  display: grid;
+  gap: 8px;
+}
+
+.reprice-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 9px;
+}
+
+.reprice-row div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.reprice-row div:last-child {
+  justify-items: end;
+  text-align: right;
+}
+
+.reprice-row strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.reprice-row.raise strong {
+  color: var(--green);
+}
+
+.reprice-row.drop strong {
+  color: var(--yellow);
+}
+
+.reprice-row button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-color: rgba(255, 203, 5, 0.46);
+  color: var(--yellow);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .empty-state {
   margin: 0;
   border: 1px dashed rgba(255, 203, 5, 0.3);
