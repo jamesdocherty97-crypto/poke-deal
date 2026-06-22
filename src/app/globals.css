@@ -370,6 +370,39 @@ label {
   font-weight: 900;
 }
 
+.section-heading.tight {
+  margin-top: -2px;
+}
+
+.dex-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(116px, 0.75fr);
+  gap: 8px;
+  align-items: end;
+  border: 1px solid rgba(42, 117, 187, 0.24);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.32);
+  padding: 9px;
+}
+
+.dex-controls.listings-controls {
+  grid-template-columns: minmax(0, 1.2fr) minmax(88px, 0.58fr) minmax(112px, 0.72fr);
+}
+
+.dex-controls label {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dex-controls input,
+.dex-controls select {
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 .muted,
 .item-row p,
 .hint,
@@ -668,6 +701,49 @@ label {
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
+}
+
+.item-badges {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  padding: 4px 7px;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: 0;
+}
+
+.grade-badge.raw {
+  border-color: rgba(255, 203, 5, 0.28);
+  color: #fff4b0;
+}
+
+.grade-badge.psa {
+  border-color: rgba(42, 117, 187, 0.46);
+  color: #88c8ff;
+}
+
+.grade-badge.bgs {
+  border-color: rgba(139, 92, 246, 0.42);
+  color: #c4b5fd;
+}
+
+.grade-badge.cgc {
+  border-color: rgba(52, 211, 153, 0.42);
+  color: var(--green);
 }
 
 .pill.warn,
@@ -1277,6 +1353,7 @@ label {
   }
 
   .workspace > .section-heading,
+  .workspace > .dex-controls,
   .workspace > .detail-grid {
     grid-column: 1 / -1;
   }
@@ -1309,6 +1386,15 @@ label {
   }
 
   .watch-controls label {
+    grid-column: 1 / -1;
+  }
+
+  .dex-controls,
+  .dex-controls.listings-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dex-controls .search-control {
     grid-column: 1 / -1;
   }
 }

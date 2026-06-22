@@ -1,6 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  buildInventoryView,
+  buildListingView,
+  type InventorySort,
+  type ListingSort,
+  type ListingStateFilter,
+} from "@/lib/dealer/tableControls";
 
 type View = "acquire" | "inventory" | "listings" | "pnl";
 type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
@@ -295,6 +302,11 @@ export default function Home() {
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
   const [cardSuggestions, setCardSuggestions] = useState<CatalogCard[]>([]);
   const [cardSuggestionsOpen, setCardSuggestionsOpen] = useState(false);
+  const [inventoryQuery, setInventoryQuery] = useState("");
+  const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
+  const [listingQuery, setListingQuery] = useState("");
+  const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("ALL");
+  const [listingSort, setListingSort] = useState<ListingSort>("newest");
 
   useEffect(() => {
     void refreshAll();
@@ -346,6 +358,18 @@ export default function Home() {
   const soldInventory = useMemo(
     () => inventory.filter((item) => item.status === "SOLD"),
     [inventory],
+  );
+  const visibleActiveInventory = useMemo(
+    () => buildInventoryView(activeInventory, { query: inventoryQuery, sort: inventorySort }),
+    [activeInventory, inventoryQuery, inventorySort],
+  );
+  const visibleSoldInventory = useMemo(
+    () => buildInventoryView(soldInventory, { query: inventoryQuery, sort: inventorySort }),
+    [soldInventory, inventoryQuery, inventorySort],
+  );
+  const visibleListings = useMemo(
+    () => buildListingView(listings, { query: listingQuery, state: listingStateFilter, sort: listingSort }),
+    [listings, listingQuery, listingStateFilter, listingSort],
   );
   const headline = comp?.headline ?? null;
   const confidenceLabel = headline ? compConfidence(headline, comp?.sourcesDisagree ?? false) : null;
@@ -1227,9 +1251,30 @@ export default function Home() {
         <section className="workspace">
           <div className="section-heading">
             <h2>Active stock</h2>
-            <span>{activeInventory.length} rows</span>
+            <span>{rowCountLabel(visibleActiveInventory.length, activeInventory.length)}</span>
           </div>
-          {activeInventory.map((item) => (
+          <div className="dex-controls" aria-label="Inventory search and sort">
+            <label className="search-control">
+              Search
+              <input
+                value={inventoryQuery}
+                onChange={(event) => setInventoryQuery(event.target.value)}
+                placeholder="Name, set, grade..."
+              />
+            </label>
+            <label>
+              Sort
+              <select value={inventorySort} onChange={(event) => setInventorySort(event.target.value as InventorySort)}>
+                <option value="newest">newest</option>
+                <option value="oldest">oldest</option>
+                <option value="highest-cost">highest cost</option>
+                <option value="lowest-cost">lowest cost</option>
+                <option value="grade">best grade</option>
+                <option value="name">name</option>
+              </select>
+            </label>
+          </div>
+          {visibleActiveInventory.map((item) => (
             <InventoryRow
               key={item.id}
               item={item}
@@ -1239,7 +1284,11 @@ export default function Home() {
               onDelete={deleteItem}
             />
           ))}
-          {activeInventory.length === 0 && <EmptyState text="No active stock. Acquire your next buy from the first tab." />}
+          {activeInventory.length === 0 ? (
+            <EmptyState text="No active stock. Acquire your next buy from the first tab." />
+          ) : visibleActiveInventory.length === 0 ? (
+            <EmptyState text="No matching active stock. Clear the search or change the sort." />
+          ) : null}
 
           {sellingId && (
             <form className="sell-sheet" onSubmit={markSold}>
@@ -1279,9 +1328,9 @@ export default function Home() {
             <>
               <div className="section-heading">
                 <h2>Sold</h2>
-                <span>{soldInventory.length} rows</span>
+                <span>{rowCountLabel(visibleSoldInventory.length, soldInventory.length)}</span>
               </div>
-              {soldInventory.slice(0, 8).map((item) => (
+              {visibleSoldInventory.slice(0, 8).map((item) => (
                 <InventoryRow
                   key={item.id}
                   item={item}
@@ -1291,6 +1340,7 @@ export default function Home() {
                   onDelete={deleteItem}
                 />
               ))}
+              {visibleSoldInventory.length === 0 && <EmptyState text="No matching sold rows." />}
             </>
           )}
         </section>
@@ -1311,7 +1361,45 @@ export default function Home() {
               All listings CSV
             </a>
           </div>
-          {listings.map((listing) => (
+          <div className="dex-controls listings-controls" aria-label="Listing search and sort">
+            <label className="search-control">
+              Search
+              <input
+                value={listingQuery}
+                onChange={(event) => setListingQuery(event.target.value)}
+                placeholder="Card, channel, grade..."
+              />
+            </label>
+            <label>
+              State
+              <select
+                value={listingStateFilter}
+                onChange={(event) => setListingStateFilter(event.target.value as ListingStateFilter)}
+              >
+                <option value="ALL">all</option>
+                <option value="DRAFT">draft</option>
+                <option value="ACTIVE">active</option>
+                <option value="SOLD">sold</option>
+                <option value="ENDED">ended</option>
+              </select>
+            </label>
+            <label>
+              Sort
+              <select value={listingSort} onChange={(event) => setListingSort(event.target.value as ListingSort)}>
+                <option value="newest">newest</option>
+                <option value="oldest">oldest</option>
+                <option value="highest-price">highest price</option>
+                <option value="lowest-price">lowest price</option>
+                <option value="channel">channel</option>
+                <option value="state">state</option>
+              </select>
+            </label>
+          </div>
+          <div className="section-heading tight">
+            <h2>Listings</h2>
+            <span>{rowCountLabel(visibleListings.length, listings.length)}</span>
+          </div>
+          {visibleListings.map((listing) => (
             <ListingRow
               key={listing.id}
               listing={listing}
@@ -1326,7 +1414,11 @@ export default function Home() {
               }
             />
           ))}
-          {listings.length === 0 && <EmptyState text="No listings yet. Acquire can create draft listings automatically." />}
+          {listings.length === 0 ? (
+            <EmptyState text="No listings yet. Acquire can create draft listings automatically." />
+          ) : visibleListings.length === 0 ? (
+            <EmptyState text="No matching listings. Clear the search or change the state filter." />
+          ) : null}
           {editingListingId && (
             <form className="sell-sheet" onSubmit={saveListing}>
               <div className="panel-heading">
@@ -1542,10 +1634,13 @@ function InventoryRow({
       <div className="item-main">
         <div className="item-title-line">
           <h3>{item.card.name}</h3>
-          <span className={`pill ${statusTone(item.status)}`}>{item.status.replace(/_/g, " ")}</span>
+          <span className="item-badges">
+            <GradeBadge grade={item.grade} />
+            <span className={`pill ${statusTone(item.status)}`}>{item.status.replace(/_/g, " ")}</span>
+          </span>
         </div>
         <p>
-          {item.card.number ?? "no number"} · {item.grade.replace(/_/g, " ")} · cost {gbp(item.costBasis)}
+          {item.card.setName} {item.card.number ?? "no number"} · cost {gbp(item.costBasis)}
         </p>
         <p>
           {listing ? `Draft ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
@@ -1598,11 +1693,14 @@ function ListingRow({
       <div className="item-main">
         <div className="item-title-line">
           <h3>{title}</h3>
-          <span className={`pill ${listingTone(listing.state)}`}>{listing.state.toLowerCase()}</span>
+          <span className="item-badges">
+            {listing.item && <GradeBadge grade={listing.item.grade} />}
+            <span className={`pill ${listingTone(listing.state)}`}>{listing.state.toLowerCase()}</span>
+          </span>
         </div>
         <p>
           {channelLabel(listing.channel)}
-          {listing.item ? ` · ${listing.item.grade.replace(/_/g, " ")}` : ""}
+          {listing.item?.card.setName ? ` · ${listing.item.card.setName}` : ""}
           {listing.externalUrl ? " · URL saved" : ""}
         </p>
         <p>{gbp(price)}</p>
@@ -1753,6 +1851,14 @@ function EmptyState({ text }: { text: string }) {
   return <p className="empty-state">{text}</p>;
 }
 
+function GradeBadge({ grade }: { grade: string }) {
+  return <span className={`grade-badge ${gradeTone(grade)}`}>{grade.replace(/_/g, " ")}</span>;
+}
+
+function rowCountLabel(visible: number, total: number): string {
+  return visible === total ? `${total} row${total === 1 ? "" : "s"}` : `${visible}/${total} rows`;
+}
+
 function compConfidence(comp: CompResult, sourcesDisagree: boolean): { label: string; tone: string } {
   if (comp.sampleSize === 0) return { label: "No comps", tone: "danger" };
   if (sourcesDisagree) return { label: "Cross-check", tone: "warn" };
@@ -1817,6 +1923,14 @@ function listingTone(state: ListingState): string {
   if (state === "SOLD") return "good";
   if (state === "ACTIVE") return "info";
   if (state === "ENDED") return "warn";
+  return "";
+}
+
+function gradeTone(grade: string): string {
+  if (grade === "RAW") return "raw";
+  if (grade.startsWith("PSA")) return "psa";
+  if (grade.startsWith("BGS")) return "bgs";
+  if (grade.startsWith("CGC")) return "cgc";
   return "";
 }
 
