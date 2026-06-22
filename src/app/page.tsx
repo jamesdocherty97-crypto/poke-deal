@@ -226,6 +226,7 @@ type PortfolioHistory = {
 
 const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
+const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const quickHunts = [
   {
     name: "Charizard ex",
@@ -275,6 +276,15 @@ export default function Home() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [itemQuantity, setItemQuantity] = useState("1");
+  const [itemCost, setItemCost] = useState("");
+  const [itemSource, setItemSource] = useState("");
+  const [itemLocation, setItemLocation] = useState("");
+  const [itemStatus, setItemStatus] = useState<ItemStatus>("IN_STOCK");
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: "inventory"; item: InventoryItem } | { kind: "watch"; watch: WatchRecord } | null
+  >(null);
   const [salePrice, setSalePrice] = useState("");
   const [fees, setFees] = useState("");
   const [postage, setPostage] = useState("1.20");
@@ -579,9 +589,11 @@ export default function Home() {
     await patchWatch(watch, { targetPence }, `Updated target for ${watch.card.name} to ${gbp(targetPence)}.`);
   }
 
+  function requestDeleteWatch(watch: WatchRecord) {
+    setDeleteTarget({ kind: "watch", watch });
+  }
+
   async function deleteWatch(watch: WatchRecord) {
-    const ok = window.confirm(`Delete watch for ${watch.card.name} ${watch.grade.replace(/_/g, " ")}?`);
-    if (!ok) return;
     setBusy(`watch-${watch.id}`);
     setError(null);
     setNotice(null);
@@ -597,6 +609,7 @@ export default function Home() {
       });
       setWatchHits((rows) => rows.filter((hit) => hit.watchId !== watch.id));
       setNotice("Watch deleted.");
+      setDeleteTarget(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "watch delete failed");
     } finally {
@@ -644,10 +657,60 @@ export default function Home() {
   function openSell(item: InventoryItem) {
     const price = item.listings[0]?.listPrice ?? item.listings[0]?.suggestedPrice ?? item.costBasis;
     setSellingId(item.id);
+    setEditingItemId(null);
     setSalePrice(penceToPounds(price));
     setFees(penceToPounds(Math.round(price * 0.128) + 30));
     setPostage("1.20");
     setSaleChannel(item.listings[0]?.channel ?? "EBAY");
+  }
+
+  function openInventoryEditor(item: InventoryItem) {
+    setEditingItemId(item.id);
+    setSellingId(null);
+    setItemQuantity(String(item.quantity));
+    setItemCost(penceToPounds(item.costBasis));
+    setItemSource(item.acquiredFrom ?? "");
+    setItemLocation(item.location ?? "");
+    setItemStatus(item.status);
+    setError(null);
+    setNotice(null);
+  }
+
+  async function saveInventoryItem(event: FormEvent) {
+    event.preventDefault();
+    const item = inventory.find((row) => row.id === editingItemId);
+    if (!item) return;
+    const quantity = Number(itemQuantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setError("Quantity must be a whole number above 0.");
+      return;
+    }
+
+    setBusy(`edit-${item.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/inventory/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantity,
+          costBasisPence: poundsToPence(itemCost),
+          acquiredFrom: itemSource.trim() || null,
+          location: itemLocation.trim() || null,
+          status: itemStatus,
+        }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "inventory edit failed");
+      setNotice(`${item.card.name} updated.`);
+      setEditingItemId(null);
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "inventory edit failed");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function markSold(event: FormEvent) {
@@ -699,9 +762,11 @@ export default function Home() {
     }
   }
 
+  function requestDeleteItem(item: InventoryItem) {
+    setDeleteTarget({ kind: "inventory", item });
+  }
+
   async function deleteItem(item: InventoryItem) {
-    const ok = window.confirm(`Delete ${item.card.name} ${item.grade}?`);
-    if (!ok) return;
     setBusy(`delete-${item.id}`);
     setError(null);
     try {
@@ -709,12 +774,23 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "delete failed");
       setNotice("Inventory row deleted.");
+      setDeleteTarget(null);
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "delete failed");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function confirmDeleteTarget() {
+    const target = deleteTarget;
+    if (!target) return;
+    if (target.kind === "inventory") {
+      await deleteItem(target.item);
+      return;
+    }
+    await deleteWatch(target.watch);
   }
 
   function openListingEditor(listing: Listing) {
@@ -1301,9 +1377,10 @@ export default function Home() {
               key={item.id}
               item={item}
               busy={busy}
+              onEdit={openInventoryEditor}
               onSell={openSell}
               onStatus={updateStatus}
-              onDelete={deleteItem}
+              onDelete={requestDeleteItem}
             />
           ))}
           {activeInventory.length === 0 ? (
@@ -1311,6 +1388,63 @@ export default function Home() {
           ) : visibleActiveInventory.length === 0 ? (
             <EmptyState text="No matching active stock. Clear the search or change the sort." />
           ) : null}
+
+          {editingItemId && (
+            <form className="sell-sheet" onSubmit={saveInventoryItem}>
+              <div className="panel-heading">
+                <h2>Edit stock</h2>
+                <button className="ghost-button" type="button" onClick={() => setEditingItemId(null)}>Close</button>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Cost
+                  <MoneyInput value={itemCost} onChange={setItemCost} disabled={busy === `edit-${editingItemId}`} />
+                </label>
+                <label>
+                  Qty
+                  <input
+                    inputMode="numeric"
+                    value={itemQuantity}
+                    onChange={(event) => setItemQuantity(event.target.value)}
+                    disabled={busy === `edit-${editingItemId}`}
+                  />
+                </label>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Source
+                  <input
+                    value={itemSource}
+                    onChange={(event) => setItemSource(event.target.value)}
+                    disabled={busy === `edit-${editingItemId}`}
+                  />
+                </label>
+                <label>
+                  Location
+                  <input
+                    value={itemLocation}
+                    onChange={(event) => setItemLocation(event.target.value)}
+                    disabled={busy === `edit-${editingItemId}`}
+                  />
+                </label>
+              </div>
+              <label>
+                Status
+                <select
+                  value={itemStatus}
+                  onChange={(event) => setItemStatus(event.target.value as ItemStatus)}
+                  disabled={busy === `edit-${editingItemId}`}
+                >
+                  {editableStatuses.map((status) => (
+                    <option key={status} value={status}>{status.replace(/_/g, " ").toLowerCase()}</option>
+                  ))}
+                </select>
+              </label>
+              <button className="primary-action" type="submit" disabled={busy === `edit-${editingItemId}`}>
+                {busy === `edit-${editingItemId}` ? "Saving..." : "Save stock"}
+              </button>
+            </form>
+          )}
 
           {sellingId && (
             <form className="sell-sheet" onSubmit={markSold}>
@@ -1357,9 +1491,10 @@ export default function Home() {
                   key={item.id}
                   item={item}
                   busy={busy}
+                  onEdit={openInventoryEditor}
                   onSell={openSell}
                   onStatus={updateStatus}
-                  onDelete={deleteItem}
+                  onDelete={requestDeleteItem}
                 />
               ))}
               {visibleSoldInventory.length === 0 && <EmptyState text="No matching sold rows." />}
@@ -1590,7 +1725,7 @@ export default function Home() {
                         watch.active ? `${watch.card.name} watch paused.` : `${watch.card.name} watch resumed.`,
                       )
                     }
-                    onDelete={() => deleteWatch(watch)}
+                    onDelete={() => requestDeleteWatch(watch)}
                   />
                 ))}
                 {watches.length === 0 && <p className="empty-state">No buy watches yet.</p>}
@@ -1649,6 +1784,37 @@ export default function Home() {
         </section>
       )}
 
+      {deleteTarget && (
+        <section className="confirm-sheet" role="dialog" aria-modal="true" aria-label="Confirm delete">
+          <div>
+            <p className="eyebrow">Delete</p>
+            <h2>{deleteTarget.kind === "inventory" ? deleteTarget.item.card.name : deleteTarget.watch.card.name}</h2>
+            <span>
+              {deleteTarget.kind === "inventory"
+                ? `${deleteTarget.item.grade.replace(/_/g, " ")} stock row, listing drafts and sale records will be removed.`
+                : `${deleteTarget.watch.grade.replace(/_/g, " ")} buy watch and its alerts will be removed.`}
+            </span>
+          </div>
+          <div className="confirm-actions">
+            <button className="ghost-button" type="button" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </button>
+            <button
+              className="danger-button"
+              type="button"
+              onClick={confirmDeleteTarget}
+              disabled={
+                deleteTarget.kind === "inventory"
+                  ? busy === `delete-${deleteTarget.item.id}`
+                  : busy === `watch-${deleteTarget.watch.id}`
+              }
+            >
+              {busy?.startsWith("delete-") || busy?.startsWith("watch-") ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </section>
+      )}
+
       <nav className="bottom-nav" aria-label="Primary">
         <TabButton active={view === "acquire"} label="Catch" onClick={() => setView("acquire")} />
         <TabButton active={view === "inventory"} label="Dex" onClick={() => setView("inventory")} />
@@ -1662,12 +1828,14 @@ export default function Home() {
 function InventoryRow({
   item,
   busy,
+  onEdit,
   onSell,
   onStatus,
   onDelete,
 }: {
   item: InventoryItem;
   busy: string | null;
+  onEdit: (item: InventoryItem) => void;
   onSell: (item: InventoryItem) => void;
   onStatus: (item: InventoryItem, status: ItemStatus) => void;
   onDelete: (item: InventoryItem) => void;
@@ -1686,13 +1854,18 @@ function InventoryRow({
           </span>
         </div>
         <p>
-          {item.card.setName} {item.card.number ?? "no number"} · cost {gbp(item.costBasis)}
+          {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
         </p>
         <p>
           {listing ? `Draft ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
           {sale ? ` · sold ${gbp(sale.salePrice)}` : ""}
         </p>
         <div className="row-actions">
+          {item.status !== "SOLD" && (
+            <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
+              Edit
+            </button>
+          )}
           {item.status !== "SOLD" && (
             <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
               Sell

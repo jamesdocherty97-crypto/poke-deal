@@ -1431,7 +1431,8 @@ label {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.sell-sheet {
+.sell-sheet,
+.confirm-sheet {
   position: fixed;
   right: 12px;
   bottom: 82px;
@@ -1439,6 +1440,31 @@ label {
   z-index: 20;
   background: rgba(13, 20, 36, 0.98);
   box-shadow: var(--shadow);
+}
+
+.confirm-sheet {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(251, 113, 133, 0.34);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.confirm-sheet h2,
+.confirm-sheet p {
+  margin: 0;
+}
+
+.confirm-sheet span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .bottom-nav {
@@ -1505,6 +1531,12 @@ label {
   }
 
   .sell-sheet {
+    right: calc(50% - 360px);
+    left: auto;
+    width: 420px;
+  }
+
+  .confirm-sheet {
     right: calc(50% - 360px);
     left: auto;
     width: 420px;
