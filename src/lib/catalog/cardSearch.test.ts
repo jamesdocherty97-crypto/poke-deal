@@ -39,7 +39,7 @@ test("rankCatalogCards understands collector numbers typed alongside names", () 
 
   assert.deepEqual(parseCardSearchQuery("Gengar TG06"), { name: "Gengar", number: "TG06" });
   assert.equal(rankCatalogCards("Gengar TG06", mixed, { setName: "Lost Origin" })[0]?.setCode, "swsh11tg");
-  assert.equal(scoreCatalogCardForSearch("TG06", mixed[1]!), 650);
+  assert.equal(scoreCatalogCardForSearch("TG06", mixed[1]!), 1100);
 });
 
 test("rankCatalogCards treats shortened prefixed subset totals as equivalent", () => {
@@ -80,6 +80,33 @@ test("rankCatalogCards understands promo collector numbers typed alongside names
     number: "SWSH262",
   });
   assert.equal(rankCatalogCards("Charizard VSTAR SWSH262", mixed, { setName: "SWSH Promos" })[0]?.setCode, "swshp");
+});
+
+test("rankCatalogCards matches SVP promo numbers against API-style numeric promo numbers", () => {
+  const mixed: CatalogCard[] = [
+    {
+      game: "POKEMON",
+      language: "EN",
+      name: "Pikachu",
+      setName: "Scarlet & Violet Black Star Promos",
+      setCode: "svp",
+      number: "101",
+    },
+    {
+      game: "POKEMON",
+      language: "EN",
+      name: "Pikachu with Grey Felt Hat",
+      setName: "Scarlet & Violet Black Star Promos",
+      setCode: "svp",
+      number: "85",
+    },
+  ];
+
+  assert.deepEqual(parseCardSearchQuery("Pikachu with Grey Felt Hat SVP085"), {
+    name: "Pikachu with Grey Felt Hat",
+    number: "SVP085",
+  });
+  assert.equal(rankCatalogCards("Pikachu SVP085", mixed, { setName: "SV Promos" })[0]?.number, "85");
 });
 
 test("rankCatalogCards applies cached set aliases to card suggestion context", () => {

@@ -12,7 +12,14 @@ export async function resolveCatalogCard(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
 ): Promise<CatalogCard | null> {
-  return catalogSource.resolve(card).catch(() => null);
+  const direct = await catalogSource.resolve(card).catch(() => null);
+  if (direct) return direct;
+
+  const searched = await catalogSource.search(card, 5).catch(() => []);
+  const best = searched[0] ?? null;
+  if (!best?.tcgApiId) return best;
+
+  return catalogSource.resolve({ ...card, tcgApiId: best.tcgApiId }).catch(() => best);
 }
 
 export function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardRef {

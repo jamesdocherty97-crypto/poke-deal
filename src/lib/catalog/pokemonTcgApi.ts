@@ -2,11 +2,12 @@ import type { CardRef } from "../domain/types.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../comps/currency.js";
 import { resolveSetIdForCard } from "./setCatalog.js";
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js";
+import { tokenizeSearchText } from "./fuzzy.js";
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
 const CARD_IDENTITY_FIELDS = "id,name,number,rarity,images,set";
 const MARKET_SELECT_FIELDS = `${CARD_IDENTITY_FIELDS},tcgplayer,cardmarket`;
-const DEFAULT_FETCH_TIMEOUT_MS = 4000;
+const DEFAULT_FETCH_TIMEOUT_MS = 6500;
 const REQUEST_CACHE_TTL_MS = 30 * 60 * 1000;
 const NULL_CACHE_TTL_MS = 60 * 1000;
 
@@ -186,29 +187,46 @@ export function buildPokemonTcgSearchQueries(card: CardRef): string[] {
   const name = card.name.trim();
   if (!name) return [];
   const nameTerm = `name:${quoteQueryValue(name)}`;
+  const relaxedNameTerm = buildRelaxedNameTerm(name);
 
-  const number = normalizeCollectorNumber(card.number);
-  const numberTerm = number ? `number:${quoteQueryValue(number)}` : undefined;
+  const numberTerms = buildPokemonTcgCollectorNumberTerms(card.number).map(
+    (number) => `number:${quoteQueryValue(number)}`,
+  );
 
   const resolvedSetId = resolveSetIdForCard(card.setName, card.number);
   const setTerm = resolvedSetId ? `set.id:${resolvedSetId}` : undefined;
 
-  const levels: Array<Array<string | undefined>> = [
-    [nameTerm, numberTerm, setTerm],
-    [nameTerm, setTerm],
-    [nameTerm, numberTerm],
-    [nameTerm],
-  ];
-
   const queries: string[] = [];
   const seen = new Set<string>();
-  for (const terms of levels) {
+  const addQuery = (...terms: Array<string | undefined>) => {
     const query = terms.filter((term): term is string => Boolean(term)).join(" ");
     if (query && !seen.has(query)) {
       seen.add(query);
       queries.push(query);
     }
+  };
+
+  for (const numberTerm of numberTerms) {
+    addQuery(nameTerm, numberTerm, setTerm);
   }
+  if (relaxedNameTerm) {
+    for (const numberTerm of numberTerms) {
+      addQuery(relaxedNameTerm, numberTerm, setTerm);
+    }
+  }
+  addQuery(nameTerm, setTerm);
+  if (relaxedNameTerm) addQuery(relaxedNameTerm, setTerm);
+
+  for (const numberTerm of numberTerms) {
+    addQuery(nameTerm, numberTerm);
+  }
+  if (relaxedNameTerm) {
+    for (const numberTerm of numberTerms) {
+      addQuery(relaxedNameTerm, numberTerm);
+    }
+  }
+  addQuery(nameTerm);
+
   return queries;
 }
 
@@ -336,11 +354,23 @@ export function normalizeCollectorNumber(number: string | undefined): string | u
   return beforeSlash;
 }
 
+export function buildPokemonTcgCollectorNumberTerms(number: string | undefined): string[] {
+  const normalized = normalizeCollectorNumber(number);
+  if (!normalized) return [];
+
+  const terms = [normalized];
+  const strippedPromo = stripPromoPrefixForApiNumber(normalized);
+  if (strippedPromo && strippedPromo !== normalized) terms.push(strippedPromo);
+  return terms;
+}
+
 function formatCollectorNumber(
   number: string,
   printedTotal: number | undefined,
   set: PokemonTcgSet | undefined,
 ): string {
+  const promoNumber = formatPromoCollectorNumber(number, set);
+  if (promoNumber) return promoNumber;
   if (number.includes("/") || !printedTotal) return number;
   const prefixed = number.match(/^([A-Za-z]{1,4})\d+$/);
   if (prefixed) {
@@ -350,6 +380,27 @@ function formatCollectorNumber(
       : number;
   }
   return `${number}/${printedTotal}`;
+}
+
+function buildRelaxedNameTerm(name: string): string | undefined {
+  const tokens = tokenizeSearchText(name);
+  const firstUsefulToken = tokens.find((token) => token.length >= 3);
+  if (!firstUsefulToken || tokens.length <= 1) return undefined;
+  return `name:${firstUsefulToken}`;
+}
+
+function stripPromoPrefixForApiNumber(number: string): string | undefined {
+  const match = number.match(/^SVP0*(\d{1,4})$/i);
+  if (!match) return undefined;
+  return String(Number.parseInt(match[1]!, 10));
+}
+
+function formatPromoCollectorNumber(number: string, set: PokemonTcgSet | undefined): string | null {
+  const setId = readString(set?.id)?.toLowerCase();
+  if (setId === "svp" && /^\d+$/.test(number)) {
+    return `SVP${number.padStart(3, "0")}`;
+  }
+  return null;
 }
 
 function shouldMirrorPrefixInPrintedTotal(prefix: string, set: PokemonTcgSet | undefined): boolean {

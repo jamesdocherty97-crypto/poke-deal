@@ -18,6 +18,7 @@ import {
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
+import { estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 
 type View = "acquire" | "inventory" | "listings" | "pnl";
@@ -240,6 +241,8 @@ const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
+const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Trade-in"];
+const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 
 type RefreshOptions = {
   toast?: boolean;
@@ -283,7 +286,10 @@ export default function Home() {
   const [salePrice, setSalePrice] = useState("");
   const [fees, setFees] = useState("");
   const [postage, setPostage] = useState("1.20");
+  const [soldAt, setSoldAt] = useState(todayInputValue());
   const [saleChannel, setSaleChannel] = useState<Channel>("EBAY");
+  const [feesTouched, setFeesTouched] = useState(false);
+  const [postageTouched, setPostageTouched] = useState(false);
   const [repriceMessage, setRepriceMessage] = useState<string | null>(null);
   const [repriceRecommendations, setRepriceRecommendations] = useState<RepriceRecommendation[]>([]);
   const [repriceCheckedAt, setRepriceCheckedAt] = useState<string | null>(null);
@@ -381,6 +387,13 @@ export default function Home() {
     return () => clearTimeout(handle);
   }, [name, setNameValue, cardSuggestionsOpen]);
 
+  useEffect(() => {
+    if (!sellingId) return;
+    const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice));
+    if (!feesTouched) setFees(penceToPounds(estimate.feesPence));
+    if (!postageTouched) setPostage(penceToPounds(estimate.postagePence));
+  }, [feesTouched, postageTouched, saleChannel, salePrice, sellingId]);
+
   const activeInventory = useMemo(
     () => inventory.filter((item) => item.status !== "SOLD"),
     [inventory],
@@ -401,6 +414,21 @@ export default function Home() {
     () => buildListingView(listings, { query: listingQuery, state: listingStateFilter, sort: listingSort }),
     [listings, listingQuery, listingStateFilter, listingSort],
   );
+  const sellingItem = useMemo(
+    () => inventory.find((item) => item.id === sellingId) ?? null,
+    [inventory, sellingId],
+  );
+  const salePreview = useMemo(() => {
+    if (!sellingItem) return null;
+    const salePricePence = poundsToPence(salePrice);
+    const feesPence = poundsToPence(fees);
+    const postagePence = poundsToPence(postage);
+    const netPence = saleNetPence({ salePricePence, feesPence, postagePence });
+    return {
+      netPence,
+      profitPence: netPence - sellingItem.costBasis,
+    };
+  }, [fees, postage, salePrice, sellingItem]);
   const headline = comp?.headline ?? null;
   const confidenceLabel = headline ? compConfidence(headline, comp?.sourcesDisagree ?? false) : null;
   const deal = useMemo(
@@ -767,12 +795,26 @@ export default function Home() {
 
   function openSell(item: InventoryItem) {
     const price = item.listings[0]?.listPrice ?? item.listings[0]?.suggestedPrice ?? item.costBasis;
+    const nextChannel = item.listings[0]?.channel ?? "EBAY";
+    const estimate = estimateSaleCosts(nextChannel, price);
     setSellingId(item.id);
     setEditingItemId(null);
     setSalePrice(penceToPounds(price));
-    setFees(penceToPounds(Math.round(price * 0.128) + 30));
-    setPostage("1.20");
-    setSaleChannel(item.listings[0]?.channel ?? "EBAY");
+    setFees(penceToPounds(estimate.feesPence));
+    setPostage(penceToPounds(estimate.postagePence));
+    setSoldAt(todayInputValue());
+    setSaleChannel(nextChannel);
+    setFeesTouched(false);
+    setPostageTouched(false);
+  }
+
+  function applySaleChannelPreset(nextChannel: Channel) {
+    const estimate = estimateSaleCosts(nextChannel, poundsToPence(salePrice));
+    setSaleChannel(nextChannel);
+    setFees(penceToPounds(estimate.feesPence));
+    setPostage(penceToPounds(estimate.postagePence));
+    setFeesTouched(false);
+    setPostageTouched(false);
   }
 
   function openInventoryEditor(item: InventoryItem) {
@@ -839,6 +881,7 @@ export default function Home() {
           salePricePence: poundsToPence(salePrice),
           feesPence: poundsToPence(fees),
           postagePence: poundsToPence(postage),
+          soldAt: soldAtIso(soldAt),
         }),
       });
       const payload = await readJson(res);
@@ -1170,42 +1213,6 @@ export default function Home() {
               <h2>Fast comp</h2>
               <span className="muted">Live GBP valuation</span>
             </div>
-            <div className="quick-hunt-toolbar" aria-label="Quick hunt controls">
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={pinCurrentQuickHunt}
-                disabled={!name.trim() || !setNameValue.trim() || !number.trim()}
-              >
-                Pin current
-              </button>
-              <button className="ghost-button" type="button" onClick={resetQuickHunts}>
-                Reset
-              </button>
-            </div>
-            <div className="quick-hunts" aria-label="Quick card picks">
-              {quickHunts.map((card) => (
-                <article className="quick-hunt-card" key={`${card.name}-${card.setName}-${card.number}`}>
-                  <button className="quick-hunt-pick" type="button" onClick={() => chooseQuickHunt(card)}>
-                    <span className="quick-art-stack">
-                      <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
-                      {card.setMarkUrl && (
-                        <img className="quick-set-mark" src={card.setMarkUrl} alt="" onError={hideBrokenImage} />
-                      )}
-                    </span>
-                    <span>{card.name}</span>
-                  </button>
-                  <button
-                    className="quick-hunt-remove danger-button"
-                    type="button"
-                    onClick={() => removePinnedQuickHunt(card)}
-                    aria-label={`Remove ${card.name} quick hunt`}
-                  >
-                    x
-                  </button>
-                </article>
-              ))}
-            </div>
             <div className="selected-card-strip" aria-label="Selected card">
               <CardImage
                 src={selectedCardImage}
@@ -1319,6 +1326,46 @@ export default function Home() {
             <button className="primary-action" type="submit" disabled={busy === "lookup"}>
               {busy === "lookup" ? "Looking up..." : "Look up comp"}
             </button>
+            {!headline && (
+              <>
+                <div className="quick-hunt-toolbar" aria-label="Quick hunt controls">
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={pinCurrentQuickHunt}
+                    disabled={!name.trim() || !setNameValue.trim() || !number.trim()}
+                  >
+                    Pin current
+                  </button>
+                  <button className="ghost-button" type="button" onClick={resetQuickHunts}>
+                    Reset
+                  </button>
+                </div>
+                <div className="quick-hunts" aria-label="Quick card picks">
+                  {quickHunts.map((card) => (
+                    <article className="quick-hunt-card" key={`${card.name}-${card.setName}-${card.number}`}>
+                      <button className="quick-hunt-pick" type="button" onClick={() => chooseQuickHunt(card)}>
+                        <span className="quick-art-stack">
+                          <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
+                          {card.setMarkUrl && (
+                            <img className="quick-set-mark" src={card.setMarkUrl} alt="" onError={hideBrokenImage} />
+                          )}
+                        </span>
+                        <span>{card.name}</span>
+                      </button>
+                      <button
+                        className="quick-hunt-remove danger-button"
+                        type="button"
+                        onClick={() => removePinnedQuickHunt(card)}
+                        aria-label={`Remove ${card.name} quick hunt`}
+                      >
+                        x
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
           </form>
 
           {headline && (
@@ -1523,6 +1570,30 @@ export default function Home() {
                 <input value={location} onChange={(event) => setLocation(event.target.value)} />
               </label>
             </div>
+            <div className="preset-row" aria-label="Source presets">
+              {sourcePresets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={source === preset ? "selected" : ""}
+                  onClick={() => setSource(preset)}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+            <div className="preset-row" aria-label="Location presets">
+              {locationPresets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={location === preset ? "selected" : ""}
+                  onClick={() => setLocation(preset)}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
             <label>
               Channel
               <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)}>
@@ -1580,7 +1651,7 @@ export default function Home() {
             />
           ))}
           {activeInventory.length === 0 ? (
-            <EmptyState text="No active stock. Acquire your next buy from the first tab." />
+            <EmptyState text="No active stock. Add your next buy from Buy." />
           ) : visibleActiveInventory.length === 0 ? (
             <EmptyState text="No matching active stock. Clear the search or change the sort." />
           ) : null}
@@ -1645,8 +1716,23 @@ export default function Home() {
           {sellingId && (
             <form className="sell-sheet" onSubmit={markSold}>
               <div className="panel-heading">
-                <h2>Mark sold</h2>
+                <div>
+                  <h2>Mark sold</h2>
+                  {sellingItem && <span className="muted">{sellingItem.card.name} · cost {gbp(sellingItem.costBasis)}</span>}
+                </div>
                 <button className="ghost-button" type="button" onClick={() => setSellingId(null)}>Close</button>
+              </div>
+              <div className="sale-channel-presets" aria-label="Sale channel presets">
+                {channels.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={saleChannel === c ? "selected" : ""}
+                    onClick={() => applySaleChannelPreset(c)}
+                  >
+                    {channelLabel(c)}
+                  </button>
+                ))}
               </div>
               <div className="form-grid">
                 <label>
@@ -1654,22 +1740,44 @@ export default function Home() {
                   <MoneyInput value={salePrice} onChange={setSalePrice} />
                 </label>
                 <label>
-                  Fees
-                  <MoneyInput value={fees} onChange={setFees} />
+                  Sold
+                  <input type="date" value={soldAt} onChange={(event) => setSoldAt(event.target.value)} />
                 </label>
               </div>
               <div className="form-grid">
                 <label>
-                  Postage
-                  <MoneyInput value={postage} onChange={setPostage} />
+                  Fees
+                  <MoneyInput
+                    value={fees}
+                    onChange={(value) => {
+                      setFeesTouched(true);
+                      setFees(value);
+                    }}
+                  />
                 </label>
                 <label>
-                  Channel
-                  <select value={saleChannel} onChange={(event) => setSaleChannel(event.target.value as Channel)}>
-                    {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
-                  </select>
+                  Postage
+                  <MoneyInput
+                    value={postage}
+                    onChange={(value) => {
+                      setPostageTouched(true);
+                      setPostage(value);
+                    }}
+                  />
                 </label>
               </div>
+              {salePreview && (
+                <div className={`sale-preview ${salePreview.profitPence >= 0 ? "good" : "warn"}`}>
+                  <div>
+                    <span>Net</span>
+                    <strong>{gbp(salePreview.netPence)}</strong>
+                  </div>
+                  <div>
+                    <span>Profit</span>
+                    <strong>{gbp(salePreview.profitPence)}</strong>
+                  </div>
+                </div>
+              )}
               <button className="primary-action" type="submit" disabled={busy === `sell-${sellingId}`}>
                 {busy === `sell-${sellingId}` ? "Saving..." : "Create sale"}
               </button>
@@ -1768,7 +1876,7 @@ export default function Home() {
             />
           ))}
           {listings.length === 0 ? (
-            <EmptyState text="No listings yet. Acquire can create draft listings automatically." />
+            <EmptyState text="No listings yet. Buy can create draft listings automatically." />
           ) : visibleListings.length === 0 ? (
             <EmptyState text="No matching listings. Clear the search or change the state filter." />
           ) : null}
@@ -1839,7 +1947,7 @@ export default function Home() {
             {noBookedSales ? (
               <div className="pnl-empty-note">
                 <strong>Nothing booked yet</strong>
-                <span>Mark a stocked card sold from Dex and Loot will start tracking revenue, profit and margin.</span>
+                <span>Mark a stocked card sold from Stock and Profit will start tracking revenue, profit and margin.</span>
               </div>
             ) : profitTrend.length > 0 ? (
               <ProfitSparkline points={profitTrend} />
@@ -1974,7 +2082,7 @@ export default function Home() {
                 </article>
               ))
             ) : (
-              <EmptyState text="No sales booked yet. Mark an item sold from Inventory." />
+              <EmptyState text="No sales booked yet. Mark an item sold from Stock." />
             )}
           </section>
         </section>
@@ -2012,10 +2120,10 @@ export default function Home() {
       )}
 
       <nav className="bottom-nav" aria-label="Primary">
-        <TabButton active={view === "acquire"} label="Catch" onClick={() => setView("acquire")} />
-        <TabButton active={view === "inventory"} label="Dex" onClick={() => setView("inventory")} />
-        <TabButton active={view === "listings"} label="Market" onClick={() => setView("listings")} />
-        <TabButton active={view === "pnl"} label="Loot" onClick={() => setView("pnl")} />
+        <TabButton active={view === "acquire"} label="Buy" onClick={() => setView("acquire")} />
+        <TabButton active={view === "inventory"} label="Stock" onClick={() => setView("inventory")} />
+        <TabButton active={view === "listings"} label="Listings" onClick={() => setView("listings")} />
+        <TabButton active={view === "pnl"} label="Profit" onClick={() => setView("pnl")} />
       </nav>
     </main>
   );
@@ -2453,7 +2561,7 @@ function judgeDeal(
   const targetBuyPence = Math.max(0, Math.round(net * 0.7));
   const roi = costBasisPence > 0 ? expectedProfitPence / costBasisPence : 0;
   if (expectedProfitPence > 0 && roi >= 0.35 && comp.sampleSize >= 3) {
-    return { label: "Catch", tone: "good", expectedProfitPence, targetBuyPence };
+    return { label: "Buy", tone: "good", expectedProfitPence, targetBuyPence };
   }
   if (expectedProfitPence > 0 && roi >= 0.1) {
     return { label: "Watch", tone: "warn", expectedProfitPence, targetBuyPence };
@@ -2626,20 +2734,35 @@ function ageLabel(value: string): string {
 }
 
 function viewTitle(view: View): string {
-  if (view === "acquire") return "Catch the deal";
-  if (view === "inventory") return "Dealer Pokédex";
-  if (view === "listings") return "PokéMart";
-  return "Loot report";
+  if (view === "acquire") return "Buy cards";
+  if (view === "inventory") return "Stock";
+  if (view === "listings") return "Listings";
+  return "Profit";
 }
 
 function channelLabel(channel: Channel): string {
-  return channel.replace("_", "-").toLowerCase();
+  if (channel === "EBAY") return "eBay";
+  if (channel === "CARDMARKET") return "Cardmarket";
+  if (channel === "VINTED") return "Vinted";
+  return "In person";
 }
 
 function shortDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown";
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
+function todayInputValue(): string {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function soldAtIso(value: string): string | undefined {
+  return value ? `${value}T12:00:00.000Z` : undefined;
 }
 
 function setMetaLabel(set: CatalogSet): string {

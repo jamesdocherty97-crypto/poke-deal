@@ -34,7 +34,7 @@ export function rankCatalogCards(
 export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setName?: string): number {
   const parsed = parseCardSearchQuery(query);
   const nameScore = parsed.name ? scoreSearchText(parsed.name, card.name) : 0;
-  const numberScore = parsed.number && card.number && sameCollectorNumber(parsed.number, card.number) ? 650 : 0;
+  const numberScore = parsed.number && card.number && sameCollectorNumber(parsed.number, card.number) ? 1100 : 0;
   if (parsed.name && nameScore === 0) return 0;
   if (nameScore === 0 && numberScore === 0) return 0;
 
@@ -99,9 +99,11 @@ function dedupeCards(cards: CatalogCard[]): CatalogCard[] {
 }
 
 function sameCollectorNumber(queryNumber: string, cardNumber: string): boolean {
-  const query = normalizeCollectorNumberForSearch(queryNumber);
-  const card = normalizeCollectorNumberForSearch(cardNumber);
-  return query === card || query === card.split("/")[0];
+  const queryForms = collectorNumberForms(queryNumber);
+  const cardForms = collectorNumberForms(cardNumber);
+  return [...queryForms].some((query) =>
+    [...cardForms].some((card) => query === card || query === card.split("/")[0]),
+  );
 }
 
 function normalizeCollectorNumberForSearch(number: string): string {
@@ -114,6 +116,21 @@ function normalizeCollectorNumberForSearch(number: string): string {
   const prefix = left.match(/^([a-z]{1,5})\d+$/)?.[1];
   if (prefix && /^\d+$/.test(right)) return `${left}/${prefix}${right}`;
   return `${left}/${right}`;
+}
+
+function collectorNumberForms(number: string): Set<string> {
+  const normalized = normalizeCollectorNumberForSearch(number);
+  const forms = new Set([normalized]);
+  const left = normalized.split("/")[0] ?? normalized;
+  const stripped = stripAlphaPrefix(left);
+  if (stripped) forms.add(stripped);
+  return forms;
+}
+
+function stripAlphaPrefix(value: string): string | undefined {
+  const match = value.match(/^[a-z]{2,5}0*(\d{1,4})$/);
+  if (!match) return undefined;
+  return String(Number.parseInt(match[1]!, 10));
 }
 
 function readCollectorNumber(value: string | undefined): string | undefined {

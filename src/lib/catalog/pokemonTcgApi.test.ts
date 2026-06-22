@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildPokemonTcgCollectorNumberTerms,
   buildPokemonTcgSearchQueries,
   buildPokemonTcgSearchQuery,
   mapPokemonTcgCard,
@@ -57,6 +58,23 @@ test("buildPokemonTcgSearchQueries uses prefixed numbers to resolve attached gal
   ]);
 });
 
+test("buildPokemonTcgSearchQueries tries API-style promo numbers after printed promo codes", () => {
+  const queries = buildPokemonTcgSearchQueries({
+    name: "Pikachu with Grey Felt Hat",
+    setName: "SV Promos",
+    number: "SVP085",
+  });
+
+  assert.deepEqual(queries.slice(0, 6), [
+    'name:"Pikachu with Grey Felt Hat" number:"SVP085" set.id:svp',
+    'name:"Pikachu with Grey Felt Hat" number:"85" set.id:svp',
+    'name:pikachu number:"SVP085" set.id:svp',
+    'name:pikachu number:"85" set.id:svp',
+    'name:"Pikachu with Grey Felt Hat" set.id:svp',
+    'name:pikachu set.id:svp',
+  ]);
+});
+
 test("buildPokemonTcgSearchQueries drops the set term entirely when it can't be resolved", () => {
   const queries = buildPokemonTcgSearchQueries({
     name: "Charizard",
@@ -65,6 +83,13 @@ test("buildPokemonTcgSearchQueries drops the set term entirely when it can't be 
   });
 
   assert.deepEqual(queries, ['name:"Charizard" number:"4"', 'name:"Charizard"']);
+});
+
+test("buildPokemonTcgCollectorNumberTerms keeps printed codes and adds stripped API promo numbers", () => {
+  assert.deepEqual(buildPokemonTcgCollectorNumberTerms("SVP085"), ["SVP085", "85"]);
+  assert.deepEqual(buildPokemonTcgCollectorNumberTerms("SWSH262"), ["SWSH262"]);
+  assert.deepEqual(buildPokemonTcgCollectorNumberTerms("TG06/TG30"), ["TG06"]);
+  assert.deepEqual(buildPokemonTcgCollectorNumberTerms("214/167"), ["214"]);
 });
 
 test("normalizeCollectorNumber keeps plain and split collector numbers useful for search", () => {
@@ -160,6 +185,27 @@ test("mapPokemonTcgCard preserves printed prefixed subset collector numbers", ()
   assert.equal(card?.setCode, "swsh11tg");
   assert.equal(card?.number, "TG06/TG30");
   assert.equal(card?.imageUrl, "https://images.pokemontcg.io/swsh11tg/TG06_hires.png");
+});
+
+test("mapPokemonTcgCard formats Scarlet & Violet promo numbers as dealer-entered SVP codes", () => {
+  const card = mapPokemonTcgCard({
+    id: "svp-85",
+    name: "Pikachu with Grey Felt Hat",
+    number: "85",
+    rarity: "Promo",
+    images: {
+      large: "https://images.pokemontcg.io/svp/85_hires.png",
+    },
+    set: {
+      id: "svp",
+      name: "Scarlet & Violet Black Star Promos",
+      printedTotal: 215,
+    },
+  });
+
+  assert.equal(card?.tcgApiId, "svp-85");
+  assert.equal(card?.number, "SVP085");
+  assert.equal(card?.setCode, "svp");
 });
 
 test("PokemonTcgApiCatalogSource searches cards and sends API key header when present", async () => {
