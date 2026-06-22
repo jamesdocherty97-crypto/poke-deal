@@ -1,4 +1,16 @@
-import type { CardRef, Game, Language } from "../domain/types.js";
+import type { CardRef, Currency, Game, Language } from "../domain/types.js";
+
+export interface CatalogPriceSignal {
+  source: "tcgplayer" | "cardmarket";
+  label: string;
+  pricePence: number;
+  originalAmount: number;
+  originalCurrency: Exclude<Currency, "GBP" | "JPY">;
+  kind: string;
+  variant?: string;
+  updatedAt?: string;
+  url?: string;
+}
 
 export interface CatalogCard {
   game: Game;
@@ -12,6 +24,7 @@ export interface CatalogCard {
   setLogoUrl?: string;
   setSymbolUrl?: string;
   tcgApiId?: string;
+  priceSignals?: CatalogPriceSignal[];
 }
 
 export interface CatalogSource {

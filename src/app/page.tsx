@@ -17,6 +17,28 @@ type CatalogCard = {
   setLogoUrl?: string;
   setSymbolUrl?: string;
   tcgApiId?: string;
+  priceSignals?: CatalogPriceSignal[];
+};
+
+type CatalogPriceSignal = {
+  source: "tcgplayer" | "cardmarket";
+  label: string;
+  pricePence: number;
+  originalAmount: number;
+  originalCurrency: "USD" | "EUR";
+  kind: string;
+  variant?: string;
+  updatedAt?: string;
+  url?: string;
+};
+
+// Bundled offline set catalog (see src/lib/catalog/setCatalog.ts) -- powers
+// set autocomplete and the "popular sets" quick-pick chips below.
+type CatalogSet = {
+  id: string;
+  name: string;
+  ptcgoCode?: string;
+  symbolUrl?: string;
 };
 
 type CompResult = {
@@ -34,6 +56,9 @@ type CompResult = {
   raw?: {
     smartMarketPrice?: { confidence?: string; daysUsed?: number; method?: string };
     chosenPriceSource?: string;
+    kind?: string;
+    caveat?: string;
+    chosenSignal?: CatalogPriceSignal;
   };
 };
 
@@ -167,10 +192,34 @@ export default function Home() {
   const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
   const [gradeOdds, setGradeOdds] = useState("45");
   const [gradingCost, setGradingCost] = useState("19.99");
+  const [popularSets, setPopularSets] = useState<CatalogSet[]>([]);
+  const [setSuggestions, setSetSuggestions] = useState<CatalogSet[]>([]);
+  const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
 
   useEffect(() => {
     void refreshAll();
+    void loadPopularSets();
   }, []);
+
+  // Set autocomplete: search-as-you-type against the bundled offline set
+  // catalog while the Set field is focused. Falls back to the curated
+  // "popular sets" list when the field is empty, so opening the dropdown
+  // on a blank field is still useful.
+  useEffect(() => {
+    if (!setSuggestionsOpen) return;
+    const query = setNameValue.trim();
+    if (!query) {
+      setSetSuggestions(popularSets);
+      return;
+    }
+    const handle = setTimeout(() => {
+      fetch(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=6`)
+        .then(readJson)
+        .then((payload) => setSetSuggestions(payload.sets ?? []))
+        .catch(() => {});
+    }, 150);
+    return () => clearTimeout(handle);
+  }, [setNameValue, setSuggestionsOpen, popularSets]);
 
   const activeInventory = useMemo(
     () => inventory.filter((item) => item.status !== "SOLD"),
@@ -205,6 +254,8 @@ export default function Home() {
     null;
   const catalogCard = comp?.catalog ?? null;
   const setMarkUrl = catalogCard?.setLogoUrl ?? catalogCard?.setSymbolUrl ?? null;
+  const marketBaseline =
+    comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
     : "loading deck";
@@ -301,6 +352,22 @@ export default function Home() {
     setGradeComp(null);
     setNotice(null);
     setError(null);
+  }
+
+  async function loadPopularSets() {
+    try {
+      const res = await fetch("/api/catalog/sets");
+      const payload = await readJson(res);
+      if (res.ok) setPopularSets(payload.sets ?? []);
+    } catch {
+      // Offline/bundled catalog only -- if this somehow fails, the Set
+      // field still works as a plain text input, so fail silently.
+    }
+  }
+
+  function chooseSet(set: CatalogSet) {
+    setSetNameValue(set.name);
+    setSetSuggestionsOpen(false);
   }
 
   function openSell(item: InventoryItem) {
@@ -536,15 +603,42 @@ export default function Home() {
               <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Card name" />
             </label>
             <div className="form-grid">
-              <label>
+              <label className="set-field">
                 Set
-                <input value={setNameValue} onChange={(event) => setSetNameValue(event.target.value)} placeholder="151" />
+                <input
+                  value={setNameValue}
+                  onChange={(event) => setSetNameValue(event.target.value)}
+                  onFocus={() => setSetSuggestionsOpen(true)}
+                  onBlur={() => setTimeout(() => setSetSuggestionsOpen(false), 150)}
+                  placeholder="base set, 151, SVI..."
+                  autoComplete="off"
+                />
+                {setSuggestionsOpen && setSuggestions.length > 0 && (
+                  <div className="set-suggestions" role="listbox" aria-label="Set suggestions">
+                    {setSuggestions.map((set) => (
+                      <button key={set.id} type="button" className="suggestion-item" onClick={() => chooseSet(set)}>
+                        {set.symbolUrl ? <img src={set.symbolUrl} alt="" /> : null}
+                        <span>{set.name}</span>
+                        {set.ptcgoCode && <small>{set.ptcgoCode}</small>}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </label>
               <label>
                 Number
                 <input value={number} onChange={(event) => setNumber(event.target.value)} placeholder="199/165" />
               </label>
             </div>
+            {popularSets.length > 0 && (
+              <div className="set-chip-row" aria-label="Popular sets">
+                {popularSets.map((set) => (
+                  <button key={set.id} type="button" onClick={() => chooseSet(set)}>
+                    {set.name}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="segmented" role="group" aria-label="Grade">
               {grades.map((g) => (
                 <button
@@ -576,6 +670,13 @@ export default function Home() {
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
               </div>
+              {marketBaseline && (
+                <div className="market-signal">
+                  <span>Catalog baseline</span>
+                  <strong>{gbp(marketBaseline.medianPence)}</strong>
+                  <small>{marketBaseline.raw?.chosenSignal?.label ?? "TCGPlayer/Cardmarket"}</small>
+                </div>
+              )}
               {catalogCard && (
                 <div className="catalog-strip">
                   {catalogCard.imageUrl ? (
@@ -600,6 +701,12 @@ export default function Home() {
                   {headline.raw.smartMarketPrice?.confidence
                     ? ` Confidence: ${headline.raw.smartMarketPrice.confidence}.`
                     : ""}
+                </p>
+              )}
+              {headline.raw?.kind === "catalog-market-baseline" && (
+                <p className="hint">
+                  Using a catalog market baseline because sold comp data is thin or missing.
+                  {headline.raw.caveat ? ` ${headline.raw.caveat}` : ""}
                 </p>
               )}
               {comp?.sourcesDisagree && (

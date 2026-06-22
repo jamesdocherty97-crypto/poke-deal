@@ -6,6 +6,7 @@
 import type { CardRef, CompQuery, CompResult } from "../domain/types.js";
 import type { CompSource } from "./CompSource.js";
 import { isConfident } from "./cleaning.js";
+import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
 
 export interface ReconciledComp {
@@ -22,7 +23,7 @@ export class CompService {
 
   /** Default wiring. Add PokeTrace etc. here as adapters are built. */
   static default(): CompService {
-    return new CompService([new PokemonPriceTrackerSource()]);
+    return new CompService([new PokemonPriceTrackerSource(), new PokemonTcgMarketSource()]);
   }
 
   /** Names + live status of configured sources (for diagnostics / UI). */

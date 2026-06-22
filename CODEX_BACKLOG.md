@@ -37,3 +37,30 @@ Ordered build plan for Pokémon Dealer OS. The **frame is done**: domain model, 
 
 ## Future (not now — see brief §9)
 - Sports/soccer via a `SportsCardsProSource` adapter + `Game.SOCCER`. Inventory/listing/sales already card-agnostic. Known gap: UK-native soccer sold comps (eBay.co.uk) need a custom feed.
+
+## Phase 4 — UX & visual polish (audit follow-up, 2026-06-21)
+
+Grounded in the current `src/app/page.tsx` / `globals.css`. The app already has a strong visual identity (dark Pokédex theme, hero card art, status pills, deal-judge logic) — these are about making it feel finished and faster to use day to day, not a redesign.
+
+**Quick wins (small diff, high payoff):**
+1. Loading state for first paint: `dashboard`/`inventory` start `null`/`[]`, so the status strip shows "Stock 0 / Profit £0.00" for a beat before the real numbers land. Render a skeleton/dimmed state for `.status-strip` and `.metric` until the corresponding fetch resolves, instead of a false zero.
+2. `<img>` fallback for card art: `card.imageUrl` / `catalogCard.imageUrl` point at the Pokémon TCG API's CDN, which does occasionally 404. Add `onError` handlers on every card-art `<img>` (hero, comp panel, catalog strip, inventory/listing thumbs) that swap to the existing `.card-thumb.blank` / `.catalog-art.blank` placeholder treatment instead of showing a broken-image icon.
+3. £ adornment on every GBP `<input>` (cost, sale price, fees, postage, grading cost) — currently plain text inputs with the currency only named in the label. A simple inline `£` prefix (wrapping div + absolutely positioned span) would read as more native and finish the "looking great" bar.
+4. Promote the deal-judge verdict (Catch / Watch / Pass in `judgeDeal()`): it's the single most decision-critical signal in the app but currently rendered as a small 3-column grid at the bottom of the comp panel. Move it to a full-width colored banner directly under the price hero (`.comp-hero`), with the tone color driving the banner background the way `.deal-card.good/.warn/.danger` already does for text.
+5. `EmptyState` treatment for the Loot/P&L metric grid on a fresh install — right now a brand-new dealer just sees an honest but bare wall of `£0.00`. Layer the same "nothing booked yet" framing already used for Inventory/Listings over the metric grid, not just the Recent Sales list below it.
+
+**Worth the extra lift:**
+6. Search/filter/sort on Inventory and Listings (`view === "inventory" | "listings"`). Both render flat, unfiltered arrays today. Filter by name/set, sort by age or value — fits the "Dex" branding directly and is the first thing that'll matter once stock grows past a screenful.
+7. Grade badges: render `PSA_10` / `BGS_9_5` etc. as a small colored "slab" badge (reusing the `.pill` pattern) instead of plain text in `InventoryRow`/`ListingRow` — graded cards are the highest-value items in the dex and deserve to read faster than the rest.
+8. Swipe-to-sell / swipe-to-delete on inventory rows on mobile, replacing/augmenting the current button row — the layout is already mobile-first (bottom sheet, bottom nav), this is a natural extension.
+9. Replace the native `window.confirm()` on delete with an in-app confirm sheet styled like `.sell-sheet` / the listing editor — a native browser dialog breaks the immersion of an otherwise fully custom UI.
+10. A small profit sparkline in the Loot tab. `dashboard.recentSales` already carries `profitPence` + `soldAt` — a lightweight inline SVG sparkline needs no new dependency and turns a list of numbers into something that reads as a trend at a glance.
+
+**Nice to have:**
+11. Make "quick hunts" (currently 4 hardcoded chase cards in `page.tsx`) user-editable — pin your own most-searched cards instead of a static Charizard/Pikachu/Mew/Umbreon list that may not reflect what this dealer actually deals in.
+12. Pull-to-refresh on mobile alongside the existing manual refresh icon button.
+13. Auto-dismissing toast-style notices instead of the persistent top-of-page `.notice` banner, which otherwise lingers until the next action clears it.
+14. Arrow-key navigation through the set-autocomplete dropdown (`.set-suggestions`) for desktop/keyboard users — currently mouse/touch only.
+
+## Note on `tsconfig.check.json` (audit follow-up, 2026-06-21)
+Widening `tsconfig.check.json`'s `include` to cover `src/app` (it currently excludes the entire app layer from type-checking) is still worth doing, but needs a machine with a real, fully-generated Prisma client to do safely — attempting it in a network-restricted sandbox surfaced errors that are indistinguishable from real bugs without one. Specifically, once `src/app` is included, four spots stop type-checking cleanly against a stub/incomplete client: the `tx` transaction callback in `src/app/api/inventory/[id]/route.ts` (`DELETE`), `src/app/api/inventory/[id]/sell/route.ts` (`POST`), and `src/app/api/listings/[id]/route.ts` (`PATCH`) all come back as implicit-`any` (should resolve to `Prisma.TransactionClient` automatically on a healthy client — explicit annotation is a safe, standard fix either way), and `listings/[id]/route.ts` also references `Prisma.ListingUpdateInput`, a schema-specific generated type that only exists after a full `prisma generate`. Do this with `npx prisma generate` succeeding first, fix whatever genuinely remains, then flip the `exclude` in `tsconfig.check.json`.

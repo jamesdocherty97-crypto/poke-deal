@@ -1,13 +1,30 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { computeDealerMetrics, summarizeSale } from "@/lib/dealer/metrics";
+import { computeDealerMetrics, summarizeSale, type DealerStatus } from "@/lib/dealer/metrics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Explicit shape for the findMany() below so this route type-checks even if
+// the generated Prisma client is ever incomplete/stale in a given environment
+// (e.g. a sandbox without network access to fetch engine binaries) -- only
+// the fields this route actually reads, kept in sync with the include/orderBy
+// below and with DealerInventoryMetricItem in lib/dealer/metrics.ts.
+type DashboardInventoryItem = {
+  id: string;
+  card: { name: string };
+  grade: string;
+  status: DealerStatus;
+  quantity: number;
+  costBasis: number;
+  createdAt: Date;
+  listings: { state: string }[];
+  sales: { id: string; salePrice: number; fees: number; postage: number; soldAt: Date }[];
+};
+
 export async function GET() {
   try {
-    const items = await getPrisma().inventoryItem.findMany({
+    const items: DashboardInventoryItem[] = await getPrisma().inventoryItem.findMany({
       include: {
         card: true,
         listings: true,

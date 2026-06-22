@@ -4,7 +4,10 @@
 import { NextResponse } from "next/server";
 import { CompService } from "@/lib/comps/compService";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
+import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
+import { PokemonTcgMarketSource } from "@/lib/comps/sources/pokemonTcgMarket";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
+import type { CatalogCard, CatalogSource } from "@/lib/catalog/types";
 import type { CardRef, Grade } from "@/lib/domain/types";
 
 export const runtime = "nodejs";
@@ -27,10 +30,14 @@ export async function GET(request: Request) {
   const grade = (searchParams.get("grade") as Grade | null) ?? "RAW";
 
   try {
-    const [result, catalog] = await Promise.all([
-      CompService.default().lookup(card, { grade }),
-      new PokemonTcgApiCatalogSource().resolve(card).catch(() => null),
+    const catalogSource = new PokemonTcgApiCatalogSource();
+    const catalog = await catalogSource.resolve(card).catch(() => null);
+    const compCard = catalog ? catalogToCardRef(catalog, card) : card;
+    const compService = new CompService([
+      new PokemonPriceTrackerSource(),
+      new PokemonTcgMarketSource(catalog ? fixedCatalogSource(catalogSource.live, catalog) : catalogSource),
     ]);
+    const result = await compService.lookup(compCard, { grade });
     if (process.env.DATABASE_URL) {
       await new PrismaCompResultRepo().create(result.headline).catch((err) => {
         console.warn(
@@ -46,4 +53,26 @@ export async function GET(request: Request) {
       { status: 502 },
     );
   }
+}
+
+function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardRef {
+  return {
+    ...fallback,
+    name: catalog.name,
+    setName: catalog.setName,
+    number: catalog.number ?? fallback.number,
+    tcgApiId: catalog.tcgApiId,
+    game: catalog.game,
+    language: catalog.language,
+  };
+}
+
+function fixedCatalogSource(live: boolean, catalog: CatalogCard): CatalogSource {
+  return {
+    name: "request-catalog",
+    live,
+    async resolve() {
+      return catalog;
+    },
+  };
 }
