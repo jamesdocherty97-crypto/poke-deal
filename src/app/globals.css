@@ -613,6 +613,80 @@ label {
   grid-column: 1 / -1;
 }
 
+.comp-receipt {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 10px;
+}
+
+.receipt-heading,
+.receipt-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 10px;
+}
+
+.receipt-heading span,
+.receipt-heading strong,
+.receipt-row span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.receipt-heading strong {
+  color: #cfe6ff;
+}
+
+.receipt-list {
+  display: grid;
+  gap: 6px;
+}
+
+.receipt-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 7px;
+}
+
+.receipt-row div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.receipt-row div:last-child {
+  justify-items: end;
+  text-align: right;
+}
+
+.receipt-row strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.receipt-row.good strong {
+  color: var(--green);
+}
+
+.receipt-row.warn strong {
+  color: var(--yellow);
+}
+
+.receipt-row.info strong {
+  color: #88c8ff;
+}
+
+.receipt-row.danger strong {
+  color: var(--danger);
+}
+
 .owned-sales-signal {
   display: grid;
   gap: 8px;

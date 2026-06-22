@@ -316,6 +316,8 @@ export default function Home() {
     comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
   const ownedSalesComp =
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
+  const compReceipt = useMemo(() => (comp ? buildCompReceipt(comp) : []), [comp]);
+  const compSpreadPct = useMemo(() => (comp ? medianSpreadPct(comp.all) : null), [comp]);
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
     : "loading deck";
@@ -771,6 +773,28 @@ export default function Home() {
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
               </div>
+              {compReceipt.length > 0 && (
+                <div className="comp-receipt">
+                  <div className="receipt-heading">
+                    <span>Comp receipt</span>
+                    <strong>{compSpreadPct == null ? "single signal" : `${compSpreadPct}% spread`}</strong>
+                  </div>
+                  <div className="receipt-list">
+                    {compReceipt.map((row) => (
+                      <div className={`receipt-row ${row.tone}`} key={row.key}>
+                        <div>
+                          <strong>{row.name}</strong>
+                          <span>{row.basis}</span>
+                        </div>
+                        <div>
+                          <strong>{row.price}</strong>
+                          <span>{row.meta}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {marketBaseline && (
                 <div className="market-signal">
                   <span>Catalog baseline</span>
@@ -1304,6 +1328,93 @@ function listingTone(state: ListingState): string {
   if (state === "ACTIVE") return "info";
   if (state === "ENDED") return "warn";
   return "";
+}
+
+function buildCompReceipt(comp: Reconciled): Array<{
+  key: string;
+  name: string;
+  basis: string;
+  price: string;
+  meta: string;
+  tone: string;
+}> {
+  return [...comp.all]
+    .sort((a, b) => receiptRank(a, comp.headline) - receiptRank(b, comp.headline))
+    .map((result) => ({
+      key: `${result.source}-${result.grade}-${result.asOf}`,
+      name: sourceLabel(result.source, result.source === comp.headline.source),
+      basis: compBasis(result),
+      price: result.sampleSize > 0 && result.medianPence > 0 ? gbp(result.medianPence) : "No data",
+      meta: compMeta(result),
+      tone: receiptTone(result, comp.headline, comp.sourcesDisagree),
+    }));
+}
+
+function receiptRank(result: CompResult, headline: CompResult): number {
+  if (result.source === headline.source) return 0;
+  if (result.source === "owned-sales") return 1;
+  if (result.source === "pokemon-tcg-market") return 2;
+  return 3;
+}
+
+function sourceLabel(source: string, headline: boolean): string {
+  const label =
+    source === "pokemon-price-tracker"
+      ? "Price Tracker"
+      : source === "pokemon-tcg-market"
+        ? "Catalog"
+        : source === "owned-sales"
+          ? "Owned sales"
+          : source.replace(/-/g, " ");
+  return headline ? `${label} · used` : label;
+}
+
+function compBasis(result: CompResult): string {
+  if (result.source === "owned-sales") return "Your sold prices";
+  if (result.raw?.kind === "catalog-market-baseline") {
+    return result.raw.chosenSignal?.label ?? "TCGPlayer/Cardmarket baseline";
+  }
+  if (result.raw?.chosenPriceSource === "smartMarketPrice") {
+    const confidence = result.raw.smartMarketPrice?.confidence;
+    return confidence ? `Smart RAW · ${confidence}` : "Smart RAW";
+  }
+  if (result.sampleSize === 0) return "No matching signal";
+  return `${result.grade.replace(/_/g, " ")} sold aggregate`;
+}
+
+function compMeta(result: CompResult): string {
+  const sample =
+    result.source === "pokemon-tcg-market"
+      ? "baseline"
+      : `${result.sampleSize} sample${result.sampleSize === 1 ? "" : "s"}`;
+  return `${sample} / ${result.windowDays}d · ${ageLabel(result.asOf)}`;
+}
+
+function receiptTone(result: CompResult, headline: CompResult, sourcesDisagree: boolean): string {
+  if (result.sampleSize === 0 || result.medianPence <= 0) return "danger";
+  if (result.source === headline.source && !sourcesDisagree) return "good";
+  if (sourcesDisagree && result.source === headline.source) return "warn";
+  if (result.sampleSize < 3) return "warn";
+  if (result.source === "pokemon-tcg-market") return "info";
+  return "";
+}
+
+function medianSpreadPct(results: CompResult[]): number | null {
+  const medians = results.map((result) => result.medianPence).filter((median) => median > 0);
+  if (medians.length < 2) return null;
+  const min = Math.min(...medians);
+  const max = Math.max(...medians);
+  return Math.round(((max - min) / min) * 100);
+}
+
+function ageLabel(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  const ageDays = Math.max(0, Math.floor((Date.now() - date.getTime()) / (24 * 60 * 60 * 1000)));
+  if (ageDays === 0) return "today";
+  if (ageDays === 1) return "1d old";
+  if (ageDays <= 30) return `${ageDays}d old`;
+  return shortDate(value);
 }
 
 function viewTitle(view: View): string {
