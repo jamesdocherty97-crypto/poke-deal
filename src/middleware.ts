@@ -8,12 +8,17 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isAuthorizedCronRequest } from "./lib/automation/cronAuth";
 
 export function middleware(req: NextRequest) {
   const password = process.env.APP_PASSWORD;
   if (!password) return NextResponse.next(); // gate disabled
 
   const header = req.headers.get("authorization");
+  if (req.nextUrl.pathname.startsWith("/api/cron/") && isAuthorizedCronRequest(header)) {
+    return NextResponse.next();
+  }
+
   if (header?.startsWith("Basic ")) {
     try {
       const decoded = atob(header.slice(6)); // "user:pass"

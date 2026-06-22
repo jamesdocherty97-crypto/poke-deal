@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getPrisma } from "@/lib/db/prisma";
-import { CompService } from "@/lib/comps/compService";
-import { formatRepriceDigest, recommendReprice } from "@/lib/alerts/repricing";
-import { notifierFromEnv } from "@/lib/alerts/notifier";
-import type { CardRef } from "@/lib/domain/types";
+import { runRepriceCheck } from "@/lib/alerts/repriceRunner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,62 +28,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { notify, limit, thresholdPct } = parsed.data;
-    const notifierConfigured = Boolean(process.env.DISCORD_WEBHOOK_URL?.trim());
-    const items = await getPrisma().inventoryItem.findMany({
-      where: { status: { in: ["IN_STOCK", "LISTED"] } },
-      include: {
-        card: true,
-        listings: { orderBy: { createdAt: "desc" }, take: 1 },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: limit,
-    });
-
-    const recommendations = [];
-    for (const item of items) {
-      const listing = item.listings[0];
-      const currentPricePence = listing?.listPrice ?? listing?.suggestedPrice ?? 0;
-      const card: CardRef = {
-        id: item.card.id,
-        name: item.card.name,
-        setName: item.card.setName,
-        number: item.card.number ?? undefined,
-        tcgApiId: item.card.tcgApiId ?? undefined,
-        game: item.card.game,
-        language: item.card.language,
-      };
-      const comps = await CompService.default().lookup(card, { grade: item.grade });
-      const recommendation = recommendReprice({
-        itemId: item.id,
-        cardName: item.card.name,
-        grade: item.grade,
-        currentPricePence,
-        costBasisPence: item.costBasis,
-        comp: comps.headline,
-        thresholdPct,
-        sourcesDisagree: comps.sourcesDisagree,
-      });
-      if (recommendation) recommendations.push(recommendation);
-    }
-
-    let notified = false;
-    if (notify && recommendations.length > 0) {
-      await notifierFromEnv().notify({
-        title: "Pokémon Dealer OS repricing",
-        body: formatRepriceDigest(recommendations),
-      });
-      notified = notifierConfigured;
-    }
-
-    return NextResponse.json({
-      recommendations,
-      notified,
-      notifierConfigured,
-      scannedCount: items.length,
-      thresholdPct,
-      checkedAt: new Date().toISOString(),
-    });
+    return NextResponse.json(await runRepriceCheck(parsed.data));
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "reprice check failed" },
