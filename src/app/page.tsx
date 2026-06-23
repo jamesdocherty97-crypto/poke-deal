@@ -23,6 +23,7 @@ import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { buildManualCompLinks } from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
+import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan } from "@/lib/dealer/buyPlan";
 import { buildCheckedComp, checkedCompSourceLabel, type CheckedCompSource } from "@/lib/dealer/checkedComp";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
@@ -760,6 +761,31 @@ export default function Home() {
       systemStatus?.summary.secondaryCrossCheck,
     ],
   );
+  const launchPlan = useMemo(
+    () =>
+      buildLaunchPlan({
+        stockCount: dashboard?.metrics.stockCount ?? activeInventory.length,
+        draftListings: draftListingCount,
+        activeListings: activeListingCount,
+        soldCount: dashboard?.metrics.soldCount ?? soldInventory.length,
+        activeWatches: activeWatchCount,
+        operatingExpensePence: dashboard?.metrics.operatingExpensePence ?? 0,
+        secondaryCrossCheck: Boolean(systemStatus?.summary.secondaryCrossCheck),
+        alertDelivery: Boolean(systemStatus?.summary.alertDelivery),
+      }),
+    [
+      activeInventory.length,
+      activeListingCount,
+      activeWatchCount,
+      dashboard?.metrics.operatingExpensePence,
+      dashboard?.metrics.soldCount,
+      dashboard?.metrics.stockCount,
+      draftListingCount,
+      soldInventory.length,
+      systemStatus?.summary.alertDelivery,
+      systemStatus?.summary.secondaryCrossCheck,
+    ],
+  );
 
   async function refreshAll(options: RefreshOptions = {}) {
     setRefreshing(true);
@@ -848,6 +874,27 @@ export default function Home() {
 
   function openLaunchReadiness(target: LaunchReadinessTarget | undefined) {
     if (!target || target === "external") return;
+    if (target === "buy") {
+      setView("acquire");
+      return;
+    }
+    if (target === "stock") {
+      setInventoryQuery("");
+      setInventorySort("newest");
+      setView("inventory");
+      return;
+    }
+    if (target === "listings") {
+      setListingStateFilter("ALL");
+      setListingSort("newest");
+      setView("listings");
+      return;
+    }
+    setView("pnl");
+  }
+
+  function openLaunchPlan(target: LaunchPlanTarget) {
+    if (target === "external") return;
     if (target === "buy") {
       setView("acquire");
       return;
@@ -2042,6 +2089,23 @@ export default function Home() {
             <div className="today-action-list">
               {todayActions.map((action) => (
                 <TodayActionButton key={action.id} action={action} onOpen={openTodayAction} />
+              ))}
+            </div>
+          </section>
+
+          <section className="panel launch-plan-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>First week</h2>
+                <span className="muted">{launchPlan.length} step{launchPlan.length === 1 ? "" : "s"}</span>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setView("pnl")}>
+                Books
+              </button>
+            </div>
+            <div className="launch-plan-list">
+              {launchPlan.map((item) => (
+                <LaunchPlanRow key={item.id} item={item} onOpen={openLaunchPlan} />
               ))}
             </div>
           </section>
@@ -3902,6 +3966,30 @@ function LaunchReadinessRow({
   );
 }
 
+function LaunchPlanRow({
+  item,
+  onOpen,
+}: {
+  item: LaunchPlanItem;
+  onOpen: (target: LaunchPlanTarget) => void;
+}) {
+  const actionable = item.target !== "external";
+  return (
+    <div className={`launch-plan-row ${item.state}`}>
+      <span aria-hidden="true">{launchPlanSymbol(item.state)}</span>
+      <div>
+        <strong>{item.title}</strong>
+        <small>{item.detail}</small>
+      </div>
+      {actionable ? (
+        <button type="button" onClick={() => onOpen(item.target)}>{item.action}</button>
+      ) : (
+        <small className="readiness-action">{item.action}</small>
+      )}
+    </div>
+  );
+}
+
 function SetupStep({
   done,
   title,
@@ -4408,6 +4496,12 @@ function sourceStatusTone(status: SystemSource["status"]): string {
 }
 
 function readinessSymbol(state: LaunchReadinessItem["state"]): string {
+  if (state === "done") return "✓";
+  if (state === "warn") return "!";
+  return "›";
+}
+
+function launchPlanSymbol(state: LaunchPlanItem["state"]): string {
   if (state === "done") return "✓";
   if (state === "warn") return "!";
   return "›";
