@@ -64,6 +64,12 @@ type BuyFlowStep = {
   detail: string;
   state: BuyFlowState;
 };
+type LookupInput = {
+  name: string;
+  setName: string;
+  number: string;
+  grade: Grade;
+};
 
 type CatalogCard = {
   name: string;
@@ -1125,9 +1131,15 @@ export default function Home() {
     setGraderCert("");
   }
 
-  function applyQuickIntake() {
+  function applyQuickIntake(options: { lookupAfter?: boolean } = {}) {
     const parsed = parseQuickIntake(quickIntake);
     const filled: string[] = [];
+    const nextLookup: LookupInput = {
+      name: parsed.name ?? name,
+      setName: parsed.setName ?? setNameValue,
+      number: parsed.number ?? number,
+      grade: parsed.grade ?? grade,
+    };
 
     if (parsed.name) {
       setName(parsed.name);
@@ -1177,12 +1189,25 @@ export default function Home() {
     setCardArtUrl(null);
     setGradeComp(null);
     clearCheckedComp();
-    setNotice(`Filled ${filled.join(", ")}.`);
     setError(null);
+    if (options.lookupAfter) {
+      if (!nextLookup.name.trim()) {
+        setError("Quick comp needs a card name.");
+        return;
+      }
+      setNotice(`Filled ${filled.join(", ")}. Looking up comp...`);
+      void lookupComp(nextLookup);
+      return;
+    }
+    setNotice(`Filled ${filled.join(", ")}.`);
   }
 
   async function lookup(event?: FormEvent) {
     event?.preventDefault();
+    await lookupComp({ name, setName: setNameValue, number, grade });
+  }
+
+  async function lookupComp(input: LookupInput) {
     setBusy("lookup");
     setError(null);
     setNotice(null);
@@ -1190,17 +1215,17 @@ export default function Home() {
     clearCheckedComp();
     try {
       const qs = new URLSearchParams({
-        name,
-        set: setNameValue,
-        number,
-        grade,
+        name: input.name,
+        set: input.setName,
+        number: input.number,
+        grade: input.grade,
       });
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "lookup failed");
       setComp(payload);
       setCardArtUrl(payload.catalog?.imageUrl ?? null);
-      pinRecentSetName(payload.catalog?.setName ?? setNameValue);
+      pinRecentSetName(payload.catalog?.setName ?? input.setName);
       setGradeComp(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "lookup failed");
@@ -2510,21 +2535,28 @@ export default function Home() {
             </div>
             <label className="quick-intake-field">
               Quick fill
-              <div className="quick-intake-row">
+              <div className="quick-intake-row quick-intake-actions">
                 <input
                   value={quickIntake}
                   onChange={(event) => setQuickIntake(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && quickIntake.trim()) {
                       event.preventDefault();
-                      applyQuickIntake();
+                      applyQuickIntake({ lookupAfter: true });
                     }
                   }}
                   placeholder="Gengar lor tg TG06 raw £10 LP vinted binder"
                   autoComplete="off"
                 />
-                <button type="button" onClick={applyQuickIntake} disabled={!quickIntake.trim()}>
+                <button type="button" onClick={() => applyQuickIntake()} disabled={!quickIntake.trim()}>
                   Fill
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyQuickIntake({ lookupAfter: true })}
+                  disabled={!quickIntake.trim() || busy === "lookup"}
+                >
+                  Comp
                 </button>
               </div>
             </label>
