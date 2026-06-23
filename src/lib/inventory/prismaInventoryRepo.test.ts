@@ -23,6 +23,8 @@ type FakeItem = {
   costBasis: number;
   acquiredFrom: string | null;
   location: string | null;
+  condition: string | null;
+  graderCert: string | null;
   status: "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
   createdAt: Date;
 };
@@ -46,6 +48,8 @@ type FakeItemData = {
   costBasis: number;
   acquiredFrom?: string;
   location?: string;
+  condition?: string;
+  graderCert?: string;
   status: "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 };
 
@@ -132,6 +136,8 @@ function fakeDb(seedCards: FakeCard[] = []) {
             ...data,
             acquiredFrom: data.acquiredFrom ?? null,
             location: data.location ?? null,
+            condition: data.condition ?? null,
+            graderCert: data.graderCert ?? null,
           };
           items.push(item);
           return withCard(item);
@@ -157,6 +163,8 @@ test("PrismaInventoryRepo creates a card and maps inventory fields", async () =>
     costBasisPence: 1800,
     acquiredFrom: "Card fair",
     location: "Box A",
+    condition: "NM",
+    graderCert: "12345678",
     status: "IN_STOCK",
   });
 
@@ -164,6 +172,8 @@ test("PrismaInventoryRepo creates a card and maps inventory fields", async () =>
   assert.equal(item.card.id, "card_1");
   assert.equal(item.card.setName, "151");
   assert.equal(item.costBasisPence, 1800);
+  assert.equal(item.condition, "NM");
+  assert.equal(item.graderCert, "12345678");
   assert.equal(item.createdAt, "2026-06-21T12:00:00.000Z");
 });
 

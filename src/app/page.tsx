@@ -20,6 +20,7 @@ import {
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
+import { buildManualCompLinks } from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildBuyPlan } from "@/lib/dealer/buyPlan";
@@ -126,6 +127,8 @@ type InventoryItem = {
   costBasis: number;
   acquiredFrom: string | null;
   location: string | null;
+  condition: string | null;
+  graderCert: string | null;
   status: ItemStatus;
   createdAt: string;
   listings: Listing[];
@@ -299,6 +302,8 @@ const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
+const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
+const VISIBLE_POPULAR_SET_LIMIT = 36;
 const expensePresets: Array<{ category: ExpenseCategory; description: string; amount?: string; channel?: Channel }> = [
   { category: "POSTAGE", description: "Postage supplies", amount: "5.00" },
   { category: "SUPPLIES", description: "Sleeves / toploaders", amount: "10.00" },
@@ -324,6 +329,8 @@ export default function Home() {
   const [quantity, setQuantity] = useState("1");
   const [source, setSource] = useState("Card fair");
   const [location, setLocation] = useState("Box A");
+  const [condition, setCondition] = useState("NM");
+  const [graderCert, setGraderCert] = useState("");
   const [strategy, setStrategy] = useState<PricingStrategy>("market");
   const [channel, setChannel] = useState<Channel>("EBAY");
   const [listPriceOverride, setListPriceOverride] = useState("");
@@ -350,6 +357,8 @@ export default function Home() {
   const [itemCost, setItemCost] = useState("");
   const [itemSource, setItemSource] = useState("");
   const [itemLocation, setItemLocation] = useState("");
+  const [itemCondition, setItemCondition] = useState("");
+  const [itemGraderCert, setItemGraderCert] = useState("");
   const [itemStatus, setItemStatus] = useState<ItemStatus>("IN_STOCK");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [salePrice, setSalePrice] = useState("");
@@ -563,6 +572,18 @@ export default function Home() {
   const ownedSalesComp =
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
   const compReceipt = useMemo(() => (comp ? buildCompReceipt(comp) : []), [comp]);
+  const manualCompLinks = useMemo(
+    () =>
+      buildManualCompLinks(
+        {
+          name: catalogCard?.name ?? name,
+          setName: catalogCard?.setName ?? setNameValue,
+          number: catalogCard?.number ?? number,
+        },
+        grade,
+      ),
+    [catalogCard?.name, catalogCard?.number, catalogCard?.setName, grade, name, number, setNameValue],
+  );
   const compSpreadPct = useMemo(() => (comp ? medianSpreadPct(comp.all) : null), [comp]);
   const dealerVerdict = useMemo(() => (comp ? buildDealerCompVerdict(comp) : null), [comp]);
   const confidenceLabel = dealerVerdict
@@ -837,6 +858,7 @@ export default function Home() {
     setCardArtUrl(null);
     setGradeComp(null);
     setListPriceOverride("");
+    setGraderCert("");
   }
 
   function applyQuickIntake() {
@@ -934,6 +956,8 @@ export default function Home() {
           quantity: intakeQuantity,
           acquiredFrom: source || undefined,
           location: location || undefined,
+          condition: condition.trim() || undefined,
+          graderCert: graderCert.trim() || undefined,
           strategy,
           channel,
           listPricePence: overrideListPricePence ?? undefined,
@@ -993,6 +1017,8 @@ export default function Home() {
           costBasisPence,
           acquiredFrom: source || undefined,
           location: location || undefined,
+          condition: condition.trim() || undefined,
+          graderCert: graderCert.trim() || undefined,
           status: "IN_STOCK",
         }),
       });
@@ -1064,6 +1090,8 @@ export default function Home() {
             costBasisPence: row.costBasisPence,
             acquiredFrom: row.acquiredFrom ?? "Opening stock",
             location: (row.location ?? location) || undefined,
+            condition: row.condition,
+            graderCert: row.graderCert,
             status: "IN_STOCK",
           }),
         });
@@ -1326,6 +1354,8 @@ export default function Home() {
     setItemCost(penceToPounds(item.costBasis));
     setItemSource(item.acquiredFrom ?? "");
     setItemLocation(item.location ?? "");
+    setItemCondition(item.condition ?? "");
+    setItemGraderCert(item.graderCert ?? "");
     setItemStatus(item.status);
     setError(null);
     setNotice(null);
@@ -1353,6 +1383,8 @@ export default function Home() {
           costBasisPence: poundsToPence(itemCost),
           acquiredFrom: itemSource.trim() || null,
           location: itemLocation.trim() || null,
+          condition: itemCondition.trim() || null,
+          graderCert: itemGraderCert.trim() || null,
           status: itemStatus,
         }),
       });
@@ -2094,7 +2126,7 @@ export default function Home() {
             </div>
             {popularSets.length > 0 && (
               <div className="set-chip-row" aria-label="Popular sets">
-                {popularSets.map((set) => (
+                {popularSets.slice(0, VISIBLE_POPULAR_SET_LIMIT).map((set) => (
                   <button key={set.id} type="button" onClick={() => chooseSet(set)}>
                     {set.logoUrl || set.symbolUrl ? (
                       <img src={set.logoUrl ?? set.symbolUrl} alt="" onError={hideBrokenImage} />
@@ -2241,6 +2273,14 @@ export default function Home() {
                   </div>
                 </div>
               )}
+              <div className="manual-comp-links" aria-label="Manual comp checks">
+                <span>Manual checks</span>
+                {manualCompLinks.map((link) => (
+                  <a key={link.kind} href={link.url} target="_blank" rel="noreferrer">
+                    {link.label}
+                  </a>
+                ))}
+              </div>
               {marketBaseline && (
                 <div className="market-signal">
                   <span>Catalog baseline</span>
@@ -2456,6 +2496,21 @@ export default function Home() {
                 <input value={location} onChange={(event) => setLocation(event.target.value)} />
               </label>
             </div>
+            <div className="form-grid">
+              <label>
+                Condition
+                <input value={condition} onChange={(event) => setCondition(event.target.value)} placeholder="NM, LP, edgewear..." />
+              </label>
+              <label>
+                Cert
+                <input
+                  inputMode="numeric"
+                  value={graderCert}
+                  onChange={(event) => setGraderCert(event.target.value)}
+                  placeholder={grade === "RAW" ? "optional" : "PSA/BGS/CGC cert"}
+                />
+              </label>
+            </div>
             <div className="preset-row" aria-label="Source presets">
               {sourcePresets.map((preset) => (
                 <button
@@ -2475,6 +2530,18 @@ export default function Home() {
                   type="button"
                   className={location === preset ? "selected" : ""}
                   onClick={() => setLocation(preset)}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+            <div className="preset-row" aria-label="Condition presets">
+              {conditionPresets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={condition === preset ? "selected" : ""}
+                  onClick={() => setCondition(preset)}
                 >
                   {preset}
                 </button>
@@ -2522,7 +2589,7 @@ export default function Home() {
               <textarea
                 value={stockImportText}
                 onChange={(event) => setStockImportText(event.target.value)}
-                placeholder="Gengar, Lost Origin Trainer Gallery, TG06/TG30, RAW, 10.00, 1, Card fair, Binder, Vinted, 25.00"
+                placeholder={`card,set,number,grade,cost,qty,source,location,condition,cert,channel,list price,state\nGengar,Lost Origin Trainer Gallery,TG06/TG30,RAW,10.00,1,Card fair,Binder,NM,,Vinted,25.00,draft`}
                 rows={4}
               />
             </label>
@@ -2542,6 +2609,8 @@ export default function Home() {
                     {stockImportPreview.rows.slice(0, 3).map((row, index) => (
                       <span key={`${row.card.name}-${row.card.number ?? ""}-${index}`}>
                         {row.quantity}x {row.card.name} · {row.card.setName ?? "No set"} · {gbp(row.costBasisPence)}
+                        {row.condition ? ` · ${row.condition}` : ""}
+                        {row.graderCert ? ` · cert ${row.graderCert}` : ""}
                         {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : ""}
                       </span>
                     ))}
@@ -2587,6 +2656,8 @@ export default function Home() {
                         {item.card.number ? ` #${item.card.number}` : ""}
                         {" · "}
                         {item.quantity} @ {gbp(item.costBasis)}
+                        {item.condition ? ` · ${item.condition}` : ""}
+                        {item.graderCert ? ` · cert ${item.graderCert}` : ""}
                       </span>
                     </div>
                     <strong>{gbp(item.costBasis * item.quantity)}</strong>
@@ -2678,6 +2749,27 @@ export default function Home() {
                   <input
                     value={itemLocation}
                     onChange={(event) => setItemLocation(event.target.value)}
+                    disabled={busy === `edit-${editingItemId}`}
+                  />
+                </label>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Condition
+                  <input
+                    value={itemCondition}
+                    onChange={(event) => setItemCondition(event.target.value)}
+                    placeholder="NM, LP, light edgewear..."
+                    disabled={busy === `edit-${editingItemId}`}
+                  />
+                </label>
+                <label>
+                  Cert
+                  <input
+                    inputMode="numeric"
+                    value={itemGraderCert}
+                    onChange={(event) => setItemGraderCert(event.target.value)}
+                    placeholder="PSA/BGS/CGC cert"
                     disabled={busy === `edit-${editingItemId}`}
                   />
                 </label>
@@ -3315,6 +3407,9 @@ function InventoryRow({
       : item.status === "SOLD" && sale
         ? ` · sold ${gbp(sale.salePrice)}`
         : ` · ${item.sales.length} sold`;
+  const stockNotes = [item.condition, item.graderCert ? `cert ${item.graderCert}` : null, item.location]
+    .filter(Boolean)
+    .join(" · ");
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
@@ -3384,6 +3479,7 @@ function InventoryRow({
           <p>
             {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
           </p>
+          {stockNotes && <p>{stockNotes}</p>}
           <p>
             {listing ? `${listingStateLabel} ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
             {soldNote}
@@ -3441,6 +3537,10 @@ function ListingRow({
   const price = listing.listPrice ?? listing.suggestedPrice ?? 0;
   const isBusy = busy === `listing-${listing.id}`;
   const canSell = Boolean(listing.item && listing.item.status !== "SOLD" && listing.state !== "SOLD");
+  const stockNotes = [
+    listing.item?.condition,
+    listing.item?.graderCert ? `cert ${listing.item.graderCert}` : null,
+  ].filter(Boolean).join(" · ");
 
   return (
     <article className="item-row">
@@ -3456,6 +3556,7 @@ function ListingRow({
         <p>
           {channelLabel(listing.channel)}
           {listing.item?.card.setName ? ` · ${listing.item.card.setName}` : ""}
+          {stockNotes ? ` · ${stockNotes}` : ""}
           {listing.externalUrl ? " · URL saved" : ""}
         </p>
         <p>{gbp(price)}</p>

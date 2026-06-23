@@ -1708,6 +1708,39 @@ label {
   color: var(--danger);
 }
 
+.manual-comp-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 203, 5, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 203, 5, 0.08);
+  padding: 9px 10px;
+}
+
+.manual-comp-links span {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: #fff2a6;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.manual-comp-links a {
+  display: inline-grid;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid rgba(255, 203, 5, 0.32);
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: var(--yellow);
+  font-size: 12px;
+  font-weight: 1000;
+  text-align: center;
+  text-decoration: none;
+}
+
 .owned-sales-signal {
   display: grid;
   gap: 8px;

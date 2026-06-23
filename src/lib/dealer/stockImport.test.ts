@@ -4,9 +4,9 @@ import test from "node:test";
 import { parseStockImportText } from "./stockImport.js";
 
 test("parseStockImportText parses headered stock CSV with listing prices", () => {
-  const parsed = parseStockImportText(`card,set,number,grade,cost,qty,source,location,channel,list price,state
-Gengar,Lost Origin Trainer Gallery,TG06/TG30,RAW,10.00,2,Card fair,Binder,Vinted,25.00,active
-Pikachu ex,Surging Sparks,238/191,PSA 10,200,1,eBay,Slabs,eBay,240,draft`);
+  const parsed = parseStockImportText(`card,set,number,grade,cost,qty,source,location,condition,cert,channel,list price,state
+Gengar,Lost Origin Trainer Gallery,TG06/TG30,RAW,10.00,2,Card fair,Binder,NM,,Vinted,25.00,active
+Pikachu ex,Surging Sparks,238/191,PSA 10,200,1,eBay,Slabs,,12345678,eBay,240,draft`);
 
   assert.equal(parsed.errors.length, 0);
   assert.equal(parsed.totalCostPence, 22000);
@@ -18,12 +18,26 @@ Pikachu ex,Surging Sparks,238/191,PSA 10,200,1,eBay,Slabs,eBay,240,draft`);
     quantity: 2,
     acquiredFrom: "Card fair",
     location: "Binder",
+    condition: "NM",
     channel: "VINTED",
     listPricePence: 2500,
     listingState: "ACTIVE",
   });
   assert.equal(parsed.rows[1]?.grade, "PSA_10");
+  assert.equal(parsed.rows[1]?.graderCert, "12345678");
   assert.equal(parsed.rows[1]?.channel, "EBAY");
+});
+
+test("parseStockImportText keeps old ordered listing rows backward compatible", () => {
+  const parsed = parseStockImportText(
+    "Gengar,Lost Origin Trainer Gallery,TG06/TG30,RAW,10.00,1,Card fair,Binder,Vinted,25.00",
+  );
+
+  assert.equal(parsed.errors.length, 0);
+  assert.equal(parsed.rows[0]?.condition, undefined);
+  assert.equal(parsed.rows[0]?.graderCert, undefined);
+  assert.equal(parsed.rows[0]?.channel, "VINTED");
+  assert.equal(parsed.rows[0]?.listPricePence, 2500);
 });
 
 test("parseStockImportText parses ordered rows without a header", () => {

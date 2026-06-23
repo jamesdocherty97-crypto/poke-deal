@@ -44,6 +44,8 @@ const inventoryDraftSchema = z.object({
   costBasisPence: z.coerce.number().int().nonnegative(),
   acquiredFrom: z.string().min(1).optional(),
   location: z.string().min(1).optional(),
+  condition: z.string().trim().min(1).optional(),
+  graderCert: z.string().trim().min(1).optional(),
   status: z.enum(["IN_STOCK", "LISTED", "SOLD", "RESERVED"]).default("IN_STOCK"),
 });
 

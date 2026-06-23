@@ -11,6 +11,8 @@ const itemPatchSchema = z.object({
   costBasisPence: z.coerce.number().int().nonnegative().optional(),
   acquiredFrom: z.string().trim().min(1).nullable().optional(),
   location: z.string().trim().min(1).nullable().optional(),
+  condition: z.string().trim().min(1).nullable().optional(),
+  graderCert: z.string().trim().min(1).nullable().optional(),
 });
 
 export async function PATCH(
@@ -42,6 +44,8 @@ export async function PATCH(
         costBasis: d.costBasisPence,
         acquiredFrom: d.acquiredFrom,
         location: d.location,
+        condition: d.condition,
+        graderCert: d.graderCert,
       },
       include: {
         card: true,

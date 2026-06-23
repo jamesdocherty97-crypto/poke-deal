@@ -15,6 +15,8 @@ export interface StockImportRow {
   quantity: number;
   acquiredFrom?: string;
   location?: string;
+  condition?: string;
+  graderCert?: string;
   channel?: ImportChannel;
   listPricePence?: number;
   listingState?: ImportListingState;
@@ -44,6 +46,8 @@ const ORDERED_COLUMNS = [
   "channel",
   "listPrice",
   "listingState",
+  "condition",
+  "graderCert",
 ] as const;
 
 type OrderedColumn = (typeof ORDERED_COLUMNS)[number];
@@ -90,6 +94,13 @@ const HEADER_ALIASES: Record<string, OrderedColumn> = {
   acquiredfrom: "acquiredFrom",
   location: "location",
   box: "location",
+  condition: "condition",
+  cond: "condition",
+  cert: "graderCert",
+  "cert number": "graderCert",
+  "grader cert": "graderCert",
+  "psa cert": "graderCert",
+  gradercert: "graderCert",
   channel: "channel",
   platform: "channel",
   list: "listPrice",
@@ -157,6 +168,8 @@ function parseStockImportLine(
     quantity: valueByColumn.get("quantity"),
     acquiredFrom: valueByColumn.get("acquiredFrom"),
     location: valueByColumn.get("location"),
+    condition: valueByColumn.get("condition"),
+    graderCert: valueByColumn.get("graderCert"),
     channel: valueByColumn.get("channel"),
     listPrice: valueByColumn.get("listPrice"),
     listingState: valueByColumn.get("listingState"),
@@ -184,6 +197,8 @@ function buildRow(input: {
   quantity?: string;
   acquiredFrom?: string;
   location?: string;
+  condition?: string;
+  graderCert?: string;
   channel?: string;
   listPrice?: string;
   listingState?: string;
@@ -221,6 +236,8 @@ function buildRow(input: {
       quantity,
       ...(clean(input.acquiredFrom) ? { acquiredFrom: clean(input.acquiredFrom) } : {}),
       ...(clean(input.location) ? { location: clean(input.location) } : {}),
+      ...(clean(input.condition) ? { condition: clean(input.condition) } : {}),
+      ...(clean(input.graderCert) ? { graderCert: clean(input.graderCert) } : {}),
       ...(channel ? { channel } : {}),
       ...(listPricePence != null ? { listPricePence } : {}),
       ...(listingState ? { listingState } : {}),

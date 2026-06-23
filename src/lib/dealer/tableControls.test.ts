@@ -13,6 +13,8 @@ const inventory = [
     createdAt: "2026-06-22T10:00:00.000Z",
     acquiredFrom: "Card fair",
     location: "Box A",
+    condition: "NM",
+    graderCert: null,
   },
   {
     id: "psa-pika",
@@ -23,6 +25,8 @@ const inventory = [
     createdAt: "2026-06-20T10:00:00.000Z",
     acquiredFrom: "Trade",
     location: "Slab case",
+    condition: null,
+    graderCert: "98765432",
   },
   {
     id: "bgs-mew",
@@ -33,6 +37,8 @@ const inventory = [
     createdAt: "2026-06-21T10:00:00.000Z",
     acquiredFrom: "Whatnot",
     location: "Box B",
+    condition: "clean front, soft corner",
+    graderCert: "BGS123",
   },
 ];
 
@@ -78,6 +84,14 @@ test("buildInventoryView searches across card, set, grade and location", () => {
     buildInventoryView(inventory, { query: "151 199", sort: "newest" }).map((row) => row.id),
     ["raw-zard"],
   );
+  assert.deepEqual(
+    buildInventoryView(inventory, { query: "soft corner", sort: "newest" }).map((row) => row.id),
+    ["bgs-mew"],
+  );
+  assert.deepEqual(
+    buildInventoryView(inventory, { query: "98765432", sort: "newest" }).map((row) => row.id),
+    ["psa-pika"],
+  );
 });
 
 test("buildInventoryView sorts stock by dealer-useful fields", () => {
@@ -99,6 +113,10 @@ test("buildListingView filters state and searches linked card context", () => {
   assert.deepEqual(
     buildListingView(listings, { query: "mew", state: "ALL", sort: "newest" }).map((row) => row.id),
     ["ended-mew"],
+  );
+  assert.deepEqual(
+    buildListingView(listings, { query: "98765432", state: "ALL", sort: "newest" }).map((row) => row.id),
+    ["active-pika"],
   );
 });
 

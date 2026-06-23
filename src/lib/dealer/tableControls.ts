@@ -14,6 +14,8 @@ export interface InventoryTableItem {
   createdAt: string;
   acquiredFrom?: string | null;
   location?: string | null;
+  condition?: string | null;
+  graderCert?: string | null;
 }
 
 export interface ListingTableRow {
@@ -25,6 +27,8 @@ export interface ListingTableRow {
   createdAt: string;
   item?: {
     grade: string;
+    condition?: string | null;
+    graderCert?: string | null;
     card: {
       name: string;
       setName: string;
@@ -105,6 +109,8 @@ function inventoryHaystack(row: InventoryTableItem): string {
       row.status,
       row.acquiredFrom,
       row.location,
+      row.condition,
+      row.graderCert,
     ].join(" "),
   );
 }
@@ -116,6 +122,8 @@ function listingHaystack(row: ListingTableRow): string {
       row.channel,
       row.state,
       row.item?.grade,
+      row.item?.condition,
+      row.item?.graderCert,
       row.item?.card.name,
       row.item?.card.setName,
       row.item?.card.number,

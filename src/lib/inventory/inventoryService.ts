@@ -14,6 +14,8 @@ export interface InventoryItemDraft {
   costBasisPence: number;
   acquiredFrom?: string;
   location?: string;
+  condition?: string;
+  graderCert?: string;
   status: "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 }
 
@@ -34,6 +36,8 @@ export interface AcquireInput {
   quantity?: number;
   acquiredFrom?: string;
   location?: string;
+  condition?: string;
+  graderCert?: string;
   comp: CompResult;
   strategy?: PricingStrategy;
   minMargin?: number;
@@ -66,6 +70,8 @@ export async function acquireToInventory(
     costBasisPence: input.costBasisPence,
     acquiredFrom: input.acquiredFrom,
     location: input.location,
+    condition: input.condition,
+    graderCert: input.graderCert,
     status: "IN_STOCK",
   });
 
