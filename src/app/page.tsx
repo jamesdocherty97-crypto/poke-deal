@@ -313,7 +313,7 @@ const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCG
 const expenseCategories: ExpenseCategory[] = ["SUPPLIES", "POSTAGE", "GRADING", "TABLE_FEE", "TRAVEL", "PLATFORM", "OTHER"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
-const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Trade-in"];
+const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
 const VISIBLE_POPULAR_SET_LIMIT = 36;
@@ -413,6 +413,7 @@ export default function Home() {
   const [gradingCost, setGradingCost] = useState("19.99");
   const [popularSets, setPopularSets] = useState<CatalogSet[]>([]);
   const [allSets, setAllSets] = useState<CatalogSet[]>([]);
+  const [showAllPopularSets, setShowAllPopularSets] = useState(false);
   const [setSuggestions, setSetSuggestions] = useState<CatalogSet[]>([]);
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
   const [cardSuggestions, setCardSuggestions] = useState<CatalogCard[]>([]);
@@ -614,6 +615,7 @@ export default function Home() {
     setNameValue,
     setSuggestions,
   ]);
+  const visiblePopularSets = showAllPopularSets ? popularSets : popularSets.slice(0, VISIBLE_POPULAR_SET_LIMIT);
   const setMarkUrl =
     catalogCard?.setLogoUrl ?? catalogCard?.setSymbolUrl ?? selectedSet?.logoUrl ?? selectedSet?.symbolUrl ?? null;
   const displayCardName = catalogCard?.name ?? name;
@@ -1016,6 +1018,18 @@ export default function Home() {
     if (parsed.quantity) {
       setQuantity(parsed.quantity);
       filled.push("qty");
+    }
+    if (parsed.source) {
+      setSource(parsed.source);
+      filled.push("source");
+    }
+    if (parsed.location) {
+      setLocation(parsed.location);
+      filled.push("location");
+    }
+    if (parsed.condition) {
+      setCondition(parsed.condition);
+      filled.push("condition");
     }
 
     if (filled.length === 0) {
@@ -2252,7 +2266,7 @@ export default function Home() {
                       applyQuickIntake();
                     }
                   }}
-                  placeholder="Gengar Lost Origin TG06 raw £10"
+                  placeholder="Gengar lor tg TG06 raw £10 LP vinted binder"
                   autoComplete="off"
                 />
                 <button type="button" onClick={applyQuickIntake} disabled={!quickIntake.trim()}>
@@ -2335,7 +2349,7 @@ export default function Home() {
             </div>
             {popularSets.length > 0 && (
               <div className="set-chip-row" aria-label="Popular sets">
-                {popularSets.slice(0, VISIBLE_POPULAR_SET_LIMIT).map((set) => (
+                {visiblePopularSets.map((set) => (
                   <button key={set.id} type="button" onClick={() => chooseSet(set)}>
                     {set.logoUrl || set.symbolUrl ? (
                       <img src={set.logoUrl ?? set.symbolUrl} alt="" onError={hideBrokenImage} />
@@ -2343,6 +2357,15 @@ export default function Home() {
                     <span>{set.name}</span>
                   </button>
                 ))}
+                {popularSets.length > VISIBLE_POPULAR_SET_LIMIT && (
+                  <button
+                    className="set-chip-more"
+                    type="button"
+                    onClick={() => setShowAllPopularSets((current) => !current)}
+                  >
+                    {showAllPopularSets ? "Fewer sets" : `${popularSets.length - VISIBLE_POPULAR_SET_LIMIT} more`}
+                  </button>
+                )}
               </div>
             )}
             <div className="grade-controls">

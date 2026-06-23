@@ -45,15 +45,32 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
   }
 
   if (comp.sourcesDisagree) {
+    const extremeSpread = spreadPct != null && spreadPct >= 50;
     return {
       ...base,
-      tone: "warn",
-      label: "Cross-check",
-      title: isMarketBaseline(comp.headline) ? "Cautious buy ceiling" : "Check before buying",
+      tone: extremeSpread ? "danger" : "warn",
+      label: extremeSpread ? "Manual check" : "Cross-check",
+      title: extremeSpread
+        ? "Do not trust one number"
+        : isMarketBaseline(comp.headline)
+          ? "Cautious buy ceiling"
+          : "Check before buying",
       detail:
         spreadPct == null
           ? "Priced sources disagree. Treat the headline as a guardrail, not a final list price."
-          : `${priced.length} priced signals are ${spreadPct}% apart. Use the headline as a buy ceiling and inspect the receipt before listing.`,
+          : extremeSpread
+            ? `${priced.length} priced signals are ${spreadPct}% apart. Open the manual checks and enter a checked comp before relying on this price.`
+            : `${priced.length} priced signals are ${spreadPct}% apart. Use the headline as a buy ceiling and inspect the receipt before listing.`,
+    };
+  }
+
+  if (isMarketBaseline(comp.headline) && priced.length < 2) {
+    return {
+      ...base,
+      tone: "warn",
+      label: "Catalog only",
+      title: "Manual sold check",
+      detail: "This is a TCGPlayer/Cardmarket market signal, not a cleaned sold-comps sample. Good for context, but check sold listings before a bigger buy.",
     };
   }
 

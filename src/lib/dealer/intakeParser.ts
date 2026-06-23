@@ -11,6 +11,9 @@ export interface ParsedQuickIntake {
   grade?: ParsedQuickIntakeGrade;
   cost?: string;
   quantity?: string;
+  source?: string;
+  location?: string;
+  condition?: string;
 }
 
 interface SetMatch {
@@ -91,6 +94,24 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
     working = removeMatch(working, quantity.match);
   }
 
+  const source = extractSource(working);
+  if (source) {
+    parsed.source = source.value;
+    working = removeMatch(working, source.match);
+  }
+
+  const location = extractLocation(working);
+  if (location) {
+    parsed.location = location.value;
+    working = removeMatch(working, location.match);
+  }
+
+  const condition = extractCondition(working);
+  if (condition) {
+    parsed.condition = condition.value;
+    working = removeMatch(working, condition.match);
+  }
+
   const grade = extractGrade(working);
   if (grade) {
     parsed.grade = grade.value;
@@ -134,6 +155,40 @@ function extractQuantity(input: string): { value: number; match: string } | null
   return { value, match: match[0] };
 }
 
+function extractSource(input: string): { value: string; match: string } | null {
+  return firstPresetMatch(input, [
+    { value: "Card fair", pattern: /\b(?:from\s+|via\s+|at\s+)?card\s+fair\b/i },
+    { value: "Facebook", pattern: /\b(?:from\s+|via\s+)?(?:facebook|fb)\b/i },
+    { value: "eBay", pattern: /\b(?:from\s+|via\s+)?ebay\b/i },
+    { value: "Cardmarket", pattern: /\b(?:from\s+|via\s+)?cardmarket\b/i },
+    { value: "Vinted", pattern: /\b(?:from\s+|via\s+)?vinted\b/i },
+    { value: "Whatnot", pattern: /\b(?:from\s+|via\s+)?whatnot\b/i },
+    { value: "Collection", pattern: /\b(?:from\s+)?collection\b/i },
+    { value: "Trade-in", pattern: /\btrade[\s-]?in\b/i },
+  ]);
+}
+
+function extractLocation(input: string): { value: string; match: string } | null {
+  return firstPresetMatch(input, [
+    { value: "Box A", pattern: /\bbox\s*a\b/i },
+    { value: "Box B", pattern: /\bbox\s*b\b/i },
+    { value: "Binder", pattern: /\bbinder\b/i },
+    { value: "To list", pattern: /\bto\s+list\b/i },
+    { value: "Slabs", pattern: /\bslabs?\b/i },
+    { value: "Singles", pattern: /\bsingles?\b/i },
+  ]);
+}
+
+function extractCondition(input: string): { value: string; match: string } | null {
+  return firstPresetMatch(input, [
+    { value: "NM", pattern: /\b(?:near\s*mint|nm)\b/i },
+    { value: "LP", pattern: /\b(?:light(?:ly)?\s*played|light\s*play|lp)\b/i },
+    { value: "MP", pattern: /\b(?:moderately\s*played|moderate\s*play|mod\s*play|mp)\b/i },
+    { value: "HP", pattern: /\b(?:heavily\s*played|heavy\s*play|hp)\b/i },
+    { value: "DMG", pattern: /\b(?:damaged|damage|dmg)\b/i },
+  ]);
+}
+
 function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: string } | null {
   const slab = input.match(/\b(PSA|BGS|CGC)\s*(10|9(?:[.,]5)?|[1-8])\b/i);
   if (slab?.[0] && slab[1] && slab[2]) {
@@ -146,6 +201,17 @@ function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: st
   const raw = input.match(/\b(?:raw|ungraded|nm|near mint)\b/i);
   if (raw?.[0]) return { value: "RAW", match: raw[0] };
 
+  return null;
+}
+
+function firstPresetMatch(
+  input: string,
+  options: Array<{ value: string; pattern: RegExp }>,
+): { value: string; match: string } | null {
+  for (const option of options) {
+    const match = input.match(option.pattern);
+    if (match?.[0]) return { value: option.value, match: match[0] };
+  }
   return null;
 }
 
@@ -190,13 +256,13 @@ function isUsefulSetPhrase(phrase: string): boolean {
 function scoreSetPhrase(phrase: string, set: { id: string; name: string; ptcgoCode?: string }): number {
   const normalizedPhrase = normalizeSearchText(phrase);
   const normalizedSet = normalizeSearchText(set.name);
+  if (STRONG_SET_ALIASES.has(normalizedPhrase)) return 1200 + tokenizeSearchText(phrase).length;
   if (
     normalizedPhrase === set.id.toLowerCase() ||
     normalizedPhrase === set.ptcgoCode?.toLowerCase()
   ) {
     return 1000;
   }
-  if (STRONG_SET_ALIASES.has(normalizedPhrase)) return 950 + tokenizeSearchText(phrase).length;
   if (normalizedPhrase === normalizedSet) return 900 + tokenizeSearchText(phrase).length;
 
   const phraseTokens = tokenizeSearchText(phrase);

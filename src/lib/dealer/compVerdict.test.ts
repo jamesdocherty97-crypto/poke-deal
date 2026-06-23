@@ -24,7 +24,7 @@ test("buildDealerCompVerdict marks missing data as manual stock", () => {
   assert.equal(verdict.title, "Stock manually");
 });
 
-test("buildDealerCompVerdict treats disagreeing raw baselines as a cautious buy ceiling", () => {
+test("buildDealerCompVerdict forces manual checks when raw baselines are far apart", () => {
   const verdict = buildDealerCompVerdict({
     headline: comp({
       source: "pokemon-tcg-market",
@@ -39,10 +39,27 @@ test("buildDealerCompVerdict treats disagreeing raw baselines as a cautious buy 
     sourcesDisagree: true,
   });
 
-  assert.equal(verdict.tone, "warn");
-  assert.equal(verdict.label, "Cross-check");
-  assert.equal(verdict.title, "Cautious buy ceiling");
+  assert.equal(verdict.tone, "danger");
+  assert.equal(verdict.label, "Manual check");
+  assert.equal(verdict.title, "Do not trust one number");
   assert.equal(verdict.spreadPct, 61);
+});
+
+test("buildDealerCompVerdict labels a lone catalog market fallback", () => {
+  const verdict = buildDealerCompVerdict({
+    headline: comp({
+      source: "pokemon-tcg-market",
+      medianPence: 4100,
+      sampleSize: 1,
+      raw: { kind: "catalog-market-baseline" },
+    }),
+    all: [comp({ source: "pokemon-tcg-market", medianPence: 4100, sampleSize: 1, raw: { kind: "catalog-market-baseline" } })],
+    sourcesDisagree: false,
+  });
+
+  assert.equal(verdict.tone, "warn");
+  assert.equal(verdict.label, "Catalog only");
+  assert.equal(verdict.title, "Manual sold check");
 });
 
 test("buildDealerCompVerdict distinguishes thin and aligned usable comps", () => {

@@ -59,3 +59,27 @@ test("parseQuickIntake accepts broader slab grades", () => {
     cost: "20.00",
   });
 });
+
+test("parseQuickIntake captures fair-flow source, location and condition", () => {
+  assert.deepEqual(parseQuickIntake("Gengar lor tg TG06 raw £10 LP vinted binder"), {
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    number: "TG06",
+    grade: "RAW",
+    cost: "10.00",
+    source: "Vinted",
+    location: "Binder",
+    condition: "LP",
+  });
+
+  assert.deepEqual(parseQuickIntake("2x Charizard 151 199/165 £18 from card fair box a nm"), {
+    name: "Charizard",
+    setName: "151",
+    number: "199/165",
+    cost: "18.00",
+    quantity: "2",
+    source: "Card fair",
+    location: "Box A",
+    condition: "NM",
+  });
+});
