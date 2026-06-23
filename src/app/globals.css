@@ -782,6 +782,24 @@ label {
   color: #fff4b0;
 }
 
+.toggle-control {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  width: fit-content;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.toggle-control input {
+  width: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  accent-color: var(--yellow);
+}
+
 .set-chip-row button img {
   width: auto;
   height: 18px;
@@ -1149,6 +1167,71 @@ label {
   background:
     linear-gradient(125deg, rgba(255, 203, 5, 0.12), transparent 48%),
     var(--panel);
+}
+
+.recent-intake-panel {
+  background:
+    linear-gradient(125deg, rgba(42, 117, 187, 0.16), transparent 50%),
+    var(--panel);
+}
+
+.recent-intake-panel .panel-heading > strong {
+  color: #88c8ff;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.recent-intake-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recent-intake-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 8px;
+}
+
+.recent-intake-row div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.recent-intake-row strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.recent-intake-row > strong {
+  justify-self: end;
+  color: #88c8ff;
+  white-space: nowrap;
+}
+
+.recent-intake-row span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.mini-card-art {
+  width: 34px;
+  height: 47px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  background: var(--panel-2);
+  object-fit: cover;
+}
+
+.mini-card-art.blank {
+  border-style: dashed;
 }
 
 .portfolio-value {

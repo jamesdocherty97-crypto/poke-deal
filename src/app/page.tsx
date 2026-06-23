@@ -18,6 +18,7 @@ import {
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
+import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
 import { estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
@@ -301,10 +302,12 @@ export default function Home() {
   const [number, setNumber] = useState("199/165");
   const [grade, setGrade] = useState<Grade>("RAW");
   const [cost, setCost] = useState("18.00");
+  const [quantity, setQuantity] = useState("1");
   const [source, setSource] = useState("Card fair");
   const [location, setLocation] = useState("Box A");
   const [strategy, setStrategy] = useState("market");
   const [channel, setChannel] = useState<Channel>("EBAY");
+  const [keepBuying, setKeepBuying] = useState(true);
   const [comp, setComp] = useState<Reconciled | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -466,6 +469,11 @@ export default function Home() {
   const visibleListings = useMemo(
     () => buildListingView(listings, { query: listingQuery, state: listingStateFilter, sort: listingSort }),
     [listings, listingQuery, listingStateFilter, listingSort],
+  );
+  const recentIntake = useMemo(() => inventory.slice(0, 4), [inventory]);
+  const recentIntakeCostPence = useMemo(
+    () => recentIntake.reduce((sum, item) => sum + item.costBasis * item.quantity, 0),
+    [recentIntake],
   );
   const sellingItem = useMemo(
     () => inventory.find((item) => item.id === sellingId) ?? null,
@@ -686,6 +694,27 @@ export default function Home() {
     if (shouldRefresh) void refreshAll({ toast: true, user: true });
   }
 
+  function applyPostStockFlow() {
+    if (!keepBuying) {
+      setView("inventory");
+      return;
+    }
+
+    const next = nextIntakeFormAfterStock(
+      { name, setName: setNameValue, number, cost, quantity },
+      true,
+    );
+    setName(next.name);
+    setSetNameValue(next.setName);
+    setNumber(next.number);
+    setCost(next.cost);
+    setQuantity(next.quantity);
+    setComp(null);
+    setSuggestion(null);
+    setCardArtUrl(null);
+    setGradeComp(null);
+  }
+
   async function lookup(event?: FormEvent) {
     event?.preventDefault();
     setBusy("lookup");
@@ -714,6 +743,12 @@ export default function Home() {
 
   async function acquire(event: FormEvent) {
     event.preventDefault();
+    const intakeQuantity = parseIntakeQuantity(quantity);
+    if (!intakeQuantity) {
+      setError("Quantity must be a whole number above 0.");
+      return;
+    }
+
     setBusy("acquire");
     setError(null);
     setNotice(null);
@@ -725,6 +760,7 @@ export default function Home() {
           card: { name, setName: setNameValue, number },
           grade,
           costBasisPence: poundsToPence(cost),
+          quantity: intakeQuantity,
           acquiredFrom: source || undefined,
           location: location || undefined,
           strategy,
@@ -737,9 +773,11 @@ export default function Home() {
       setSuggestion(payload.suggestion);
       setComp(payload.comps ?? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false });
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
-      setNotice(`Stocked. List at ${gbp(payload.suggestion.pricePence)}.`);
+      setNotice(
+        `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. List at ${gbp(payload.suggestion.pricePence)}.`,
+      );
       await refreshAll();
-      setView("inventory");
+      applyPostStockFlow();
     } catch (err) {
       setError(err instanceof Error ? err.message : "acquire failed");
     } finally {
@@ -748,6 +786,12 @@ export default function Home() {
   }
 
   async function stockWithoutComp() {
+    const intakeQuantity = parseIntakeQuantity(quantity);
+    if (!intakeQuantity) {
+      setError("Quantity must be a whole number above 0.");
+      return;
+    }
+
     setBusy("manual-stock");
     setError(null);
     setNotice(null);
@@ -765,6 +809,7 @@ export default function Home() {
         body: JSON.stringify({
           card: { name, setName: setNameValue, number },
           grade,
+          quantity: intakeQuantity,
           costBasisPence,
           acquiredFrom: source || undefined,
           location: location || undefined,
@@ -796,11 +841,11 @@ export default function Home() {
 
       setNotice(
         listingCreated
-          ? `Stocked manually. Drafted at ${gbp(draftDefaults.listPricePence)}.`
-          : "Stocked manually. Add a listing from Stock when ready.",
+          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Drafted at ${gbp(draftDefaults.listPricePence)}.`
+          : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.`,
       );
       await refreshAll();
-      setView("inventory");
+      applyPostStockFlow();
     } catch (err) {
       setError(err instanceof Error ? err.message : "manual stock failed");
     } finally {
@@ -1965,11 +2010,30 @@ export default function Home() {
                 <MoneyInput value={cost} onChange={setCost} />
               </label>
               <label>
+                Qty
+                <input
+                  id="quantity"
+                  inputMode="numeric"
+                  min="1"
+                  step="1"
+                  value={quantity}
+                  onChange={(event) => setQuantity(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
                 Strategy
                 <select value={strategy} onChange={(event) => setStrategy(event.target.value)}>
                   <option value="quick">Quick</option>
                   <option value="market">Market</option>
                   <option value="patient">Patient</option>
+                </select>
+              </label>
+              <label>
+                Channel
+                <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)}>
+                  {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
                 </select>
               </label>
             </div>
@@ -2007,11 +2071,14 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <label>
-              Channel
-              <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)}>
-                {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
-              </select>
+            <label className="toggle-control">
+              <input
+                id="keep-buying"
+                type="checkbox"
+                checked={keepBuying}
+                onChange={(event) => setKeepBuying(event.target.checked)}
+              />
+              <span>Keep buying</span>
             </label>
             <button className="primary-action" type="submit" disabled={busy === "acquire"}>
               {busy === "acquire" ? "Stocking..." : "Acquire + price"}
@@ -2025,6 +2092,34 @@ export default function Home() {
               </p>
             )}
           </form>
+          {recentIntake.length > 0 && (
+            <section className="panel recent-intake-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Recent buys</h2>
+                  <span className="muted">{recentIntake.length} latest</span>
+                </div>
+                <strong>{gbp(recentIntakeCostPence)}</strong>
+              </div>
+              <div className="recent-intake-list">
+                {recentIntake.map((item) => (
+                  <article className="recent-intake-row" key={item.id}>
+                    <CardImage src={item.card.imageUrl} className="mini-card-art" fallbackClassName="mini-card-art blank" alt="" />
+                    <div>
+                      <strong>{item.card.name}</strong>
+                      <span>
+                        {item.card.setName}
+                        {item.card.number ? ` #${item.card.number}` : ""}
+                        {" · "}
+                        {item.quantity} @ {gbp(item.costBasis)}
+                      </span>
+                    </div>
+                    <strong>{gbp(item.costBasis * item.quantity)}</strong>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
         </section>
       )}
 
