@@ -27,6 +27,7 @@ import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTar
 import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
 import { buildCheckedComp, checkedCompSourceLabel, type CheckedCompSource } from "@/lib/dealer/checkedComp";
+import { buildListingPack, type ListingPack } from "@/lib/dealer/listingPack";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
@@ -57,6 +58,12 @@ type AcquireListingState = "DRAFT" | "ACTIVE";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
 type ExpenseCategory = "SUPPLIES" | "POSTAGE" | "GRADING" | "TABLE_FEE" | "TRAVEL" | "PLATFORM" | "OTHER";
+type BuyFlowState = "done" | "current" | "wait" | "warn";
+type BuyFlowStep = {
+  label: string;
+  detail: string;
+  state: BuyFlowState;
+};
 
 type CatalogCard = {
   name: string;
@@ -441,6 +448,8 @@ export default function Home() {
   const [listingState, setListingState] = useState<Exclude<ListingState, "SOLD">>("DRAFT");
   const [listingChannel, setListingChannel] = useState<Channel>("EBAY");
   const [listingExternalUrl, setListingExternalUrl] = useState("");
+  const [listingPackId, setListingPackId] = useState<string | null>(null);
+  const [listingPackCopied, setListingPackCopied] = useState(false);
   const [cardArtUrl, setCardArtUrl] = useState<string | null>(null);
   const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
   const [gradeOdds, setGradeOdds] = useState("45");
@@ -560,6 +569,27 @@ export default function Home() {
     () => buildListingView(listings, { query: listingQuery, state: listingStateFilter, sort: listingSort }),
     [listings, listingQuery, listingStateFilter, listingSort],
   );
+  const listingPackTarget = useMemo(
+    () => listings.find((listing) => listing.id === listingPackId) ?? null,
+    [listingPackId, listings],
+  );
+  const listingPack = useMemo(() => {
+    if (!listingPackTarget?.item) return null;
+    const { item } = listingPackTarget;
+    return buildListingPack({
+      card: {
+        name: item.card.name,
+        setName: item.card.setName,
+        number: item.card.number,
+        language: "EN",
+      },
+      grade: item.grade,
+      compMedianPence: listingPackTarget.listPrice ?? listingPackTarget.suggestedPrice ?? undefined,
+      costBasisPence: item.costBasis,
+      condition: item.condition,
+      certNumber: item.graderCert,
+    });
+  }, [listingPackTarget]);
   const recentIntake = useMemo(() => inventory.slice(0, 4), [inventory]);
   const recentIntakeCostPence = useMemo(
     () => recentIntake.reduce((sum, item) => sum + item.costBasis * item.quantity, 0),
@@ -761,6 +791,50 @@ export default function Home() {
         : null,
     [deal?.targetBuyPence, headline, watchTarget],
   );
+  const buyFlowSteps = useMemo<BuyFlowStep[]>(() => {
+    const cardReady = Boolean(name.trim() && setNameValue.trim());
+    const compReady = Boolean(headline);
+    const costPence = poundsToPence(cost);
+    const qty = parseIntakeQuantity(quantity) ?? 0;
+    const stockReady = costPence > 0 && qty > 0;
+    const decisionTone = confidenceLabel?.tone ?? "wait";
+
+    return [
+      {
+        label: "Card",
+        detail: cardReady
+          ? [displaySetName, displayNumber ? `#${displayNumber}` : null].filter(Boolean).join(" ")
+          : "card + set",
+        state: cardReady ? "done" : "current",
+      },
+      {
+        label: "Comp",
+        detail: headline ? `${gbp(headline.medianPence)} · ${confidenceLabel?.label ?? "priced"}` : "lookup",
+        state: compReady ? "done" : cardReady ? "current" : "wait",
+      },
+      {
+        label: "Decision",
+        detail: deal?.label ?? confidenceLabel?.label ?? "target",
+        state: !compReady ? "wait" : decisionTone === "good" ? "done" : "warn",
+      },
+      {
+        label: "Stock",
+        detail: stockReady ? `${qty} @ ${gbp(costPence)}` : "cost + qty",
+        state: compReady ? "current" : "wait",
+      },
+    ];
+  }, [
+    confidenceLabel?.label,
+    confidenceLabel?.tone,
+    cost,
+    deal?.label,
+    displayNumber,
+    displaySetName,
+    headline,
+    name,
+    quantity,
+    setNameValue,
+  ]);
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
@@ -1902,6 +1976,7 @@ export default function Home() {
     });
     setCreatingListingItemId(item.id);
     setEditingListingId(null);
+    setListingPackId(null);
     setSellingId(null);
     setListingPrice(penceToPounds(defaults.listPricePence));
     setListingState("DRAFT");
@@ -1991,10 +2066,36 @@ export default function Home() {
   function openListingEditor(listing: Listing) {
     setEditingListingId(listing.id);
     setCreatingListingItemId(null);
+    setListingPackId(null);
     setListingPrice(penceToPounds(listing.listPrice ?? listing.suggestedPrice ?? 0));
     setListingState(listing.state === "SOLD" ? "ENDED" : listing.state);
     setListingChannel(listing.channel);
     setListingExternalUrl(listing.externalUrl ?? "");
+  }
+
+  function openListingPack(listing: Listing) {
+    if (!listing.item) {
+      setError("This listing is missing its stock row.");
+      return;
+    }
+    setListingPackId(listing.id);
+    setListingPackCopied(false);
+    setEditingListingId(null);
+    setCreatingListingItemId(null);
+    setSellingId(null);
+    setError(null);
+    setNotice(null);
+  }
+
+  async function copyListingPack() {
+    if (!listingPack) return;
+    try {
+      await navigator.clipboard.writeText(listingPack.copyReady);
+      setListingPackCopied(true);
+      setNotice("Listing pack copied.");
+    } catch {
+      setError("Copy failed. Select the listing block and copy it manually.");
+    }
   }
 
   async function patchListing(
@@ -2367,6 +2468,7 @@ export default function Home() {
               <button type="button" onClick={() => setView("pnl")}>Add cost</button>
               <a className="export-link" href="/api/export/books" download>Books CSV</a>
               <a className="export-link" href="/api/export/listings?state=DRAFT" download>Draft CSV</a>
+              <a className="export-link" href="/api/export/listing-pack" download>Listing pack</a>
             </div>
           </section>
         </section>
@@ -2374,6 +2476,7 @@ export default function Home() {
 
       {view === "acquire" && (
         <section className="workspace">
+          <BuyFlowRail steps={buyFlowSteps} />
           <form className="panel lookup-panel" onSubmit={lookup}>
             <div className="panel-heading">
               <h2>Fast comp</h2>
@@ -2570,6 +2673,25 @@ export default function Home() {
                 </select>
               </label>
             </div>
+            <label className="psa-lookup-field">
+              PSA cert
+              <div className="quick-intake-row">
+                <input
+                  inputMode="numeric"
+                  value={graderCert}
+                  onChange={(event) => setGraderCert(event.target.value)}
+                  placeholder={grade === "RAW" ? "optional for slabs" : "cert number"}
+                />
+                <button
+                  type="button"
+                  onClick={verifyPsaCert}
+                  disabled={busy === "psa" || !graderCert.trim()}
+                >
+                  {busy === "psa" ? "..." : "Verify"}
+                </button>
+              </div>
+            </label>
+            {psaResult && <PsaCertCard result={psaResult} />}
             <button className="primary-action" type="submit" disabled={busy === "lookup"}>
               {busy === "lookup" ? "Looking up..." : "Look up comp"}
             </button>
@@ -2999,51 +3121,14 @@ export default function Home() {
               </label>
               <label>
                 Cert
-                <div className="quick-intake-row">
-                  <input
-                    inputMode="numeric"
-                    value={graderCert}
-                    onChange={(event) => setGraderCert(event.target.value)}
-                    placeholder={grade === "RAW" ? "optional" : "PSA cert number"}
-                  />
-                  <button
-                    type="button"
-                    onClick={verifyPsaCert}
-                    disabled={busy === "psa" || !graderCert.trim()}
-                  >
-                    {busy === "psa" ? "..." : "Verify PSA"}
-                  </button>
-                </div>
+                <input
+                  inputMode="numeric"
+                  value={graderCert}
+                  onChange={(event) => setGraderCert(event.target.value)}
+                  placeholder={grade === "RAW" ? "optional" : "PSA cert number"}
+                />
               </label>
             </div>
-            {psaResult && (
-              <div className={`psa-cert-card ${psaResult.found ? "good" : "warn"}`}>
-                {psaResult.found ? (
-                  <>
-                    <div className="psa-cert-heading">
-                      <div>
-                        <span>PSA cert {psaResult.certNumber}{psaResult.live ? "" : " · demo"}</span>
-                        <strong>{toTitleCase(psaResult.subject ?? "Unknown card")}</strong>
-                        <small>
-                          {[psaResult.year, psaResult.brand ? toTitleCase(psaResult.brand) : null, psaResult.cardNumber ? `#${psaResult.cardNumber}` : null]
-                            .filter(Boolean)
-                            .join(" · ")}
-                          {psaResult.variety ? ` · ${toTitleCase(psaResult.variety)}` : ""}
-                        </small>
-                      </div>
-                      <span className="pill good">{psaResult.gradeLabel ?? psaResult.grade?.replace(/_/g, " ")}</span>
-                    </div>
-                    <div className="psa-cert-pop">
-                      <Metric label="Pop at grade" value={psaResult.totalPopulation != null ? String(psaResult.totalPopulation) : "—"} />
-                      <Metric label="Pop higher" value={psaResult.populationHigher != null ? String(psaResult.populationHigher) : "—"} />
-                    </div>
-                    <p className="hint">Card and grade filled from the slab. Run a comp to value it, then acquire.</p>
-                  </>
-                ) : (
-                  <p className="hint">{psaResult.reason ?? "Cert not found."}</p>
-                )}
-              </div>
-            )}
             <div className="preset-row" aria-label="Source presets">
               {sourcePresets.map((preset) => (
                 <button
@@ -3401,6 +3486,9 @@ export default function Home() {
             <a className="export-link" href="/api/export/listings" download>
               All listings CSV
             </a>
+            <a className="export-link" href="/api/export/listing-pack" download>
+              eBay pack CSV
+            </a>
           </div>
           <div className="dex-controls listings-controls" aria-label="Listing search and sort">
             <label className="search-control">
@@ -3446,6 +3534,7 @@ export default function Home() {
               listing={listing}
               busy={busy}
               onEdit={openListingEditor}
+              onPack={openListingPack}
               onSell={openSellFromListing}
               onState={(state) =>
                 patchListing(
@@ -3495,6 +3584,15 @@ export default function Home() {
                 {busy === `listing-${editingListingId}` ? "Saving..." : "Save listing"}
               </button>
             </form>
+          )}
+          {listingPackTarget && listingPack && (
+            <ListingPackSheet
+              listing={listingPackTarget}
+              pack={listingPack}
+              copied={listingPackCopied}
+              onCopy={copyListingPack}
+              onClose={() => setListingPackId(null)}
+            />
           )}
         </section>
       )}
@@ -3744,7 +3842,7 @@ export default function Home() {
             {(watchCheckedAt || watchDiscordReady !== null) && (
               <div className="alert-status">
                 <span>{watchCheckedAt ? `Checked ${ageLabel(watchCheckedAt)}` : "Not checked"}</span>
-                <strong>{watchDiscordReady ? "Discord ready" : "In-app only"}</strong>
+                <strong>{watchDiscordReady ? "Push ready" : "In-app only"}</strong>
               </div>
             )}
             {watchHits.length > 0 ? (
@@ -3787,13 +3885,13 @@ export default function Home() {
               <Metric label="45d+ stock" value={String(dashboard?.metrics.agedStockCount ?? 0)} />
             </div>
             <button className="primary-action" type="button" onClick={checkReprices} disabled={busy === "reprice"}>
-              {busy === "reprice" ? "Checking..." : "Check + alert Discord"}
+              {busy === "reprice" ? "Checking..." : "Check reprices"}
             </button>
             {repriceMessage && <p className="hint">{repriceMessage}</p>}
             {(repriceCheckedAt || discordReady !== null) && (
               <div className="alert-status">
                 <span>{repriceCheckedAt ? `Checked ${ageLabel(repriceCheckedAt)}` : "Not checked"}</span>
-                <strong>{discordReady ? "Discord ready" : "In-app only"}</strong>
+                <strong>{discordReady ? "Push ready" : "In-app only"}</strong>
               </div>
             )}
             {repriceRecommendations.length > 0 && (
@@ -4000,6 +4098,114 @@ export default function Home() {
   );
 }
 
+function BuyFlowRail({ steps }: { steps: BuyFlowStep[] }) {
+  return (
+    <section className="buy-flow-rail" aria-label="Buy workflow">
+      {steps.map((step, index) => (
+        <div className={`buy-flow-step ${step.state}`} key={step.label}>
+          <span>{index + 1}</span>
+          <div>
+            <strong>{step.label}</strong>
+            <small>{step.detail || "ready"}</small>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function PsaCertCard({ result }: { result: PsaCertView }) {
+  return (
+    <div className={`psa-cert-card ${result.found ? "good" : "warn"}`}>
+      {result.found ? (
+        <>
+          <div className="psa-cert-heading">
+            <div>
+              <span>PSA cert {result.certNumber}{result.live ? "" : " · demo"}</span>
+              <strong>{toTitleCase(result.subject ?? "Unknown card")}</strong>
+              <small>
+                {[result.year, result.brand ? toTitleCase(result.brand) : null, result.cardNumber ? `#${result.cardNumber}` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {result.variety ? ` · ${toTitleCase(result.variety)}` : ""}
+              </small>
+            </div>
+            <span className="pill good">{result.gradeLabel ?? result.grade?.replace(/_/g, " ")}</span>
+          </div>
+          <div className="psa-cert-pop">
+            <Metric label="Pop at grade" value={result.totalPopulation != null ? String(result.totalPopulation) : "-"} />
+            <Metric label="Pop higher" value={result.populationHigher != null ? String(result.populationHigher) : "-"} />
+          </div>
+          <p className="hint">Verified slab details are filling the buy form.</p>
+        </>
+      ) : (
+        <p className="hint">{result.reason ?? "Cert not found."}</p>
+      )}
+    </div>
+  );
+}
+
+function ListingPackSheet({
+  listing,
+  pack,
+  copied,
+  onCopy,
+  onClose,
+}: {
+  listing: Listing;
+  pack: ListingPack;
+  copied: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  const item = listing.item;
+  const specifics = Object.entries(pack.itemSpecifics);
+
+  return (
+    <form className="sell-sheet listing-pack-sheet" onSubmit={(event) => event.preventDefault()}>
+      <div className="panel-heading">
+        <div>
+          <h2>Listing pack</h2>
+          <span className="muted">
+            {channelLabel(listing.channel)}
+            {item ? ` · ${item.card.name} · ${item.grade.replace(/_/g, " ")}` : ""}
+          </span>
+        </div>
+        <button className="ghost-button" type="button" onClick={onClose}>Close</button>
+      </div>
+      <div className="listing-pack-summary">
+        <div>
+          <span>Title</span>
+          <strong>{pack.title}</strong>
+        </div>
+        <div>
+          <span>Price</span>
+          <strong>{gbp(pack.suggestedPricePence)}</strong>
+        </div>
+        <div>
+          <span>Postage</span>
+          <strong>{gbp(pack.postage.pricePence)}</strong>
+        </div>
+      </div>
+      <div className="listing-pack-specifics">
+        {specifics.map(([label, value]) => (
+          <span key={label}>
+            <strong>{label}</strong>
+            {value}
+          </span>
+        ))}
+      </div>
+      <label>
+        Copy block
+        <textarea readOnly value={pack.copyReady} rows={9} />
+      </label>
+      <button className="primary-action" type="button" onClick={onCopy}>
+        {copied ? "Copied" : "Copy listing pack"}
+      </button>
+    </form>
+  );
+}
+
 function InventoryRow({
   item,
   busy,
@@ -4142,12 +4348,14 @@ function ListingRow({
   listing,
   busy,
   onEdit,
+  onPack,
   onSell,
   onState,
 }: {
   listing: Listing;
   busy: string | null;
   onEdit: (listing: Listing) => void;
+  onPack: (listing: Listing) => void;
   onSell: (listing: Listing) => void;
   onState: (state: Exclude<ListingState, "SOLD">) => void;
 }) {
@@ -4183,6 +4391,11 @@ function ListingRow({
           <button type="button" onClick={() => onEdit(listing)} disabled={isBusy || listing.state === "SOLD"}>
             Edit
           </button>
+          {listing.item && (
+            <button type="button" onClick={() => onPack(listing)} disabled={isBusy}>
+              Pack
+            </button>
+          )}
           {listing.state !== "ACTIVE" && listing.state !== "SOLD" && (
             <button type="button" onClick={() => onState("ACTIVE")} disabled={isBusy}>
               Activate
