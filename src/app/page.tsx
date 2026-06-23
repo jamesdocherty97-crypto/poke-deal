@@ -17,6 +17,7 @@ import {
   serializeQuickHunts,
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
+import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
@@ -541,6 +542,7 @@ export default function Home() {
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
   const compReceipt = useMemo(() => (comp ? buildCompReceipt(comp) : []), [comp]);
   const compSpreadPct = useMemo(() => (comp ? medianSpreadPct(comp.all) : null), [comp]);
+  const dealerVerdict = useMemo(() => (comp ? buildDealerCompVerdict(comp) : null), [comp]);
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
@@ -1856,6 +1858,22 @@ export default function Home() {
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
               </div>
+              {dealerVerdict && (
+                <div className={`dealer-verdict ${dealerVerdict.tone}`}>
+                  <div>
+                    <span>{dealerVerdict.label}</span>
+                    <strong>{dealerVerdict.title}</strong>
+                    <small>{dealerVerdict.detail}</small>
+                  </div>
+                  <div>
+                    <span>Signals</span>
+                    <strong>
+                      {dealerVerdict.pricedSignalCount}/{dealerVerdict.totalSignalCount}
+                    </strong>
+                    <small>{dealerVerdict.spreadPct == null ? "single price" : `${dealerVerdict.spreadPct}% spread`}</small>
+                  </div>
+                </div>
+              )}
               {compReceipt.length > 0 && (
                 <div className="comp-receipt">
                   <div className="receipt-heading">

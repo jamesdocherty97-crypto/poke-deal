@@ -1414,6 +1414,68 @@ label {
     rgba(3, 8, 20, 0.42);
 }
 
+.dealer-verdict {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.38);
+  padding: 10px;
+}
+
+.dealer-verdict.good {
+  border-color: rgba(52, 211, 153, 0.34);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.dealer-verdict.warn {
+  border-color: rgba(255, 203, 5, 0.38);
+  background: rgba(255, 203, 5, 0.12);
+}
+
+.dealer-verdict.danger {
+  border-color: rgba(251, 113, 133, 0.38);
+  background: rgba(251, 113, 133, 0.12);
+}
+
+.dealer-verdict div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.dealer-verdict div:last-child {
+  justify-items: end;
+  text-align: right;
+}
+
+.dealer-verdict span,
+.dealer-verdict small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.dealer-verdict strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.dealer-verdict.good strong {
+  color: var(--green);
+}
+
+.dealer-verdict.warn strong {
+  color: var(--yellow);
+}
+
+.dealer-verdict.danger strong {
+  color: var(--danger);
+}
+
 .market-signal {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
