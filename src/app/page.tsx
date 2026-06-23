@@ -786,6 +786,12 @@ export default function Home() {
     projectedListSuggestion?.pricePence,
     quantity,
   ]);
+  const quickStockQuantity = parseIntakeQuantity(quantity) ?? 0;
+  const quickStockCostPence = poundsToPence(cost);
+  const quickStockListPence = listPriceOverride.trim()
+    ? poundsToPence(listPriceOverride)
+    : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
+  const quickStockReady = Boolean(headline && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
   const buyTargetSuggestion = useMemo(
     () =>
       headline
@@ -1272,11 +1278,15 @@ export default function Home() {
     }
   }
 
-  async function acquire(event: FormEvent) {
-    event.preventDefault();
+  async function acquire(event?: FormEvent) {
+    event?.preventDefault();
     const intakeQuantity = parseIntakeQuantity(quantity);
     if (!intakeQuantity) {
       setError("Quantity must be a whole number above 0.");
+      return;
+    }
+    if (poundsToPence(cost) <= 0) {
+      setError("Cost must be above £0.");
       return;
     }
     const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
@@ -1346,6 +1356,10 @@ export default function Home() {
     const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
     if (overrideListPricePence != null && overrideListPricePence <= 0) {
       setError("List price must be above £0 or left blank.");
+      return;
+    }
+    if (poundsToPence(cost) <= 0) {
+      setError("Cost must be above £0.");
       return;
     }
 
@@ -2798,6 +2812,45 @@ export default function Home() {
                   </div>
                 </div>
               )}
+              <div className={`quick-stock-card ${buyPlan?.tone ?? "warn"}`}>
+                <div className="quick-stock-heading">
+                  <div>
+                    <span>Ready to stock</span>
+                    <strong>{quickStockReady ? `${quickStockQuantity} to ${acquireListingState === "ACTIVE" ? "list" : "draft"}` : "Add cost"}</strong>
+                  </div>
+                  <span className={`pill ${buyPlan?.tone ?? "warn"}`}>{buyPlan?.label ?? "Check"}</span>
+                </div>
+                <div className="quick-stock-grid">
+                  <label>
+                    Cost
+                    <MoneyInput value={cost} onChange={setCost} />
+                  </label>
+                  <label>
+                    Qty
+                    <input
+                      inputMode="numeric"
+                      min="1"
+                      step="1"
+                      value={quantity}
+                      onChange={(event) => setQuantity(event.target.value)}
+                    />
+                  </label>
+                  <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
+                  <Metric
+                    label="Profit"
+                    value={buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
+                    tone={buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
+                  />
+                </div>
+                <button
+                  className="primary-action"
+                  type="button"
+                  onClick={() => void acquire()}
+                  disabled={busy === "acquire" || !quickStockReady}
+                >
+                  {busy === "acquire" ? "Stocking..." : "Stock this"}
+                </button>
+              </div>
               <div className="detail-grid">
                 <Metric label="Range" value={`${gbp(headline.lowPence)}-${gbp(headline.highPence)}`} />
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
