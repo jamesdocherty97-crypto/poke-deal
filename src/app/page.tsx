@@ -28,6 +28,7 @@ type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
+type ExpenseCategory = "SUPPLIES" | "POSTAGE" | "GRADING" | "TABLE_FEE" | "TRAVEL" | "PLATFORM" | "OTHER";
 
 type CatalogCard = {
   name: string;
@@ -153,6 +154,18 @@ type Sale = {
   soldAt: string;
 };
 
+type ExpenseRecord = {
+  id: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  spentAt: string;
+  channel: Channel | null;
+  source: string | null;
+  notes: string | null;
+  createdAt: string;
+};
+
 type Dashboard = {
   metrics: {
     stockCount: number;
@@ -162,6 +175,8 @@ type Dashboard = {
     activeCostPence: number;
     realizedRevenuePence: number;
     realizedProfitPence: number;
+    operatingExpensePence: number;
+    netProfitPence: number;
     realizedMarginPct: number | null;
     sellThroughPct: number;
     averageAgeDays: number;
@@ -170,6 +185,7 @@ type Dashboard = {
     worstSale: SaleSummary | null;
   };
   recentSales: SaleSummary[];
+  recentExpenses: ExpenseRecord[];
   staleStock: Array<{ id: string; name: string; grade: string; status: ItemStatus; createdAt: string }>;
   listingsByState: Record<string, number>;
 };
@@ -260,10 +276,18 @@ type SystemSource = {
 
 const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
+const expenseCategories: ExpenseCategory[] = ["SUPPLIES", "POSTAGE", "GRADING", "TABLE_FEE", "TRAVEL", "PLATFORM", "OTHER"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
+const expensePresets: Array<{ category: ExpenseCategory; description: string; amount?: string; channel?: Channel }> = [
+  { category: "POSTAGE", description: "Postage supplies", amount: "5.00" },
+  { category: "SUPPLIES", description: "Sleeves / toploaders", amount: "10.00" },
+  { category: "TABLE_FEE", description: "Card fair table", amount: "15.00", channel: "IN_PERSON" },
+  { category: "GRADING", description: "Grading submission", amount: "19.99" },
+  { category: "TRAVEL", description: "Travel to buy stock", amount: "5.00", channel: "IN_PERSON" },
+];
 
 type RefreshOptions = {
   toast?: boolean;
@@ -288,6 +312,7 @@ export default function Home() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioHistory | null>(null);
   const [watches, setWatches] = useState<WatchRecord[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userRefreshing, setUserRefreshing] = useState(false);
@@ -312,6 +337,11 @@ export default function Home() {
   const [saleChannel, setSaleChannel] = useState<Channel>("EBAY");
   const [feesTouched, setFeesTouched] = useState(false);
   const [postageTouched, setPostageTouched] = useState(false);
+  const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>("SUPPLIES");
+  const [expenseDescription, setExpenseDescription] = useState("Postage supplies");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseSpentAt, setExpenseSpentAt] = useState(todayInputValue());
+  const [expenseChannel, setExpenseChannel] = useState<Channel | "">("");
   const [repriceMessage, setRepriceMessage] = useState<string | null>(null);
   const [repriceRecommendations, setRepriceRecommendations] = useState<RepriceRecommendation[]>([]);
   const [repriceCheckedAt, setRepriceCheckedAt] = useState<string | null>(null);
@@ -505,6 +535,8 @@ export default function Home() {
   const compSpreadPct = useMemo(() => (comp ? medianSpreadPct(comp.all) : null), [comp]);
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
+  const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
+  const netProfitTone = netProfitPence >= 0 ? "good" : "warn";
   const profitTrend = useMemo(() => buildProfitTrend(dashboard?.recentSales ?? []), [dashboard?.recentSales]);
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
@@ -545,12 +577,13 @@ export default function Home() {
     if (options.user) setUserRefreshing(true);
     setError(null);
     try {
-      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes, systemRes] = await Promise.all([
+      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes, expensesRes, systemRes] = await Promise.all([
         fetch("/api/inventory"),
         fetch("/api/listings"),
         fetch("/api/dashboard"),
         fetch("/api/snapshots/portfolio"),
         fetch("/api/watches"),
+        fetch("/api/expenses"),
         fetch("/api/system/status"),
       ]);
       const inventoryJson = await readJson(inventoryRes);
@@ -558,17 +591,20 @@ export default function Home() {
       const dashboardJson = await readJson(dashboardRes);
       const portfolioJson = await readJson(portfolioRes);
       const watchesJson = await readJson(watchesRes);
+      const expensesJson = await readJson(expensesRes);
       const systemJson = await readJson(systemRes);
       if (!inventoryRes.ok) throw new Error(inventoryJson.error ?? "inventory failed");
       if (!listingsRes.ok) throw new Error(listingsJson.error ?? "listings failed");
       if (!dashboardRes.ok) throw new Error(dashboardJson.error ?? "dashboard failed");
       if (!portfolioRes.ok) throw new Error(portfolioJson.error ?? "snapshot history failed");
       if (!watchesRes.ok) throw new Error(watchesJson.error ?? "watches failed");
+      if (!expensesRes.ok) throw new Error(expensesJson.error ?? "expenses failed");
       if (!systemRes.ok) throw new Error(systemJson.error ?? "system status failed");
       setInventory(inventoryJson.items);
       setListings(listingsJson.listings);
       setDashboard(dashboardJson);
       setPortfolio(portfolioJson);
+      setExpenses(expensesJson.expenses ?? []);
       setSystemStatus(systemJson);
       const nextWatches = (watchesJson.watches ?? []) as WatchRecord[];
       setWatches(nextWatches);
@@ -1050,6 +1086,72 @@ export default function Home() {
     }
   }
 
+  function applyExpensePreset(preset: (typeof expensePresets)[number]) {
+    setExpenseCategory(preset.category);
+    setExpenseDescription(preset.description);
+    if (preset.amount) setExpenseAmount(preset.amount);
+    setExpenseChannel(preset.channel ?? "");
+    setError(null);
+    setNotice(null);
+  }
+
+  async function addExpense(event: FormEvent) {
+    event.preventDefault();
+    const description = expenseDescription.trim();
+    const amountPence = poundsToPence(expenseAmount);
+    if (!description) {
+      setError("Add a short cost description.");
+      return;
+    }
+    if (amountPence <= 0) {
+      setError("Enter a cost above £0.");
+      return;
+    }
+
+    setBusy("expense-create");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: expenseCategory,
+          description,
+          amountPence,
+          spentAt: soldAtIso(expenseSpentAt),
+          channel: expenseChannel || undefined,
+        }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "expense create failed");
+      setNotice(`Cost saved: ${gbp(amountPence)}.`);
+      setExpenseAmount("");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "expense create failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteExpense(expense: ExpenseRecord) {
+    setBusy(`expense-${expense.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/expenses/${expense.id}`, { method: "DELETE" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "expense delete failed");
+      setNotice("Cost deleted.");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "expense delete failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function updateStatus(item: InventoryItem, status: ItemStatus) {
     setBusy(`status-${item.id}`);
     setError(null);
@@ -1489,6 +1591,13 @@ export default function Home() {
                 action="Targets"
                 onClick={() => setView("pnl")}
               />
+              <SetupStep
+                done={(dashboard?.metrics.operatingExpensePence ?? 0) > 0}
+                title="Cost tracker"
+                detail={gbp(dashboard?.metrics.operatingExpensePence ?? 0)}
+                action="Costs"
+                onClick={() => setView("pnl")}
+              />
             </div>
           </section>
 
@@ -1502,6 +1611,7 @@ export default function Home() {
               <button type="button" onClick={() => setView("inventory")}>Sell stock</button>
               <button type="button" onClick={() => setView("listings")}>List drafts</button>
               <button type="button" onClick={() => setView("pnl")}>Profit</button>
+              <button type="button" onClick={() => setView("pnl")}>Add cost</button>
               <a className="export-link" href="/api/export/books" download>Books CSV</a>
               <a className="export-link" href="/api/export/listings?state=DRAFT" download>Draft CSV</a>
             </div>
@@ -2285,6 +2395,18 @@ export default function Home() {
                 loading={dashboardLoading}
               />
               <Metric
+                label="Costs"
+                value={gbp(dashboard?.metrics.operatingExpensePence ?? 0)}
+                tone="warn"
+                loading={dashboardLoading}
+              />
+              <Metric
+                label="Net"
+                value={gbp(netProfitPence)}
+                tone={netProfitTone}
+                loading={dashboardLoading}
+              />
+              <Metric
                 label="Margin"
                 value={dashboard?.metrics.realizedMarginPct == null ? "n/a" : `${dashboard.metrics.realizedMarginPct}%`}
                 loading={dashboardLoading}
@@ -2298,17 +2420,107 @@ export default function Home() {
             {noBookedSales ? (
               <div className="pnl-empty-note">
                 <strong>Nothing booked yet</strong>
-                <span>Mark a stocked card sold from Stock and Profit will start tracking revenue, profit and margin.</span>
+                <span>Mark a stocked card sold from Stock, then add any setup costs here so net profit stays honest.</span>
               </div>
             ) : profitTrend.length > 0 ? (
               <ProfitSparkline points={profitTrend} />
             ) : null}
           </section>
-          <div className="export-actions single" aria-label="Books export">
+          <div className="export-actions" aria-label="Books export">
             <a className="export-link" href="/api/export/books" download>
-              Books CSV
+              Sales CSV
+            </a>
+            <a className="export-link" href="/api/export/expenses" download>
+              Costs CSV
             </a>
           </div>
+          <section className="panel expense-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Costs</h2>
+                <span className="muted">{expenses.length} saved</span>
+              </div>
+              <strong>{gbp(dashboard?.metrics.operatingExpensePence ?? 0)}</strong>
+            </div>
+            <form className="expense-form" onSubmit={addExpense}>
+              <div className="preset-row expense-presets" aria-label="Cost presets">
+                {expensePresets.map((preset) => (
+                  <button
+                    key={`${preset.category}-${preset.description}`}
+                    type="button"
+                    onClick={() => applyExpensePreset(preset)}
+                  >
+                    {expenseCategoryLabel(preset.category)}
+                  </button>
+                ))}
+              </div>
+              <label>
+                Description
+                <input
+                  value={expenseDescription}
+                  onChange={(event) => setExpenseDescription(event.target.value)}
+                  placeholder="Toploaders, table fee, grading..."
+                />
+              </label>
+              <div className="form-grid">
+                <label>
+                  Amount
+                  <MoneyInput value={expenseAmount} onChange={setExpenseAmount} />
+                </label>
+                <label>
+                  Date
+                  <input type="date" value={expenseSpentAt} onChange={(event) => setExpenseSpentAt(event.target.value)} />
+                </label>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Category
+                  <select value={expenseCategory} onChange={(event) => setExpenseCategory(event.target.value as ExpenseCategory)}>
+                    {expenseCategories.map((category) => (
+                      <option key={category} value={category}>{expenseCategoryLabel(category)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Channel
+                  <select value={expenseChannel} onChange={(event) => setExpenseChannel(event.target.value as Channel | "")}>
+                    <option value="">general</option>
+                    {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <button className="primary-action" type="submit" disabled={busy === "expense-create"}>
+                {busy === "expense-create" ? "Saving..." : "Add cost"}
+              </button>
+            </form>
+            <div className="expense-list">
+              {expenses.slice(0, 6).map((expense) => (
+                <article className="expense-row" key={expense.id}>
+                  <div>
+                    <strong>{expense.description}</strong>
+                    <span>
+                      {expenseCategoryLabel(expense.category)}
+                      {expense.channel ? ` · ${channelLabel(expense.channel)}` : ""}
+                      {" · "}
+                      {shortDate(expense.spentAt)}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>{gbp(expense.amount)}</strong>
+                    <button
+                      className="danger-button"
+                      type="button"
+                      onClick={() => void deleteExpense(expense)}
+                      disabled={busy === `expense-${expense.id}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {expenses.length === 0 && <EmptyState text="No costs saved yet. Add setup costs, supplies, grading and fair fees here." />}
+            </div>
+          </section>
           <section className="panel portfolio-panel">
             <div className="panel-heading">
               <h2>Stock value</h2>
@@ -2855,7 +3067,7 @@ function Metric({
 }: {
   label: string;
   value: string;
-  tone?: "good";
+  tone?: "good" | "warn";
   loading?: boolean;
 }) {
   return (
@@ -3181,6 +3393,16 @@ function channelLabel(channel: Channel): string {
   if (channel === "CARDMARKET") return "Cardmarket";
   if (channel === "VINTED") return "Vinted";
   return "In person";
+}
+
+function expenseCategoryLabel(category: ExpenseCategory): string {
+  if (category === "SUPPLIES") return "Supplies";
+  if (category === "POSTAGE") return "Postage";
+  if (category === "GRADING") return "Grading";
+  if (category === "TABLE_FEE") return "Table fee";
+  if (category === "TRAVEL") return "Travel";
+  if (category === "PLATFORM") return "Platform";
+  return "Other";
 }
 
 function shortDate(value: string): string {

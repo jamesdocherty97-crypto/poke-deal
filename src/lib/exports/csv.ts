@@ -57,6 +57,18 @@ export type BookSaleExportRecord = {
   };
 };
 
+export type ExpenseExportRecord = {
+  id: string;
+  category: string;
+  description: string;
+  amount: number;
+  spentAt: Date;
+  channel: string | null;
+  source: string | null;
+  notes: string | null;
+  createdAt: Date;
+};
+
 type CsvRow = Record<string, CsvCell>;
 
 const LISTING_COLUMNS = [
@@ -104,6 +116,19 @@ const BOOK_COLUMNS = [
   "item_id",
   "sale_id",
   "tcg_api_id",
+] as const;
+
+const EXPENSE_COLUMNS = [
+  "spent_at",
+  "category",
+  "description",
+  "currency",
+  "amount_gbp",
+  "channel",
+  "source",
+  "notes",
+  "created_at",
+  "expense_id",
 ] as const;
 
 export function listingsToCsv(listings: ListingExportRecord[]): string {
@@ -176,6 +201,24 @@ export function booksToCsv(sales: BookSaleExportRecord[]): string {
         tcg_api_id: card.tcgApiId,
       };
     }),
+  );
+}
+
+export function expensesToCsv(expenses: ExpenseExportRecord[]): string {
+  return toCsv(
+    EXPENSE_COLUMNS,
+    expenses.map((expense) => ({
+      spent_at: isoDate(expense.spentAt),
+      category: expense.category,
+      description: expense.description,
+      currency: "GBP",
+      amount_gbp: formatGbpDecimal(expense.amount),
+      channel: expense.channel,
+      source: expense.source,
+      notes: expense.notes,
+      created_at: isoDate(expense.createdAt),
+      expense_id: expense.id,
+    })),
   );
 }
 

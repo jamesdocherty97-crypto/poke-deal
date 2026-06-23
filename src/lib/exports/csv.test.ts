@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { booksToCsv, escapeCsvCell, listingsToCsv } from "./csv.js";
+import { booksToCsv, escapeCsvCell, expensesToCsv, listingsToCsv } from "./csv.js";
 
 test("escapeCsvCell quotes commas, quotes and newlines", () => {
   assert.equal(escapeCsvCell("plain"), "plain");
@@ -76,4 +76,23 @@ test("booksToCsv exports realized profit and margin in GBP", () => {
 
   assert.match(csv, /^sold_at,channel,card_name/);
   assert.match(csv, /2026-06-22T10:00:00\.000Z,EBAY,Charizard ex,151,199\/165,RAW,1,GBP,50\.00,6\.50,1\.20,18\.00,24\.30,48\.6/);
+});
+
+test("expensesToCsv exports operating costs in GBP", () => {
+  const csv = expensesToCsv([
+    {
+      id: "expense_1",
+      category: "TABLE_FEE",
+      description: "Card fair table",
+      amount: 1500,
+      spentAt: new Date("2026-06-23T08:30:00.000Z"),
+      channel: "IN_PERSON",
+      source: "Local fair",
+      notes: "Sunday pitch",
+      createdAt: new Date("2026-06-23T09:00:00.000Z"),
+    },
+  ]);
+
+  assert.match(csv, /^spent_at,category,description,currency,amount_gbp/);
+  assert.match(csv, /2026-06-23T08:30:00\.000Z,TABLE_FEE,Card fair table,GBP,15\.00,IN_PERSON,Local fair,Sunday pitch/);
 });

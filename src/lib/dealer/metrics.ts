@@ -24,6 +24,14 @@ export interface DealerSaleMetricItem {
   soldAt: string;
 }
 
+export interface DealerExpenseMetricItem {
+  id: string;
+  category: string;
+  description: string;
+  amountPence: number;
+  spentAt: string;
+}
+
 export interface DealerMetrics {
   stockCount: number;
   listedCount: number;
@@ -32,6 +40,8 @@ export interface DealerMetrics {
   activeCostPence: number;
   realizedRevenuePence: number;
   realizedProfitPence: number;
+  operatingExpensePence: number;
+  netProfitPence: number;
   realizedMarginPct: number | null;
   sellThroughPct: number;
   averageAgeDays: number;
@@ -63,6 +73,7 @@ export function computeDealerMetrics(
   items: DealerInventoryMetricItem[],
   sales: DealerSaleMetricItem[],
   now: Date = new Date(),
+  expenses: DealerExpenseMetricItem[] = [],
 ): DealerMetrics {
   const activeItems = items.filter((item) => item.status !== "SOLD");
   const activeUnits = activeItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -78,6 +89,8 @@ export function computeDealerMetrics(
   const realizedRevenuePence = sales.reduce((sum, sale) => sum + sale.salePricePence, 0);
   const saleSummaries = sales.map(summarizeSale);
   const realizedProfitPence = saleSummaries.reduce((sum, sale) => sum + sale.profitPence, 0);
+  const operatingExpensePence = expenses.reduce((sum, expense) => sum + expense.amountPence, 0);
+  const netProfitPence = realizedProfitPence - operatingExpensePence;
   const realizedMarginPct =
     realizedRevenuePence > 0 ? roundPct(realizedProfitPence / realizedRevenuePence) : null;
   const unitDenominator = activeUnits + soldCount;
@@ -98,6 +111,8 @@ export function computeDealerMetrics(
     activeCostPence,
     realizedRevenuePence,
     realizedProfitPence,
+    operatingExpensePence,
+    netProfitPence,
     realizedMarginPct,
     sellThroughPct,
     averageAgeDays,

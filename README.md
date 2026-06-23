@@ -103,6 +103,7 @@ Money is stored as **GBP pence (Int)** throughout to avoid float drift.
 - [x] Persist headline comps to `CompResult` on lookup
 - [x] Mobile-first PWA app shell
 - [x] Mark-sold flow with `Sale` creation and P&L dashboard
+- [x] Operating expense ledger with net-profit view and CSV export
 - [x] Listing lifecycle controls for DRAFT/ACTIVE/ENDED
 - [x] RAW comps prefer provider smartMarketPrice when available
 - [x] Optional PokeTrace source for secondary raw/graded cross-checks

@@ -71,6 +71,14 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       return mapPokemonTcgCard(readDataObject(json));
     }
 
+    for (const candidateId of buildPokemonTcgIdCandidates(card)) {
+      const json = await this.request(`/cards/${encodeURIComponent(candidateId)}`, {
+        select: MARKET_SELECT_FIELDS,
+      });
+      const direct = mapPokemonTcgCard(readDataObject(json));
+      if (direct) return direct;
+    }
+
     const queries = buildPokemonTcgSearchQueries(card);
     if (queries.length === 0) return null;
 
@@ -362,6 +370,22 @@ export function buildPokemonTcgCollectorNumberTerms(number: string | undefined):
   const strippedPromo = stripPromoPrefixForApiNumber(normalized);
   if (strippedPromo && strippedPromo !== normalized) terms.push(strippedPromo);
   return terms;
+}
+
+export function buildPokemonTcgIdCandidates(card: CardRef): string[] {
+  const setId = resolveSetIdForCard(card.setName, card.number);
+  if (!setId) return [];
+
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const number of buildPokemonTcgCollectorNumberTerms(card.number)) {
+    const id = `${setId}-${number}`;
+    if (!seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+  return ids;
 }
 
 function formatCollectorNumber(

@@ -74,12 +74,54 @@ test("computeDealerMetrics summarizes stock, sales, age and movers", () => {
   assert.equal(metrics.activeCostPence, 12600);
   assert.equal(metrics.realizedRevenuePence, 2200);
   assert.equal(metrics.realizedProfitPence, 800);
+  assert.equal(metrics.operatingExpensePence, 0);
+  assert.equal(metrics.netProfitPence, 800);
   assert.equal(metrics.realizedMarginPct, 36.4);
   assert.equal(metrics.sellThroughPct, 25);
   assert.equal(metrics.averageAgeDays, 51);
   assert.equal(metrics.agedStockCount, 1);
   assert.equal(metrics.bestSale?.name, "Venusaur ex");
   assert.equal(metrics.worstSale?.profitPence, 800);
+});
+
+test("computeDealerMetrics subtracts operating expenses from net profit", () => {
+  const metrics = computeDealerMetrics(
+    [],
+    [
+      {
+        id: "sale_1",
+        itemId: "item_1",
+        name: "Gengar",
+        grade: "RAW",
+        salePricePence: 5000,
+        feesPence: 650,
+        postagePence: 120,
+        costBasisPence: 2500,
+        soldAt: "2026-06-20T12:00:00.000Z",
+      },
+    ],
+    NOW,
+    [
+      {
+        id: "expense_1",
+        category: "TABLE_FEE",
+        description: "Card fair table",
+        amountPence: 1500,
+        spentAt: "2026-06-20T08:00:00.000Z",
+      },
+      {
+        id: "expense_2",
+        category: "SUPPLIES",
+        description: "Toploaders",
+        amountPence: 600,
+        spentAt: "2026-06-20T09:00:00.000Z",
+      },
+    ],
+  );
+
+  assert.equal(metrics.realizedProfitPence, 1730);
+  assert.equal(metrics.operatingExpensePence, 2100);
+  assert.equal(metrics.netProfitPence, -370);
 });
 
 test("computeDealerMetrics counts partial sales from duplicate stock as sold units", () => {

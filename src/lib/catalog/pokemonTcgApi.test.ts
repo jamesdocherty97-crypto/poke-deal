@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPokemonTcgCollectorNumberTerms,
+  buildPokemonTcgIdCandidates,
   buildPokemonTcgSearchQueries,
   buildPokemonTcgSearchQuery,
   mapPokemonTcgCard,
@@ -90,6 +91,25 @@ test("buildPokemonTcgCollectorNumberTerms keeps printed codes and adds stripped 
   assert.deepEqual(buildPokemonTcgCollectorNumberTerms("SWSH262"), ["SWSH262"]);
   assert.deepEqual(buildPokemonTcgCollectorNumberTerms("TG06/TG30"), ["TG06"]);
   assert.deepEqual(buildPokemonTcgCollectorNumberTerms("214/167"), ["214"]);
+});
+
+test("buildPokemonTcgIdCandidates builds exact set-number ids before search", () => {
+  assert.deepEqual(
+    buildPokemonTcgIdCandidates({
+      name: "Gengar",
+      setName: "Lost Origin Trainer Gallery",
+      number: "TG06/TG30",
+    }),
+    ["swsh11tg-TG06"],
+  );
+  assert.deepEqual(
+    buildPokemonTcgIdCandidates({
+      name: "Pikachu with Grey Felt Hat",
+      setName: "SV Promos",
+      number: "SVP085",
+    }),
+    ["svp-SVP085", "svp-85"],
+  );
 });
 
 test("normalizeCollectorNumber keeps plain and split collector numbers useful for search", () => {
@@ -237,21 +257,60 @@ test("PokemonTcgApiCatalogSource searches cards and sends API key header when pr
   }) as typeof fetch;
 
   const source = new PokemonTcgApiCatalogSource("secret", fetchImpl, "https://api.example.test/v2");
-  const card = await source.resolve({ name: "Charizard ex", setName: "151", number: "199/165" });
+  const card = await source.resolve({ name: "Charizard ex", setName: "151" });
 
-  assert.equal(card?.tcgApiId, "sv3pt5-199");
+  assert.equal(card?.tcgApiId, "sv3pt5-006");
   assert.equal(calls.length, 1);
   assert.ok(calls[0]?.url.startsWith("https://api.example.test/v2/cards?"));
   assert.equal(
     new URL(calls[0]?.url ?? "").searchParams.get("q"),
-    'name:"Charizard ex" number:"199" set.id:sv3pt5',
+    'name:"Charizard ex" set.id:sv3pt5',
   );
   assert.equal(calls[0]?.headers["X-Api-Key"], "secret");
+});
+
+test("PokemonTcgApiCatalogSource resolves known set-number cards by deterministic id first", async () => {
+  const calls: string[] = [];
+  const fetchImpl = (async (url: URL) => {
+    calls.push(url.toString());
+    return {
+      ok: true,
+      async json() {
+        return {
+          data: {
+            id: "swsh11tg-TG06",
+            name: "Gengar",
+            number: "TG06",
+            images: { large: "gengar.png" },
+            set: { id: "swsh11tg", name: "Lost Origin Trainer Gallery", printedTotal: 30 },
+          },
+        };
+      },
+    } as Response;
+  }) as typeof fetch;
+
+  const source = new PokemonTcgApiCatalogSource(undefined, fetchImpl, "https://api.example.test/v2");
+  const card = await source.resolve({
+    name: "Gengar",
+    setName: "Lost Origin",
+    number: "TG06/TG30",
+  });
+
+  assert.equal(card?.tcgApiId, "swsh11tg-TG06");
+  assert.equal(card?.number, "TG06/TG30");
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls[0],
+    "https://api.example.test/v2/cards/swsh11tg-TG06?select=id%2Cname%2Cnumber%2Crarity%2Cimages%2Cset%2Ctcgplayer%2Ccardmarket",
+  );
 });
 
 test("PokemonTcgApiCatalogSource falls back to looser queries when the most specific one returns no results", async () => {
   const queriesSeen: string[] = [];
   const fetchImpl = (async (url: URL) => {
+    if (!url.searchParams.has("q")) {
+      return { ok: false, async json() { return {}; } } as Response;
+    }
     const q = url.searchParams.get("q") ?? "";
     queriesSeen.push(q);
     const hasNumber = q.includes("number:");

@@ -22,16 +22,32 @@ type DashboardInventoryItem = {
   sales: { id: string; salePrice: number; fees: number; postage: number; soldAt: Date }[];
 };
 
+type DashboardExpense = {
+  id: string;
+  category: string;
+  description: string;
+  amount: number;
+  spentAt: Date;
+  channel: string | null;
+  source: string | null;
+};
+
 export async function GET() {
   try {
-    const items: DashboardInventoryItem[] = await getPrisma().inventoryItem.findMany({
-      include: {
-        card: true,
-        listings: true,
-        sales: { orderBy: { soldAt: "desc" } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const prisma = getPrisma();
+    const [items, expenses]: [DashboardInventoryItem[], DashboardExpense[]] = await Promise.all([
+      prisma.inventoryItem.findMany({
+        include: {
+          card: true,
+          listings: true,
+          sales: { orderBy: { soldAt: "desc" } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.expense.findMany({
+        orderBy: { spentAt: "desc" },
+      }),
+    ]);
 
     const metricItems = items.map((item) => ({
       id: item.id,
@@ -55,6 +71,13 @@ export async function GET() {
         soldAt: sale.soldAt.toISOString(),
       })),
     );
+    const metricExpenses = expenses.map((expense) => ({
+      id: expense.id,
+      category: expense.category,
+      description: expense.description,
+      amountPence: expense.amount,
+      spentAt: expense.spentAt.toISOString(),
+    }));
 
     const listingsByState = items
       .flatMap((item) => item.listings)
@@ -64,11 +87,15 @@ export async function GET() {
       }, {});
 
     return NextResponse.json({
-      metrics: computeDealerMetrics(metricItems, metricSales),
+      metrics: computeDealerMetrics(metricItems, metricSales, new Date(), metricExpenses),
       recentSales: metricSales
         .map(summarizeSale)
         .sort((a, b) => Date.parse(b.soldAt) - Date.parse(a.soldAt))
         .slice(0, 8),
+      recentExpenses: expenses.slice(0, 8).map((expense) => ({
+        ...expense,
+        spentAt: expense.spentAt.toISOString(),
+      })),
       staleStock: metricItems
         .filter((item) => item.status !== "SOLD")
         .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
