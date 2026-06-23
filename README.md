@@ -4,6 +4,8 @@ Command centre for running a Pokémon card dealing business: **value → buy →
 
 This repo is the **frame** — the architecture and one working vertical slice, built by Claude Opus 4.8 as senior engineer. Breadth is handed to Codex (see `CODEX_BACKLOG.md`). Decisions already made are in `DECISIONS.md`. Full rationale is in the project brief.
 
+For a non-technical walkthrough of the product, daily workflows, future features and outstanding actions, see [`USER_GUIDE.md`](USER_GUIDE.md).
+
 ---
 
 ## What works right now
