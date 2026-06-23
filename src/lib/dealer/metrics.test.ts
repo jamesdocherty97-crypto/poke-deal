@@ -91,8 +91,82 @@ test("computeDealerMetrics summarizes stock, sales, age and movers", () => {
   assert.equal(metrics.sellThroughPct, 25);
   assert.equal(metrics.averageAgeDays, 51);
   assert.equal(metrics.agedStockCount, 1);
+  assert.equal(metrics.channelBreakdown.length, 1);
+  assert.equal(metrics.channelBreakdown[0]?.channel, "IN_PERSON");
+  assert.equal(metrics.channelBreakdown[0]?.profitPence, 800);
   assert.equal(metrics.bestSale?.name, "Venusaur ex");
   assert.equal(metrics.worstSale?.profitPence, 800);
+});
+
+test("computeDealerMetrics breaks realized P&L down by sale channel", () => {
+  const metrics = computeDealerMetrics(
+    [],
+    [
+      {
+        id: "sale_1",
+        itemId: "item_1",
+        name: "Gengar",
+        grade: "RAW",
+        channel: "EBAY",
+        salePricePence: 5000,
+        feesPence: 650,
+        postagePence: 120,
+        costBasisPence: 2500,
+        soldAt: "2026-06-20T12:00:00.000Z",
+      },
+      {
+        id: "sale_2",
+        itemId: "item_2",
+        name: "Mew ex",
+        grade: "RAW",
+        channel: "EBAY",
+        salePricePence: 2000,
+        feesPence: 260,
+        postagePence: 120,
+        costBasisPence: 900,
+        soldAt: "2026-06-21T12:00:00.000Z",
+      },
+      {
+        id: "sale_3",
+        itemId: "item_3",
+        name: "Pikachu",
+        grade: "RAW",
+        channel: "VINTED",
+        salePricePence: 1800,
+        feesPence: 0,
+        postagePence: 0,
+        costBasisPence: 1000,
+        soldAt: "2026-06-21T13:00:00.000Z",
+      },
+    ],
+    NOW,
+  );
+
+  assert.deepEqual(metrics.channelBreakdown.map((row) => row.channel), ["EBAY", "VINTED"]);
+  assert.deepEqual(metrics.channelBreakdown[0], {
+    channel: "EBAY",
+    saleCount: 2,
+    revenuePence: 7000,
+    feesPence: 910,
+    postagePence: 240,
+    costPence: 3400,
+    profitPence: 2450,
+    averageSalePence: 3500,
+    averageProfitPence: 1225,
+    marginPct: 35,
+  });
+  assert.deepEqual(metrics.channelBreakdown[1], {
+    channel: "VINTED",
+    saleCount: 1,
+    revenuePence: 1800,
+    feesPence: 0,
+    postagePence: 0,
+    costPence: 1000,
+    profitPence: 800,
+    averageSalePence: 1800,
+    averageProfitPence: 800,
+    marginPct: 44.4,
+  });
 });
 
 test("computeDealerMetrics subtracts operating expenses from net profit", () => {

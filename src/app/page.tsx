@@ -197,6 +197,7 @@ type Dashboard = {
     sellThroughPct: number;
     averageAgeDays: number;
     agedStockCount: number;
+    channelBreakdown: ChannelBreakdown[];
     bestSale: SaleSummary | null;
     worstSale: SaleSummary | null;
   };
@@ -204,6 +205,19 @@ type Dashboard = {
   recentExpenses: ExpenseRecord[];
   staleStock: Array<{ id: string; name: string; grade: string; status: ItemStatus; createdAt: string }>;
   listingsByState: Record<string, number>;
+};
+
+type ChannelBreakdown = {
+  channel: Channel;
+  saleCount: number;
+  revenuePence: number;
+  feesPence: number;
+  postagePence: number;
+  costPence: number;
+  profitPence: number;
+  averageSalePence: number;
+  averageProfitPence: number;
+  marginPct: number | null;
 };
 
 type SaleSummary = {
@@ -3349,6 +3363,38 @@ export default function Home() {
               <span>postage {gbp(dashboard?.metrics.realizedPostagePence ?? 0)}</span>
               <span>costs {gbp(dashboard?.metrics.operatingExpensePence ?? 0)}</span>
             </div>
+          </section>
+          <section className="panel channel-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Channel P&amp;L</h2>
+                <span className="muted">where sales work</span>
+              </div>
+              <span className="pill">{dashboard?.metrics.channelBreakdown.length ?? 0} active</span>
+            </div>
+            {dashboard?.metrics.channelBreakdown.length ? (
+              <div className="channel-list">
+                {dashboard.metrics.channelBreakdown.map((row) => (
+                  <article className={`channel-row ${row.profitPence >= 0 ? "good" : "warn"}`} key={row.channel}>
+                    <div>
+                      <strong>{channelLabel(row.channel)}</strong>
+                      <span>
+                        {row.saleCount} sale{row.saleCount === 1 ? "" : "s"} · avg {gbp(row.averageSalePence)}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>{gbp(row.profitPence)}</strong>
+                      <span>{row.marginPct == null ? "n/a" : `${row.marginPct}%`} margin</span>
+                    </div>
+                    <small>
+                      revenue {gbp(row.revenuePence)} · fees {gbp(row.feesPence)} · postage {gbp(row.postagePence)}
+                    </small>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="No channel data yet. Mark a sale from Stock and this will show which channel is working." />
+            )}
           </section>
           <div className="export-actions" aria-label="Books export">
             <a className="export-link" href="/api/export/books" download>

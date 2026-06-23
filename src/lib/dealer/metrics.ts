@@ -54,8 +54,22 @@ export interface DealerMetrics {
   sellThroughPct: number;
   averageAgeDays: number;
   agedStockCount: number;
+  channelBreakdown: DealerChannelSummary[];
   bestSale: DealerSaleSummary | null;
   worstSale: DealerSaleSummary | null;
+}
+
+export interface DealerChannelSummary {
+  channel: string;
+  saleCount: number;
+  revenuePence: number;
+  feesPence: number;
+  postagePence: number;
+  costPence: number;
+  profitPence: number;
+  averageSalePence: number;
+  averageProfitPence: number;
+  marginPct: number | null;
 }
 
 export interface DealerSaleSummary {
@@ -122,6 +136,7 @@ export function computeDealerMetrics(
   const agedStockCount = ages.filter((age) => age >= AGED_STOCK_DAYS).length;
 
   const sortedSales = [...saleSummaries].sort((a, b) => b.profitPence - a.profitPence);
+  const channelBreakdown = buildChannelBreakdown(saleSummaries);
 
   return {
     stockCount,
@@ -144,6 +159,7 @@ export function computeDealerMetrics(
     sellThroughPct,
     averageAgeDays,
     agedStockCount,
+    channelBreakdown,
     bestSale: sortedSales[0] ?? null,
     worstSale: sortedSales.at(-1) ?? null,
   };
@@ -171,6 +187,44 @@ export function summarizeSale(sale: DealerSaleMetricItem): DealerSaleSummary {
     marginPct: sale.salePricePence > 0 ? roundPct(profitPence / sale.salePricePence) : null,
     soldAt: sale.soldAt,
   };
+}
+
+export function buildChannelBreakdown(sales: DealerSaleSummary[]): DealerChannelSummary[] {
+  const byChannel = new Map<string, DealerChannelSummary>();
+
+  for (const sale of sales) {
+    const current =
+      byChannel.get(sale.channel) ??
+      {
+        channel: sale.channel,
+        saleCount: 0,
+        revenuePence: 0,
+        feesPence: 0,
+        postagePence: 0,
+        costPence: 0,
+        profitPence: 0,
+        averageSalePence: 0,
+        averageProfitPence: 0,
+        marginPct: null,
+      };
+
+    current.saleCount += 1;
+    current.revenuePence += sale.salePricePence;
+    current.feesPence += sale.feesPence;
+    current.postagePence += sale.postagePence;
+    current.costPence += sale.costBasisPence;
+    current.profitPence += sale.profitPence;
+    byChannel.set(sale.channel, current);
+  }
+
+  return [...byChannel.values()]
+    .map((row) => ({
+      ...row,
+      averageSalePence: row.saleCount > 0 ? Math.round(row.revenuePence / row.saleCount) : 0,
+      averageProfitPence: row.saleCount > 0 ? Math.round(row.profitPence / row.saleCount) : 0,
+      marginPct: row.revenuePence > 0 ? roundPct(row.profitPence / row.revenuePence) : null,
+    }))
+    .sort((a, b) => b.profitPence - a.profitPence || b.revenuePence - a.revenuePence || a.channel.localeCompare(b.channel));
 }
 
 export function buildProfitTrend(

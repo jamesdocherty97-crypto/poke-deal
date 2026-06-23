@@ -1197,6 +1197,63 @@ label {
   font-weight: 900;
 }
 
+.channel-panel {
+  background:
+    linear-gradient(125deg, rgba(42, 117, 187, 0.16), transparent 48%),
+    var(--panel);
+}
+
+.channel-list {
+  display: grid;
+  gap: 8px;
+}
+
+.channel-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: start;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.38);
+  padding: 10px;
+}
+
+.channel-row > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.channel-row > div:nth-child(2) {
+  justify-items: end;
+  text-align: right;
+}
+
+.channel-row strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.channel-row.good > div:nth-child(2) strong {
+  color: var(--green);
+}
+
+.channel-row.warn > div:nth-child(2) strong {
+  color: var(--yellow);
+}
+
+.channel-row span,
+.channel-row small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.channel-row small {
+  grid-column: 1 / -1;
+}
+
 .profit-sparkline svg {
   width: 100%;
   height: 72px;
