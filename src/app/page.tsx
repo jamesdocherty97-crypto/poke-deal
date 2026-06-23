@@ -1432,6 +1432,43 @@ export default function Home() {
     setPostageTouched(false);
   }
 
+  function useListingSalePrice() {
+    if (!sellingItem) return;
+    const price = saleListPrice(sellingItem) ?? sellingItem.costBasis;
+    const estimate = estimateSaleCosts(saleChannel, price);
+    setSalePrice(penceToPounds(price));
+    setFees(penceToPounds(estimate.feesPence));
+    setPostage(penceToPounds(estimate.postagePence));
+    setFeesTouched(false);
+    setPostageTouched(false);
+  }
+
+  function sellAllQuantity() {
+    if (!sellingItem) return;
+    setSaleQuantity(String(sellingItem.quantity));
+  }
+
+  function applyCashSale() {
+    setSaleChannel("IN_PERSON");
+    setFees("0.00");
+    setPostage("0.00");
+    setFeesTouched(true);
+    setPostageTouched(true);
+  }
+
+  function resetSaleCosts() {
+    const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice));
+    setFees(penceToPounds(estimate.feesPence));
+    setPostage(penceToPounds(estimate.postagePence));
+    setFeesTouched(false);
+    setPostageTouched(false);
+  }
+
+  function clearSalePostage() {
+    setPostage("0.00");
+    setPostageTouched(true);
+  }
+
   function openInventoryEditor(item: InventoryItem) {
     setEditingItemId(item.id);
     setSellingId(null);
@@ -3460,6 +3497,25 @@ export default function Home() {
               </button>
             ))}
           </div>
+          <div className="sale-shortcuts" aria-label="Sale shortcuts">
+            <button type="button" onClick={useListingSalePrice} disabled={!sellingItem}>
+              List price
+            </button>
+            {sellingItem && sellingItem.quantity > 1 && (
+              <button type="button" onClick={sellAllQuantity}>
+                All qty
+              </button>
+            )}
+            <button type="button" onClick={applyCashSale}>
+              Cash sale
+            </button>
+            <button type="button" onClick={resetSaleCosts}>
+              Reset fees
+            </button>
+            <button type="button" onClick={clearSalePostage}>
+              No post
+            </button>
+          </div>
           <div className="form-grid">
             <label>
               Total sale
@@ -4176,6 +4232,14 @@ function listingTone(state: ListingState): string {
   if (state === "ACTIVE") return "info";
   if (state === "ENDED") return "warn";
   return "";
+}
+
+function saleListPrice(item: InventoryItem): number | null {
+  const listing =
+    item.listings.find((row) => row.state === "ACTIVE") ??
+    item.listings.find((row) => row.state === "DRAFT") ??
+    item.listings[0];
+  return listing?.listPrice ?? listing?.suggestedPrice ?? null;
 }
 
 function gradeTone(grade: string): string {

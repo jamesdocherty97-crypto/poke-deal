@@ -2382,6 +2382,22 @@ label {
   color: var(--yellow);
 }
 
+.sale-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sale-shortcuts button {
+  min-height: 36px;
+  padding: 6px 7px;
+  border-color: rgba(42, 117, 187, 0.32);
+  background: rgba(42, 117, 187, 0.12);
+  color: #cfe6ff;
+  font-size: 11px;
+  font-weight: 950;
+}
+
 .price-preview {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 68px;
