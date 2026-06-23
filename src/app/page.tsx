@@ -872,9 +872,20 @@ export default function Home() {
   const draftListingCount = Number(dashboard?.listingsByState.DRAFT ?? 0);
   const activeListingCount = Number(dashboard?.listingsByState.ACTIVE ?? 0);
   const activeWatchCount = watches.filter((watch) => watch.active).length;
-  const unlistedStockCount = activeInventory.filter(
-    (item) => !item.listings.some((listing) => listing.state === "DRAFT" || listing.state === "ACTIVE"),
-  ).length;
+  const unlistedStock = useMemo(
+    () =>
+      activeInventory.filter(
+        (item) =>
+          item.status === "IN_STOCK" &&
+          !item.listings.some((listing) => listing.state === "DRAFT" || listing.state === "ACTIVE"),
+      ),
+    [activeInventory],
+  );
+  const visibleUnlistedStock = useMemo(
+    () => buildInventoryView(unlistedStock, { query: listingQuery, sort: "newest" }),
+    [listingQuery, unlistedStock],
+  );
+  const unlistedStockCount = unlistedStock.length;
   const todayActions = useMemo(
     () =>
       buildTodayActions({
@@ -3641,6 +3652,37 @@ export default function Home() {
               </select>
             </label>
           </div>
+          {(listingStateFilter === "ALL" || listingStateFilter === "DRAFT") && unlistedStock.length > 0 && (
+            <section className="panel listing-queue-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Listing queue</h2>
+                  <span className="muted">{rowCountLabel(visibleUnlistedStock.length, unlistedStock.length)}</span>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setView("acquire")}>
+                  Add buy
+                </button>
+              </div>
+              <div className="listing-queue-list">
+                {visibleUnlistedStock.slice(0, 6).map((item) => (
+                  <ListingQueueRow
+                    key={item.id}
+                    item={item}
+                    busy={busy}
+                    onDraft={openListingCreator}
+                    onEdit={openInventoryEditor}
+                    onSell={openSell}
+                  />
+                ))}
+              </div>
+              {visibleUnlistedStock.length === 0 && <EmptyState text="No unlisted stock matches this search." />}
+              {visibleUnlistedStock.length > 6 && (
+                <p className="hint">
+                  Showing 6 of {visibleUnlistedStock.length}. Use search to narrow the queue.
+                </p>
+              )}
+            </section>
+          )}
           <div className="section-heading tight">
             <h2>Listings</h2>
             <span>{rowCountLabel(visibleListings.length, listings.length)}</span>
@@ -4477,6 +4519,58 @@ function InventoryRow({
               Delete
             </button>
           </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ListingQueueRow({
+  item,
+  busy,
+  onDraft,
+  onEdit,
+  onSell,
+}: {
+  item: InventoryItem;
+  busy: string | null;
+  onDraft: (item: InventoryItem) => void;
+  onEdit: (item: InventoryItem) => void;
+  onSell: (item: InventoryItem) => void;
+}) {
+  const stockNotes = [item.condition, item.graderCert ? `cert ${item.graderCert}` : null, item.location]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <article className="item-row listing-queue-row">
+      <CardImage src={item.card.imageUrl} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
+      <div className="item-main">
+        <div className="item-title-line">
+          <h3>{item.card.name}</h3>
+          <span className="item-badges">
+            <GradeBadge grade={item.grade} />
+            <span className={`pill ${statusTone(item.status)}`}>{item.status.replace(/_/g, " ")}</span>
+          </span>
+        </div>
+        <p>
+          {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
+        </p>
+        {stockNotes && <p>{stockNotes}</p>}
+        <div className="row-actions">
+          <button
+            type="button"
+            onClick={() => onDraft(item)}
+            disabled={busy?.startsWith("create-listing-") || busy?.startsWith("listing-")}
+          >
+            Draft
+          </button>
+          <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
+            Sell
+          </button>
+          <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
+            Edit
+          </button>
         </div>
       </div>
     </article>

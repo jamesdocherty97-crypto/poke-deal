@@ -2761,6 +2761,8 @@ label {
   bottom: 82px;
   left: 12px;
   z-index: 20;
+  max-height: calc(100vh - 118px - env(safe-area-inset-top));
+  overflow-y: auto;
   background: rgba(13, 20, 36, 0.98);
   box-shadow: var(--shadow);
 }
@@ -2768,6 +2770,24 @@ label {
 .listing-pack-sheet {
   max-height: min(78vh, 720px);
   overflow-y: auto;
+}
+
+.listing-queue-panel {
+  border-color: rgba(255, 203, 5, 0.22);
+  background:
+    linear-gradient(120deg, rgba(255, 203, 5, 0.1), transparent 48%),
+    var(--panel);
+}
+
+.listing-queue-list {
+  display: grid;
+  gap: 8px;
+}
+
+.listing-queue-row {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
 }
 
 .listing-pack-summary {
