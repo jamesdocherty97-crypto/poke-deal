@@ -8,6 +8,7 @@ import {
   mapCardAggregateToComp,
   normalizeProviderCollectorNumber,
   PokemonPriceTrackerSource,
+  providerPayloadMatchesRequest,
 } from "./pokemonPriceTracker.js";
 import type { CardRef } from "../../domain/types.js";
 
@@ -111,19 +112,97 @@ test("buildPokemonPriceTrackerSearch handles common gallery and shiny-vault inpu
 });
 
 test("PokemonPriceTrackerSource live requests use provider-style prefixed numbers", async () => {
-  let requestedUrlString: string | null = null;
+  const requestedUrls: string[] = [];
   const fetchImpl = (async (url: string | URL | Request) => {
-    requestedUrlString = String(url);
+    requestedUrls.push(String(url));
     return new Response(JSON.stringify(fixture), { status: 200, headers: { "content-type": "application/json" } });
   }) as typeof fetch;
 
   const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
   await source.lookup({ name: "Gengar", setName: "Lost Origin", number: "TG06/30" }, { grade: "RAW" });
 
-  assert.ok(requestedUrlString);
-  const requestedUrl = new URL(requestedUrlString);
+  assert.ok(requestedUrls[0]);
+  const requestedUrl = new URL(requestedUrls[0]);
   assert.equal(requestedUrl.searchParams.get("search"), "Gengar TG06/TG30");
   assert.equal(requestedUrl.searchParams.get("limit"), "1");
+});
+
+test("providerPayloadMatchesRequest validates fallback provider cards", () => {
+  const celebrationReprint = {
+    data: [
+      {
+        name: "Charizard",
+        setName: "Celebrations: Classic Collection",
+        cardNumber: "4/102",
+      },
+    ],
+  };
+  const giratinaGallery = {
+    data: [
+      {
+        name: "Giratina VSTAR (Secret)",
+        setName: "SWSH: Crown Zenith: Galarian Gallery",
+        cardNumber: "GG69/GG70",
+      },
+    ],
+  };
+
+  assert.equal(
+    providerPayloadMatchesRequest(celebrationReprint, { name: "Charizard", setName: "Base", number: "4/102" }),
+    false,
+  );
+  assert.equal(
+    providerPayloadMatchesRequest(giratinaGallery, {
+      name: "Giratina VSTAR",
+      setName: "Crown Zenith Galarian Gallery",
+      number: "GG69/GG70",
+    }),
+    true,
+  );
+});
+
+test("PokemonPriceTrackerSource retries without a restrictive set filter", async () => {
+  const requestedUrls: string[] = [];
+  const fallbackPayload = {
+    data: [
+      {
+        name: "Giratina VSTAR (Secret)",
+        setName: "SWSH: Crown Zenith: Galarian Gallery",
+        cardNumber: "GG69/GG70",
+        ebay: {
+          salesByGrade: {
+            bgs9_5: {
+              count: 2,
+              averagePrice: 110,
+              medianPrice: 100,
+              minPrice: 90,
+              maxPrice: 130,
+              lastMarketUpdate: "2026-06-22T12:00:00.000Z",
+            },
+          },
+        },
+      },
+    ],
+  };
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const urlString = String(url);
+    requestedUrls.push(urlString);
+    const requestedUrl = new URL(urlString);
+    const payload = requestedUrl.searchParams.has("set") ? { data: [] } : fallbackPayload;
+    return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
+  const comp = await source.lookup(
+    { name: "Giratina VSTAR", setName: "Crown Zenith Galarian Gallery", number: "GG69/GG70" },
+    { grade: "BGS_9_5" },
+  );
+
+  assert.equal(requestedUrls.length, 2);
+  assert.equal(new URL(requestedUrls[0]!).searchParams.get("set"), "Crown Zenith Galarian Gallery");
+  assert.equal(new URL(requestedUrls[1]!).searchParams.has("set"), false);
+  assert.equal(comp.sampleSize, 2);
+  assert.equal(comp.medianPence, usdToPence(100));
 });
 
 test("PSA_10 maps from 'psa10' aggregate", () => {

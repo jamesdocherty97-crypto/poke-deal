@@ -61,3 +61,15 @@ test("buildDealerCompVerdict distinguishes thin and aligned usable comps", () =>
   assert.equal(usable.tone, "good");
   assert.equal(usable.label, "Usable");
 });
+
+test("buildDealerCompVerdict warns on single-source graded comps", () => {
+  const verdict = buildDealerCompVerdict({
+    headline: comp({ grade: "PSA_10", medianPence: 37756, sampleSize: 293 }),
+    all: [comp({ grade: "PSA_10", medianPence: 37756, sampleSize: 293 })],
+    sourcesDisagree: false,
+  });
+
+  assert.equal(verdict.tone, "warn");
+  assert.equal(verdict.label, "Single graded");
+  assert.equal(verdict.title, "Manual check needed");
+});

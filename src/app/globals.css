@@ -839,6 +839,16 @@ label {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.grade-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.grade-select-field {
+  display: grid;
+  gap: 6px;
+}
+
 .segmented button,
 .bottom-nav button {
   min-height: 40px;
@@ -899,6 +909,7 @@ label {
 
 .today-action-list,
 .source-health-list,
+.readiness-list,
 .setup-step-list {
   display: grid;
   gap: 8px;
@@ -916,6 +927,7 @@ label {
 
 .today-action span,
 .source-health-row div,
+.readiness-row div,
 .setup-step div {
   display: grid;
   min-width: 0;
@@ -924,6 +936,7 @@ label {
 
 .today-action strong,
 .source-health-row strong,
+.readiness-row strong,
 .setup-step strong {
   overflow-wrap: anywhere;
   color: var(--ink);
@@ -933,6 +946,7 @@ label {
 
 .today-action small,
 .source-health-row span,
+.readiness-row small,
 .setup-step small {
   color: var(--muted);
   font-size: 11px;
@@ -961,6 +975,7 @@ label {
 }
 
 .source-health-row,
+.readiness-row,
 .setup-step {
   display: grid;
   align-items: center;
@@ -973,6 +988,53 @@ label {
 
 .source-health-row {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.readiness-list {
+  margin-top: 10px;
+}
+
+.readiness-row {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+}
+
+.readiness-row > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(42, 117, 187, 0.36);
+  border-radius: 50%;
+  color: #88c8ff;
+  font-size: 14px;
+  font-weight: 1000;
+}
+
+.readiness-row.done > span {
+  border-color: rgba(52, 211, 153, 0.36);
+  color: var(--green);
+}
+
+.readiness-row.warn > span {
+  border-color: rgba(251, 113, 133, 0.42);
+  color: var(--danger);
+}
+
+.readiness-row button {
+  min-height: 34px;
+  padding: 6px 9px;
+  color: #cfe6ff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.readiness-action {
+  min-height: 26px;
+  border: 1px solid rgba(255, 203, 5, 0.34);
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--yellow);
+  text-transform: uppercase;
 }
 
 .source-health-row > span {

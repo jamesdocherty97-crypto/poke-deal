@@ -1,7 +1,8 @@
 import { getSetById, searchSets, resolveSetIdForCard } from "../catalog/setCatalog.js";
 import { normalizeSearchText, tokenizeSearchText, tokenMatches } from "../catalog/fuzzy.js";
+import type { Grade } from "../domain/types.js";
 
-export type ParsedQuickIntakeGrade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
+export type ParsedQuickIntakeGrade = Grade;
 
 export interface ParsedQuickIntake {
   name?: string;
@@ -24,13 +25,25 @@ const NUMBER_PATTERNS = [
   /\b(?:TG|GG|SVP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,3}\b/i,
 ];
 
-const GRADE_PATTERNS: Array<{ grade: ParsedQuickIntakeGrade; pattern: RegExp }> = [
-  { grade: "BGS_9_5", pattern: /\bbgs\s*9(?:\.|,)?5\b/i },
-  { grade: "CGC_10", pattern: /\bcgc\s*10\b/i },
-  { grade: "PSA_10", pattern: /\bpsa\s*10\b/i },
-  { grade: "PSA_9", pattern: /\bpsa\s*9\b/i },
-  { grade: "RAW", pattern: /\b(?:raw|ungraded|nm|near mint)\b/i },
-];
+const SUPPORTED_QUICK_GRADES = new Set<ParsedQuickIntakeGrade>([
+  "RAW",
+  "PSA_1",
+  "PSA_2",
+  "PSA_3",
+  "PSA_4",
+  "PSA_5",
+  "PSA_6",
+  "PSA_7",
+  "PSA_8",
+  "PSA_9",
+  "PSA_10",
+  "BGS_9",
+  "BGS_9_5",
+  "BGS_10",
+  "CGC_9",
+  "CGC_9_5",
+  "CGC_10",
+]);
 
 const STRONG_SET_ALIASES = new Set([
   "151",
@@ -122,10 +135,17 @@ function extractQuantity(input: string): { value: number; match: string } | null
 }
 
 function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: string } | null {
-  for (const option of GRADE_PATTERNS) {
-    const match = input.match(option.pattern);
-    if (match?.[0]) return { value: option.grade, match: match[0] };
+  const slab = input.match(/\b(PSA|BGS|CGC)\s*(10|9(?:[.,]5)?|[1-8])\b/i);
+  if (slab?.[0] && slab[1] && slab[2]) {
+    const company = slab[1].toUpperCase();
+    const numeric = slab[2].replace(",", ".").replace(".", "_");
+    const grade = `${company}_${numeric}` as ParsedQuickIntakeGrade;
+    if (SUPPORTED_QUICK_GRADES.has(grade)) return { value: grade, match: slab[0] };
   }
+
+  const raw = input.match(/\b(?:raw|ungraded|nm|near mint)\b/i);
+  if (raw?.[0]) return { value: "RAW", match: raw[0] };
+
   return null;
 }
 

@@ -13,6 +13,7 @@
 
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
 import { getSetById, resolveSetIdForCard } from "../../catalog/setCatalog.js";
+import { normalizeSearchText, tokenizeSearchText } from "../../catalog/fuzzy.js";
 import type { CompSource } from "../CompSource.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
@@ -61,30 +62,28 @@ export class PokemonPriceTrackerSource implements CompSource {
     // BILLING: credits are charged on the requested `limit` (default 50!) — pass limit=1.
     const days = Math.min(Math.max(windowDays, 1), 180); // Pro plan caps history at 180d
     const search = buildPokemonPriceTrackerSearch(card);
-    const params = new URLSearchParams({
-      language: "english",
-      search,
-      includeEbay: "true",
-      days: String(days),
-      limit: "1",
-    });
-    if (card.setName) params.set("set", card.setName);
+    const attempts = buildFetchAttempts(card, search, days);
 
-    try {
-      const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${this.apiKey}`, Accept: "application/json" },
-        signal: timeoutSignal(this.fetchTimeoutMs),
-      });
-      if (!res.ok) {
-        console.warn(`[${this.name}] HTTP ${res.status} — no comp returned`);
-        return null;
+    for (const params of attempts) {
+      try {
+        const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${this.apiKey}`, Accept: "application/json" },
+          signal: timeoutSignal(this.fetchTimeoutMs),
+        });
+        if (!res.ok) {
+          console.warn(`[${this.name}] HTTP ${res.status} — no comp returned`);
+          continue;
+        }
+        const json = (await res.json()) as unknown;
+        if (providerPayloadMatchesRequest(json, card)) return json;
+        console.warn(`[${this.name}] returned a different card for ${search} — retrying/falling back`);
+      } catch (err) {
+        // Degrade, don't explode: a dead provider must not break a lookup.
+        console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
       }
-      return (await res.json()) as unknown;
-    } catch (err) {
-      // Degrade, don't explode: a dead provider must not break a lookup.
-      console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
-      return null;
     }
+
+    return null;
   }
 }
 
@@ -113,6 +112,26 @@ export function gradeToProviderKey(grade: Grade): string {
 export function buildPokemonPriceTrackerSearch(card: CardRef): string {
   const number = normalizeProviderCollectorNumber(card.number, card.setName);
   return [card.name, number].filter(Boolean).join(" ");
+}
+
+function buildFetchAttempts(card: CardRef, search: string, days: number): URLSearchParams[] {
+  const base = {
+    language: "english",
+    includeEbay: "true",
+    days: String(days),
+    limit: "1",
+  };
+  const attempts: URLSearchParams[] = [];
+
+  const withSet = new URLSearchParams({ ...base, search });
+  if (card.setName) withSet.set("set", card.setName);
+  attempts.push(withSet);
+
+  if (card.setName) {
+    attempts.push(new URLSearchParams({ ...base, search }));
+  }
+
+  return attempts;
 }
 
 export function normalizeProviderCollectorNumber(
@@ -239,4 +258,65 @@ export function mapCardAggregateToComp(
       chosenPriceSource: smartRawPrice ? "smartMarketPrice" : "medianPrice",
     },
   };
+}
+
+export function providerPayloadMatchesRequest(json: unknown, request: CardRef): boolean {
+  const providerCard = firstProviderCard(json);
+  if (!providerCard) return false;
+
+  const providerName = normalizeSearchText(readProviderString(providerCard, "name") ?? "");
+  const requestedName = normalizeSearchText(request.name);
+  if (providerName && requestedName && !providerName.includes(requestedName) && !requestedName.includes(providerName)) {
+    const requestedTokens = tokenizeSearchText(request.name);
+    if (!requestedTokens.every((token) => providerName.includes(token))) return false;
+  }
+
+  const providerNumber = normalizeComparableCollectorNumber(
+    readProviderString(providerCard, "number") ??
+      readProviderString(providerCard, "cardNumber") ??
+      readProviderString(providerCard, "collectorNumber") ??
+      undefined,
+  );
+  const requestedNumber = normalizeComparableCollectorNumber(normalizeProviderCollectorNumber(request.number, request.setName));
+  if (providerNumber && requestedNumber && providerNumber !== requestedNumber) return false;
+
+  const providerSet = normalizeSearchText(readProviderSetName(providerCard) ?? "");
+  if (request.setName && providerSet) {
+    const requestedSetTokens = tokenizeSearchText(request.setName).filter((token) => !["set", "sv", "swsh"].includes(token));
+    if (requestedSetTokens.length > 0 && !requestedSetTokens.every((token) => providerSet.includes(token))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function firstProviderCard(json: unknown): Record<string, unknown> | null {
+  const root = json as { data?: unknown } | null;
+  const card = Array.isArray(root?.data) ? root!.data[0] : root?.data;
+  return card && typeof card === "object" ? (card as Record<string, unknown>) : null;
+}
+
+function readProviderString(card: Record<string, unknown>, key: string): string | null {
+  const value = card[key];
+  return typeof value === "string" ? value : null;
+}
+
+function readProviderSetName(card: Record<string, unknown>): string | null {
+  const direct = readProviderString(card, "setName");
+  if (direct) return direct;
+
+  const set = card.set;
+  if (typeof set === "string") return set;
+  if (set && typeof set === "object") {
+    const name = (set as Record<string, unknown>).name;
+    if (typeof name === "string") return name;
+  }
+
+  return null;
+}
+
+function normalizeComparableCollectorNumber(value: string | undefined): string | null {
+  const normalized = value?.trim().toUpperCase().replace(/\s+/g, "");
+  return normalized && normalized.length > 0 ? normalized : null;
 }

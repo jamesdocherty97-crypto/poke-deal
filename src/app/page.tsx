@@ -2,7 +2,7 @@
 
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { suggestListPrice, type PricingStrategy } from "@/lib/comps/pricing";
-import type { CompResult as DomainCompResult } from "@/lib/domain/types";
+import type { CompResult as DomainCompResult, Grade as DomainGrade } from "@/lib/domain/types";
 import {
   buildInventoryView,
   buildListingView,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/dealer/quickHunts";
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
+import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
@@ -30,7 +31,7 @@ import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeAc
 import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
 
 type View = "today" | "acquire" | "inventory" | "listings" | "pnl";
-type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
+type Grade = DomainGrade;
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type AcquireListingState = "DRAFT" | "ACTIVE";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
@@ -283,7 +284,14 @@ type SystemSource = {
   required: boolean;
 };
 
-const grades: Grade[] = ["RAW", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
+const quickGrades: Grade[] = ["RAW", "PSA_8", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
+const gradeOptions: Grade[] = [
+  "RAW",
+  "PSA_1", "PSA_2", "PSA_3", "PSA_4", "PSA_5",
+  "PSA_6", "PSA_7", "PSA_8", "PSA_9", "PSA_10",
+  "BGS_9", "BGS_9_5", "BGS_10",
+  "CGC_9", "CGC_9_5", "CGC_10",
+];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const expenseCategories: ExpenseCategory[] = ["SUPPLIES", "POSTAGE", "GRADING", "TABLE_FEE", "TRAVEL", "PLATFORM", "OTHER"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
@@ -510,7 +518,6 @@ export default function Home() {
     };
   }, [fees, postage, salePrice, saleQuantity, sellingItem]);
   const headline = comp?.headline ?? null;
-  const confidenceLabel = headline ? compConfidence(headline, comp?.sourcesDisagree ?? false) : null;
   const deal = useMemo(
     () => (headline ? judgeDeal(headline, poundsToPence(cost), poundsToPence(postage)) : null),
     [headline, cost, postage],
@@ -557,6 +564,11 @@ export default function Home() {
   const compReceipt = useMemo(() => (comp ? buildCompReceipt(comp) : []), [comp]);
   const compSpreadPct = useMemo(() => (comp ? medianSpreadPct(comp.all) : null), [comp]);
   const dealerVerdict = useMemo(() => (comp ? buildDealerCompVerdict(comp) : null), [comp]);
+  const confidenceLabel = dealerVerdict
+    ? { label: dealerVerdict.label, tone: dealerVerdict.tone }
+    : headline
+      ? compConfidence(headline, comp?.sourcesDisagree ?? false)
+      : null;
   const stockImportPreview = useMemo(() => parseStockImportText(stockImportText), [stockImportText]);
   const stockImportHasText = stockImportText.trim().length > 0;
   const projectedListSuggestion = useMemo(
@@ -606,6 +618,37 @@ export default function Home() {
       draftListingCount,
       soldInventory.length,
       unlistedStockCount,
+    ],
+  );
+  const launchReadiness = useMemo(
+    () =>
+      systemStatus
+        ? buildLaunchReadiness({
+            livePrimaryComps: systemStatus.summary.livePrimaryComps,
+            liveCatalogKey: systemStatus.summary.liveCatalogKey,
+            secondaryCrossCheck: systemStatus.summary.secondaryCrossCheck,
+            alertDelivery: systemStatus.summary.alertDelivery,
+            stockCount: dashboard?.metrics.stockCount ?? activeInventory.length,
+            draftListings: draftListingCount,
+            activeListings: activeListingCount,
+            soldCount: dashboard?.metrics.soldCount ?? soldInventory.length,
+            activeWatches: activeWatchCount,
+            operatingExpensePence: dashboard?.metrics.operatingExpensePence ?? 0,
+          })
+        : [],
+    [
+      activeInventory.length,
+      activeListingCount,
+      activeWatchCount,
+      dashboard?.metrics.operatingExpensePence,
+      dashboard?.metrics.soldCount,
+      dashboard?.metrics.stockCount,
+      draftListingCount,
+      soldInventory.length,
+      systemStatus?.summary.alertDelivery,
+      systemStatus?.summary.liveCatalogKey,
+      systemStatus?.summary.livePrimaryComps,
+      systemStatus?.summary.secondaryCrossCheck,
     ],
   );
 
@@ -689,6 +732,27 @@ export default function Home() {
     if (target === "reprice") {
       setView("pnl");
       void checkReprices();
+      return;
+    }
+    setView("pnl");
+  }
+
+  function openLaunchReadiness(target: LaunchReadinessTarget | undefined) {
+    if (!target || target === "external") return;
+    if (target === "buy") {
+      setView("acquire");
+      return;
+    }
+    if (target === "stock") {
+      setInventoryQuery("");
+      setInventorySort("newest");
+      setView("inventory");
+      return;
+    }
+    if (target === "listings") {
+      setListingStateFilter("ALL");
+      setListingSort("newest");
+      setView("listings");
       return;
     }
     setView("pnl");
@@ -1818,6 +1882,15 @@ export default function Home() {
                 <SourceHealthRow key={source.id} source={source} />
               ))}
             </div>
+            {systemStatus ? (
+              <div className="readiness-list" aria-label="Launch readiness">
+                {launchReadiness.slice(0, 6).map((item) => (
+                  <LaunchReadinessRow key={item.id} item={item} onOpen={openLaunchReadiness} />
+                ))}
+              </div>
+            ) : (
+              <p className="hint">Checking comp sources and setup...</p>
+            )}
           </section>
 
           <section className="panel launch-panel">
@@ -2007,17 +2080,29 @@ export default function Home() {
                 ))}
               </div>
             )}
-            <div className="segmented" role="group" aria-label="Grade">
-              {grades.map((g) => (
-                <button
-                  key={g}
-                  className={grade === g ? "selected" : ""}
-                  type="button"
-                  onClick={() => setGrade(g)}
-                >
-                  {g.replace(/_/g, " ")}
-                </button>
-              ))}
+            <div className="grade-controls">
+              <div className="segmented" role="group" aria-label="Quick grade">
+                {quickGrades.map((g) => (
+                  <button
+                    key={g}
+                    className={grade === g ? "selected" : ""}
+                    type="button"
+                    onClick={() => setGrade(g)}
+                  >
+                    {g.replace(/_/g, " ")}
+                  </button>
+                ))}
+              </div>
+              <label className="grade-select-field">
+                Grade
+                <select value={grade} onChange={(event) => setGrade(event.target.value as Grade)}>
+                  {gradeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <button className="primary-action" type="submit" disabled={busy === "lookup"}>
               {busy === "lookup" ? "Looking up..." : "Look up comp"}
@@ -3411,6 +3496,32 @@ function SourceHealthRow({ source }: { source: SystemSource }) {
   );
 }
 
+function LaunchReadinessRow({
+  item,
+  onOpen,
+}: {
+  item: LaunchReadinessItem;
+  onOpen: (target: LaunchReadinessTarget | undefined) => void;
+}) {
+  const actionable = Boolean(item.action && item.target && item.target !== "external");
+  return (
+    <div className={`readiness-row ${item.state}`}>
+      <span aria-hidden="true">{readinessSymbol(item.state)}</span>
+      <div>
+        <strong>{item.title}</strong>
+        <small>{item.detail}</small>
+      </div>
+      {item.action ? (
+        actionable ? (
+          <button type="button" onClick={() => onOpen(item.target)}>{item.action}</button>
+        ) : (
+          <small className="readiness-action">{item.action}</small>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 function SetupStep({
   done,
   title,
@@ -3901,6 +4012,12 @@ function sourceStatusTone(status: SystemSource["status"]): string {
   if (status === "public") return "info";
   if (status === "fixture") return "warn";
   return "danger";
+}
+
+function readinessSymbol(state: LaunchReadinessItem["state"]): string {
+  if (state === "done") return "✓";
+  if (state === "warn") return "!";
+  return "›";
 }
 
 function channelLabel(channel: Channel): string {

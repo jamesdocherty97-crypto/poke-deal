@@ -2,6 +2,7 @@ export type DealerCompTone = "good" | "warn" | "danger";
 
 export type DealerCompSignal = {
   source: string;
+  grade?: string;
   medianPence: number;
   sampleSize: number;
   raw?: unknown;
@@ -66,6 +67,16 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
     };
   }
 
+  if (priced.length < 2 && isGradedSignal(comp.headline)) {
+    return {
+      ...base,
+      tone: "warn",
+      label: "Single graded",
+      title: "Manual check needed",
+      detail: "This slab price has no live cross-check. Treat it as indicative until PokeTrace, owned sales, or a manual eBay check confirms it.",
+    };
+  }
+
   if (priced.length < 2) {
     return {
       ...base,
@@ -101,4 +112,8 @@ function isMarketBaseline(signal: DealerCompSignal): boolean {
   if (!signal.raw || typeof signal.raw !== "object") return false;
   const kind = (signal.raw as { kind?: unknown }).kind;
   return kind === "catalog-market-baseline" || kind === "market-baseline";
+}
+
+function isGradedSignal(signal: DealerCompSignal): boolean {
+  return signal.grade != null && signal.grade !== "RAW";
 }

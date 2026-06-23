@@ -41,3 +41,21 @@ test("parseQuickIntake resolves vintage dealer shorthand", () => {
     number: "4/102",
   });
 });
+
+test("parseQuickIntake accepts broader slab grades", () => {
+  assert.deepEqual(parseQuickIntake("Charizard base set 4/102 psa8 £300"), {
+    name: "Charizard",
+    setName: "Base",
+    number: "4/102",
+    grade: "PSA_8",
+    cost: "300.00",
+  });
+
+  assert.deepEqual(parseQuickIntake("Gengar lost origin TG06 CGC 9.5 £20"), {
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    number: "TG06",
+    grade: "CGC_9_5",
+    cost: "20.00",
+  });
+});

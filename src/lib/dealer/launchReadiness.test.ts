@@ -1,0 +1,69 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { buildLaunchReadiness } from "./launchReadiness.js";
+
+test("buildLaunchReadiness starts with source and first-buy setup work", () => {
+  const items = buildLaunchReadiness({
+    livePrimaryComps: false,
+    liveCatalogKey: false,
+    secondaryCrossCheck: false,
+    alertDelivery: false,
+    stockCount: 0,
+    draftListings: 0,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 0,
+  });
+
+  assert.equal(items[0]?.id, "live-comps");
+  assert.equal(items[0]?.state, "warn");
+  assert.equal(items.some((item) => item.id === "first-buy" && item.target === "buy"), true);
+  assert.equal(items.some((item) => item.id === "cross-check" && item.state === "warn"), true);
+});
+
+test("buildLaunchReadiness nudges draft listings and first sale for a new operator", () => {
+  const items = buildLaunchReadiness({
+    livePrimaryComps: true,
+    liveCatalogKey: true,
+    secondaryCrossCheck: false,
+    alertDelivery: false,
+    stockCount: 3,
+    draftListings: 2,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 0,
+  });
+
+  const listing = items.find((item) => item.id === "listing-pipeline");
+  const sale = items.find((item) => item.id === "sale-loop");
+
+  assert.equal(listing?.state, "next");
+  assert.equal(listing?.target, "listings");
+  assert.match(listing?.detail ?? "", /2 draft/);
+  assert.equal(sale?.target, "stock");
+  assert.equal(items.some((item) => item.id === "first-buy"), false);
+});
+
+test("buildLaunchReadiness marks operating systems done when they are ready", () => {
+  const items = buildLaunchReadiness({
+    livePrimaryComps: true,
+    liveCatalogKey: true,
+    secondaryCrossCheck: true,
+    alertDelivery: true,
+    stockCount: 6,
+    draftListings: 0,
+    activeListings: 4,
+    soldCount: 2,
+    activeWatches: 1,
+    operatingExpensePence: 2500,
+  });
+
+  assert.equal(items.find((item) => item.id === "live-comps")?.state, "done");
+  assert.equal(items.find((item) => item.id === "cross-check")?.state, "done");
+  assert.equal(items.find((item) => item.id === "alerts")?.state, "done");
+  assert.equal(items.find((item) => item.id === "listing-pipeline")?.state, "done");
+  assert.equal(items.find((item) => item.id === "sale-loop")?.state, "done");
+});
