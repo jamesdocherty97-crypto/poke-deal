@@ -182,10 +182,17 @@ type Dashboard = {
     soldCount: number;
     reservedCount: number;
     activeCostPence: number;
+    soldCostPence: number;
     realizedRevenuePence: number;
+    realizedFeesPence: number;
+    realizedPostagePence: number;
     realizedProfitPence: number;
     operatingExpensePence: number;
     netProfitPence: number;
+    cashInPence: number;
+    cashOutPence: number;
+    cashNetPence: number;
+    cashRecoveryPct: number;
     realizedMarginPct: number | null;
     sellThroughPct: number;
     averageAgeDays: number;
@@ -696,6 +703,8 @@ export default function Home() {
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
   const netProfitTone = netProfitPence >= 0 ? "good" : "warn";
+  const cashNetPence = dashboard?.metrics.cashNetPence ?? 0;
+  const cashNetTone = cashNetPence >= 0 ? "good" : "warn";
   const profitTrend = useMemo(() => buildProfitTrend(dashboard?.recentSales ?? []), [dashboard?.recentSales]);
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
@@ -3291,6 +3300,32 @@ export default function Home() {
             ) : profitTrend.length > 0 ? (
               <ProfitSparkline points={profitTrend} />
             ) : null}
+          </section>
+          <section className="panel cash-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Cash position</h2>
+                <span className="muted">stock + sales + costs</span>
+              </div>
+              <span className={`pill ${cashNetTone}`}>{gbp(cashNetPence)}</span>
+            </div>
+            <div className="detail-grid">
+              <Metric label="Cash in" value={gbp(dashboard?.metrics.cashInPence ?? 0)} loading={dashboardLoading} />
+              <Metric label="Cash out" value={gbp(dashboard?.metrics.cashOutPence ?? 0)} tone="warn" loading={dashboardLoading} />
+              <Metric label="In stock" value={gbp(dashboard?.metrics.activeCostPence ?? 0)} loading={dashboardLoading} />
+              <Metric
+                label="Recovered"
+                value={`${dashboard?.metrics.cashRecoveryPct ?? 0}%`}
+                tone={(dashboard?.metrics.cashRecoveryPct ?? 0) >= 100 ? "good" : "warn"}
+                loading={dashboardLoading}
+              />
+            </div>
+            <div className="cash-breakdown">
+              <span>sold stock {gbp(dashboard?.metrics.soldCostPence ?? 0)}</span>
+              <span>fees {gbp(dashboard?.metrics.realizedFeesPence ?? 0)}</span>
+              <span>postage {gbp(dashboard?.metrics.realizedPostagePence ?? 0)}</span>
+              <span>costs {gbp(dashboard?.metrics.operatingExpensePence ?? 0)}</span>
+            </div>
           </section>
           <div className="export-actions" aria-label="Books export">
             <a className="export-link" href="/api/export/books" download>

@@ -39,10 +39,17 @@ export interface DealerMetrics {
   soldCount: number;
   reservedCount: number;
   activeCostPence: number;
+  soldCostPence: number;
   realizedRevenuePence: number;
+  realizedFeesPence: number;
+  realizedPostagePence: number;
   realizedProfitPence: number;
   operatingExpensePence: number;
   netProfitPence: number;
+  cashInPence: number;
+  cashOutPence: number;
+  cashNetPence: number;
+  cashRecoveryPct: number;
   realizedMarginPct: number | null;
   sellThroughPct: number;
   averageAgeDays: number;
@@ -93,10 +100,17 @@ export function computeDealerMetrics(
   );
 
   const realizedRevenuePence = sales.reduce((sum, sale) => sum + sale.salePricePence, 0);
+  const soldCostPence = sales.reduce((sum, sale) => sum + sale.costBasisPence, 0);
+  const realizedFeesPence = sales.reduce((sum, sale) => sum + sale.feesPence, 0);
+  const realizedPostagePence = sales.reduce((sum, sale) => sum + sale.postagePence, 0);
   const saleSummaries = sales.map(summarizeSale);
   const realizedProfitPence = saleSummaries.reduce((sum, sale) => sum + sale.profitPence, 0);
   const operatingExpensePence = expenses.reduce((sum, expense) => sum + expense.amountPence, 0);
   const netProfitPence = realizedProfitPence - operatingExpensePence;
+  const cashInPence = realizedRevenuePence;
+  const cashOutPence = activeCostPence + soldCostPence + realizedFeesPence + realizedPostagePence + operatingExpensePence;
+  const cashNetPence = cashInPence - cashOutPence;
+  const cashRecoveryPct = cashOutPence > 0 ? roundPct(cashInPence / cashOutPence) : 0;
   const realizedMarginPct =
     realizedRevenuePence > 0 ? roundPct(realizedProfitPence / realizedRevenuePence) : null;
   const unitDenominator = activeUnits + soldCount;
@@ -115,10 +129,17 @@ export function computeDealerMetrics(
     soldCount,
     reservedCount,
     activeCostPence,
+    soldCostPence,
     realizedRevenuePence,
+    realizedFeesPence,
+    realizedPostagePence,
     realizedProfitPence,
     operatingExpensePence,
     netProfitPence,
+    cashInPence,
+    cashOutPence,
+    cashNetPence,
+    cashRecoveryPct,
     realizedMarginPct,
     sellThroughPct,
     averageAgeDays,

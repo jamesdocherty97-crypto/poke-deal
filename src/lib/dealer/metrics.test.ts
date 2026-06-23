@@ -76,10 +76,17 @@ test("computeDealerMetrics summarizes stock, sales, age and movers", () => {
   assert.equal(metrics.listedCount, 1);
   assert.equal(metrics.soldCount, 1);
   assert.equal(metrics.activeCostPence, 12600);
+  assert.equal(metrics.soldCostPence, 1000);
   assert.equal(metrics.realizedRevenuePence, 2200);
+  assert.equal(metrics.realizedFeesPence, 300);
+  assert.equal(metrics.realizedPostagePence, 100);
   assert.equal(metrics.realizedProfitPence, 800);
   assert.equal(metrics.operatingExpensePence, 0);
   assert.equal(metrics.netProfitPence, 800);
+  assert.equal(metrics.cashInPence, 2200);
+  assert.equal(metrics.cashOutPence, 14000);
+  assert.equal(metrics.cashNetPence, -11800);
+  assert.equal(metrics.cashRecoveryPct, 15.7);
   assert.equal(metrics.realizedMarginPct, 36.4);
   assert.equal(metrics.sellThroughPct, 25);
   assert.equal(metrics.averageAgeDays, 51);
@@ -127,6 +134,10 @@ test("computeDealerMetrics subtracts operating expenses from net profit", () => 
   assert.equal(metrics.realizedProfitPence, 1730);
   assert.equal(metrics.operatingExpensePence, 2100);
   assert.equal(metrics.netProfitPence, -370);
+  assert.equal(metrics.cashInPence, 5000);
+  assert.equal(metrics.cashOutPence, 5370);
+  assert.equal(metrics.cashNetPence, -370);
+  assert.equal(metrics.cashRecoveryPct, 93.1);
 });
 
 test("computeDealerMetrics counts partial sales from duplicate stock as sold units", () => {
