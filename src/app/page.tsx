@@ -30,6 +30,7 @@ import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/l
 type View = "today" | "acquire" | "inventory" | "listings" | "pnl";
 type Grade = "RAW" | "PSA_9" | "PSA_10" | "BGS_9_5" | "CGC_10";
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
+type AcquireListingState = "DRAFT" | "ACTIVE";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
 type ExpenseCategory = "SUPPLIES" | "POSTAGE" | "GRADING" | "TABLE_FEE" | "TRAVEL" | "PLATFORM" | "OTHER";
@@ -325,6 +326,8 @@ export default function Home() {
   const [location, setLocation] = useState("Box A");
   const [strategy, setStrategy] = useState("market");
   const [channel, setChannel] = useState<Channel>("EBAY");
+  const [listPriceOverride, setListPriceOverride] = useState("");
+  const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>("DRAFT");
   const [keepBuying, setKeepBuying] = useState(true);
   const [comp, setComp] = useState<Reconciled | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
@@ -743,6 +746,7 @@ export default function Home() {
     setSuggestion(null);
     setCardArtUrl(null);
     setGradeComp(null);
+    setListPriceOverride("");
   }
 
   function applyQuickIntake() {
@@ -820,6 +824,11 @@ export default function Home() {
       setError("Quantity must be a whole number above 0.");
       return;
     }
+    const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
+    if (overrideListPricePence != null && overrideListPricePence <= 0) {
+      setError("List price must be above £0 or left blank.");
+      return;
+    }
 
     setBusy("acquire");
     setError(null);
@@ -837,6 +846,8 @@ export default function Home() {
           location: location || undefined,
           strategy,
           channel,
+          listPricePence: overrideListPricePence ?? undefined,
+          listingState: acquireListingState,
           createListing: true,
         }),
       });
@@ -845,8 +856,10 @@ export default function Home() {
       setSuggestion(payload.suggestion);
       setComp(payload.comps ?? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false });
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
+      const listedPence = payload.listing?.listPrice ?? payload.listing?.suggestedPrice ?? payload.suggestion.pricePence;
+      const listingVerb = payload.listing?.state === "ACTIVE" ? "Listed" : "Drafted";
       setNotice(
-        `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. List at ${gbp(payload.suggestion.pricePence)}.`,
+        `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${listingVerb} at ${gbp(listedPence)}.`,
       );
       await refreshAll();
       applyPostStockFlow();
@@ -861,6 +874,11 @@ export default function Home() {
     const intakeQuantity = parseIntakeQuantity(quantity);
     if (!intakeQuantity) {
       setError("Quantity must be a whole number above 0.");
+      return;
+    }
+    const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
+    if (overrideListPricePence != null && overrideListPricePence <= 0) {
+      setError("List price must be above £0 or left blank.");
       return;
     }
 
@@ -893,14 +911,15 @@ export default function Home() {
 
       let listingCreated = false;
       if (payload.item?.id) {
+        const listPricePence = overrideListPricePence ?? draftDefaults.listPricePence;
         const listingRes = await fetch("/api/listings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             itemId: payload.item.id,
             channel,
-            state: "DRAFT",
-            listPricePence: draftDefaults.listPricePence,
+            state: acquireListingState,
+            listPricePence,
           }),
         });
         const listingPayload = await readJson(listingRes);
@@ -913,7 +932,7 @@ export default function Home() {
 
       setNotice(
         listingCreated
-          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Drafted at ${gbp(draftDefaults.listPricePence)}.`
+          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${acquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(overrideListPricePence ?? draftDefaults.listPricePence)}.`
           : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.`,
       );
       await refreshAll();
@@ -2235,7 +2254,7 @@ export default function Home() {
           <form className="panel" onSubmit={acquire}>
             <div className="panel-heading">
               <h2>Just bought it</h2>
-              <span className="muted">Stock + draft listing</span>
+              <span className="muted">Stock + listing</span>
             </div>
             <div className="form-grid">
               <label>
@@ -2267,6 +2286,19 @@ export default function Home() {
                 Channel
                 <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)}>
                   {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
+                List price
+                <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="auto" />
+              </label>
+              <label>
+                Listing
+                <select value={acquireListingState} onChange={(event) => setAcquireListingState(event.target.value as AcquireListingState)}>
+                  <option value="DRAFT">Draft</option>
+                  <option value="ACTIVE">Active</option>
                 </select>
               </label>
             </div>
@@ -3581,15 +3613,23 @@ function MoneyInput({
   value,
   onChange,
   disabled = false,
+  placeholder,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   return (
     <span className="money-input">
       <span aria-hidden="true">£</span>
-      <input inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+      <input
+        inputMode="decimal"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        placeholder={placeholder}
+      />
     </span>
   );
 }

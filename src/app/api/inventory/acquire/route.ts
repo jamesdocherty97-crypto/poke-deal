@@ -1,6 +1,6 @@
 // POST /api/inventory/acquire — the flagship dealer action.
 // Given a card I've just bought, look up its live comp, compute a suggested list price,
-// persist it as stock, and create a DRAFT listing at that price. One call = the whole
+// persist it as stock, and create a listing at that price. One call = the whole
 // "value → buy → stock → price" loop.
 
 import { NextResponse } from "next/server";
@@ -44,6 +44,8 @@ const acquireSchema = z.object({
   strategy: z.enum(["quick", "market", "patient"]).default("market"),
   minMargin: z.coerce.number().min(0).max(5).optional(),
   channel: z.enum(["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"]).default("EBAY"),
+  listPricePence: z.coerce.number().int().nonnegative().optional(),
+  listingState: z.enum(["DRAFT", "ACTIVE"]).default("DRAFT"),
   createListing: z.boolean().default(true),
 });
 
@@ -95,22 +97,41 @@ export async function POST(request: Request) {
       minMargin: d.minMargin,
     });
 
-    // 4. create a DRAFT listing at the suggested price (best-effort; never fails the acquire)
-    let listing: { id: string; channel: string; suggestedPrice: number | null } | null = null;
+    // 4. create a listing at the suggested/chosen price (best-effort; never fails the acquire)
+    let listing: {
+      id: string;
+      channel: string;
+      state: string;
+      suggestedPrice: number | null;
+      listPrice: number | null;
+    } | null = null;
     if (d.createListing) {
       const title = [compCard.name, compCard.number, d.grade === "RAW" ? "" : d.grade.replace(/_/g, " ")]
         .filter(Boolean)
         .join(" ");
       listing = await getPrisma()
-        .listing.create({
-          data: {
-            itemId: item.id,
-            channel: d.channel,
-            state: "DRAFT",
-            title,
-            suggestedPrice: suggestion.pricePence,
-          },
-          select: { id: true, channel: true, suggestedPrice: true },
+        .$transaction(async (tx) => {
+          const created = await tx.listing.create({
+            data: {
+              itemId: item.id,
+              channel: d.channel,
+              state: d.listingState,
+              title,
+              suggestedPrice: suggestion.pricePence,
+              listPrice: d.listPricePence ?? null,
+              listedAt: d.listingState === "ACTIVE" ? new Date() : null,
+            },
+            select: { id: true, channel: true, state: true, suggestedPrice: true, listPrice: true },
+          });
+
+          if (d.listingState === "ACTIVE") {
+            await tx.inventoryItem.update({
+              where: { id: item.id },
+              data: { status: "LISTED" },
+            });
+          }
+
+          return created;
         })
         .catch((err) => {
           console.warn("[acquire] draft listing skipped:", err instanceof Error ? err.message : "unknown");
