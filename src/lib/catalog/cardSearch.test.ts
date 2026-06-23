@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCardSearchQuery, rankCatalogCards, scoreCatalogCardForSearch } from "./cardSearch.js";
+import {
+  normalizeCatalogCardSearchInput,
+  parseCardSearchQuery,
+  rankCatalogCards,
+  scoreCatalogCardForSearch,
+} from "./cardSearch.js";
 import { searchChaseCards } from "./chaseCards.js";
 import type { CatalogCard } from "./types.js";
 
@@ -40,6 +45,22 @@ test("rankCatalogCards understands collector numbers typed alongside names", () 
   assert.deepEqual(parseCardSearchQuery("Gengar TG06"), { name: "Gengar", number: "TG06" });
   assert.equal(rankCatalogCards("Gengar TG06", mixed, { setName: "Lost Origin" })[0]?.setCode, "swsh11tg");
   assert.equal(scoreCatalogCardForSearch("TG06", mixed[1]!), 1100);
+});
+
+test("normalizeCatalogCardSearchInput splits dealer shorthand into card, set and number", () => {
+  assert.deepEqual(normalizeCatalogCardSearchInput("Gengar Lost Origin TG06 raw £10"), {
+    query: "Gengar TG06",
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    number: "TG06",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Charizard ex 151 199/165 PSA 10"), {
+    query: "Charizard ex 199/165",
+    name: "Charizard ex",
+    setName: "151",
+    number: "199/165",
+  });
 });
 
 test("rankCatalogCards treats shortened prefixed subset totals as equivalent", () => {

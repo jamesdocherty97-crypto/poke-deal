@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { parseCardSearchQuery, rankCatalogCards, type ParsedCardSearchQuery } from "@/lib/catalog/cardSearch";
+import {
+  normalizeCatalogCardSearchInput,
+  parseCardSearchQuery,
+  rankCatalogCards,
+  type ParsedCardSearchQuery,
+} from "@/lib/catalog/cardSearch";
 import { searchChaseCards } from "@/lib/catalog/chaseCards";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { toCardData } from "@/lib/catalog/prismaCardCache";
@@ -32,24 +37,25 @@ export async function GET(request: Request) {
 
   if (!q.trim()) return NextResponse.json({ cards: [] });
 
-  const parsedQuery = parseCardSearchQuery(q);
-  const localCards = await findLocalCards(q, setName, parsedQuery).catch(() => []);
-  const localRanked = rankCatalogCards(q, localCards, { setName, limit });
+  const lookup = normalizeCatalogCardSearchInput(q, setName);
+  const parsedQuery = parseCardSearchQuery(lookup.query);
+  const localCards = await findLocalCards(lookup.query, lookup.setName, parsedQuery).catch(() => []);
+  const localRanked = rankCatalogCards(lookup.query, localCards, { setName: lookup.setName, limit });
 
   let liveCards: CatalogCard[] = [];
   if (localRanked.length < limit) {
     const source = new PokemonTcgApiCatalogSource();
-    const liveName = parsedQuery.name || q;
+    const liveName = lookup.name || parsedQuery.name || q;
     liveCards = await source
-      .search({ name: liveName, number: parsedQuery.number, setName, game: "POKEMON", language: "EN" }, limit)
+      .search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: lookup.setName, game: "POKEMON", language: "EN" }, limit)
       .catch(() => []);
     await cacheCatalogCards(liveCards).catch((err) => {
       console.warn("[catalog/cards] live card cache skipped:", err instanceof Error ? err.message : "unknown error");
     });
   }
 
-  const chaseCards = searchChaseCards(q, setName, limit);
-  const cards = rankCatalogCards(q, [...localRanked, ...liveCards, ...chaseCards], { setName, limit });
+  const chaseCards = searchChaseCards(lookup.query, lookup.setName, limit);
+  const cards = rankCatalogCards(lookup.query, [...localRanked, ...liveCards, ...chaseCards], { setName: lookup.setName, limit });
   return NextResponse.json({ cards });
 }
 

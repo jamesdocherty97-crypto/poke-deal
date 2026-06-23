@@ -1,6 +1,6 @@
 import type { CatalogCard } from "./types.js";
 import { normalizeSearchText, scoreSearchText } from "./fuzzy.js";
-import { getSetById, resolveSetId } from "./setCatalog.js";
+import { getSetById, resolveSetId, resolveSetIdForCard, searchSets } from "./setCatalog.js";
 
 export interface CardSearchOptions {
   setName?: string;
@@ -10,6 +10,19 @@ export interface CardSearchOptions {
 export interface ParsedCardSearchQuery {
   name: string;
   number?: string;
+}
+
+export interface NormalizedCatalogCardSearchInput {
+  query: string;
+  name: string;
+  setName?: string;
+  number?: string;
+}
+
+interface SetPhraseMatch {
+  phrase: string;
+  setName: string;
+  score: number;
 }
 
 export function rankCatalogCards(
@@ -50,7 +63,7 @@ export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setN
 }
 
 export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
-  const trimmed = query.trim().replace(/\s+/g, " ");
+  const trimmed = stripLookupNoise(query).trim().replace(/\s+/g, " ");
   if (!trimmed) return { name: "" };
 
   const wholeNumber = readCollectorNumber(trimmed);
@@ -62,6 +75,31 @@ export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
   if (name && number) return { name, number };
 
   return { name: trimmed };
+}
+
+export function normalizeCatalogCardSearchInput(
+  query: string,
+  explicitSetName?: string,
+): NormalizedCatalogCardSearchInput {
+  const cleaned = stripLookupNoise(query);
+  const parsed = parseCardSearchQuery(cleaned);
+  let name = parsed.name || cleaned.trim();
+  const number = parsed.number;
+
+  let setName = explicitSetName?.trim() || undefined;
+  if (setName) {
+    setName = resolveSetDisplayName(setName, number);
+  } else {
+    const setMatch = findSetPhraseInName(name, number);
+    if (setMatch) {
+      setName = setMatch.setName;
+      name = removePhrase(name, setMatch.phrase);
+    }
+  }
+
+  name = normalizeNameForSearch(name);
+  const normalizedQuery = [name, number].filter(Boolean).join(" ").trim() || cleaned.trim();
+  return { query: normalizedQuery, name, setName, number };
 }
 
 function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
@@ -80,6 +118,73 @@ function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
   );
 
   return Math.max(directScore, resolvedScore);
+}
+
+function stripLookupNoise(input: string): string {
+  return input
+    .replace(/(?:£\s*)\d+(?:[.,]\d{1,2})?/gi, " ")
+    .replace(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?\d+(?:[.,]\d{1,2})?\b/gi, " ")
+    .replace(/\bbgs\s*9(?:\.|,)?5\b/gi, " ")
+    .replace(/\b(?:psa|cgc)\s*(?:9|10)\b/gi, " ")
+    .replace(/\b(?:raw|ungraded|nm|near mint)\b/gi, " ")
+    .replace(/\b(?:qty|quantity)\s*\d{1,3}\b/gi, " ")
+    .replace(/(?:^|\s)(?:x\s*\d{1,3}|\d{1,3}\s*x)(?=\s|$)/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function findSetPhraseInName(name: string, number: string | undefined): SetPhraseMatch | null {
+  const words = name.split(/\s+/).filter(Boolean);
+  let best: SetPhraseMatch | null = null;
+
+  for (let start = 0; start < words.length; start += 1) {
+    for (let end = start + 1; end <= Math.min(words.length, start + 5); end += 1) {
+      const phrase = words.slice(start, end).join(" ");
+      const match = scoreSetPhrase(phrase, number);
+      if (!match) continue;
+      if (!best || match.score > best.score) best = match;
+    }
+  }
+
+  return best;
+}
+
+function scoreSetPhrase(phrase: string, number: string | undefined): SetPhraseMatch | null {
+  const normalizedPhrase = normalizeSearchText(phrase);
+  if (!normalizedPhrase) return null;
+  if (["ex", "gx", "v", "vmax", "vstar"].includes(normalizedPhrase)) return null;
+
+  const set = searchSets(phrase, 1)[0];
+  if (!set) return null;
+
+  const resolvedSetName = resolveSetDisplayName(set.name, number);
+  const normalizedSetName = normalizeSearchText(set.name);
+  const phraseTokenCount = normalizedPhrase.split(/\s+/).filter(Boolean).length;
+  const exactish =
+    normalizedPhrase === set.id.toLowerCase() ||
+    normalizedPhrase === set.ptcgoCode?.toLowerCase() ||
+    normalizedPhrase === normalizedSetName;
+  const contextual = phraseTokenCount >= 2 && normalizedSetName.includes(normalizedPhrase);
+  if (!exactish && !contextual) return null;
+
+  const score = (exactish ? 1000 : 800) + phraseTokenCount;
+  return { phrase, setName: resolvedSetName, score };
+}
+
+function resolveSetDisplayName(setName: string, number: string | undefined): string {
+  const resolvedId = resolveSetIdForCard(setName, number);
+  return (resolvedId && getSetById(resolvedId)?.name) || setName;
+}
+
+function removePhrase(input: string, phrase: string): string {
+  return input.replace(new RegExp(escapeRegExp(phrase), "i"), " ");
+}
+
+function normalizeNameForSearch(input: string): string {
+  return input
+    .replace(/[()|,;]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function dedupeCards(cards: CatalogCard[]): CatalogCard[] {
@@ -139,6 +244,10 @@ function readCollectorNumber(value: string | undefined): string | undefined {
   return /^(?:[A-Za-z]{1,5}\d{1,4}|\d{1,4})(?:\/[A-Za-z]{0,5}\d{1,4})?$/.test(trimmed)
     ? trimmed
     : undefined;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function tieBreakCard(a: CatalogCard, b: CatalogCard): number {

@@ -2236,6 +2236,56 @@ label {
   color: var(--yellow);
 }
 
+.price-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 68px;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 9px;
+}
+
+.price-preview div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.price-preview span,
+.price-preview small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.price-preview strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.08;
+}
+
+.price-preview.high strong {
+  color: var(--green);
+}
+
+.price-preview.low strong,
+.price-preview.none strong {
+  color: var(--yellow);
+}
+
+.price-preview button {
+  min-width: 68px;
+  min-height: 36px;
+  border-color: rgba(255, 203, 5, 0.42);
+  background: rgba(255, 203, 5, 0.14);
+  color: #fff4b0;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .confirm-sheet {
   display: grid;
   gap: 12px;

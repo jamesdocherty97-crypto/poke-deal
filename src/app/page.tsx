@@ -1,6 +1,8 @@
 "use client";
 
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { suggestListPrice, type PricingStrategy } from "@/lib/comps/pricing";
+import type { CompResult as DomainCompResult } from "@/lib/domain/types";
 import {
   buildInventoryView,
   buildListingView,
@@ -81,18 +83,7 @@ type CatalogSet = {
   logoUrl?: string;
 };
 
-type CompResult = {
-  source: string;
-  grade: string;
-  medianPence: number;
-  meanPence: number;
-  lowPence: number;
-  highPence: number;
-  sampleSize: number;
-  windowDays: number;
-  trendPct: number | null;
-  outliersRemoved: number;
-  asOf: string;
+type CompResult = Omit<DomainCompResult, "raw"> & {
   raw?: {
     smartMarketPrice?: { confidence?: string; daysUsed?: number; method?: string };
     chosenPriceSource?: string;
@@ -324,7 +315,7 @@ export default function Home() {
   const [quantity, setQuantity] = useState("1");
   const [source, setSource] = useState("Card fair");
   const [location, setLocation] = useState("Box A");
-  const [strategy, setStrategy] = useState("market");
+  const [strategy, setStrategy] = useState<PricingStrategy>("market");
   const [channel, setChannel] = useState<Channel>("EBAY");
   const [listPriceOverride, setListPriceOverride] = useState("");
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>("DRAFT");
@@ -568,6 +559,17 @@ export default function Home() {
   const dealerVerdict = useMemo(() => (comp ? buildDealerCompVerdict(comp) : null), [comp]);
   const stockImportPreview = useMemo(() => parseStockImportText(stockImportText), [stockImportText]);
   const stockImportHasText = stockImportText.trim().length > 0;
+  const projectedListSuggestion = useMemo(
+    () =>
+      headline
+        ? suggestListPrice({
+            comp: headline,
+            strategy,
+            costBasisPence: poundsToPence(cost),
+          })
+        : null,
+    [headline, strategy, cost],
+  );
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
@@ -2276,7 +2278,7 @@ export default function Home() {
             <div className="form-grid">
               <label>
                 Strategy
-                <select value={strategy} onChange={(event) => setStrategy(event.target.value)}>
+                <select value={strategy} onChange={(event) => setStrategy(event.target.value as PricingStrategy)}>
                   <option value="quick">Quick</option>
                   <option value="market">Market</option>
                   <option value="patient">Patient</option>
@@ -2302,6 +2304,18 @@ export default function Home() {
                 </select>
               </label>
             </div>
+            {projectedListSuggestion && (
+              <div className={`price-preview ${projectedListSuggestion.confidence}`}>
+                <div>
+                  <span>Auto list</span>
+                  <strong>{gbp(projectedListSuggestion.pricePence)}</strong>
+                  <small>{projectedListSuggestion.confidence}{projectedListSuggestion.flooredToMargin ? " · margin floor" : ""}</small>
+                </div>
+                <button type="button" onClick={() => setListPriceOverride(penceToPounds(projectedListSuggestion.pricePence))}>
+                  Use
+                </button>
+              </div>
+            )}
             <div className="form-grid">
               <label>
                 Source
