@@ -76,6 +76,20 @@ test("buildPokemonTcgSearchQueries tries API-style promo numbers after printed p
   ]);
 });
 
+test("buildPokemonTcgSearchQueries keeps unavailable promo sets strict", () => {
+  const queries = buildPokemonTcgSearchQueries({
+    name: "Snivy",
+    setName: "MEP",
+    number: "MEP049",
+  });
+
+  assert.deepEqual(queries, [
+    'name:"Snivy" number:"MEP049" set.id:mep',
+    'name:"Snivy" number:"49" set.id:mep',
+    'name:"Snivy" set.id:mep',
+  ]);
+});
+
 test("buildPokemonTcgSearchQueries drops the set term entirely when it can't be resolved", () => {
   const queries = buildPokemonTcgSearchQueries({
     name: "Charizard",
@@ -88,6 +102,7 @@ test("buildPokemonTcgSearchQueries drops the set term entirely when it can't be 
 
 test("buildPokemonTcgCollectorNumberTerms keeps printed codes and adds stripped API promo numbers", () => {
   assert.deepEqual(buildPokemonTcgCollectorNumberTerms("SVP085"), ["SVP085", "85"]);
+  assert.deepEqual(buildPokemonTcgCollectorNumberTerms("MEP049"), ["MEP049", "49"]);
   assert.deepEqual(buildPokemonTcgCollectorNumberTerms("SWSH262"), ["SWSH262"]);
   assert.deepEqual(buildPokemonTcgCollectorNumberTerms("TG06/TG30"), ["TG06"]);
   assert.deepEqual(buildPokemonTcgCollectorNumberTerms("214/167"), ["214"]);
@@ -109,6 +124,14 @@ test("buildPokemonTcgIdCandidates builds exact set-number ids before search", ()
       number: "SVP085",
     }),
     ["svp-SVP085", "svp-85"],
+  );
+  assert.deepEqual(
+    buildPokemonTcgIdCandidates({
+      name: "Snivy",
+      setName: "MEP",
+      number: "MEP049",
+    }),
+    ["mep-MEP049", "mep-49"],
   );
 });
 
@@ -226,6 +249,26 @@ test("mapPokemonTcgCard formats Scarlet & Violet promo numbers as dealer-entered
   assert.equal(card?.tcgApiId, "svp-85");
   assert.equal(card?.number, "SVP085");
   assert.equal(card?.setCode, "svp");
+});
+
+test("mapPokemonTcgCard formats Mega Evolution promo numbers as dealer-entered MEP codes", () => {
+  const card = mapPokemonTcgCard({
+    id: "mep-49",
+    name: "Snivy",
+    number: "49",
+    rarity: "Promo",
+    images: {
+      large: "https://images.pokemontcg.io/mep/49_hires.png",
+    },
+    set: {
+      id: "mep",
+      name: "Mega Evolution Promos",
+    },
+  });
+
+  assert.equal(card?.tcgApiId, "mep-49");
+  assert.equal(card?.number, "MEP049");
+  assert.equal(card?.setCode, "mep");
 });
 
 test("PokemonTcgApiCatalogSource searches cards and sends API key header when present", async () => {

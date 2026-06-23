@@ -42,6 +42,24 @@ test("parseQuickIntake resolves vintage dealer shorthand", () => {
   });
 });
 
+test("parseQuickIntake resolves Mega Evolution promo shorthand", () => {
+  assert.deepEqual(parseQuickIntake("Snivy MEP 049 raw £2"), {
+    name: "Snivy",
+    setName: "Mega Evolution Promos",
+    number: "MEP049",
+    grade: "RAW",
+    cost: "2.00",
+  });
+
+  assert.deepEqual(parseQuickIntake("Snivy MEP049 raw £2"), {
+    name: "Snivy",
+    setName: "Mega Evolution Promos",
+    number: "MEP049",
+    grade: "RAW",
+    cost: "2.00",
+  });
+});
+
 test("parseQuickIntake accepts broader slab grades", () => {
   assert.deepEqual(parseQuickIntake("Charizard base set 4/102 psa8 £300"), {
     name: "Charizard",

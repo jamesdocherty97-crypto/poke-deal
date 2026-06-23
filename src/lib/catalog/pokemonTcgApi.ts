@@ -1,6 +1,6 @@
 import type { CardRef } from "../domain/types.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../comps/currency.js";
-import { resolveSetIdForCard } from "./setCatalog.js";
+import { isApiUnavailableSetId, resolveSetIdForCard } from "./setCatalog.js";
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js";
 import { tokenizeSearchText } from "./fuzzy.js";
 
@@ -225,6 +225,8 @@ export function buildPokemonTcgSearchQueries(card: CardRef): string[] {
   addQuery(nameTerm, setTerm);
   if (relaxedNameTerm) addQuery(relaxedNameTerm, setTerm);
 
+  if (isApiUnavailableSetId(resolvedSetId)) return queries;
+
   for (const numberTerm of numberTerms) {
     addQuery(nameTerm, numberTerm);
   }
@@ -414,7 +416,7 @@ function buildRelaxedNameTerm(name: string): string | undefined {
 }
 
 function stripPromoPrefixForApiNumber(number: string): string | undefined {
-  const match = number.match(/^SVP0*(\d{1,4})$/i);
+  const match = number.match(/^(?:SVP|MEP)0*(\d{1,4})$/i);
   if (!match) return undefined;
   return String(Number.parseInt(match[1]!, 10));
 }
@@ -423,6 +425,9 @@ function formatPromoCollectorNumber(number: string, set: PokemonTcgSet | undefin
   const setId = readString(set?.id)?.toLowerCase();
   if (setId === "svp" && /^\d+$/.test(number)) {
     return `SVP${number.padStart(3, "0")}`;
+  }
+  if (setId === "mep" && /^\d+$/.test(number)) {
+    return `MEP${number.padStart(3, "0")}`;
   }
   return null;
 }

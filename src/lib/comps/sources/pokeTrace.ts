@@ -1,4 +1,6 @@
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
+import { getSetById, resolveSetId } from "../../catalog/setCatalog.js";
+import { tokenizeSearchText, tokenMatches } from "../../catalog/fuzzy.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
@@ -91,28 +93,32 @@ export class PokeTraceSource implements CompSource {
   }
 
   private async fetchCards(card: CardRef, market: PokeTraceMarket): Promise<unknown | null> {
-    const search = [card.name, card.number].filter(Boolean).join(" ");
-    const params = new URLSearchParams({
-      search,
-      market,
-      product_type: "single",
-      limit: "1",
-    });
-
-    try {
-      const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
-        headers: { "X-API-Key": this.apiKey ?? "", Accept: "application/json" },
-        signal: timeoutSignal(this.fetchTimeoutMs),
+    for (const search of buildPokeTraceSearchVariants(card)) {
+      const params = new URLSearchParams({
+        search,
+        market,
+        product_type: "single",
+        limit: "3",
       });
-      if (!res.ok) {
-        console.warn(`[${this.name}] HTTP ${res.status} - no comp returned`);
-        return null;
+
+      try {
+        const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
+          headers: { "X-API-Key": this.apiKey ?? "", Accept: "application/json" },
+          signal: timeoutSignal(this.fetchTimeoutMs),
+        });
+        if (!res.ok) {
+          console.warn(`[${this.name}] HTTP ${res.status} - no comp returned`);
+          if (res.status === 403) break;
+          continue;
+        }
+        const json = (await res.json()) as unknown;
+        if (findMatchingPokeTraceCard(json, card)) return json;
+      } catch (err) {
+        console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
       }
-      return (await res.json()) as unknown;
-    } catch (err) {
-      console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
-      return null;
     }
+
+    return null;
   }
 }
 
@@ -125,8 +131,7 @@ export function mapPokeTraceCardsToComp(
   ctx: MapContext,
   rates: FxRates = STATIC_RATES,
 ): CompResult {
-  const payload = json as PokeTracePayload | null;
-  const card = (Array.isArray(payload?.data) ? payload!.data[0] : payload?.data) as PokeTraceCard | undefined;
+  const card = findMatchingPokeTraceCard(json, ctx.card);
   if (!card) return emptyComp(ctx, "no PokeTrace card match");
 
   const choice = chooseTier(card, ctx.grade);
@@ -167,6 +172,19 @@ export function mapPokeTraceCardsToComp(
       ...choice.tier,
     },
   };
+}
+
+export function buildPokeTraceSearchVariants(card: CardRef): string[] {
+  const name = card.name.trim();
+  const number = card.number?.trim().replace(/\s+/g, "");
+  if (!name) return [];
+
+  const variants = new Set<string>();
+  const strippedPromo = stripPromoCollectorPrefix(number);
+  if (strippedPromo) variants.add([name, strippedPromo].join(" "));
+  if (number) variants.add([name, number].join(" "));
+  if (!number) variants.add(name);
+  return [...variants];
 }
 
 function chooseTier(card: PokeTraceCard, grade: Grade): PokeTraceTierChoice | null {
@@ -216,6 +234,89 @@ function canonicalCardRef(input: CardRef, card: PokeTraceCard): CardRef {
     game: "POKEMON",
     language: input.language ?? "EN",
   };
+}
+
+function findMatchingPokeTraceCard(json: unknown, request: CardRef): PokeTraceCard | null {
+  return readPokeTraceCards(json).find((card) => pokeTraceCardMatchesRequest(card, request)) ?? null;
+}
+
+function readPokeTraceCards(json: unknown): PokeTraceCard[] {
+  const payload = json as PokeTracePayload | null;
+  const data = payload?.data;
+  if (Array.isArray(data)) return data;
+  return data ? [data] : [];
+}
+
+function pokeTraceCardMatchesRequest(card: PokeTraceCard, request: CardRef): boolean {
+  const providerName = readString(card.name) ?? "";
+  if (!tokensMatch(request.name, providerName)) return false;
+
+  const requestedNumber = request.number?.trim();
+  const providerNumber = readString(card.cardNumber) ?? undefined;
+  if (requestedNumber && providerNumber && !collectorNumberMatches(providerNumber, requestedNumber)) return false;
+
+  const providerSet = readString(card.set?.name) ?? "";
+  if (request.setName && !setMatchesRequest(providerSet, request.setName)) return false;
+
+  return true;
+}
+
+function setMatchesRequest(providerSet: string, requestedSet: string): boolean {
+  const candidates = [requestedSet];
+  const resolvedSetId = resolveSetId(requestedSet);
+  const resolvedSet = resolvedSetId ? getSetById(resolvedSetId) : undefined;
+  if (resolvedSet?.name) candidates.push(resolvedSet.name);
+  if (resolvedSet?.ptcgoCode) candidates.push(resolvedSet.ptcgoCode);
+
+  return candidates.some((candidate) => tokensMatch(candidate, providerSet));
+}
+
+function tokensMatch(needle: string, haystack: string): boolean {
+  const needleTokens = tokenizeSearchText(needle).map(singularizeToken).filter((token) => token !== "set");
+  const haystackTokens = tokenizeSearchText(haystack).map(singularizeToken);
+  if (needleTokens.length === 0) return true;
+  if (haystackTokens.length === 0) return false;
+  return needleTokens.every((needleToken) =>
+    haystackTokens.some((haystackToken) => tokenMatches(needleToken, haystackToken)),
+  );
+}
+
+function collectorNumberMatches(providerNumber: string, requestedNumber: string): boolean {
+  const providerForms = collectorNumberForms(providerNumber);
+  const requestedForms = collectorNumberForms(requestedNumber);
+  return [...requestedForms].some((requested) => providerForms.has(requested));
+}
+
+function collectorNumberForms(number: string): Set<string> {
+  const normalized = normalizeComparableCollectorNumber(number);
+  const left = normalized.split("/")[0] ?? normalized;
+  const stripped = stripPromoCollectorPrefix(left);
+  return new Set(
+    [normalized, left, stripped, stripped ? normalizeComparableCollectorNumber(stripped) : null].filter(
+      (value): value is string => Boolean(value),
+    ),
+  );
+}
+
+function normalizeComparableCollectorNumber(number: string): string {
+  return number
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .split("/")
+    .map((part) => part.replace(/^0+(\d)/, "$1"))
+    .join("/");
+}
+
+function stripPromoCollectorPrefix(number: string | undefined): string | null {
+  const normalized = number?.trim().toUpperCase().replace(/\s+/g, "");
+  const match = normalized?.match(/^(?:SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)(\d{1,4})$/);
+  if (!match) return null;
+  return match[1]!;
+}
+
+function singularizeToken(token: string): string {
+  return token.endsWith("s") && token.length > 3 ? token.slice(0, -1) : token;
 }
 
 function priceToGbpPence(value: unknown, currency: "USD" | "EUR", rates: FxRates): number {

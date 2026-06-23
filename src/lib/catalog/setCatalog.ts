@@ -18,7 +18,7 @@
 //
 // Fully offline by design: ships a bundled snapshot of all known sets
 // (captured from GET /v2/sets on 2026-06-21 and re-verified on
-// 2026-06-22, 173 sets) so search,
+// 2026-06-22, 173 API sets + 1 local MEP placeholder) so search,
 // autocomplete, and popular-set chips work with zero API key, consistent
 // with this project's fixture/offline-mode convention (see fixtures.ts).
 // To freshen the snapshot later, re-fetch /v2/sets and regenerate the
@@ -217,6 +217,7 @@ const SET_SNAPSHOT: CatalogSet[] = [
   { id: "me2pt5", name: "Ascended Heroes", series: "Mega Evolution", printedTotal: 217, total: 295, releaseDate: "2026-01-30", ptcgoCode: "ASC", symbolUrl: "https://images.scrydex.com/pokemon/me2pt5-symbol/symbol", logoUrl: "https://images.scrydex.com/pokemon/me2pt5-logo/logo" },
   { id: "me3", name: "Perfect Order", series: "Mega Evolution", printedTotal: 88, total: 124, releaseDate: "2026-03-27", ptcgoCode: "POR", symbolUrl: "https://images.scrydex.com/pokemon/me3-symbol/symbol", logoUrl: "https://images.scrydex.com/pokemon/me3-logo/logo" },
   { id: "me4", name: "Chaos Rising", series: "Mega Evolution", printedTotal: 86, total: 122, releaseDate: "2026-05-22", ptcgoCode: "CRI", symbolUrl: "https://images.scrydex.com/pokemon/me4-symbol/symbol", logoUrl: "https://images.scrydex.com/pokemon/me4-logo/logo" },
+  { id: "mep", name: "Mega Evolution Promos", series: "Mega Evolution", releaseDate: "2025-09-26", ptcgoCode: "MEP" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -344,7 +345,18 @@ const SET_ALIASES: Record<string, string> = {
   "sword shield promos": "swshp",
   "sv promos": "svp",
   "scarlet violet promos": "svp",
+  mep: "mep",
+  "mega evolution promo": "mep",
+  "mega evolution promos": "mep",
+  "mega promo": "mep",
+  "mega promos": "mep",
+  "me promos": "mep",
 };
+
+// Sets that dealers can already type/stock, but that are not yet present in
+// the live Pokemon TCG API. Keep them as strict set filters so lookups do not
+// drift into an unrelated card with the same name.
+const API_UNAVAILABLE_SET_IDS = new Set(["mep"]);
 
 // Curated set of well-known / heavily-traded sets spanning vintage WOTC
 // through current-era chase sets, for "popular sets" quick-pick UI chips.
@@ -365,6 +377,7 @@ const POPULAR_SET_IDS = [
   "sv9",
   "zsv10pt5",
   "rsv10pt5",
+  "mep",
   "me1",
   "me2",
   "me2pt5",
@@ -584,6 +597,10 @@ export function resolveExactSetId(query: string | undefined): string | undefined
       set.ptcgoCode?.toUpperCase() === upper ||
       normalizeSearchText(set.name) === normalized,
   )?.id;
+}
+
+export function isApiUnavailableSetId(setId: string | undefined): boolean {
+  return Boolean(setId && API_UNAVAILABLE_SET_IDS.has(setId));
 }
 
 /**

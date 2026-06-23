@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { gradeToPokeTraceTier, mapPokeTraceCardsToComp, PokeTraceSource } from "./pokeTrace.js";
+import { buildPokeTraceSearchVariants, gradeToPokeTraceTier, mapPokeTraceCardsToComp, PokeTraceSource } from "./pokeTrace.js";
 import type { CardRef } from "../../domain/types.js";
 
 const fixture = JSON.parse(
@@ -81,6 +81,75 @@ test("RAW can use PokeTrace Cardmarket baselines for UK-relevant pricing", () =>
   assert.equal(comp.sampleSize, 31);
   assert.equal((comp.raw as { priceSource?: string }).priceSource, "cardmarket");
   assert.equal((comp.raw as { market?: string }).market, "EU");
+});
+
+test("PokeTrace search variants strip known promo prefixes for lookup", () => {
+  assert.deepEqual(buildPokeTraceSearchVariants({ name: "Snivy", setName: "MEP", number: "MEP049" }), [
+    "Snivy 049",
+    "Snivy MEP049",
+  ]);
+});
+
+test("PokeTrace chooses the matching promo card from multiple results", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Snivy",
+          cardNumber: "001/012",
+          set: { name: "McDonald's Promos 2011" },
+          market: "US",
+          currency: "USD",
+          prices: { tcgplayer: { NEAR_MINT: { avg: 2, saleCount: 10 } } },
+        },
+        {
+          name: "Snivy - 049",
+          cardNumber: "049",
+          set: { name: "ME: Mega Evolution Promo" },
+          market: "US",
+          currency: "USD",
+          prices: { tcgplayer: { NEAR_MINT: { avg: 19.38, saleCount: 274 } } },
+          lastUpdated: "2026-06-23T00:00:00Z",
+        },
+      ],
+    },
+    {
+      source: "poketrace",
+      card: { name: "Snivy", setName: "Mega Evolution Promos", number: "MEP049" },
+      grade: "RAW",
+      windowDays: 90,
+    },
+  );
+
+  assert.equal(comp.sampleSize, 274);
+  assert.equal(comp.medianPence, usdToPence(19.38));
+  assert.equal(comp.card.setName, "ME: Mega Evolution Promo");
+});
+
+test("PokeTrace rejects wrong-set cards for unavailable promo sets", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Snivy",
+          cardNumber: "1",
+          set: { name: "Black & White" },
+          market: "US",
+          currency: "USD",
+          prices: { tcgplayer: { NEAR_MINT: { avg: 1.5, saleCount: 20 } } },
+        },
+      ],
+    },
+    {
+      source: "poketrace",
+      card: { name: "Snivy", setName: "MEP", number: "MEP049" },
+      grade: "RAW",
+      windowDays: 90,
+    },
+  );
+
+  assert.equal(comp.sampleSize, 0);
+  assert.match((comp.raw as { reason?: string }).reason ?? "", /card match/);
 });
 
 test("PokeTraceSource tries EU first, then falls back to US", async () => {

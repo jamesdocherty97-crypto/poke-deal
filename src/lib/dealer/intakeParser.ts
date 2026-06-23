@@ -23,9 +23,9 @@ interface SetMatch {
 }
 
 const NUMBER_PATTERNS = [
-  /\b(?:TG|GG|SVP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,3}\s*\/\s*(?:TG|GG|SV)?\s*0?\d{1,3}\b/i,
+  /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,3}\s*\/\s*(?:TG|GG|SV|MEP)?\s*0?\d{1,3}\b/i,
   /\b\d{1,3}\s*\/\s*\d{1,3}\b/i,
-  /\b(?:TG|GG|SVP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,3}\b/i,
+  /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,3}\b/i,
 ];
 
 const SUPPORTED_QUICK_GRADES = new Set<ParsedQuickIntakeGrade>([
@@ -73,6 +73,8 @@ const STRONG_SET_ALIASES = new Set([
   "prismatic",
   "prismatic evo",
   "prismatic evos",
+  "mep",
+  "mega evolution promos",
   "sv promos",
   "swsh promos",
   "wotc promos",
@@ -128,6 +130,11 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
   if (setMatch) {
     parsed.setName = setMatch.setName;
     working = removePhrase(working, setMatch.phrase);
+  } else if (parsed.number) {
+    const inferredSetName = inferSetNameFromCollectorNumber(parsed.number);
+    if (inferredSetName) {
+      parsed.setName = inferredSetName;
+    }
   }
 
   const name = cleanupName(working);
@@ -286,6 +293,13 @@ function normalizeCollectorNumber(value: string): string {
     .replace(/\s+/g, "")
     .replace(/^([a-z]+)/i, (prefix) => prefix.toUpperCase())
     .replace(/\/([a-z]+)/i, (_, prefix: string) => `/${prefix.toUpperCase()}`);
+}
+
+function inferSetNameFromCollectorNumber(number: string): string | undefined {
+  const prefix = number.match(/^([A-Z]{2,5})\d{1,4}/)?.[1];
+  if (!prefix) return undefined;
+  const setId = resolveSetIdForCard(prefix, number);
+  return setId ? getSetById(setId)?.name : undefined;
 }
 
 function formatMoney(value: string): string {

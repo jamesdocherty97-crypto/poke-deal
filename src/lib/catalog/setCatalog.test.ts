@@ -5,6 +5,7 @@ import {
   getPopularSets,
   getRelatedSubsetIds,
   getSetById,
+  isApiUnavailableSetId,
   resolveExactSetId,
   resolveSetAliasId,
   resolveSetId,
@@ -48,6 +49,8 @@ test("resolveSetId handles dealer shorthand for current chase sets and subsets",
   assert.equal(resolveSetId("hidden fates sv"), "sma");
   assert.equal(resolveSetId("brs tg"), "swsh9tg");
   assert.equal(resolveSetId("sv promos"), "svp");
+  assert.equal(resolveSetId("mep"), "mep");
+  assert.equal(resolveSetId("mega evolution promos"), "mep");
 });
 
 test("resolveSetAliasId only returns curated exact aliases", () => {
@@ -75,6 +78,13 @@ test("resolveSetIdForCard uses prefixed collector numbers to choose gallery subs
 test("resolveSetIdForCard does not treat promo prefixes as gallery subsets", () => {
   assert.equal(resolveSetIdForCard("SWSH Promos", "SWSH262"), "swshp");
   assert.equal(resolveSetIdForCard("SV Promos", "SVP085"), "svp");
+  assert.equal(resolveSetIdForCard("MEP", "MEP049"), "mep");
+});
+
+test("MEP is known locally but treated as unavailable upstream", () => {
+  assert.equal(getSetById("mep")?.name, "Mega Evolution Promos");
+  assert.equal(isApiUnavailableSetId("mep"), true);
+  assert.equal(isApiUnavailableSetId("svp"), false);
 });
 
 test("getRelatedSubsetIds exposes attached high-volume subsets", () => {
@@ -118,6 +128,7 @@ test("getPopularSets returns the curated quick-pick list in order", () => {
   assert.ok(popular.length >= 70);
   assert.equal(popular[0]?.id, "sv8pt5");
   assert.ok(popular.some((set) => set.id === "swsh12pt5gg"));
+  assert.ok(popular.some((set) => set.id === "mep"));
   assert.ok(popular.some((set) => set.id === "swsh11tg"));
   assert.ok(popular.some((set) => set.id === "swsh12tg"));
   assert.ok(popular.some((set) => set.id === "sv8"));
@@ -127,7 +138,7 @@ test("getPopularSets returns the curated quick-pick list in order", () => {
 
 test("getAllSets returns the full bundled snapshot sorted newest first", () => {
   const all = getAllSets();
-  assert.equal(all.length, 173);
+  assert.equal(all.length, 174);
 
   for (let i = 1; i < all.length; i++) {
     const prevDate = all[i - 1]?.releaseDate ?? "";

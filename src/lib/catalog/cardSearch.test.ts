@@ -92,6 +92,13 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     setName: "Evolving Skies",
     number: "215",
   });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Snivy MEP 049 raw £2"), {
+    query: "Snivy 049",
+    name: "Snivy",
+    setName: "Mega Evolution Promos",
+    number: "049",
+  });
 });
 
 test("rankCatalogCards treats shortened prefixed subset totals as equivalent", () => {
@@ -174,6 +181,15 @@ test("scoreCatalogCardForSearch penalizes wrong set context without hiding usefu
   const score = scoreCatalogCardForSearch("Pikachu", cards[0]!, "Base");
   assert.ok(score > 0);
   assert.ok(score < scoreCatalogCardForSearch("Pikachu", cards[0]!, "Surging Sparks"));
+});
+
+test("rankCatalogCards does not cross-match unavailable promo sets", () => {
+  const mixed: CatalogCard[] = [
+    { game: "POKEMON", language: "EN", name: "Snivy", setName: "Black & White", setCode: "bw1", number: "1/114" },
+    { game: "POKEMON", language: "EN", name: "Snivy", setName: "BW Black Star Promos", setCode: "bwp", number: "BW06" },
+  ];
+
+  assert.deepEqual(rankCatalogCards("Snivy 049", mixed, { setName: "MEP" }), []);
 });
 
 test("scoreCatalogCardForSearch does not surface unrelated cards just because they have images", () => {

@@ -2,6 +2,7 @@ import type { CatalogCard } from "./types.js";
 import { normalizeSearchText, scoreSearchText } from "./fuzzy.js";
 import {
   getSetById,
+  isApiUnavailableSetId,
   resolveExactSetId,
   resolveSetAliasId,
   resolveSetId,
@@ -57,6 +58,9 @@ export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setN
   const numberScore = parsed.number && card.number && sameCollectorNumber(parsed.number, card.number) ? 1100 : 0;
   if (parsed.name && nameScore === 0) return 0;
   if (nameScore === 0 && numberScore === 0) return 0;
+
+  const resolvedSetId = setName?.trim() ? resolveSetId(setName) : undefined;
+  if (isApiUnavailableSetId(resolvedSetId) && card.setCode !== resolvedSetId) return 0;
 
   let score = nameScore * 4 + numberScore;
   if (setName?.trim()) {

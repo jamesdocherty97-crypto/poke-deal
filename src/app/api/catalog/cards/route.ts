@@ -126,9 +126,9 @@ function normalizeCachedCardNumber(card: DbCard): string | undefined {
   const number = card.number?.trim();
   if (!number) return undefined;
 
-  if (card.setCode === "svp") {
+  if (card.setCode === "svp" || card.setCode === "mep") {
     const match = number.match(/^0*(\d{1,3})(?:\/\d+)?$/);
-    if (match) return `SVP${match[1]!.padStart(3, "0")}`;
+    if (match) return `${card.setCode.toUpperCase()}${match[1]!.padStart(3, "0")}`;
   }
 
   return number;
