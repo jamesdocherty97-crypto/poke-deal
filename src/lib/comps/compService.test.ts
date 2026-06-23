@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { detectDisagreement, pickHeadline } from "./compService.js";
+import { CompService, detectDisagreement, pickHeadline } from "./compService.js";
 import type { CompResult } from "../domain/types.js";
+import type { CompSource } from "./CompSource.js";
 
 function comp(overrides: Partial<CompResult>): CompResult {
   return {
@@ -121,4 +122,20 @@ test("pickHeadline keeps confident graded comps on sample size", () => {
   const psaLarge = comp({ grade: "PSA_10", medianPence: 11500, sampleSize: 10 });
 
   assert.equal(pickHeadline([psaSmall, psaLarge]), psaLarge);
+});
+
+test("CompService degrades a hanging source into a visible empty comp", async () => {
+  const hangingSource: CompSource = {
+    name: "slow-source",
+    live: true,
+    lookup: () => new Promise<CompResult>(() => undefined),
+  };
+  const service = new CompService([hangingSource], 5);
+
+  const result = await service.lookup({ name: "Gengar" }, { grade: "RAW", windowDays: 30 });
+
+  assert.equal(result.headline.source, "slow-source");
+  assert.equal(result.headline.sampleSize, 0);
+  assert.equal(result.headline.windowDays, 30);
+  assert.match((result.headline.raw as { reason?: string }).reason ?? "", /timed out/);
 });

@@ -155,11 +155,16 @@ test("missing grade returns empty result, not an error", () => {
   assert.equal(c.sampleSize, 0);
   assert.equal(c.medianPence, 0);
   assert.equal(c.trendPct, null);
+  assert.match((c.raw as { reason?: string }).reason ?? "", /BGS 10/);
 });
 
 test("malformed payload returns empty result", () => {
-  assert.equal(mapCardAggregateToComp(null, ctx("RAW")).sampleSize, 0);
-  assert.equal(mapCardAggregateToComp({ data: {} }, ctx("RAW")).sampleSize, 0);
+  const nullComp = mapCardAggregateToComp(null, ctx("RAW"));
+  const malformedComp = mapCardAggregateToComp({ data: {} }, ctx("RAW"));
+
+  assert.equal(nullComp.sampleSize, 0);
+  assert.equal(malformedComp.sampleSize, 0);
+  assert.match((malformedComp.raw as { reason?: string }).reason ?? "", /grade aggregate/);
 });
 
 test("PokemonPriceTrackerSource degrades when live fetch fails or times out", async () => {
@@ -173,6 +178,7 @@ test("PokemonPriceTrackerSource degrades when live fetch fails or times out", as
 
   assert.equal(comp.sampleSize, 0);
   assert.equal(comp.medianPence, 0);
+  assert.match((comp.raw as { reason?: string }).reason ?? "", /failed|no response/);
 });
 
 test("PokemonPriceTrackerSource live requests use the low-credit limit and cap history days", async () => {

@@ -61,10 +61,17 @@ test("PokeTraceSource degrades without keys or failed fetches", async () => {
 
   assert.equal(comp.sampleSize, 0);
   assert.equal(comp.medianPence, 0);
+  assert.match((comp.raw as { reason?: string }).reason ?? "", /failed|no response/);
 });
 
 test("malformed or unsupported payloads return empty comps", () => {
-  assert.equal(mapPokeTraceCardsToComp(null, ctx("RAW")).sampleSize, 0);
-  assert.equal(mapPokeTraceCardsToComp({ data: [] }, ctx("RAW")).sampleSize, 0);
-  assert.equal(mapPokeTraceCardsToComp(fixture, ctx("CGC_10")).sampleSize, 0);
+  const nullComp = mapPokeTraceCardsToComp(null, ctx("RAW"));
+  const emptyComp = mapPokeTraceCardsToComp({ data: [] }, ctx("RAW"));
+  const unsupportedComp = mapPokeTraceCardsToComp(fixture, ctx("CGC_10"));
+
+  assert.equal(nullComp.sampleSize, 0);
+  assert.equal(emptyComp.sampleSize, 0);
+  assert.equal(unsupportedComp.sampleSize, 0);
+  assert.match((emptyComp.raw as { reason?: string }).reason ?? "", /card match/);
+  assert.match((unsupportedComp.raw as { reason?: string }).reason ?? "", /price tier/);
 });

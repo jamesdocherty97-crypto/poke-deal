@@ -14,6 +14,17 @@ export interface UnitSalePlan {
   fullySold: boolean;
 }
 
+export interface UnitSaleUndoInput {
+  quantity: number;
+  status: UnitSaleStatus;
+}
+
+export interface UnitSaleUndoPlan {
+  quantity: number;
+  status: UnitSaleStatus;
+  restoredQuantity: number;
+}
+
 export function planUnitSale(input: UnitSalePlanInput): UnitSalePlan {
   if (input.status === "SOLD") {
     throw new Error("Stock row is already sold.");
@@ -45,6 +56,23 @@ export function planUnitSale(input: UnitSalePlanInput): UnitSalePlan {
     status: input.status,
     closeOpenListings: false,
     fullySold: false,
+  };
+}
+
+export function planSaleUndo(input: UnitSaleUndoInput): UnitSaleUndoPlan {
+  const quantity = Number.isFinite(input.quantity) ? Math.max(1, Math.floor(input.quantity)) : 1;
+  if (input.status === "SOLD") {
+    return {
+      quantity: 1,
+      status: "IN_STOCK",
+      restoredQuantity: 1,
+    };
+  }
+
+  return {
+    quantity: quantity + 1,
+    status: input.status,
+    restoredQuantity: 1,
   };
 }
 

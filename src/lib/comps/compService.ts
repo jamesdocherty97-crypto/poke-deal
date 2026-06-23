@@ -5,10 +5,12 @@
 
 import type { CardRef, CompQuery, CompResult } from "../domain/types.js";
 import type { CompSource } from "./CompSource.js";
-import { isConfident } from "./cleaning.js";
+import { DEFAULT_WINDOW_DAYS, isConfident } from "./cleaning.js";
 import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
 import { PokeTraceSource } from "./sources/pokeTrace.js";
+
+const DEFAULT_SOURCE_TIMEOUT_MS = 8000;
 
 export interface ReconciledComp {
   /** The single comp to act on. */
@@ -20,7 +22,10 @@ export interface ReconciledComp {
 }
 
 export class CompService {
-  constructor(private readonly sources: CompSource[]) {}
+  constructor(
+    private readonly sources: CompSource[],
+    private readonly sourceTimeoutMs = DEFAULT_SOURCE_TIMEOUT_MS,
+  ) {}
 
   /** Default wiring. Add PokeTrace etc. here as adapters are built. */
   static default(): CompService {
@@ -34,7 +39,7 @@ export class CompService {
 
   async lookup(card: CardRef, query: CompQuery = {}): Promise<ReconciledComp> {
     const settled = await Promise.allSettled(
-      this.sources.map((s) => s.lookup(card, query)),
+      this.sources.map((source) => this.lookupSource(source, card, query)),
     );
     const all = settled
       .filter((r): r is PromiseFulfilledResult<CompResult> => r.status === "fulfilled")
@@ -47,6 +52,55 @@ export class CompService {
     const headline = pickHeadline(all);
     return { headline, all, sourcesDisagree: detectDisagreement(all) };
   }
+
+  private async lookupSource(source: CompSource, card: CardRef, query: CompQuery): Promise<CompResult> {
+    const fallback = (reason: string): CompResult => emptySourceComp(source.name, card, query, reason);
+    try {
+      return await withTimeout(
+        source.lookup(card, query),
+        this.sourceTimeoutMs,
+        () => fallback(`${source.name} timed out`),
+      );
+    } catch (err) {
+      return fallback(err instanceof Error ? `${source.name} failed: ${err.message}` : `${source.name} failed`);
+    }
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: () => T): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(fallback()), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+function emptySourceComp(source: string, card: CardRef, query: CompQuery, reason: string): CompResult {
+  return {
+    source,
+    card,
+    grade: query.grade ?? "RAW",
+    currency: "GBP",
+    medianPence: 0,
+    meanPence: 0,
+    lowPence: 0,
+    highPence: 0,
+    sampleSize: 0,
+    windowDays: query.windowDays ?? DEFAULT_WINDOW_DAYS,
+    trendPct: null,
+    outliersRemoved: 0,
+    asOf: new Date().toISOString(),
+    raw: { reason },
+  };
 }
 
 /** Largest confident sample wins; fall back to largest sample of any. */

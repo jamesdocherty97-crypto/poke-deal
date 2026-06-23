@@ -50,6 +50,9 @@ export class PokemonPriceTrackerSource implements CompSource {
     }
 
     const json = await this.fetchCard(card, windowDays);
+    if (json == null) {
+      return emptyComp({ source: this.name, card, grade, windowDays }, "Price Tracker lookup failed or returned no response");
+    }
     return mapCardAggregateToComp(json, { source: this.name, card, grade, windowDays });
   }
 
@@ -149,7 +152,7 @@ function readPrefixedCollectorPrefix(value: string | undefined): string | null {
   return match?.[1]?.toUpperCase() ?? null;
 }
 
-function emptyComp(ctx: MapContext): CompResult {
+function emptyComp(ctx: MapContext, reason = "no Price Tracker data"): CompResult {
   return {
     source: ctx.source,
     card: ctx.card,
@@ -164,6 +167,7 @@ function emptyComp(ctx: MapContext): CompResult {
     trendPct: null,
     outliersRemoved: 0,
     asOf: new Date().toISOString(),
+    raw: { reason },
   };
 }
 
@@ -184,7 +188,7 @@ export function mapCardAggregateToComp(
     | undefined;
 
   const byGrade = card?.ebay?.salesByGrade;
-  if (!byGrade) return emptyComp(ctx);
+  if (!byGrade) return emptyComp(ctx, "no eBay grade aggregate returned");
 
   const agg = byGrade[gradeToProviderKey(ctx.grade)] as
     | {
@@ -199,7 +203,9 @@ export function mapCardAggregateToComp(
     | undefined;
 
   const count = Number(agg?.count ?? 0);
-  if (!agg || !Number.isFinite(count) || count <= 0) return emptyComp(ctx);
+  if (!agg || !Number.isFinite(count) || count <= 0) {
+    return emptyComp(ctx, `no ${ctx.grade.replace(/_/g, " ")} eBay aggregate`);
+  }
 
   const usdToPence = (usd: unknown): number => {
     const n = Number(usd);

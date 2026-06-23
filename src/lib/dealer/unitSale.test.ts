@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { planUnitSale, splitPence } from "./unitSale.js";
+import { planSaleUndo, planUnitSale, splitPence } from "./unitSale.js";
 
 test("planUnitSale fully sells a single-copy stock row", () => {
   assert.deepEqual(planUnitSale({ quantity: 1, status: "LISTED" }), {
@@ -50,6 +50,22 @@ test("planUnitSale rejects already sold stock", () => {
 test("planUnitSale rejects impossible sold quantities", () => {
   assert.throws(() => planUnitSale({ quantity: 2, soldQuantity: 0, status: "IN_STOCK" }), /above 0/);
   assert.throws(() => planUnitSale({ quantity: 2, soldQuantity: 3, status: "IN_STOCK" }), /exceed stock/);
+});
+
+test("planSaleUndo restores a fully sold row as one active copy", () => {
+  assert.deepEqual(planSaleUndo({ quantity: 3, status: "SOLD" }), {
+    quantity: 1,
+    status: "IN_STOCK",
+    restoredQuantity: 1,
+  });
+});
+
+test("planSaleUndo increments active duplicate stock", () => {
+  assert.deepEqual(planSaleUndo({ quantity: 2, status: "LISTED" }), {
+    quantity: 3,
+    status: "LISTED",
+    restoredQuantity: 1,
+  });
 });
 
 test("splitPence preserves exact totals across unit sale records", () => {

@@ -4,7 +4,7 @@ import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
 
 const BASE_URL = "https://api.poketrace.com/v1";
-const DEFAULT_FETCH_TIMEOUT_MS = 6500;
+const DEFAULT_FETCH_TIMEOUT_MS = 2200;
 
 type PokeTraceMarket = "US" | "EU";
 
@@ -65,9 +65,10 @@ export class PokeTraceSource implements CompSource {
     const grade = query.grade ?? "RAW";
     const windowDays = query.windowDays ?? DEFAULT_WINDOW_DAYS;
     const ctx = { source: this.name, card, grade, windowDays };
-    if (!this.live) return emptyComp(ctx);
+    if (!this.live) return emptyComp(ctx, "PokeTrace key missing");
 
     const payload = await this.fetchCards(card);
+    if (payload == null) return emptyComp(ctx, "PokeTrace lookup failed or returned no response");
     return mapPokeTraceCardsToComp(payload, ctx);
   }
 
@@ -108,16 +109,16 @@ export function mapPokeTraceCardsToComp(
 ): CompResult {
   const payload = json as PokeTracePayload | null;
   const card = (Array.isArray(payload?.data) ? payload!.data[0] : payload?.data) as PokeTraceCard | undefined;
-  if (!card) return emptyComp(ctx);
+  if (!card) return emptyComp(ctx, "no PokeTrace card match");
 
   const choice = chooseTier(card, ctx.grade);
-  if (!choice) return emptyComp(ctx);
+  if (!choice) return emptyComp(ctx, `no PokeTrace ${ctx.grade.replace(/_/g, " ")} price tier`);
 
   const currency = readCurrency(card.currency);
-  if (!currency) return emptyComp(ctx);
+  if (!currency) return emptyComp(ctx, "PokeTrace returned an unsupported currency");
 
   const avgPence = priceToGbpPence(choice.tier.avg, currency, rates);
-  if (avgPence <= 0) return emptyComp(ctx);
+  if (avgPence <= 0) return emptyComp(ctx, "PokeTrace returned no usable price");
 
   const lowPence = priceToGbpPence(choice.tier.low, currency, rates) || avgPence;
   const highPence = priceToGbpPence(choice.tier.high, currency, rates) || avgPence;
@@ -167,7 +168,7 @@ function chooseTier(card: PokeTraceCard, grade: Grade): PokeTraceTierChoice | nu
   return null;
 }
 
-function emptyComp(ctx: MapContext): CompResult {
+function emptyComp(ctx: MapContext, reason = "no PokeTrace data"): CompResult {
   return {
     source: ctx.source,
     card: ctx.card,
@@ -182,6 +183,7 @@ function emptyComp(ctx: MapContext): CompResult {
     trendPct: null,
     outliersRemoved: 0,
     asOf: new Date().toISOString(),
+    raw: { reason },
   };
 }
 

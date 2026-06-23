@@ -96,6 +96,9 @@ type CompResult = {
     kind?: string;
     caveat?: string;
     chosenSignal?: CatalogPriceSignal;
+    reason?: string;
+    priceSource?: string;
+    tier?: string;
     sales?: OwnedSaleCompRow[];
   };
 };
@@ -206,6 +209,11 @@ type SaleSummary = {
   marginPct: number | null;
   soldAt: string;
 };
+
+type DeleteTarget =
+  | { kind: "inventory"; item: InventoryItem }
+  | { kind: "watch"; watch: WatchRecord }
+  | { kind: "sale"; sale: SaleSummary };
 
 type RepriceRecommendation = {
   itemId: string;
@@ -336,9 +344,7 @@ export default function Home() {
   const [itemSource, setItemSource] = useState("");
   const [itemLocation, setItemLocation] = useState("");
   const [itemStatus, setItemStatus] = useState<ItemStatus>("IN_STOCK");
-  const [deleteTarget, setDeleteTarget] = useState<
-    { kind: "inventory"; item: InventoryItem } | { kind: "watch"; watch: WatchRecord } | null
-  >(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [salePrice, setSalePrice] = useState("");
   const [fees, setFees] = useState("");
   const [postage, setPostage] = useState("1.20");
@@ -1221,6 +1227,29 @@ export default function Home() {
     }
   }
 
+  function requestUndoSale(sale: SaleSummary) {
+    setDeleteTarget({ kind: "sale", sale });
+  }
+
+  async function undoSale(sale: SaleSummary) {
+    setBusy(`sale-${sale.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/sales/${sale.id}`, { method: "DELETE" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "sale undo failed");
+      setNotice("Sale undone. One copy restored to Stock.");
+      setDeleteTarget(null);
+      await refreshAll();
+      setView("inventory");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "sale undo failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function updateStatus(item: InventoryItem, status: ItemStatus) {
     setBusy(`status-${item.id}`);
     setError(null);
@@ -1325,6 +1354,10 @@ export default function Home() {
     if (!target) return;
     if (target.kind === "inventory") {
       await deleteItem(target.item);
+      return;
+    }
+    if (target.kind === "sale") {
+      await undoSale(target.sale);
       return;
     }
     await deleteWatch(target.watch);
@@ -2798,9 +2831,17 @@ export default function Home() {
                       fees {gbp(sale.feesPence)} · postage {gbp(sale.postagePence)} · cost {gbp(sale.costBasisPence)}
                     </small>
                   </div>
-                  <div>
+                  <div className="sale-result">
                     <strong>{gbp(sale.profitPence)}</strong>
                     <span>{sale.marginPct == null ? "n/a" : `${sale.marginPct}%`}</span>
+                    <button
+                      className="ghost-button sale-undo-button"
+                      type="button"
+                      onClick={() => requestUndoSale(sale)}
+                      disabled={busy === `sale-${sale.id}`}
+                    >
+                      {busy === `sale-${sale.id}` ? "Undoing..." : "Undo"}
+                    </button>
                   </div>
                 </article>
               ))
@@ -2814,13 +2855,9 @@ export default function Home() {
       {deleteTarget && (
         <section className="confirm-sheet" role="dialog" aria-modal="true" aria-label="Confirm delete">
           <div>
-            <p className="eyebrow">Delete</p>
-            <h2>{deleteTarget.kind === "inventory" ? deleteTarget.item.card.name : deleteTarget.watch.card.name}</h2>
-            <span>
-              {deleteTarget.kind === "inventory"
-                ? `${deleteTarget.item.grade.replace(/_/g, " ")} stock row, listing drafts and sale records will be removed.`
-                : `${deleteTarget.watch.grade.replace(/_/g, " ")} buy watch and its alerts will be removed.`}
-            </span>
+            <p className="eyebrow">{deleteTarget.kind === "sale" ? "Undo" : "Delete"}</p>
+            <h2>{deleteTargetTitle(deleteTarget)}</h2>
+            <span>{deleteTargetDetail(deleteTarget)}</span>
           </div>
           <div className="confirm-actions">
             <button className="ghost-button" type="button" onClick={() => setDeleteTarget(null)}>
@@ -2830,13 +2867,9 @@ export default function Home() {
               className="danger-button"
               type="button"
               onClick={confirmDeleteTarget}
-              disabled={
-                deleteTarget.kind === "inventory"
-                  ? busy === `delete-${deleteTarget.item.id}`
-                  : busy === `watch-${deleteTarget.watch.id}`
-              }
+              disabled={deleteTargetBusy(deleteTarget, busy)}
             >
-              {busy?.startsWith("delete-") || busy?.startsWith("watch-") ? "Deleting..." : "Delete"}
+              {deleteTargetButtonLabel(deleteTarget, busy)}
             </button>
           </div>
         </section>
@@ -3038,6 +3071,33 @@ function ListingRow({
       </div>
     </article>
   );
+}
+
+function deleteTargetTitle(target: DeleteTarget): string {
+  if (target.kind === "inventory") return target.item.card.name;
+  if (target.kind === "sale") return target.sale.name;
+  return target.watch.card.name;
+}
+
+function deleteTargetDetail(target: DeleteTarget): string {
+  if (target.kind === "inventory") {
+    return `${target.item.grade.replace(/_/g, " ")} stock row, listing drafts and sale records will be removed.`;
+  }
+  if (target.kind === "sale") {
+    return `${target.sale.grade.replace(/_/g, " ")} ${channelLabel(target.sale.channel)} sale will be removed and one copy restored to Stock. Listings stay closed until you relist.`;
+  }
+  return `${target.watch.grade.replace(/_/g, " ")} buy watch and its alerts will be removed.`;
+}
+
+function deleteTargetBusy(target: DeleteTarget, busy: string | null): boolean {
+  if (target.kind === "inventory") return busy === `delete-${target.item.id}`;
+  if (target.kind === "sale") return busy === `sale-${target.sale.id}`;
+  return busy === `watch-${target.watch.id}`;
+}
+
+function deleteTargetButtonLabel(target: DeleteTarget, busy: string | null): string {
+  if (target.kind === "sale") return busy === `sale-${target.sale.id}` ? "Undoing..." : "Undo sale";
+  return busy?.startsWith("delete-") || busy?.startsWith("watch-") ? "Deleting..." : "Delete";
 }
 
 function TodayActionButton({
@@ -3445,6 +3505,7 @@ function sourceLabel(source: string, headline: boolean): string {
 }
 
 function compBasis(result: CompResult): string {
+  if (result.sampleSize === 0 || result.medianPence <= 0) return rawReason(result) ?? "No matching signal";
   if (result.source === "owned-sales") return "Your sold prices";
   if (result.source === "poketrace") {
     const raw = result.raw as { priceSource?: string; tier?: string; kind?: string } | undefined;
@@ -3459,16 +3520,21 @@ function compBasis(result: CompResult): string {
     const confidence = result.raw.smartMarketPrice?.confidence;
     return confidence ? `Smart RAW · ${confidence}` : "Smart RAW";
   }
-  if (result.sampleSize === 0) return "No matching signal";
   return `${result.grade.replace(/_/g, " ")} sold aggregate`;
 }
 
 function compMeta(result: CompResult): string {
+  const reason = rawReason(result);
+  if ((result.sampleSize === 0 || result.medianPence <= 0) && reason) return reason;
   const sample =
     result.source === "pokemon-tcg-market"
       ? "baseline"
       : `${result.sampleSize} sample${result.sampleSize === 1 ? "" : "s"}`;
   return `${sample} / ${result.windowDays}d · ${ageLabel(result.asOf)}`;
+}
+
+function rawReason(result: CompResult): string | null {
+  return typeof result.raw?.reason === "string" && result.raw.reason.trim() ? result.raw.reason : null;
 }
 
 function receiptTone(result: CompResult, headline: CompResult, sourcesDisagree: boolean): string {

@@ -1886,7 +1886,7 @@ label {
   gap: 3px;
 }
 
-.sale-mini-row div:last-child {
+.sale-mini-row .sale-result {
   justify-items: end;
   text-align: right;
 }
@@ -1897,9 +1897,15 @@ label {
   font-size: 13px;
 }
 
-.sale-mini-row div:last-child strong {
+.sale-mini-row .sale-result strong {
   color: var(--green);
   font-size: 16px;
+}
+
+.sale-undo-button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .sale-mini-row span,
