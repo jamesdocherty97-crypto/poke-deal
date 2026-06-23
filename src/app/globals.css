@@ -1362,6 +1362,67 @@ label {
     var(--panel);
 }
 
+.target-suggestion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(255, 203, 5, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 203, 5, 0.08);
+  padding: 10px;
+}
+
+.target-suggestion.active {
+  border-color: rgba(52, 211, 153, 0.34);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.target-suggestion div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.target-suggestion span {
+  color: #fff2a6;
+  font-size: 11px;
+  font-weight: 1000;
+}
+
+.target-suggestion strong {
+  overflow-wrap: anywhere;
+  color: var(--yellow);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.target-suggestion.active strong {
+  color: var(--green);
+}
+
+.target-suggestion small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.target-suggestion button {
+  min-width: 64px;
+  min-height: 38px;
+  border-color: rgba(255, 203, 5, 0.32);
+  color: var(--yellow);
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.target-suggestion button:disabled {
+  border-color: rgba(52, 211, 153, 0.25);
+  color: var(--green);
+  opacity: 1;
+}
+
 .stock-import-panel {
   background:
     linear-gradient(125deg, rgba(139, 92, 246, 0.16), transparent 48%),

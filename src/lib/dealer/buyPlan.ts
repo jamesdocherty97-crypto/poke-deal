@@ -25,6 +25,19 @@ export interface BuyPlan {
   note: string;
 }
 
+export interface BuyTargetSuggestionInput {
+  targetBuyPence?: number | null;
+  compMedianPence: number;
+  currentTargetPence?: number | null;
+}
+
+export interface BuyTargetSuggestion {
+  label: "Target buy" | "70% comp";
+  targetPence: number;
+  note: string;
+  alreadyUsing: boolean;
+}
+
 export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
   const unitCostPence = Math.max(0, Math.round(input.unitCostPence));
   const quantity = Math.max(1, Math.round(input.quantity));
@@ -99,6 +112,41 @@ export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
   };
 }
 
+export function buildBuyTargetSuggestion(input: BuyTargetSuggestionInput): BuyTargetSuggestion | null {
+  const currentTargetPence = sanitisePence(input.currentTargetPence ?? 0);
+  const targetBuyPence = sanitisePence(input.targetBuyPence ?? 0);
+  const compMedianPence = sanitisePence(input.compMedianPence);
+
+  if (targetBuyPence > 0) {
+    return {
+      label: "Target buy",
+      targetPence: targetBuyPence,
+      note: "Keeps a 30% safety cushion after expected selling costs.",
+      alreadyUsing: isSamePence(currentTargetPence, targetBuyPence),
+    };
+  }
+
+  if (compMedianPence > 0) {
+    const targetPence = Math.round(compMedianPence * 0.7);
+    return {
+      label: "70% comp",
+      targetPence,
+      note: "Fallback target when fee-aware deal maths is not available.",
+      alreadyUsing: isSamePence(currentTargetPence, targetPence),
+    };
+  }
+
+  return null;
+}
+
 function roundPct(fraction: number): number {
   return Math.round(fraction * 1000) / 10;
+}
+
+function sanitisePence(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function isSamePence(left: number, right: number): boolean {
+  return Math.abs(left - right) <= 1;
 }

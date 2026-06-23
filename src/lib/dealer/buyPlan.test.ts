@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildBuyPlan } from "./buyPlan.js";
+import { buildBuyPlan, buildBuyTargetSuggestion } from "./buyPlan.js";
 
 test("buildBuyPlan accounts for eBay fees and postage per unit", () => {
   const plan = buildBuyPlan({
@@ -62,4 +62,44 @@ test("buildBuyPlan downgrades profitable but cautious comps", () => {
   assert.equal(plan.label, "Check");
   assert.equal(plan.tone, "warn");
   assert.match(plan.note, /second look/);
+});
+
+test("buildBuyTargetSuggestion prefers fee-aware target buy", () => {
+  const suggestion = buildBuyTargetSuggestion({
+    targetBuyPence: 2436,
+    compMedianPence: 5000,
+    currentTargetPence: 1500,
+  });
+
+  assert.deepEqual(suggestion, {
+    label: "Target buy",
+    targetPence: 2436,
+    note: "Keeps a 30% safety cushion after expected selling costs.",
+    alreadyUsing: false,
+  });
+});
+
+test("buildBuyTargetSuggestion falls back to 70 percent of comp", () => {
+  const suggestion = buildBuyTargetSuggestion({
+    targetBuyPence: 0,
+    compMedianPence: 5000,
+    currentTargetPence: 3500,
+  });
+
+  assert.deepEqual(suggestion, {
+    label: "70% comp",
+    targetPence: 3500,
+    note: "Fallback target when fee-aware deal maths is not available.",
+    alreadyUsing: true,
+  });
+});
+
+test("buildBuyTargetSuggestion returns null without a priced signal", () => {
+  const suggestion = buildBuyTargetSuggestion({
+    targetBuyPence: 0,
+    compMedianPence: 0,
+    currentTargetPence: 1500,
+  });
+
+  assert.equal(suggestion, null);
 });

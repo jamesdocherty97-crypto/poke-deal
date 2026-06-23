@@ -24,7 +24,7 @@ import { buildManualCompLinks } from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
-import { buildBuyPlan } from "@/lib/dealer/buyPlan";
+import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
 import { buildCheckedComp, checkedCompSourceLabel, type CheckedCompSource } from "@/lib/dealer/checkedComp";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
@@ -608,8 +608,8 @@ export default function Home() {
     };
   }, [checkedComp, comp]);
   const deal = useMemo(
-    () => (headline ? judgeDeal(headline, poundsToPence(cost), poundsToPence(postage)) : null),
-    [headline, cost, postage],
+    () => (headline ? judgeDeal(headline, poundsToPence(cost), channel) : null),
+    [channel, headline, cost],
   );
   const gradeEv = useMemo(
     () =>
@@ -715,6 +715,17 @@ export default function Home() {
     projectedListSuggestion?.pricePence,
     quantity,
   ]);
+  const buyTargetSuggestion = useMemo(
+    () =>
+      headline
+        ? buildBuyTargetSuggestion({
+            targetBuyPence: deal?.targetBuyPence ?? null,
+            compMedianPence: headline.medianPence,
+            currentTargetPence: poundsToPence(watchTarget),
+          })
+        : null,
+    [deal?.targetBuyPence, headline, watchTarget],
+  );
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
@@ -2721,6 +2732,22 @@ export default function Home() {
                   <input value={grade.replace(/_/g, " ")} readOnly />
                 </label>
               </div>
+              {buyTargetSuggestion && (
+                <div className={`target-suggestion ${buyTargetSuggestion.alreadyUsing ? "active" : ""}`}>
+                  <div>
+                    <span>{buyTargetSuggestion.label}</span>
+                    <strong>{gbp(buyTargetSuggestion.targetPence)}</strong>
+                    <small>{buyTargetSuggestion.note}</small>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setWatchTarget(penceToPounds(buyTargetSuggestion.targetPence))}
+                    disabled={buyTargetSuggestion.alreadyUsing}
+                  >
+                    {buyTargetSuggestion.alreadyUsing ? "Using" : "Use"}
+                  </button>
+                </div>
+              )}
               <button className="secondary-action" type="button" onClick={createWatch} disabled={busy === "watch-create"}>
                 {busy === "watch-create" ? "Saving watch..." : "Watch for buy price"}
               </button>
@@ -4369,7 +4396,7 @@ function hideBrokenImage(event: SyntheticEvent<HTMLImageElement>) {
 function judgeDeal(
   comp: CompResult,
   costBasisPence: number,
-  postagePence: number,
+  channel: Channel,
 ): {
   label: string;
   tone: "good" | "warn" | "danger";
@@ -4379,8 +4406,8 @@ function judgeDeal(
   if (comp.sampleSize === 0 || comp.medianPence <= 0) {
     return { label: "No signal", tone: "danger", expectedProfitPence: 0, targetBuyPence: 0 };
   }
-  const fees = Math.round(comp.medianPence * 0.128) + 30;
-  const net = comp.medianPence - fees - postagePence;
+  const costs = estimateSaleCosts(channel, comp.medianPence);
+  const net = comp.medianPence - costs.feesPence - costs.postagePence;
   const expectedProfitPence = net - costBasisPence;
   const targetBuyPence = Math.max(0, Math.round(net * 0.7));
   const roi = costBasisPence > 0 ? expectedProfitPence / costBasisPence : 0;
