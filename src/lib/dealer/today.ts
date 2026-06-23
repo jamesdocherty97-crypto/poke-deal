@@ -1,4 +1,4 @@
-export type TodayActionTarget = "buy" | "stock" | "drafts" | "profit" | "watches" | "reprice";
+export type TodayActionTarget = "buy" | "stock" | "drafts" | "sales" | "profit" | "watches" | "reprice";
 
 export type TodayActionTone = "good" | "warn" | "info";
 
@@ -84,8 +84,8 @@ export function buildTodayActions(input: TodayActionInput, limit = 5): TodayActi
     actions.push({
       id: "first-sale",
       title: "Book first sale",
-      detail: "Profit starts after a sold item",
-      target: "stock",
+      detail: input.activeListings > 0 ? "Sell from active listings" : "Profit starts after a sold item",
+      target: input.activeListings > 0 ? "sales" : "stock",
       tone: "good",
       priority: 64,
     });

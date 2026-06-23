@@ -72,3 +72,20 @@ test("buildTodayActions does not offer repricing until a listing is active", () 
   assert.equal(actions.some((action) => action.id === "reprice"), false);
   assert.equal(actions[0]?.id, "draft-listings");
 });
+
+test("buildTodayActions sends first-sale work to active listings when possible", () => {
+  const actions = buildTodayActions({
+    stockCount: 2,
+    activeStockCount: 2,
+    soldCount: 0,
+    draftListings: 0,
+    activeListings: 1,
+    activeWatches: 1,
+    agedStockCount: 0,
+    unlistedStockCount: 0,
+  });
+
+  const firstSale = actions.find((action) => action.id === "first-sale");
+  assert.equal(firstSale?.target, "sales");
+  assert.match(firstSale?.detail ?? "", /active listings/);
+});

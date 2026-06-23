@@ -665,6 +665,12 @@ export default function Home() {
       setView("listings");
       return;
     }
+    if (target === "sales") {
+      setListingStateFilter("ACTIVE");
+      setListingSort("newest");
+      setView("listings");
+      return;
+    }
     if (target === "watches") {
       setView("pnl");
       return;
@@ -1043,12 +1049,14 @@ export default function Home() {
     setError(null);
   }
 
-  function openSell(item: InventoryItem) {
-    const price = item.listings[0]?.listPrice ?? item.listings[0]?.suggestedPrice ?? item.costBasis;
-    const nextChannel = item.listings[0]?.channel ?? "EBAY";
+  function openSell(item: InventoryItem, listing?: Listing) {
+    const saleListing = listing ?? item.listings[0];
+    const price = saleListing?.listPrice ?? saleListing?.suggestedPrice ?? item.costBasis;
+    const nextChannel = saleListing?.channel ?? "EBAY";
     const estimate = estimateSaleCosts(nextChannel, price);
     setSellingId(item.id);
     setEditingItemId(null);
+    setEditingListingId(null);
     setCreatingListingItemId(null);
     setSalePrice(penceToPounds(price));
     setSaleQuantity("1");
@@ -1058,6 +1066,20 @@ export default function Home() {
     setSaleChannel(nextChannel);
     setFeesTouched(false);
     setPostageTouched(false);
+    setError(null);
+    setNotice(null);
+  }
+
+  function openSellFromListing(listing: Listing) {
+    if (!listing.item) {
+      setError("This listing is missing its stock row.");
+      return;
+    }
+    if (listing.item.status === "SOLD") {
+      setError("That stock row is already sold.");
+      return;
+    }
+    openSell(listing.item, listing);
   }
 
   function applySaleChannelPreset(nextChannel: Channel) {
@@ -2298,96 +2320,6 @@ export default function Home() {
             </form>
           )}
 
-          {sellingId && (
-            <form className="sell-sheet" onSubmit={markSold}>
-              <div className="panel-heading">
-                <div>
-                  <h2>Mark sold</h2>
-                  {sellingItem && (
-                    <span className="muted">
-                      {sellingItem.card.name} · cost {gbp(sellingItem.costBasis)} each · {sellingItem.quantity} in stock
-                    </span>
-                  )}
-                </div>
-                <button className="ghost-button" type="button" onClick={() => setSellingId(null)}>Close</button>
-              </div>
-              <div className="sale-channel-presets" aria-label="Sale channel presets">
-                {channels.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={saleChannel === c ? "selected" : ""}
-                    onClick={() => applySaleChannelPreset(c)}
-                  >
-                    {channelLabel(c)}
-                  </button>
-                ))}
-              </div>
-              <div className="form-grid">
-                <label>
-                  Total sale
-                  <MoneyInput value={salePrice} onChange={setSalePrice} />
-                </label>
-                <label>
-                  Qty sold
-                  <input
-                    inputMode="numeric"
-                    min="1"
-                    max={sellingItem?.quantity ?? 1}
-                    step="1"
-                    value={saleQuantity}
-                    onChange={(event) => setSaleQuantity(event.target.value)}
-                  />
-                </label>
-              </div>
-              <div className="form-grid">
-                <label>
-                  Sold
-                  <input type="date" value={soldAt} onChange={(event) => setSoldAt(event.target.value)} />
-                </label>
-                <label>
-                  Fees
-                  <MoneyInput
-                    value={fees}
-                    onChange={(value) => {
-                      setFeesTouched(true);
-                      setFees(value);
-                    }}
-                  />
-                </label>
-              </div>
-              <label>
-                Postage
-                <MoneyInput
-                  value={postage}
-                  onChange={(value) => {
-                    setPostageTouched(true);
-                    setPostage(value);
-                  }}
-                />
-              </label>
-              {salePreview && (
-                <div className={`sale-preview ${salePreview.profitPence >= 0 ? "good" : "warn"}`}>
-                  <div>
-                    <span>Net</span>
-                    <strong>{gbp(salePreview.netPence)}</strong>
-                  </div>
-                  <div>
-                    <span>Cost</span>
-                    <strong>{gbp(salePreview.costPence)}</strong>
-                  </div>
-                  <div>
-                    <span>Profit</span>
-                    <strong>{gbp(salePreview.profitPence)}</strong>
-                  </div>
-                </div>
-              )}
-              <button className="primary-action" type="submit" disabled={busy === `sell-${sellingId}`}>
-                {busy === `sell-${sellingId}` ? "Saving..." : "Create sale"}
-              </button>
-            </form>
-          )}
-
           {creatingListingItemId && creatingListingItem && (
             <form className="sell-sheet" onSubmit={createListing}>
               <div className="panel-heading">
@@ -2509,6 +2441,7 @@ export default function Home() {
               listing={listing}
               busy={busy}
               onEdit={openListingEditor}
+              onSell={openSellFromListing}
               onState={(state) =>
                 patchListing(
                   listing,
@@ -2852,6 +2785,96 @@ export default function Home() {
         </section>
       )}
 
+      {sellingId && (
+        <form className="sell-sheet" onSubmit={markSold}>
+          <div className="panel-heading">
+            <div>
+              <h2>Mark sold</h2>
+              {sellingItem && (
+                <span className="muted">
+                  {sellingItem.card.name} · cost {gbp(sellingItem.costBasis)} each · {sellingItem.quantity} in stock
+                </span>
+              )}
+            </div>
+            <button className="ghost-button" type="button" onClick={() => setSellingId(null)}>Close</button>
+          </div>
+          <div className="sale-channel-presets" aria-label="Sale channel presets">
+            {channels.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={saleChannel === c ? "selected" : ""}
+                onClick={() => applySaleChannelPreset(c)}
+              >
+                {channelLabel(c)}
+              </button>
+            ))}
+          </div>
+          <div className="form-grid">
+            <label>
+              Total sale
+              <MoneyInput value={salePrice} onChange={setSalePrice} />
+            </label>
+            <label>
+              Qty sold
+              <input
+                inputMode="numeric"
+                min="1"
+                max={sellingItem?.quantity ?? 1}
+                step="1"
+                value={saleQuantity}
+                onChange={(event) => setSaleQuantity(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="form-grid">
+            <label>
+              Sold
+              <input type="date" value={soldAt} onChange={(event) => setSoldAt(event.target.value)} />
+            </label>
+            <label>
+              Fees
+              <MoneyInput
+                value={fees}
+                onChange={(value) => {
+                  setFeesTouched(true);
+                  setFees(value);
+                }}
+              />
+            </label>
+          </div>
+          <label>
+            Postage
+            <MoneyInput
+              value={postage}
+              onChange={(value) => {
+                setPostageTouched(true);
+                setPostage(value);
+              }}
+            />
+          </label>
+          {salePreview && (
+            <div className={`sale-preview ${salePreview.profitPence >= 0 ? "good" : "warn"}`}>
+              <div>
+                <span>Net</span>
+                <strong>{gbp(salePreview.netPence)}</strong>
+              </div>
+              <div>
+                <span>Cost</span>
+                <strong>{gbp(salePreview.costPence)}</strong>
+              </div>
+              <div>
+                <span>Profit</span>
+                <strong>{gbp(salePreview.profitPence)}</strong>
+              </div>
+            </div>
+          )}
+          <button className="primary-action" type="submit" disabled={busy === `sell-${sellingId}`}>
+            {busy === `sell-${sellingId}` ? "Saving..." : "Create sale"}
+          </button>
+        </form>
+      )}
+
       {deleteTarget && (
         <section className="confirm-sheet" role="dialog" aria-modal="true" aria-label="Confirm delete">
           <div>
@@ -3024,17 +3047,20 @@ function ListingRow({
   listing,
   busy,
   onEdit,
+  onSell,
   onState,
 }: {
   listing: Listing;
   busy: string | null;
   onEdit: (listing: Listing) => void;
+  onSell: (listing: Listing) => void;
   onState: (state: Exclude<ListingState, "SOLD">) => void;
 }) {
   const card = listing.item?.card;
   const title = listing.title ?? card?.name ?? "Untitled listing";
   const price = listing.listPrice ?? listing.suggestedPrice ?? 0;
   const isBusy = busy === `listing-${listing.id}`;
+  const canSell = Boolean(listing.item && listing.item.status !== "SOLD" && listing.state !== "SOLD");
 
   return (
     <article className="item-row">
@@ -3065,6 +3091,11 @@ function ListingRow({
           {listing.state === "ACTIVE" && (
             <button type="button" onClick={() => onState("ENDED")} disabled={isBusy}>
               End
+            </button>
+          )}
+          {canSell && (
+            <button type="button" onClick={() => onSell(listing)} disabled={Boolean(busy?.startsWith("sell-"))}>
+              Sell
             </button>
           )}
         </div>
