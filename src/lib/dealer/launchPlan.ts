@@ -111,7 +111,7 @@ export function buildLaunchPlan(input: LaunchPlanInput, limit = 5): LaunchPlanIt
     items.push({
       id: "discord-alerts",
       title: "Turn on alerts",
-      detail: "Discord webhook is missing; reprices and buy hits stay in-app.",
+      detail: "Push alerts are off; reprices and buy hits stay in-app.",
       state: "warn",
       action: "Setup",
       target: "external",

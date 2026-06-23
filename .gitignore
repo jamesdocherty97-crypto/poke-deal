@@ -11,6 +11,7 @@ prisma/dev.db
 coverage/
 *.tsbuildinfo
 .vercel
+APP_LOGIN_PASSWORD.txt
 
 # sandbox-only artifacts
 .env.bak.*

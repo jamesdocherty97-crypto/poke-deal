@@ -161,7 +161,7 @@ function buildAlertReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
     return {
       id: "alerts",
       title: "Alerts",
-      detail: "Discord delivery is ready for buys and reprices.",
+      detail: "Push delivery is ready for buys and reprices.",
       state: "done",
       priority: 68,
     };
@@ -170,7 +170,7 @@ function buildAlertReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
   return {
     id: "alerts",
     title: "Alerts",
-    detail: "Add a Discord webhook so price drops and reprices reach you.",
+    detail: "Push delivery is off, so price drops and reprices stay in-app.",
     state: "warn",
     action: "Setup",
     target: "external",

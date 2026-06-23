@@ -74,14 +74,14 @@ export async function GET() {
         : "Add DATABASE_URL in Vercel so stock and sales persist.",
     },
     {
-      id: "discord",
-      label: "Discord",
+      id: "push-alerts",
+      label: "Push alerts",
       role: "price and reprice alerts",
       status: process.env.DISCORD_WEBHOOK_URL?.trim() ? "ready" : "missing",
       required: false,
       setupHint: process.env.DISCORD_WEBHOOK_URL?.trim()
         ? "Alert delivery is ready for buy targets and repricing."
-        : "Add DISCORD_WEBHOOK_URL in Vercel for push-style alerts.",
+        : "Push delivery is off; buy targets and reprices still stay in-app.",
     },
   ];
 

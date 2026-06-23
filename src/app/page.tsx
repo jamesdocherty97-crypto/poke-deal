@@ -463,6 +463,7 @@ export default function Home() {
   const [popularSets, setPopularSets] = useState<CatalogSet[]>([]);
   const [allSets, setAllSets] = useState<CatalogSet[]>([]);
   const [showAllPopularSets, setShowAllPopularSets] = useState(false);
+  const [scrollToComp, setScrollToComp] = useState(false);
   const [setSuggestions, setSetSuggestions] = useState<CatalogSet[]>([]);
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
   const [cardSuggestions, setCardSuggestions] = useState<CatalogCard[]>([]);
@@ -476,6 +477,7 @@ export default function Home() {
   const [recentSetIds, setRecentSetIds] = useState<string[]>([]);
   const pullStartY = useRef<number | null>(null);
   const pullTracking = useRef(false);
+  const compPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     void refreshAll();
@@ -847,6 +849,16 @@ export default function Home() {
     quantity,
     setNameValue,
   ]);
+
+  useEffect(() => {
+    if (!scrollToComp || !headline || !compPanelRef.current) return;
+    const handle = window.setTimeout(() => {
+      compPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setScrollToComp(false);
+    }, 80);
+    return () => window.clearTimeout(handle);
+  }, [headline, scrollToComp]);
+
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
@@ -1233,6 +1245,7 @@ export default function Home() {
       setCardArtUrl(payload.catalog?.imageUrl ?? null);
       pinRecentSetName(payload.catalog?.setName ?? input.setName);
       setGradeComp(null);
+      setScrollToComp(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "lookup failed");
     } finally {
@@ -1629,7 +1642,13 @@ export default function Home() {
     setError(null);
   }
 
-  function chooseQuickHunt(card: QuickHuntCard) {
+  function chooseQuickHunt(card: QuickHuntCard, options: { lookupAfter?: boolean } = {}) {
+    const nextLookup = {
+      name: card.name,
+      setName: card.setName,
+      number: card.number,
+      grade,
+    };
     setName(card.name);
     setSetNameValue(card.setName);
     setNumber(card.number);
@@ -1640,6 +1659,10 @@ export default function Home() {
     clearCheckedComp();
     setNotice(null);
     setError(null);
+    if (options.lookupAfter) {
+      setNotice(`Looking up ${card.name}...`);
+      void lookupComp(nextLookup);
+    }
   }
 
   async function loadSetCatalog() {
@@ -2759,14 +2782,22 @@ export default function Home() {
                 <div className="quick-hunts" aria-label="Quick card picks">
                   {quickHunts.map((card) => (
                     <article className="quick-hunt-card" key={`${card.name}-${card.setName}-${card.number}`}>
-                      <button className="quick-hunt-pick" type="button" onClick={() => chooseQuickHunt(card)}>
+                      <button
+                        className="quick-hunt-pick"
+                        type="button"
+                        onClick={() => chooseQuickHunt(card, { lookupAfter: true })}
+                        disabled={busy === "lookup"}
+                      >
                         <span className="quick-art-stack">
                           <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
                           {card.setMarkUrl && (
                             <img className="quick-set-mark" src={card.setMarkUrl} alt="" onError={hideBrokenImage} />
                           )}
                         </span>
-                        <span>{card.name}</span>
+                        <span className="quick-hunt-copy">
+                          <strong>{card.name}</strong>
+                          <small>{card.setName} #{card.number}</small>
+                        </span>
                       </button>
                       <button
                         className="quick-hunt-remove danger-button"
@@ -2784,7 +2815,7 @@ export default function Home() {
           </form>
 
           {headline && (
-            <section className="panel comp-panel">
+            <section className="panel comp-panel" ref={compPanelRef}>
               <div className="comp-hero">
                 <div>
                   <p className="eyebrow">
@@ -3369,6 +3400,7 @@ export default function Home() {
               </div>
             </section>
           )}
+          {headline && <div className="mobile-buy-spacer" aria-hidden="true" />}
         </section>
       )}
 
@@ -4169,6 +4201,28 @@ export default function Home() {
               {deleteTargetButtonLabel(deleteTarget, busy)}
             </button>
           </div>
+        </section>
+      )}
+
+      {view === "acquire" && headline && (
+        <section className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`} aria-label="Current buy action">
+          <div>
+            <span>{confidenceLabel?.label ?? "Comp"}</span>
+            <strong>{gbp(headline.medianPence)}</strong>
+            <small>
+              {quickStockReady
+                ? `${quickStockQuantity} @ ${gbp(quickStockCostPence)} · ${deal?.label ?? "ready"}`
+                : "add cost and quantity"}
+            </small>
+          </div>
+          <button
+            className="primary-action"
+            type="button"
+            onClick={() => void acquire()}
+            disabled={busy === "acquire" || !quickStockReady}
+          >
+            {busy === "acquire" ? "Stocking..." : quickStockReady ? "Stock" : "Add cost"}
+          </button>
         </section>
       )}
 

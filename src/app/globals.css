@@ -699,6 +699,28 @@ label {
   overflow-wrap: anywhere;
 }
 
+.quick-hunt-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.quick-hunt-copy strong {
+  overflow-wrap: anywhere;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.08;
+}
+
+.quick-hunt-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .selected-card-strip {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) 76px;
@@ -2968,6 +2990,84 @@ label {
   font-size: 22px;
 }
 
+.mobile-buy-spacer {
+  display: none;
+}
+
+.mobile-buy-action {
+  position: fixed;
+  right: 10px;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  left: 10px;
+  z-index: 29;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+  align-items: center;
+  max-width: 720px;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 203, 5, 0.34);
+  border-radius: 8px;
+  background: rgba(13, 20, 36, 0.97);
+  box-shadow: 0 -14px 36px rgba(0, 0, 0, 0.34);
+  padding: 9px;
+  backdrop-filter: blur(18px);
+}
+
+.mobile-buy-action.good {
+  border-color: rgba(52, 211, 153, 0.42);
+}
+
+.mobile-buy-action.warn {
+  border-color: rgba(255, 203, 5, 0.42);
+}
+
+.mobile-buy-action.danger {
+  border-color: rgba(251, 113, 133, 0.44);
+}
+
+.mobile-buy-action div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.mobile-buy-action span,
+.mobile-buy-action small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-buy-action strong {
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.mobile-buy-action.good strong {
+  color: var(--green);
+}
+
+.mobile-buy-action.warn strong {
+  color: var(--yellow);
+}
+
+.mobile-buy-action.danger strong {
+  color: var(--danger);
+}
+
+.mobile-buy-action button {
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 .confirm-sheet {
   display: grid;
   gap: 12px;
@@ -3075,6 +3175,11 @@ label {
     grid-column: 1 / -1;
   }
 
+  .mobile-buy-action,
+  .mobile-buy-spacer {
+    display: none;
+  }
+
   .sell-sheet {
     right: calc(50% - 360px);
     left: auto;
@@ -3141,5 +3246,10 @@ label {
 @media (max-width: 759px) {
   .lookup-panel {
     margin-bottom: 72px;
+  }
+
+  .mobile-buy-spacer {
+    display: block;
+    min-height: 78px;
   }
 }
