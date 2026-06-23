@@ -2094,7 +2094,7 @@ label {
 
 .sale-preview {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
@@ -2254,7 +2254,8 @@ label {
 
   .detail-grid,
   .form-grid,
-  .deal-banner {
+  .deal-banner,
+  .sale-preview {
     grid-template-columns: 1fr;
   }
 

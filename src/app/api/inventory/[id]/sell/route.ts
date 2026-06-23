@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
 import { realizedProfit } from "@/lib/comps/pricing";
-import { planUnitSale } from "@/lib/dealer/unitSale";
+import { planUnitSale, splitPence } from "@/lib/dealer/unitSale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ const sellSchema = z.object({
   salePricePence: z.coerce.number().int().nonnegative(),
   feesPence: z.coerce.number().int().nonnegative().default(0),
   postagePence: z.coerce.number().int().nonnegative().default(0),
+  quantity: z.coerce.number().int().positive().default(1),
   soldAt: z.coerce.date().optional(),
 });
 
@@ -42,18 +43,31 @@ export async function POST(
         include: { card: true },
       });
       if (!item) throw new Error("Inventory item not found");
-      const salePlan = planUnitSale({ quantity: item.quantity, status: item.status });
-
-      const sale = await tx.sale.create({
-        data: {
-          itemId: item.id,
-          channel: d.channel,
-          salePrice: d.salePricePence,
-          fees: d.feesPence,
-          postage: d.postagePence,
-          soldAt: d.soldAt ?? new Date(),
-        },
+      const salePlan = planUnitSale({
+        quantity: item.quantity,
+        soldQuantity: d.quantity,
+        status: item.status,
       });
+      const soldAt = d.soldAt ?? new Date();
+      const salePrices = splitPence(d.salePricePence, salePlan.soldQuantity);
+      const fees = splitPence(d.feesPence, salePlan.soldQuantity);
+      const postage = splitPence(d.postagePence, salePlan.soldQuantity);
+
+      const sales = [];
+      for (let index = 0; index < salePlan.soldQuantity; index += 1) {
+        sales.push(
+          await tx.sale.create({
+            data: {
+              itemId: item.id,
+              channel: d.channel,
+              salePrice: salePrices[index] ?? 0,
+              fees: fees[index] ?? 0,
+              postage: postage[index] ?? 0,
+              soldAt,
+            },
+          }),
+        );
+      }
 
       const updatedItem = await tx.inventoryItem.update({
         where: { id: item.id },
@@ -71,21 +85,33 @@ export async function POST(
       if (salePlan.closeOpenListings) {
         await tx.listing.updateMany({
           where: { itemId: item.id, state: { in: ["DRAFT", "ACTIVE"] } },
-          data: { state: "SOLD", endedAt: sale.soldAt },
+          data: { state: "SOLD", endedAt: soldAt },
         });
       }
 
-      return { item: updatedItem, sale, salePlan };
+      return { item: updatedItem, sale: sales[0] ?? null, sales, salePlan };
     });
 
-    const profitPence = realizedProfit({
-      salePrice: result.sale.salePrice,
-      fees: result.sale.fees,
-      postage: result.sale.postage,
-      costBasis: result.item.costBasis,
-    });
+    const profitPence = result.sales.reduce(
+      (sum, sale) =>
+        sum +
+        realizedProfit({
+          salePrice: sale.salePrice,
+          fees: sale.fees,
+          postage: sale.postage,
+          costBasis: result.item.costBasis,
+        }),
+      0,
+    );
 
-    return NextResponse.json({ ...result, profitPence }, { status: 201 });
+    return NextResponse.json(
+      {
+        ...result,
+        profitPence,
+        quantitySold: result.salePlan.soldQuantity,
+      },
+      { status: 201 },
+    );
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "mark sold failed" },

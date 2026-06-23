@@ -339,6 +339,7 @@ export default function Home() {
   const [postage, setPostage] = useState("1.20");
   const [soldAt, setSoldAt] = useState(todayInputValue());
   const [saleChannel, setSaleChannel] = useState<Channel>("EBAY");
+  const [saleQuantity, setSaleQuantity] = useState("1");
   const [feesTouched, setFeesTouched] = useState(false);
   const [postageTouched, setPostageTouched] = useState(false);
   const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>("SUPPLIES");
@@ -486,15 +487,19 @@ export default function Home() {
   );
   const salePreview = useMemo(() => {
     if (!sellingItem) return null;
+    const soldQuantity = parseIntakeQuantity(saleQuantity) ?? 0;
     const salePricePence = poundsToPence(salePrice);
     const feesPence = poundsToPence(fees);
     const postagePence = poundsToPence(postage);
     const netPence = saleNetPence({ salePricePence, feesPence, postagePence });
+    const costPence = sellingItem.costBasis * soldQuantity;
     return {
+      soldQuantity,
       netPence,
-      profitPence: netPence - sellingItem.costBasis,
+      costPence,
+      profitPence: netPence - costPence,
     };
-  }, [fees, postage, salePrice, sellingItem]);
+  }, [fees, postage, salePrice, saleQuantity, sellingItem]);
   const headline = comp?.headline ?? null;
   const confidenceLabel = headline ? compConfidence(headline, comp?.sourcesDisagree ?? false) : null;
   const deal = useMemo(
@@ -1035,6 +1040,7 @@ export default function Home() {
     setEditingItemId(null);
     setCreatingListingItemId(null);
     setSalePrice(penceToPounds(price));
+    setSaleQuantity("1");
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
     setSoldAt(todayInputValue());
@@ -1105,6 +1111,16 @@ export default function Home() {
   async function markSold(event: FormEvent) {
     event.preventDefault();
     if (!sellingId) return;
+    const item = sellingItem;
+    const soldQuantity = parseIntakeQuantity(saleQuantity);
+    if (!item || !soldQuantity) {
+      setError("Sold quantity must be a whole number above 0.");
+      return;
+    }
+    if (soldQuantity > item.quantity) {
+      setError(`Only ${item.quantity} in stock.`);
+      return;
+    }
     setBusy(`sell-${sellingId}`);
     setError(null);
     setNotice(null);
@@ -1117,12 +1133,13 @@ export default function Home() {
           salePricePence: poundsToPence(salePrice),
           feesPence: poundsToPence(fees),
           postagePence: poundsToPence(postage),
+          quantity: soldQuantity,
           soldAt: soldAtIso(soldAt),
         }),
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "mark sold failed");
-      setNotice(`Sold. Profit ${gbp(payload.profitPence)}.`);
+      setNotice(`${soldQuantity > 1 ? `${soldQuantity} copies sold` : "Sold"}. Profit ${gbp(payload.profitPence)}.`);
       setSellingId(null);
       await refreshAll();
       setView("pnl");
@@ -2250,8 +2267,7 @@ export default function Home() {
                   <h2>Mark sold</h2>
                   {sellingItem && (
                     <span className="muted">
-                      {sellingItem.card.name} · cost {gbp(sellingItem.costBasis)}
-                      {sellingItem.quantity > 1 ? ` · selling 1 of ${sellingItem.quantity}` : ""}
+                      {sellingItem.card.name} · cost {gbp(sellingItem.costBasis)} each · {sellingItem.quantity} in stock
                     </span>
                   )}
                 </div>
@@ -2271,15 +2287,26 @@ export default function Home() {
               </div>
               <div className="form-grid">
                 <label>
-                  Sale
+                  Total sale
                   <MoneyInput value={salePrice} onChange={setSalePrice} />
                 </label>
+                <label>
+                  Qty sold
+                  <input
+                    inputMode="numeric"
+                    min="1"
+                    max={sellingItem?.quantity ?? 1}
+                    step="1"
+                    value={saleQuantity}
+                    onChange={(event) => setSaleQuantity(event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="form-grid">
                 <label>
                   Sold
                   <input type="date" value={soldAt} onChange={(event) => setSoldAt(event.target.value)} />
                 </label>
-              </div>
-              <div className="form-grid">
                 <label>
                   Fees
                   <MoneyInput
@@ -2290,22 +2317,26 @@ export default function Home() {
                     }}
                   />
                 </label>
-                <label>
-                  Postage
-                  <MoneyInput
-                    value={postage}
-                    onChange={(value) => {
-                      setPostageTouched(true);
-                      setPostage(value);
-                    }}
-                  />
-                </label>
               </div>
+              <label>
+                Postage
+                <MoneyInput
+                  value={postage}
+                  onChange={(value) => {
+                    setPostageTouched(true);
+                    setPostage(value);
+                  }}
+                />
+              </label>
               {salePreview && (
                 <div className={`sale-preview ${salePreview.profitPence >= 0 ? "good" : "warn"}`}>
                   <div>
                     <span>Net</span>
                     <strong>{gbp(salePreview.netPence)}</strong>
+                  </div>
+                  <div>
+                    <span>Cost</span>
+                    <strong>{gbp(salePreview.costPence)}</strong>
                   </div>
                   <div>
                     <span>Profit</span>
