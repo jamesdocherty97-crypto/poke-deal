@@ -545,6 +545,7 @@ label {
 }
 
 .comp-panel {
+  scroll-margin-top: 78px;
   background:
     linear-gradient(115deg, rgba(42, 117, 187, 0.26), transparent 46%),
     linear-gradient(245deg, rgba(255, 203, 5, 0.18), transparent 52%),
