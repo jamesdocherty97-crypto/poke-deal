@@ -8,6 +8,7 @@ export interface LaunchPlanInput {
   soldCount: number;
   activeWatches: number;
   operatingExpensePence: number;
+  setupKnown?: boolean;
   secondaryCrossCheck: boolean;
   alertDelivery: boolean;
 }
@@ -95,7 +96,9 @@ export function buildLaunchPlan(input: LaunchPlanInput, limit = 5): LaunchPlanIt
     });
   }
 
-  if (!input.secondaryCrossCheck) {
+  const setupKnown = input.setupKnown ?? true;
+
+  if (setupKnown && !input.secondaryCrossCheck) {
     items.push({
       id: "second-source",
       title: "Add second comp source",
@@ -104,18 +107,6 @@ export function buildLaunchPlan(input: LaunchPlanInput, limit = 5): LaunchPlanIt
       action: "Setup",
       target: "external",
       priority: 60,
-    });
-  }
-
-  if (!input.alertDelivery) {
-    items.push({
-      id: "discord-alerts",
-      title: "Turn on alerts",
-      detail: "Push alerts are off; reprices and buy hits stay in-app.",
-      state: "warn",
-      action: "Setup",
-      target: "external",
-      priority: 52,
     });
   }
 

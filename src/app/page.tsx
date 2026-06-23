@@ -950,6 +950,7 @@ export default function Home() {
         soldCount: dashboard?.metrics.soldCount ?? soldInventory.length,
         activeWatches: activeWatchCount,
         operatingExpensePence: dashboard?.metrics.operatingExpensePence ?? 0,
+        setupKnown: Boolean(systemStatus),
         secondaryCrossCheck: Boolean(systemStatus?.summary.secondaryCrossCheck),
         alertDelivery: Boolean(systemStatus?.summary.alertDelivery),
       }),

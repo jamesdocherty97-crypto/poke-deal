@@ -21,6 +21,7 @@ test("buildLaunchReadiness starts with source and first-buy setup work", () => {
   assert.equal(items[0]?.state, "warn");
   assert.equal(items.some((item) => item.id === "first-buy" && item.target === "buy"), true);
   assert.equal(items.some((item) => item.id === "cross-check" && item.state === "warn"), true);
+  assert.equal(items.find((item) => item.id === "alerts")?.state, "next");
 });
 
 test("buildLaunchReadiness nudges draft listings and first sale for a new operator", () => {

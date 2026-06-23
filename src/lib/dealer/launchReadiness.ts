@@ -167,6 +167,16 @@ function buildAlertReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
     };
   }
 
+  if (input.activeListings === 0 && input.activeWatches === 0) {
+    return {
+      id: "alerts",
+      title: "Alerts",
+      detail: "In-app reprices are enough until listings or buy targets are active.",
+      state: "next",
+      priority: 42,
+    };
+  }
+
   return {
     id: "alerts",
     title: "Alerts",

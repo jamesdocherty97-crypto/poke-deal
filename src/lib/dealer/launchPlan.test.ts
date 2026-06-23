@@ -20,7 +20,6 @@ test("buildLaunchPlan starts a new business with stock, costs and source work", 
     "setup-costs",
     "source-target",
     "second-source",
-    "discord-alerts",
   ]);
   assert.equal(plan[0]?.target, "buy");
   assert.equal(plan.find((item) => item.id === "second-source")?.state, "warn");
@@ -38,9 +37,25 @@ test("buildLaunchPlan prioritizes draft activation and first sale", () => {
     alertDelivery: false,
   });
 
-  assert.deepEqual(plan.map((item) => item.id), ["activate-drafts", "first-sale", "discord-alerts"]);
+  assert.deepEqual(plan.map((item) => item.id), ["activate-drafts", "first-sale"]);
   assert.equal(plan[0]?.target, "listings");
   assert.equal(plan[1]?.target, "listings");
+});
+
+test("buildLaunchPlan waits for setup status before warning about source setup", () => {
+  const plan = buildLaunchPlan({
+    stockCount: 0,
+    draftListings: 0,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 0,
+    setupKnown: false,
+    secondaryCrossCheck: false,
+    alertDelivery: false,
+  });
+
+  assert.equal(plan.some((item) => item.id === "second-source"), false);
 });
 
 test("buildLaunchPlan returns an operating rhythm once the loop is live", () => {
