@@ -16,6 +16,7 @@ import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { acquireToInventory } from "@/lib/inventory/inventoryService";
 import { getPrisma } from "@/lib/db/prisma";
+import { buildCheckedComp } from "@/lib/dealer/checkedComp";
 import type { CardRef } from "@/lib/domain/types";
 
 export const runtime = "nodejs";
@@ -49,6 +50,15 @@ const acquireSchema = z.object({
   listPricePence: z.coerce.number().int().nonnegative().optional(),
   listingState: z.enum(["DRAFT", "ACTIVE"]).default("DRAFT"),
   createListing: z.boolean().default(true),
+  checkedComp: z
+    .object({
+      pricePence: z.coerce.number().int().positive(),
+      sampleSize: z.coerce.number().int().positive().default(1),
+      windowDays: z.coerce.number().int().positive().max(365).default(30),
+      source: z.enum(["EBAY_SOLD", "CARDMARKET", "TCGPLAYER", "OTHER"]).default("EBAY_SOLD"),
+      note: z.string().trim().min(1).optional(),
+    })
+    .optional(),
 });
 
 export async function POST(request: Request) {
@@ -74,12 +84,33 @@ export async function POST(request: Request) {
 
     // 1. live comp for this card+grade
     const comps = await createAppCompService(catalogSource, catalog).lookup(compCard, { grade: d.grade });
+    const checkedComp = d.checkedComp
+      ? buildCheckedComp({
+          card: compCard,
+          grade: d.grade,
+          pricePence: d.checkedComp.pricePence,
+          sampleSize: d.checkedComp.sampleSize,
+          windowDays: d.checkedComp.windowDays,
+          source: d.checkedComp.source,
+          note: d.checkedComp.note,
+        })
+      : null;
+    const pricingComp = checkedComp ?? comps.headline;
+    const responseComps = checkedComp
+      ? { ...comps, headline: checkedComp, all: [checkedComp, ...comps.all], sourcesDisagree: false }
+      : comps;
 
     // 2. persist comp history (best-effort)
     if (process.env.DATABASE_URL) {
-      await new PrismaCompResultRepo().create(comps.headline).catch((err) =>
+      const compRepo = new PrismaCompResultRepo();
+      await compRepo.create(comps.headline).catch((err) =>
         console.warn("[acquire] comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
       );
+      if (checkedComp) {
+        await compRepo.create(checkedComp).catch((err) =>
+          console.warn("[acquire] checked comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
+        );
+      }
     }
 
     // 3. stock it + compute the suggested list price (valuing and pricing are one pipeline)
@@ -96,7 +127,7 @@ export async function POST(request: Request) {
       location: d.location,
       condition: d.condition,
       graderCert: d.graderCert,
-      comp: comps.headline,
+      comp: pricingComp,
       strategy: d.strategy,
       minMargin: d.minMargin,
     });
@@ -143,7 +174,7 @@ export async function POST(request: Request) {
         });
     }
 
-    return NextResponse.json({ item, suggestion, comp: comps.headline, comps, catalog, listing }, { status: 201 });
+    return NextResponse.json({ item, suggestion, comp: pricingComp, comps: responseComps, catalog, listing }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "acquire failed" },

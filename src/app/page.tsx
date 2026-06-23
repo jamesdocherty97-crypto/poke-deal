@@ -24,6 +24,7 @@ import { buildManualCompLinks } from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildBuyPlan } from "@/lib/dealer/buyPlan";
+import { buildCheckedComp, checkedCompSourceLabel, type CheckedCompSource } from "@/lib/dealer/checkedComp";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
@@ -97,6 +98,9 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
     priceSource?: string;
     tier?: string;
     sales?: OwnedSaleCompRow[];
+    source?: CheckedCompSource;
+    sourceLabel?: string;
+    note?: string;
   };
 };
 
@@ -297,6 +301,7 @@ const gradeOptions: Grade[] = [
   "CGC_9", "CGC_9_5", "CGC_10",
 ];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
+const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCGPLAYER", "OTHER"];
 const expenseCategories: ExpenseCategory[] = ["SUPPLIES", "POSTAGE", "GRADING", "TABLE_FEE", "TRAVEL", "PLATFORM", "OTHER"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
@@ -334,6 +339,10 @@ export default function Home() {
   const [strategy, setStrategy] = useState<PricingStrategy>("market");
   const [channel, setChannel] = useState<Channel>("EBAY");
   const [listPriceOverride, setListPriceOverride] = useState("");
+  const [checkedCompPrice, setCheckedCompPrice] = useState("");
+  const [checkedCompSample, setCheckedCompSample] = useState("1");
+  const [checkedCompSource, setCheckedCompSource] = useState<CheckedCompSource>("EBAY_SOLD");
+  const [checkedCompNote, setCheckedCompNote] = useState("");
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>("DRAFT");
   const [keepBuying, setKeepBuying] = useState(true);
   const [comp, setComp] = useState<Reconciled | null>(null);
@@ -527,7 +536,54 @@ export default function Home() {
       profitPence: netPence - costPence,
     };
   }, [fees, postage, salePrice, saleQuantity, sellingItem]);
-  const headline = comp?.headline ?? null;
+  const apiHeadline = comp?.headline ?? null;
+  const catalogCard = comp?.catalog ?? null;
+  const checkedComp = useMemo<CompResult | null>(
+    () => {
+      const built = buildCheckedComp({
+        card: {
+          name: catalogCard?.name ?? name,
+          setName: catalogCard?.setName ?? setNameValue,
+          number: catalogCard?.number ?? number,
+          tcgApiId: catalogCard?.tcgApiId,
+          game: "POKEMON",
+          language: "EN",
+        },
+        grade,
+        pricePence: checkedCompPrice.trim() ? poundsToPence(checkedCompPrice) : 0,
+        sampleSize: Number(checkedCompSample),
+        windowDays: 30,
+        source: checkedCompSource,
+        note: checkedCompNote,
+      });
+      return built as CompResult | null;
+    },
+    [
+      catalogCard?.name,
+      catalogCard?.number,
+      catalogCard?.setName,
+      catalogCard?.tcgApiId,
+      checkedCompNote,
+      checkedCompPrice,
+      checkedCompSample,
+      checkedCompSource,
+      grade,
+      name,
+      number,
+      setNameValue,
+    ],
+  );
+  const headline = checkedComp ?? apiHeadline;
+  const compForReceipt = useMemo<Reconciled | null>(() => {
+    if (!comp) return null;
+    if (!checkedComp) return comp;
+    return {
+      ...comp,
+      headline: checkedComp,
+      all: [checkedComp, ...comp.all],
+      sourcesDisagree: false,
+    };
+  }, [checkedComp, comp]);
   const deal = useMemo(
     () => (headline ? judgeDeal(headline, poundsToPence(cost), poundsToPence(postage)) : null),
     [headline, cost, postage],
@@ -544,7 +600,6 @@ export default function Home() {
         : null,
     [headline, gradeComp, gradeOdds, gradingCost],
   );
-  const catalogCard = comp?.catalog ?? null;
   const selectedSet = useMemo(() => findSelectedSet([...popularSets, ...setSuggestions, ...allSets], setNameValue), [
     allSets,
     popularSets,
@@ -553,6 +608,9 @@ export default function Home() {
   ]);
   const setMarkUrl =
     catalogCard?.setLogoUrl ?? catalogCard?.setSymbolUrl ?? selectedSet?.logoUrl ?? selectedSet?.symbolUrl ?? null;
+  const displayCardName = catalogCard?.name ?? name;
+  const displaySetName = catalogCard?.setName ?? setNameValue;
+  const displayNumber = catalogCard?.number ?? number;
   const matchingQuickHunt = quickHunts.find(
     (card) =>
       card.name.trim().toLowerCase() === name.trim().toLowerCase() &&
@@ -571,7 +629,7 @@ export default function Home() {
     comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
   const ownedSalesComp =
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
-  const compReceipt = useMemo(() => (comp ? buildCompReceipt(comp) : []), [comp]);
+  const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
   const manualCompLinks = useMemo(
     () =>
       buildManualCompLinks(
@@ -584,12 +642,15 @@ export default function Home() {
       ),
     [catalogCard?.name, catalogCard?.number, catalogCard?.setName, grade, name, number, setNameValue],
   );
-  const compSpreadPct = useMemo(() => (comp ? medianSpreadPct(comp.all) : null), [comp]);
-  const dealerVerdict = useMemo(() => (comp ? buildDealerCompVerdict(comp) : null), [comp]);
+  const compSpreadPct = useMemo(() => (compForReceipt ? medianSpreadPct(compForReceipt.all) : null), [compForReceipt]);
+  const dealerVerdict = useMemo(
+    () => (checkedComp ? null : compForReceipt ? buildDealerCompVerdict(compForReceipt) : null),
+    [checkedComp, compForReceipt],
+  );
   const confidenceLabel = dealerVerdict
     ? { label: dealerVerdict.label, tone: dealerVerdict.tone }
     : headline
-      ? compConfidence(headline, comp?.sourcesDisagree ?? false)
+      ? compConfidence(headline, compForReceipt?.sourcesDisagree ?? false)
       : null;
   const stockImportPreview = useMemo(() => parseStockImportText(stockImportText), [stockImportText]);
   const stockImportHasText = stockImportText.trim().length > 0;
@@ -615,12 +676,15 @@ export default function Home() {
       quantity: intakeQuantity,
       listPricePence,
       channel,
-      cautious: Boolean(comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
+      cautious: checkedComp
+        ? checkedComp.sampleSize < 2
+        : Boolean(compForReceipt?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
     });
   }, [
     channel,
-    comp?.sourcesDisagree,
+    compForReceipt?.sourcesDisagree,
     cost,
+    checkedComp,
     dealerVerdict,
     headline?.medianPence,
     listPriceOverride,
@@ -838,6 +902,13 @@ export default function Home() {
     if (shouldRefresh) void refreshAll({ toast: true, user: true });
   }
 
+  function clearCheckedComp() {
+    setCheckedCompPrice("");
+    setCheckedCompSample("1");
+    setCheckedCompSource("EBAY_SOLD");
+    setCheckedCompNote("");
+  }
+
   function applyPostStockFlow() {
     if (!keepBuying) {
       setView("inventory");
@@ -858,6 +929,7 @@ export default function Home() {
     setCardArtUrl(null);
     setGradeComp(null);
     setListPriceOverride("");
+    clearCheckedComp();
     setGraderCert("");
   }
 
@@ -899,6 +971,7 @@ export default function Home() {
     setSuggestion(null);
     setCardArtUrl(null);
     setGradeComp(null);
+    clearCheckedComp();
     setNotice(`Filled ${filled.join(", ")}.`);
     setError(null);
   }
@@ -909,6 +982,7 @@ export default function Home() {
     setError(null);
     setNotice(null);
     setSuggestion(null);
+    clearCheckedComp();
     try {
       const qs = new URLSearchParams({
         name,
@@ -963,6 +1037,15 @@ export default function Home() {
           listPricePence: overrideListPricePence ?? undefined,
           listingState: acquireListingState,
           createListing: true,
+          checkedComp: checkedComp
+            ? {
+                pricePence: checkedComp.medianPence,
+                sampleSize: checkedComp.sampleSize,
+                windowDays: checkedComp.windowDays,
+                source: checkedCompSource,
+                note: checkedCompNote.trim() || undefined,
+              }
+            : undefined,
         }),
       });
       const payload = await readJson(res);
@@ -1270,6 +1353,7 @@ export default function Home() {
     setSuggestion(null);
     setCardArtUrl(card.imageUrl ?? null);
     setGradeComp(null);
+    clearCheckedComp();
     setNotice(null);
     setError(null);
   }
@@ -1293,6 +1377,7 @@ export default function Home() {
   function chooseSet(set: CatalogSet) {
     setSetNameValue(set.name);
     setSetSuggestionsOpen(false);
+    clearCheckedComp();
   }
 
   function chooseCard(card: CatalogCard) {
@@ -1301,6 +1386,7 @@ export default function Home() {
     if (card.number) setNumber(card.number);
     if (card.imageUrl) setCardArtUrl(card.imageUrl);
     setCardSuggestionsOpen(false);
+    clearCheckedComp();
     setError(null);
   }
 
@@ -2023,14 +2109,14 @@ export default function Home() {
                 src={selectedCardImage}
                 className="selected-card-art"
                 fallbackClassName="selected-card-art blank"
-                alt={`${name} card art`}
+                alt={`${displayCardName} card art`}
               />
               <div>
                 <span>Current card</span>
-                <strong>{name}</strong>
+                <strong>{displayCardName}</strong>
                 <small>
-                  {setNameValue}
-                  {number ? ` #${number}` : ""}
+                  {displaySetName}
+                  {displayNumber ? ` #${displayNumber}` : ""}
                   {" · "}
                   {grade.replace(/_/g, " ")}
                 </small>
@@ -2068,7 +2154,10 @@ export default function Home() {
               Card
               <input
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  clearCheckedComp();
+                }}
                 onFocus={() => setCardSuggestionsOpen(true)}
                 onBlur={() => setTimeout(() => setCardSuggestionsOpen(false), 150)}
                 placeholder="Charizard, Moonbreon, Mr Mime..."
@@ -2101,7 +2190,10 @@ export default function Home() {
                 Set
                 <input
                   value={setNameValue}
-                  onChange={(event) => setSetNameValue(event.target.value)}
+                  onChange={(event) => {
+                    setSetNameValue(event.target.value);
+                    clearCheckedComp();
+                  }}
                   onFocus={() => setSetSuggestionsOpen(true)}
                   onBlur={() => setTimeout(() => setSetSuggestionsOpen(false), 150)}
                   placeholder="base set, evo skies, PRE..."
@@ -2121,7 +2213,14 @@ export default function Home() {
               </label>
               <label>
                 Number
-                <input value={number} onChange={(event) => setNumber(event.target.value)} placeholder="199/165" />
+                <input
+                  value={number}
+                  onChange={(event) => {
+                    setNumber(event.target.value);
+                    clearCheckedComp();
+                  }}
+                  placeholder="199/165"
+                />
               </label>
             </div>
             {popularSets.length > 0 && (
@@ -2143,7 +2242,10 @@ export default function Home() {
                     key={g}
                     className={grade === g ? "selected" : ""}
                     type="button"
-                    onClick={() => setGrade(g)}
+                    onClick={() => {
+                      setGrade(g);
+                      clearCheckedComp();
+                    }}
                   >
                     {g.replace(/_/g, " ")}
                   </button>
@@ -2151,7 +2253,13 @@ export default function Home() {
               </div>
               <label className="grade-select-field">
                 Grade
-                <select value={grade} onChange={(event) => setGrade(event.target.value as Grade)}>
+                <select
+                  value={grade}
+                  onChange={(event) => {
+                    setGrade(event.target.value as Grade);
+                    clearCheckedComp();
+                  }}
+                >
                   {gradeOptions.map((option) => (
                     <option key={option} value={option}>
                       {option.replace(/_/g, " ")}
@@ -2209,7 +2317,11 @@ export default function Home() {
             <section className="panel comp-panel">
               <div className="comp-hero">
                 <div>
-                  <p className="eyebrow">{headline.source}</p>
+                  <p className="eyebrow">
+                    {headline.source === "manual-check"
+                      ? checkedCompSourceLabel(headline.raw?.source)
+                      : headline.source}
+                  </p>
                   <h2>{gbp(headline.medianPence)}</h2>
                 </div>
                 <span className={`pill ${confidenceLabel?.tone ?? ""}`}>{confidenceLabel?.label}</span>
@@ -2281,6 +2393,63 @@ export default function Home() {
                   </a>
                 ))}
               </div>
+              <div className={`checked-comp-card ${checkedComp ? "active" : ""}`}>
+                <div className="checked-comp-heading">
+                  <div>
+                    <span>Checked comp</span>
+                    <strong>{checkedComp ? `${gbp(checkedComp.medianPence)} in use` : "Optional override"}</strong>
+                  </div>
+                  {checkedComp && (
+                    <button className="ghost-button" type="button" onClick={clearCheckedComp}>
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="form-grid">
+                  <label>
+                    Sold price
+                    <MoneyInput value={checkedCompPrice} onChange={setCheckedCompPrice} placeholder="e.g. 24.00" />
+                  </label>
+                  <label>
+                    Seen on
+                    <select
+                      value={checkedCompSource}
+                      onChange={(event) => setCheckedCompSource(event.target.value as CheckedCompSource)}
+                    >
+                      {checkedCompSources.map((source) => (
+                        <option key={source} value={source}>
+                          {checkedCompSourceLabel(source)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="form-grid">
+                  <label>
+                    Sample
+                    <input
+                      inputMode="numeric"
+                      min="1"
+                      step="1"
+                      value={checkedCompSample}
+                      onChange={(event) => setCheckedCompSample(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Note
+                    <input
+                      value={checkedCompNote}
+                      onChange={(event) => setCheckedCompNote(event.target.value)}
+                      placeholder="NM solds, same language"
+                    />
+                  </label>
+                </div>
+                {checkedComp && (
+                  <p className="hint">
+                    Auto list, buy plan and acquire are using this checked comp. API sources stay in the receipt.
+                  </p>
+                )}
+              </div>
               {marketBaseline && (
                 <div className="market-signal">
                   <span>Catalog baseline</span>
@@ -2346,8 +2515,17 @@ export default function Home() {
                   {headline.raw.caveat ? ` ${headline.raw.caveat}` : ""}
                 </p>
               )}
-              {comp?.sourcesDisagree && (
+              {headline.raw?.kind === "checked-comp" && (
+                <p className="hint">
+                  Checked against {headline.raw.sourceLabel ?? checkedCompSourceLabel(headline.raw.source)}
+                  {headline.raw.note ? ` · ${headline.raw.note}` : ""}.
+                </p>
+              )}
+              {comp?.sourcesDisagree && !checkedComp && (
                 <p className="hint danger-text">Sources disagree materially. Treat this as a check-before-buy price.</p>
+              )}
+              {comp?.sourcesDisagree && checkedComp && (
+                <p className="hint danger-text">API sources disagree; the checked comp is driving this buy.</p>
               )}
             </section>
           )}
@@ -4038,7 +4216,9 @@ function receiptRank(result: CompResult, headline: CompResult): number {
 
 function sourceLabel(source: string, headline: boolean): string {
   const label =
-    source === "pokemon-price-tracker"
+    source === "manual-check"
+      ? "Checked comp"
+      : source === "pokemon-price-tracker"
       ? "Price Tracker"
       : source === "poketrace"
         ? "PokeTrace"
@@ -4052,6 +4232,9 @@ function sourceLabel(source: string, headline: boolean): string {
 
 function compBasis(result: CompResult): string {
   if (result.sampleSize === 0 || result.medianPence <= 0) return rawReason(result) ?? "No matching signal";
+  if (result.raw?.kind === "checked-comp") {
+    return `${result.raw.sourceLabel ?? checkedCompSourceLabel(result.raw.source)} checked price`;
+  }
   if (result.source === "owned-sales") return "Your sold prices";
   if (result.source === "poketrace") {
     const raw = result.raw as { priceSource?: string; tier?: string; kind?: string } | undefined;
