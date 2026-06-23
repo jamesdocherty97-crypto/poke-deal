@@ -17,6 +17,7 @@ export interface DealerSaleMetricItem {
   itemId: string;
   name: string;
   grade: string;
+  channel: string;
   salePricePence: number;
   feesPence: number;
   postagePence: number;
@@ -55,6 +56,11 @@ export interface DealerSaleSummary {
   itemId: string;
   name: string;
   grade: string;
+  channel: string;
+  salePricePence: number;
+  feesPence: number;
+  postagePence: number;
+  costBasisPence: number;
   profitPence: number;
   marginPct: number | null;
   soldAt: string;
@@ -135,6 +141,11 @@ export function summarizeSale(sale: DealerSaleMetricItem): DealerSaleSummary {
     itemId: sale.itemId,
     name: sale.name,
     grade: sale.grade,
+    channel: sale.channel,
+    salePricePence: sale.salePricePence,
+    feesPence: sale.feesPence,
+    postagePence: sale.postagePence,
+    costBasisPence: sale.costBasisPence,
     profitPence,
     marginPct: sale.salePricePence > 0 ? roundPct(profitPence / sale.salePricePence) : null,
     soldAt: sale.soldAt,

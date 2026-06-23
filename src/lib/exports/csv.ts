@@ -186,7 +186,7 @@ export function booksToCsv(sales: BookSaleExportRecord[]): string {
         set_name: card.setName,
         number: card.number,
         grade: item.grade,
-        quantity: item.quantity,
+        quantity: 1,
         currency: "GBP",
         sale_price_gbp: formatGbpDecimal(sale.salePrice),
         fees_gbp: formatGbpDecimal(sale.fees),

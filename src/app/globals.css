@@ -1876,6 +1876,39 @@ label {
   border-top: 0;
 }
 
+.sale-mini-row {
+  align-items: flex-start;
+}
+
+.sale-mini-row div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.sale-mini-row div:last-child {
+  justify-items: end;
+  text-align: right;
+}
+
+.sale-mini-row strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.sale-mini-row div:last-child strong {
+  color: var(--green);
+  font-size: 16px;
+}
+
+.sale-mini-row span,
+.sale-mini-row small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
 .alert-status {
   display: flex;
   align-items: center;

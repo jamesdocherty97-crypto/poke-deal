@@ -59,7 +59,7 @@ test("booksToCsv exports realized profit and margin in GBP", () => {
       item: {
         id: "item_1",
         grade: "RAW",
-        quantity: 1,
+        quantity: 3,
         costBasis: 1800,
         acquiredFrom: "Card fair",
         acquiredAt: new Date("2026-06-22T08:00:00.000Z"),

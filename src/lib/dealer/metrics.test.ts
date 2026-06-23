@@ -10,6 +10,7 @@ test("summarizeSale computes GBP pence profit and margin", () => {
     itemId: "item_1",
     name: "Charizard ex",
     grade: "RAW",
+    channel: "EBAY",
     salePricePence: 3000,
     feesPence: 414,
     postagePence: 120,
@@ -19,6 +20,8 @@ test("summarizeSale computes GBP pence profit and margin", () => {
 
   assert.equal(sale.profitPence, 666);
   assert.equal(sale.marginPct, 22.2);
+  assert.equal(sale.channel, "EBAY");
+  assert.equal(sale.salePricePence, 3000);
 });
 
 test("computeDealerMetrics summarizes stock, sales, age and movers", () => {
@@ -58,6 +61,7 @@ test("computeDealerMetrics summarizes stock, sales, age and movers", () => {
         itemId: "item_3",
         name: "Venusaur ex",
         grade: "RAW",
+        channel: "IN_PERSON",
         salePricePence: 2200,
         feesPence: 300,
         postagePence: 100,
@@ -93,6 +97,7 @@ test("computeDealerMetrics subtracts operating expenses from net profit", () => 
         itemId: "item_1",
         name: "Gengar",
         grade: "RAW",
+        channel: "EBAY",
         salePricePence: 5000,
         feesPence: 650,
         postagePence: 120,
@@ -143,6 +148,7 @@ test("computeDealerMetrics counts partial sales from duplicate stock as sold uni
         itemId: "item_1",
         name: "Gengar",
         grade: "RAW",
+        channel: "CARDMARKET",
         salePricePence: 2500,
         feesPence: 300,
         postagePence: 120,

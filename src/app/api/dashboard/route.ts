@@ -19,7 +19,7 @@ type DashboardInventoryItem = {
   costBasis: number;
   createdAt: Date;
   listings: { state: string }[];
-  sales: { id: string; salePrice: number; fees: number; postage: number; soldAt: Date }[];
+  sales: { id: string; channel: string; salePrice: number; fees: number; postage: number; soldAt: Date }[];
 };
 
 type DashboardExpense = {
@@ -64,6 +64,7 @@ export async function GET() {
         itemId: item.id,
         name: item.card.name,
         grade: item.grade,
+        channel: sale.channel,
         salePricePence: sale.salePrice,
         feesPence: sale.fees,
         postagePence: sale.postage,

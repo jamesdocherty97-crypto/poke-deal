@@ -197,6 +197,11 @@ type SaleSummary = {
   itemId: string;
   name: string;
   grade: string;
+  channel: Channel;
+  salePricePence: number;
+  feesPence: number;
+  postagePence: number;
+  costBasisPence: number;
   profitPence: number;
   marginPct: number | null;
   soldAt: string;
@@ -2783,9 +2788,20 @@ export default function Home() {
             </div>
             {dashboard?.recentSales.length ? (
               dashboard.recentSales.map((sale) => (
-                <article className="mini-row" key={sale.id}>
-                  <span>{sale.name} {sale.grade.replace(/_/g, " ")}</span>
-                  <strong>{gbp(sale.profitPence)}</strong>
+                <article className="mini-row sale-mini-row" key={sale.id}>
+                  <div>
+                    <strong>{sale.name} {sale.grade.replace(/_/g, " ")}</strong>
+                    <span>
+                      {shortDate(sale.soldAt)} · {channelLabel(sale.channel)} · sale {gbp(sale.salePricePence)}
+                    </span>
+                    <small>
+                      fees {gbp(sale.feesPence)} · postage {gbp(sale.postagePence)} · cost {gbp(sale.costBasisPence)}
+                    </small>
+                  </div>
+                  <div>
+                    <strong>{gbp(sale.profitPence)}</strong>
+                    <span>{sale.marginPct == null ? "n/a" : `${sale.marginPct}%`}</span>
+                  </div>
                 </article>
               ))
             ) : (
