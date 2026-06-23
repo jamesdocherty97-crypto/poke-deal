@@ -65,9 +65,10 @@ export function computeDealerMetrics(
   now: Date = new Date(),
 ): DealerMetrics {
   const activeItems = items.filter((item) => item.status !== "SOLD");
+  const activeUnits = activeItems.reduce((sum, item) => sum + item.quantity, 0);
   const stockCount = countByStatus(items, "IN_STOCK");
   const listedCount = countByStatus(items, "LISTED");
-  const soldCount = countByStatus(items, "SOLD");
+  const soldCount = sales.length;
   const reservedCount = countByStatus(items, "RESERVED");
   const activeCostPence = activeItems.reduce(
     (sum, item) => sum + item.costBasisPence * item.quantity,
@@ -79,7 +80,8 @@ export function computeDealerMetrics(
   const realizedProfitPence = saleSummaries.reduce((sum, sale) => sum + sale.profitPence, 0);
   const realizedMarginPct =
     realizedRevenuePence > 0 ? roundPct(realizedProfitPence / realizedRevenuePence) : null;
-  const sellThroughPct = items.length > 0 ? roundPct(soldCount / items.length) : 0;
+  const unitDenominator = activeUnits + soldCount;
+  const sellThroughPct = unitDenominator > 0 ? roundPct(soldCount / unitDenominator) : 0;
 
   const ages = activeItems.map((item) => ageDays(item.createdAt, now));
   const averageAgeDays =

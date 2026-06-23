@@ -2025,7 +2025,12 @@ export default function Home() {
               <div className="panel-heading">
                 <div>
                   <h2>Mark sold</h2>
-                  {sellingItem && <span className="muted">{sellingItem.card.name} · cost {gbp(sellingItem.costBasis)}</span>}
+                  {sellingItem && (
+                    <span className="muted">
+                      {sellingItem.card.name} · cost {gbp(sellingItem.costBasis)}
+                      {sellingItem.quantity > 1 ? ` · selling 1 of ${sellingItem.quantity}` : ""}
+                    </span>
+                  )}
                 </div>
                 <button className="ghost-button" type="button" onClick={() => setSellingId(null)}>Close</button>
               </div>
@@ -2495,6 +2500,13 @@ function InventoryRow({
 }) {
   const listing = item.listings[0];
   const sale = item.sales[0];
+  const listingStateLabel = listing ? listing.state.charAt(0) + listing.state.slice(1).toLowerCase() : "";
+  const soldNote =
+    item.sales.length === 0
+      ? ""
+      : item.status === "SOLD" && sale
+        ? ` · sold ${gbp(sale.salePrice)}`
+        : ` · ${item.sales.length} sold`;
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
@@ -2565,8 +2577,8 @@ function InventoryRow({
             {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
           </p>
           <p>
-            {listing ? `Draft ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
-            {sale ? ` · sold ${gbp(sale.salePrice)}` : ""}
+            {listing ? `${listingStateLabel} ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
+            {soldNote}
           </p>
           <div className="row-actions">
             {item.status !== "SOLD" && (

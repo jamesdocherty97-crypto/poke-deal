@@ -75,11 +75,46 @@ test("computeDealerMetrics summarizes stock, sales, age and movers", () => {
   assert.equal(metrics.realizedRevenuePence, 2200);
   assert.equal(metrics.realizedProfitPence, 800);
   assert.equal(metrics.realizedMarginPct, 36.4);
-  assert.equal(metrics.sellThroughPct, 33.3);
+  assert.equal(metrics.sellThroughPct, 25);
   assert.equal(metrics.averageAgeDays, 51);
   assert.equal(metrics.agedStockCount, 1);
   assert.equal(metrics.bestSale?.name, "Venusaur ex");
   assert.equal(metrics.worstSale?.profitPence, 800);
+});
+
+test("computeDealerMetrics counts partial sales from duplicate stock as sold units", () => {
+  const metrics = computeDealerMetrics(
+    [
+      {
+        id: "item_1",
+        name: "Gengar",
+        grade: "RAW",
+        status: "LISTED",
+        quantity: 2,
+        costBasisPence: 1200,
+        createdAt: "2026-06-01T12:00:00.000Z",
+      },
+    ],
+    [
+      {
+        id: "sale_1",
+        itemId: "item_1",
+        name: "Gengar",
+        grade: "RAW",
+        salePricePence: 2500,
+        feesPence: 300,
+        postagePence: 120,
+        costBasisPence: 1200,
+        soldAt: "2026-06-20T12:00:00.000Z",
+      },
+    ],
+    NOW,
+  );
+
+  assert.equal(metrics.listedCount, 2);
+  assert.equal(metrics.soldCount, 1);
+  assert.equal(metrics.activeCostPence, 2400);
+  assert.equal(metrics.sellThroughPct, 33.3);
 });
 
 test("buildProfitTrend aggregates daily profit into a cumulative trend", () => {

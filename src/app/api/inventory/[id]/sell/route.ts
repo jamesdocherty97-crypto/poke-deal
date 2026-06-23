@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
 import { realizedProfit } from "@/lib/comps/pricing";
+import { planUnitSale } from "@/lib/dealer/unitSale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,7 @@ export async function POST(
         include: { card: true },
       });
       if (!item) throw new Error("Inventory item not found");
+      const salePlan = planUnitSale({ quantity: item.quantity, status: item.status });
 
       const sale = await tx.sale.create({
         data: {
@@ -55,7 +57,10 @@ export async function POST(
 
       const updatedItem = await tx.inventoryItem.update({
         where: { id: item.id },
-        data: { status: "SOLD" },
+        data: {
+          quantity: salePlan.remainingQuantity,
+          status: salePlan.status,
+        },
         include: {
           card: true,
           listings: { orderBy: { createdAt: "desc" } },
@@ -63,12 +68,14 @@ export async function POST(
         },
       });
 
-      await tx.listing.updateMany({
-        where: { itemId: item.id, state: { in: ["DRAFT", "ACTIVE"] } },
-        data: { state: "SOLD", endedAt: sale.soldAt },
-      });
+      if (salePlan.closeOpenListings) {
+        await tx.listing.updateMany({
+          where: { itemId: item.id, state: { in: ["DRAFT", "ACTIVE"] } },
+          data: { state: "SOLD", endedAt: sale.soldAt },
+        });
+      }
 
-      return { item: updatedItem, sale };
+      return { item: updatedItem, sale, salePlan };
     });
 
     const profitPence = realizedProfit({
