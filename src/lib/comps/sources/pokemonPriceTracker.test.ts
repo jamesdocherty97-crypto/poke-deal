@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   buildPokemonPriceTrackerSearch,
+  buildPokemonPriceTrackerSearchVariants,
   gradeToProviderKey,
   mapCardAggregateToComp,
   normalizeProviderCollectorNumber,
@@ -111,6 +112,17 @@ test("buildPokemonPriceTrackerSearch handles common gallery and shiny-vault inpu
   );
 });
 
+test("buildPokemonPriceTrackerSearchVariants fall back to collector number without printed total", () => {
+  assert.deepEqual(
+    buildPokemonPriceTrackerSearchVariants({
+      name: "Mew ex",
+      setName: "Paldean Fates",
+      number: "232/091",
+    }),
+    ["Mew ex 232/091", "Mew ex 232", "Mew ex"],
+  );
+});
+
 test("PokemonPriceTrackerSource live requests use provider-style prefixed numbers", async () => {
   const requestedUrls: string[] = [];
   const fetchImpl = (async (url: string | URL | Request) => {
@@ -146,6 +158,15 @@ test("providerPayloadMatchesRequest validates fallback provider cards", () => {
       },
     ],
   };
+  const mewWithoutPrintedTotal = {
+    data: [
+      {
+        name: "Mew ex",
+        setName: "Paldean Fates",
+        cardNumber: "232",
+      },
+    ],
+  };
 
   assert.equal(
     providerPayloadMatchesRequest(celebrationReprint, { name: "Charizard", setName: "Base", number: "4/102" }),
@@ -156,6 +177,14 @@ test("providerPayloadMatchesRequest validates fallback provider cards", () => {
       name: "Giratina VSTAR",
       setName: "Crown Zenith Galarian Gallery",
       number: "GG69/GG70",
+    }),
+    true,
+  );
+  assert.equal(
+    providerPayloadMatchesRequest(mewWithoutPrintedTotal, {
+      name: "Mew ex",
+      setName: "Paldean Fates",
+      number: "232/091",
     }),
     true,
   );
@@ -203,6 +232,54 @@ test("PokemonPriceTrackerSource retries without a restrictive set filter", async
   assert.equal(new URL(requestedUrls[1]!).searchParams.has("set"), false);
   assert.equal(comp.sampleSize, 2);
   assert.equal(comp.medianPence, usdToPence(100));
+});
+
+test("PokemonPriceTrackerSource retries with collector number only before giving up", async () => {
+  const requestedUrls: string[] = [];
+  const fallbackPayload = {
+    data: [
+      {
+        name: "Mew ex",
+        setName: "Paldean Fates",
+        cardNumber: "232",
+        ebay: {
+          salesByGrade: {
+            ungraded: {
+              count: 9,
+              averagePrice: 104,
+              medianPrice: 100,
+              minPrice: 88,
+              maxPrice: 120,
+              smartMarketPrice: { price: 96, confidence: "medium", method: "filtered", daysUsed: 30 },
+              lastMarketUpdate: "2026-06-22T12:00:00.000Z",
+            },
+          },
+        },
+      },
+    ],
+  };
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const urlString = String(url);
+    requestedUrls.push(urlString);
+    const requestedUrl = new URL(urlString);
+    const payload =
+      requestedUrl.searchParams.get("search") === "Mew ex 232" && requestedUrl.searchParams.get("set") === "Paldean Fates"
+        ? fallbackPayload
+        : { data: [] };
+    return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
+  const comp = await source.lookup({ name: "Mew ex", setName: "Paldean Fates", number: "232/091" }, { grade: "RAW" });
+
+  assert.equal(requestedUrls.length, 3);
+  assert.equal(new URL(requestedUrls[0]!).searchParams.get("search"), "Mew ex 232/091");
+  assert.equal(new URL(requestedUrls[1]!).searchParams.get("search"), "Mew ex 232/091");
+  assert.equal(new URL(requestedUrls[1]!).searchParams.has("set"), false);
+  assert.equal(new URL(requestedUrls[2]!).searchParams.get("search"), "Mew ex 232");
+  assert.equal(new URL(requestedUrls[2]!).searchParams.get("set"), "Paldean Fates");
+  assert.equal(comp.sampleSize, 9);
+  assert.equal(comp.medianPence, usdToPence(96));
 });
 
 test("PSA_10 maps from 'psa10' aggregate", () => {

@@ -131,6 +131,17 @@ function buildFetchAttempts(card: CardRef, search: string, days: number): URLSea
     attempts.push(new URLSearchParams({ ...base, search }));
   }
 
+  const fallbackSearches = buildPokemonPriceTrackerSearchVariants(card).filter((variant) => variant !== search);
+  for (const fallbackSearch of fallbackSearches) {
+    const fallbackWithSet = new URLSearchParams({ ...base, search: fallbackSearch });
+    if (card.setName) fallbackWithSet.set("set", card.setName);
+    attempts.push(fallbackWithSet);
+
+    if (card.setName && fallbackSearch !== card.name.trim()) {
+      attempts.push(new URLSearchParams({ ...base, search: fallbackSearch }));
+    }
+  }
+
   return attempts;
 }
 
@@ -153,6 +164,15 @@ export function normalizeProviderCollectorNumber(
   const setId = resolveSetIdForCard(setName, left);
   const set = setId ? getSetById(setId) : undefined;
   return set?.printedTotal ? `${left}/${prefix}${set.printedTotal}` : left;
+}
+
+export function buildPokemonPriceTrackerSearchVariants(card: CardRef): string[] {
+  const variants = [buildPokemonPriceTrackerSearch(card)];
+  const number = normalizeProviderCollectorNumber(card.number, card.setName);
+  const leftNumber = number?.split("/")[0]?.trim();
+  if (leftNumber) variants.push([card.name, leftNumber].filter(Boolean).join(" "));
+  variants.push(card.name.trim());
+  return [...new Set(variants.filter((variant) => variant.trim().length > 0))];
 }
 
 function shouldMirrorProviderPrefix(prefix: string, setName: string | undefined): boolean {
@@ -278,7 +298,7 @@ export function providerPayloadMatchesRequest(json: unknown, request: CardRef): 
       undefined,
   );
   const requestedNumber = normalizeComparableCollectorNumber(normalizeProviderCollectorNumber(request.number, request.setName));
-  if (providerNumber && requestedNumber && providerNumber !== requestedNumber) return false;
+  if (providerNumber && requestedNumber && !collectorNumbersMatch(providerNumber, requestedNumber)) return false;
 
   const providerSet = normalizeSearchText(readProviderSetName(providerCard) ?? "");
   if (request.setName && providerSet) {
@@ -317,6 +337,27 @@ function readProviderSetName(card: Record<string, unknown>): string | null {
 }
 
 function normalizeComparableCollectorNumber(value: string | undefined): string | null {
-  const normalized = value?.trim().toUpperCase().replace(/\s+/g, "");
+  const normalized = value
+    ?.trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .split("/")
+    .map(normalizeCollectorPartForCompare)
+    .join("/");
   return normalized && normalized.length > 0 ? normalized : null;
+}
+
+function normalizeCollectorPartForCompare(value: string): string {
+  const match = value.match(/^([A-Z]*)(\d+)$/);
+  if (!match) return value;
+  const prefix = match[1] ?? "";
+  const number = Number.parseInt(match[2]!, 10);
+  return Number.isFinite(number) ? `${prefix}${number}` : value;
+}
+
+function collectorNumbersMatch(providerNumber: string, requestedNumber: string): boolean {
+  if (providerNumber === requestedNumber) return true;
+  const providerLeft = providerNumber.split("/")[0];
+  const requestedLeft = requestedNumber.split("/")[0];
+  return Boolean(providerLeft && requestedLeft && providerLeft === requestedLeft);
 }
