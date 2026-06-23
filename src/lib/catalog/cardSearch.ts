@@ -1,6 +1,13 @@
 import type { CatalogCard } from "./types.js";
 import { normalizeSearchText, scoreSearchText } from "./fuzzy.js";
-import { getSetById, resolveSetId, resolveSetIdForCard, searchSets } from "./setCatalog.js";
+import {
+  getSetById,
+  resolveExactSetId,
+  resolveSetAliasId,
+  resolveSetId,
+  resolveSetIdForCard,
+  searchSets,
+} from "./setCatalog.js";
 
 export interface CardSearchOptions {
   setName?: string;
@@ -69,7 +76,7 @@ export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
   const wholeNumber = readCollectorNumber(trimmed);
   if (wholeNumber) return { name: "", number: wholeNumber };
 
-  const trailing = trimmed.match(/^(.*?)\s+#?([A-Za-z]{1,5}\d{1,4}(?:\/[A-Za-z]{0,5}\d{1,4})?|\d{1,4}\/\d{1,4})$/);
+  const trailing = trimmed.match(/^(.*?)\s+#?([A-Za-z]{1,5}\d{1,4}(?:\/[A-Za-z]{0,5}\d{1,4})?|\d{1,4}\/\d{1,4}|\d{1,4})$/);
   const name = trailing?.[1]?.trim();
   const number = readCollectorNumber(trailing?.[2]);
   if (name && number) return { name, number };
@@ -84,9 +91,17 @@ export function normalizeCatalogCardSearchInput(
   const cleaned = stripLookupNoise(query);
   const parsed = parseCardSearchQuery(cleaned);
   let name = parsed.name || cleaned.trim();
-  const number = parsed.number;
+  let number = parsed.number;
 
   let setName = explicitSetName?.trim() || undefined;
+  if (!setName && number && isPlainCollectorNumber(number)) {
+    const numericSetId = resolveExactSetId(number);
+    if (numericSetId) {
+      setName = getSetById(numericSetId)?.name;
+      number = undefined;
+    }
+  }
+
   if (setName) {
     setName = resolveSetDisplayName(setName, number);
   } else {
@@ -97,9 +112,15 @@ export function normalizeCatalogCardSearchInput(
     }
   }
 
+  const trailingNumber = !number && setName ? splitTrailingPlainCollectorNumber(name) : null;
+  if (trailingNumber) {
+    name = trailingNumber.name;
+  }
+
   name = normalizeNameForSearch(name);
-  const normalizedQuery = [name, number].filter(Boolean).join(" ").trim() || cleaned.trim();
-  return { query: normalizedQuery, name, setName, number };
+  const normalizedNumber = number ?? trailingNumber?.number;
+  const normalizedQuery = [name, normalizedNumber].filter(Boolean).join(" ").trim() || cleaned.trim();
+  return { query: normalizedQuery, name, setName, number: normalizedNumber };
 }
 
 function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
@@ -158,9 +179,11 @@ function scoreSetPhrase(phrase: string, number: string | undefined): SetPhraseMa
   if (!set) return null;
 
   const resolvedSetName = resolveSetDisplayName(set.name, number);
+  const aliasId = resolveSetAliasId(phrase);
   const normalizedSetName = normalizeSearchText(set.name);
   const phraseTokenCount = normalizedPhrase.split(/\s+/).filter(Boolean).length;
   const exactish =
+    aliasId === set.id ||
     normalizedPhrase === set.id.toLowerCase() ||
     normalizedPhrase === set.ptcgoCode?.toLowerCase() ||
     normalizedPhrase === normalizedSetName;
@@ -185,6 +208,18 @@ function normalizeNameForSearch(input: string): string {
     .replace(/[()|,;]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+function splitTrailingPlainCollectorNumber(input: string): { name: string; number: string } | null {
+  const match = input.trim().match(/^(.*?)\s+#?(\d{1,4})$/);
+  const name = match?.[1]?.trim();
+  const number = match?.[2];
+  if (!name || !number) return null;
+  return { name, number };
+}
+
+function isPlainCollectorNumber(value: string): boolean {
+  return /^\d{1,4}$/.test(value);
 }
 
 function dedupeCards(cards: CatalogCard[]): CatalogCard[] {

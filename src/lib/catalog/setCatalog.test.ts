@@ -5,6 +5,8 @@ import {
   getPopularSets,
   getRelatedSubsetIds,
   getSetById,
+  resolveExactSetId,
+  resolveSetAliasId,
   resolveSetId,
   resolveSetIdForCard,
   searchSets,
@@ -46,6 +48,20 @@ test("resolveSetId handles dealer shorthand for current chase sets and subsets",
   assert.equal(resolveSetId("hidden fates sv"), "sma");
   assert.equal(resolveSetId("brs tg"), "swsh9tg");
   assert.equal(resolveSetId("sv promos"), "svp");
+});
+
+test("resolveSetAliasId only returns curated exact aliases", () => {
+  assert.equal(resolveSetAliasId("base set"), "base1");
+  assert.equal(resolveSetAliasId("cz gg"), "swsh12pt5gg");
+  assert.equal(resolveSetAliasId("moonbreon"), "swsh7");
+  assert.equal(resolveSetAliasId("set"), undefined);
+});
+
+test("resolveExactSetId avoids fuzzy numeric collector-number matches", () => {
+  assert.equal(resolveExactSetId("151"), "sv3pt5");
+  assert.equal(resolveExactSetId("base set"), "base1");
+  assert.equal(resolveExactSetId("215"), undefined);
+  assert.equal(resolveExactSetId("set"), undefined);
 });
 
 test("resolveSetIdForCard uses prefixed collector numbers to choose gallery subsets", () => {

@@ -43,6 +43,7 @@ test("rankCatalogCards understands collector numbers typed alongside names", () 
   ];
 
   assert.deepEqual(parseCardSearchQuery("Gengar TG06"), { name: "Gengar", number: "TG06" });
+  assert.deepEqual(parseCardSearchQuery("Magikarp 203"), { name: "Magikarp", number: "203" });
   assert.equal(rankCatalogCards("Gengar TG06", mixed, { setName: "Lost Origin" })[0]?.setCode, "swsh11tg");
   assert.equal(scoreCatalogCardForSearch("TG06", mixed[1]!), 1100);
 });
@@ -60,6 +61,36 @@ test("normalizeCatalogCardSearchInput splits dealer shorthand into card, set and
     name: "Charizard ex",
     setName: "151",
     number: "199/165",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Charizard 151"), {
+    query: "Charizard",
+    name: "Charizard",
+    setName: "151",
+    number: undefined,
+  });
+});
+
+test("normalizeCatalogCardSearchInput understands curated set aliases inside full card text", () => {
+  assert.deepEqual(normalizeCatalogCardSearchInput("Giratina VSTAR cz gg GG69 bgs 9.5 £80"), {
+    query: "Giratina VSTAR GG69",
+    name: "Giratina VSTAR",
+    setName: "Crown Zenith Galarian Gallery",
+    number: "GG69",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Charizard base set 4/102"), {
+    query: "Charizard 4/102",
+    name: "Charizard",
+    setName: "Base",
+    number: "4/102",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Umbreon VMAX moonbreon 215 psa 10"), {
+    query: "Umbreon VMAX 215",
+    name: "Umbreon VMAX",
+    setName: "Evolving Skies",
+    number: "215",
   });
 });
 

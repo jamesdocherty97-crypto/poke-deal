@@ -562,6 +562,30 @@ export function resolveSetId(query: string | undefined): string | undefined {
   return searchSets(query, 1)[0]?.id;
 }
 
+/** Exact curated alias lookup for dealer shorthand that cannot be inferred from literal set tokens. */
+export function resolveSetAliasId(query: string | undefined): string | undefined {
+  if (!query?.trim()) return undefined;
+  return SET_ALIASES[normalizeSearchText(query)];
+}
+
+/** Exact set lookup only: id, literal name, PTCGO code, or curated alias. No fuzzy/token fallback. */
+export function resolveExactSetId(query: string | undefined): string | undefined {
+  if (!query?.trim()) return undefined;
+  const trimmed = query.trim();
+  const normalized = normalizeSearchText(trimmed);
+  const aliasId = SET_ALIASES[normalized];
+  if (aliasId) return aliasId;
+
+  const lower = trimmed.toLowerCase();
+  const upper = trimmed.toUpperCase();
+  return SET_SNAPSHOT.find(
+    (set) =>
+      set.id.toLowerCase() === lower ||
+      set.ptcgoCode?.toUpperCase() === upper ||
+      normalizeSearchText(set.name) === normalized,
+  )?.id;
+}
+
 /**
  * Resolve a set for a card lookup, using alphanumeric collector numbers to
  * steer parent sets into their attached subsets. Example: dealers often type
