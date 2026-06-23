@@ -19,6 +19,7 @@ import {
   serializeQuickHunts,
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
+import { parseRecentSetIds, pinRecentSetId } from "@/lib/dealer/recentSets";
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { buildManualCompLinks } from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
@@ -329,6 +330,7 @@ const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCG
 const expenseCategories: ExpenseCategory[] = ["SUPPLIES", "POSTAGE", "GRADING", "TABLE_FEE", "TRAVEL", "PLATFORM", "OTHER"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
+const RECENT_SETS_STORAGE_KEY = "pokemon-dealer-os.recent-sets.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
@@ -440,6 +442,7 @@ export default function Home() {
   const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("ALL");
   const [listingSort, setListingSort] = useState<ListingSort>("newest");
   const [quickHunts, setQuickHunts] = useState<QuickHuntCard[]>(DEFAULT_QUICK_HUNTS);
+  const [recentSetIds, setRecentSetIds] = useState<string[]>([]);
   const pullStartY = useRef<number | null>(null);
   const pullTracking = useRef(false);
 
@@ -453,6 +456,14 @@ export default function Home() {
       setQuickHunts(parseQuickHunts(window.localStorage.getItem(QUICK_HUNTS_STORAGE_KEY)));
     } catch {
       setQuickHunts(DEFAULT_QUICK_HUNTS);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      setRecentSetIds(parseRecentSetIds(window.localStorage.getItem(RECENT_SETS_STORAGE_KEY)));
+    } catch {
+      setRecentSetIds([]);
     }
   }, []);
 
@@ -632,6 +643,12 @@ export default function Home() {
     setSuggestions,
   ]);
   const visiblePopularSets = showAllPopularSets ? popularSets : popularSets.slice(0, VISIBLE_POPULAR_SET_LIMIT);
+  const recentSets = useMemo(() => {
+    const byId = new Map([...allSets, ...popularSets, ...setSuggestions].map((set) => [set.id, set]));
+    return recentSetIds
+      .map((id) => byId.get(id))
+      .filter((set): set is CatalogSet => Boolean(set));
+  }, [allSets, popularSets, recentSetIds, setSuggestions]);
   const setMarkUrl =
     catalogCard?.setLogoUrl ?? catalogCard?.setSymbolUrl ?? selectedSet?.logoUrl ?? selectedSet?.symbolUrl ?? null;
   const displayCardName = catalogCard?.name ?? name;
@@ -1028,6 +1045,7 @@ export default function Home() {
     }
     if (parsed.setName) {
       setSetNameValue(parsed.setName);
+      pinRecentSetName(parsed.setName);
       filled.push("set");
     }
     if (parsed.number) {
@@ -1092,6 +1110,7 @@ export default function Home() {
       if (!res.ok) throw new Error(payload.error ?? "lookup failed");
       setComp(payload);
       setCardArtUrl(payload.catalog?.imageUrl ?? null);
+      pinRecentSetName(payload.catalog?.setName ?? setNameValue);
       setGradeComp(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "lookup failed");
@@ -1150,6 +1169,7 @@ export default function Home() {
       setSuggestion(payload.suggestion);
       setComp(payload.comps ?? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false });
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
+      pinRecentSetName(payload.catalog?.setName ?? setNameValue);
       const listedPence = payload.listing?.listPrice ?? payload.listing?.suggestedPrice ?? payload.suggestion.pricePence;
       const listingVerb = payload.listing?.state === "ACTIVE" ? "Listed" : "Drafted";
       setNotice(
@@ -1474,17 +1494,37 @@ export default function Home() {
   function chooseSet(set: CatalogSet) {
     setSetNameValue(set.name);
     setSetSuggestionsOpen(false);
+    pinRecentSet(set.id);
     clearCheckedComp();
   }
 
   function chooseCard(card: CatalogCard) {
     setName(card.name);
     setSetNameValue(card.setName);
+    pinRecentSetName(card.setName);
     if (card.number) setNumber(card.number);
     if (card.imageUrl) setCardArtUrl(card.imageUrl);
     setCardSuggestionsOpen(false);
     clearCheckedComp();
     setError(null);
+  }
+
+  function pinRecentSetName(value: string | null | undefined) {
+    if (!value?.trim()) return;
+    const match = findSelectedSet([...popularSets, ...setSuggestions, ...allSets], value);
+    if (match) pinRecentSet(match.id);
+  }
+
+  function pinRecentSet(id: string) {
+    setRecentSetIds((current) => {
+      const next = pinRecentSetId(current, id);
+      try {
+        window.localStorage.setItem(RECENT_SETS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Device storage is optional; the current session still benefits.
+      }
+      return next;
+    });
   }
 
   function openSell(item: InventoryItem, listing?: Listing) {
@@ -2404,25 +2444,43 @@ export default function Home() {
                 />
               </label>
             </div>
+            {recentSets.length > 0 && (
+              <div className="set-chip-stack" aria-label="Recent sets">
+                <span>Recent sets</span>
+                <div className="set-chip-row recent-set-row">
+                  {recentSets.map((set) => (
+                    <button key={set.id} type="button" onClick={() => chooseSet(set)}>
+                      {set.logoUrl || set.symbolUrl ? (
+                        <img src={set.logoUrl ?? set.symbolUrl} alt="" onError={hideBrokenImage} />
+                      ) : null}
+                      <span>{set.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {popularSets.length > 0 && (
-              <div className="set-chip-row" aria-label="Popular sets">
-                {visiblePopularSets.map((set) => (
-                  <button key={set.id} type="button" onClick={() => chooseSet(set)}>
-                    {set.logoUrl || set.symbolUrl ? (
-                      <img src={set.logoUrl ?? set.symbolUrl} alt="" onError={hideBrokenImage} />
-                    ) : null}
-                    <span>{set.name}</span>
-                  </button>
-                ))}
-                {popularSets.length > VISIBLE_POPULAR_SET_LIMIT && (
-                  <button
-                    className="set-chip-more"
-                    type="button"
-                    onClick={() => setShowAllPopularSets((current) => !current)}
-                  >
-                    {showAllPopularSets ? "Fewer sets" : `${popularSets.length - VISIBLE_POPULAR_SET_LIMIT} more`}
-                  </button>
-                )}
+              <div className="set-chip-stack" aria-label="Popular sets">
+                <span>Popular sets</span>
+                <div className="set-chip-row">
+                  {visiblePopularSets.map((set) => (
+                    <button key={set.id} type="button" onClick={() => chooseSet(set)}>
+                      {set.logoUrl || set.symbolUrl ? (
+                        <img src={set.logoUrl ?? set.symbolUrl} alt="" onError={hideBrokenImage} />
+                      ) : null}
+                      <span>{set.name}</span>
+                    </button>
+                  ))}
+                  {popularSets.length > VISIBLE_POPULAR_SET_LIMIT && (
+                    <button
+                      className="set-chip-more"
+                      type="button"
+                      onClick={() => setShowAllPopularSets((current) => !current)}
+                    >
+                      {showAllPopularSets ? "Fewer sets" : `${popularSets.length - VISIBLE_POPULAR_SET_LIMIT} more`}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             <div className="grade-controls">
