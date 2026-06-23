@@ -20,6 +20,7 @@ import {
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
+import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
 import { estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
@@ -316,6 +317,7 @@ export default function Home() {
   const [setNameValue, setSetNameValue] = useState("151");
   const [number, setNumber] = useState("199/165");
   const [quickIntake, setQuickIntake] = useState("");
+  const [stockImportText, setStockImportText] = useState("");
   const [grade, setGrade] = useState<Grade>("RAW");
   const [cost, setCost] = useState("18.00");
   const [quantity, setQuantity] = useState("1");
@@ -561,6 +563,8 @@ export default function Home() {
   const compReceipt = useMemo(() => (comp ? buildCompReceipt(comp) : []), [comp]);
   const compSpreadPct = useMemo(() => (comp ? medianSpreadPct(comp.all) : null), [comp]);
   const dealerVerdict = useMemo(() => (comp ? buildDealerCompVerdict(comp) : null), [comp]);
+  const stockImportPreview = useMemo(() => parseStockImportText(stockImportText), [stockImportText]);
+  const stockImportHasText = stockImportText.trim().length > 0;
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
@@ -916,6 +920,76 @@ export default function Home() {
       applyPostStockFlow();
     } catch (err) {
       setError(err instanceof Error ? err.message : "manual stock failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function importStockRows(event: FormEvent) {
+    event.preventDefault();
+    const parsed = parseStockImportText(stockImportText);
+    if (parsed.errors.length > 0) {
+      setError(`${parsed.errors.length} import row${parsed.errors.length === 1 ? "" : "s"} need fixing.`);
+      return;
+    }
+    if (parsed.rows.length === 0) {
+      setError("Paste at least one stock row to import.");
+      return;
+    }
+
+    setBusy("stock-import");
+    setError(null);
+    setNotice(null);
+    let stocked = 0;
+    let listingsCreated = 0;
+
+    try {
+      for (const row of parsed.rows) {
+        const stockRes = await fetch("/api/inventory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            card: row.card,
+            grade: row.grade,
+            quantity: row.quantity,
+            costBasisPence: row.costBasisPence,
+            acquiredFrom: row.acquiredFrom ?? "Opening stock",
+            location: (row.location ?? location) || undefined,
+            status: "IN_STOCK",
+          }),
+        });
+        const stockPayload = await readJson(stockRes);
+        if (!stockRes.ok) throw new Error(stockPayload.error ?? "stock import failed");
+        stocked += 1;
+
+        if (row.listPricePence != null && stockPayload.item?.id) {
+          const listingRes = await fetch("/api/listings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              itemId: stockPayload.item.id,
+              channel: row.channel ?? channel,
+              state: row.listingState ?? "DRAFT",
+              listPricePence: row.listPricePence,
+            }),
+          });
+          const listingPayload = await readJson(listingRes);
+          if (!listingRes.ok) {
+            console.warn("[stock import] listing skipped:", listingPayload.error ?? "listing create failed");
+          } else {
+            listingsCreated += 1;
+          }
+        }
+      }
+
+      setStockImportText("");
+      setNotice(
+        `Imported ${stocked} stock row${stocked === 1 ? "" : "s"}${listingsCreated > 0 ? ` and ${listingsCreated} listing${listingsCreated === 1 ? "" : "s"}` : ""}.`,
+      );
+      await refreshAll();
+      setView("inventory");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "stock import failed");
     } finally {
       setBusy(null);
     }
@@ -2250,6 +2324,72 @@ export default function Home() {
                 Suggested list price {gbp(suggestion.pricePence)}. {suggestion.rationale}
               </p>
             )}
+          </form>
+          <form className="panel stock-import-panel" onSubmit={importStockRows}>
+            <div className="panel-heading">
+              <div>
+                <h2>Opening stock</h2>
+                <span className="muted">
+                  {stockImportHasText
+                    ? `${stockImportPreview.rows.length} row${stockImportPreview.rows.length === 1 ? "" : "s"} · ${gbp(stockImportPreview.totalCostPence)}`
+                    : "Bulk stock"}
+                </span>
+              </div>
+              {stockImportHasText && (
+                <button className="ghost-button" type="button" onClick={() => setStockImportText("")}>
+                  Clear
+                </button>
+              )}
+            </div>
+            <label>
+              Paste rows
+              <textarea
+                value={stockImportText}
+                onChange={(event) => setStockImportText(event.target.value)}
+                placeholder="Gengar, Lost Origin Trainer Gallery, TG06/TG30, RAW, 10.00, 1, Card fair, Binder, Vinted, 25.00"
+                rows={4}
+              />
+            </label>
+            {stockImportHasText && (
+              <div className={`stock-import-preview ${stockImportPreview.errors.length > 0 ? "warn" : "good"}`}>
+                {stockImportPreview.errors.length > 0 ? (
+                  <div className="stock-import-errors">
+                    {stockImportPreview.errors.slice(0, 4).map((row) => (
+                      <span key={`${row.line}-${row.message}`}>
+                        Line {row.line}: {row.message}
+                      </span>
+                    ))}
+                    {stockImportPreview.errors.length > 4 && <span>+{stockImportPreview.errors.length - 4} more</span>}
+                  </div>
+                ) : (
+                  <div className="stock-import-rows">
+                    {stockImportPreview.rows.slice(0, 3).map((row, index) => (
+                      <span key={`${row.card.name}-${row.card.number ?? ""}-${index}`}>
+                        {row.quantity}x {row.card.name} · {row.card.setName ?? "No set"} · {gbp(row.costBasisPence)}
+                        {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : ""}
+                      </span>
+                    ))}
+                    {stockImportPreview.rows.length > 3 && <span>+{stockImportPreview.rows.length - 3} more</span>}
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              className="secondary-action"
+              type="submit"
+              disabled={
+                busy === "stock-import" ||
+                !stockImportHasText ||
+                stockImportPreview.rows.length === 0 ||
+                stockImportPreview.errors.length > 0
+              }
+            >
+              {busy === "stock-import"
+                ? "Importing..."
+                : stockImportPreview.rows.length > 0
+                  ? `Import ${stockImportPreview.rows.length} row${stockImportPreview.rows.length === 1 ? "" : "s"}`
+                  : "Import rows"}
+            </button>
           </form>
           {recentIntake.length > 0 && (
             <section className="panel recent-intake-panel">

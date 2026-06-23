@@ -43,7 +43,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -62,7 +63,8 @@ button:disabled {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 46px;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -74,9 +76,15 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--yellow);
   box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.16);
+}
+
+textarea {
+  min-height: 108px;
+  resize: vertical;
 }
 
 .money-input {
@@ -1187,6 +1195,47 @@ label {
   background:
     linear-gradient(125deg, rgba(255, 203, 5, 0.12), transparent 48%),
     var(--panel);
+}
+
+.stock-import-panel {
+  background:
+    linear-gradient(125deg, rgba(139, 92, 246, 0.16), transparent 48%),
+    var(--panel);
+}
+
+.stock-import-preview,
+.stock-import-rows,
+.stock-import-errors {
+  display: grid;
+  gap: 6px;
+}
+
+.stock-import-preview {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 9px;
+}
+
+.stock-import-preview.good {
+  border-color: rgba(52, 211, 153, 0.32);
+}
+
+.stock-import-preview.warn {
+  border-color: rgba(255, 203, 5, 0.38);
+}
+
+.stock-import-rows span,
+.stock-import-errors span {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.28;
+}
+
+.stock-import-errors span {
+  color: #fff4b0;
 }
 
 .recent-intake-panel {
