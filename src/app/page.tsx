@@ -22,6 +22,7 @@ import {
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
+import { buildBuyPlan } from "@/lib/dealer/buyPlan";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
@@ -582,6 +583,29 @@ export default function Home() {
         : null,
     [headline, strategy, cost],
   );
+  const buyPlan = useMemo(() => {
+    const intakeQuantity = parseIntakeQuantity(quantity) ?? 1;
+    const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
+    const listPricePence = overrideListPricePence ?? projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
+    if (listPricePence <= 0) return null;
+
+    return buildBuyPlan({
+      unitCostPence: poundsToPence(cost),
+      quantity: intakeQuantity,
+      listPricePence,
+      channel,
+      cautious: Boolean(comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
+    });
+  }, [
+    channel,
+    comp?.sourcesDisagree,
+    cost,
+    dealerVerdict,
+    headline?.medianPence,
+    listPriceOverride,
+    projectedListSuggestion?.pricePence,
+    quantity,
+  ]);
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
@@ -2401,6 +2425,27 @@ export default function Home() {
                 </button>
               </div>
             )}
+            {buyPlan && (
+              <div className={`buy-plan ${buyPlan.tone}`}>
+                <div className="buy-plan-heading">
+                  <span>After {channelLabel(channel)}</span>
+                  <strong>{buyPlan.label}</strong>
+                  <small>{buyPlan.note}</small>
+                </div>
+                <div>
+                  <span>Net/unit</span>
+                  <strong>{gbp(buyPlan.unitNetPence)}</strong>
+                  <small>
+                    fees {gbp(buyPlan.unitFeesPence)} · post {gbp(buyPlan.unitPostagePence)}
+                  </small>
+                </div>
+                <div>
+                  <span>Profit</span>
+                  <strong>{gbp(buyPlan.totalProfitPence)}</strong>
+                  <small>{formatPct(buyPlan.roiPct)} ROI · {formatPct(buyPlan.marginPct)} margin</small>
+                </div>
+              </div>
+            )}
             <div className="form-grid">
               <label>
                 Source
@@ -4085,6 +4130,10 @@ function findSelectedSet(sets: CatalogSet[], value: string): CatalogSet | null {
 function gbp(pence: number): string {
   const sign = pence < 0 ? "-" : "";
   return `${sign}£${(Math.abs(pence) / 100).toFixed(2)}`;
+}
+
+function formatPct(value: number | null): string {
+  return value == null ? "n/a" : `${value.toFixed(1).replace(/\.0$/, "")}%`;
 }
 
 function poundsToPence(value: string): number {

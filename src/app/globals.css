@@ -2348,6 +2348,67 @@ label {
   font-weight: 900;
 }
 
+.buy-plan {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.38);
+  padding: 10px;
+}
+
+.buy-plan.good {
+  border-color: rgba(52, 211, 153, 0.38);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.buy-plan.warn {
+  border-color: rgba(255, 203, 5, 0.4);
+  background: rgba(255, 203, 5, 0.12);
+}
+
+.buy-plan.danger {
+  border-color: rgba(251, 113, 133, 0.4);
+  background: rgba(251, 113, 133, 0.12);
+}
+
+.buy-plan div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.buy-plan span,
+.buy-plan small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.buy-plan strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.08;
+}
+
+.buy-plan.good strong {
+  color: var(--green);
+}
+
+.buy-plan.warn strong {
+  color: var(--yellow);
+}
+
+.buy-plan.danger strong {
+  color: var(--danger);
+}
+
+.buy-plan-heading strong {
+  font-size: 22px;
+}
+
 .confirm-sheet {
   display: grid;
   gap: 12px;
@@ -2475,6 +2536,7 @@ label {
   .detail-grid,
   .form-grid,
   .deal-banner,
+  .buy-plan,
   .sale-preview {
     grid-template-columns: 1fr;
   }
