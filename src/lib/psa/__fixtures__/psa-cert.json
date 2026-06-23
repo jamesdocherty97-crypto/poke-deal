@@ -1,0 +1,25 @@
+{
+  "_comment": "Representative PSA Public API GetByCertNumber response envelope. Based on the documented PSACert shape (CardGrade like 'GEM MT 10', Subject, Brand, CardNumber, Variety, populations). Confirm exact fields against a live cert once a PSA_API_TOKEN is configured.",
+  "IsValidRequest": true,
+  "ServerMessage": "Request successful",
+  "PSACert": {
+    "CertNumber": "79721014",
+    "SpecID": 4129577,
+    "SpecNumber": "21029086",
+    "LabelType": "WithLanguageVariety",
+    "ReverseBarCode": false,
+    "Year": "2021",
+    "Brand": "POKEMON SWORD & SHIELD EVOLVING SKIES",
+    "Category": "TCG CARDS",
+    "CardNumber": "215",
+    "Subject": "UMBREON VMAX",
+    "Variety": "ALTERNATE ART SECRET",
+    "IsPSADNA": false,
+    "IsDualCert": false,
+    "GradeDescription": "GEM MT 10",
+    "CardGrade": "GEM MT 10",
+    "TotalPopulation": 12863,
+    "TotalPopulationWithQualifier": 12901,
+    "PopulationHigher": 0
+  }
+}

@@ -11,3 +11,7 @@ prisma/dev.db
 coverage/
 *.tsbuildinfo
 .vercel
+
+# sandbox-only artifacts
+.env.bak.*
+tsconfig.offlinetest.json

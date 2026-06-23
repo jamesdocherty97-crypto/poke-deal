@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { PokeTraceSource } from "@/lib/comps/sources/pokeTrace";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
+import { PsaCertLookup } from "@/lib/psa/psaCert";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function GET() {
   const priceTracker = new PokemonPriceTrackerSource();
   const catalog = new PokemonTcgApiCatalogSource();
   const pokeTrace = new PokeTraceSource();
+  const psa = new PsaCertLookup();
 
   const sources: SystemSource[] = [
     {
@@ -52,6 +54,16 @@ export async function GET() {
         : "Add POKETRACE_API_KEY in Vercel for EU/Cardmarket and US cross-checks.",
     },
     {
+      id: "psa-public-api",
+      label: "PSA cert lookup",
+      role: "graded slab verification + population",
+      status: psa.live ? "ready" : "fixture",
+      required: false,
+      setupHint: psa.live
+        ? "Live PSA cert verification is available (100 lookups/day on the free tier)."
+        : "Add PSA_API_TOKEN in Vercel for live cert lookups. Runs on a demo cert until then.",
+    },
+    {
       id: "owned-sales",
       label: "Owned sales",
       role: "James's real sale history",
@@ -79,6 +91,7 @@ export async function GET() {
       livePrimaryComps: priceTracker.live,
       liveCatalogKey: catalog.live,
       secondaryCrossCheck: pokeTrace.live,
+      psaCertLookup: psa.live,
       alertDelivery: Boolean(process.env.DISCORD_WEBHOOK_URL?.trim()),
       storedSales: Boolean(process.env.DATABASE_URL?.trim()),
     },

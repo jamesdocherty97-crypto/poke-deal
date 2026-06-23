@@ -1,0 +1,51 @@
+{
+  "_comment": "Captured shape of a PokeTrace FREE-tier /v1/cards response (US market only). Free tier returns US TCGPlayer + eBay raw-condition tiers but NO Cardmarket/EU data and NO graded tiers (both gated behind Pro). Used to lock the adapter's free-tier behaviour. Verified against live free-tier docs/response 2026-06-23.",
+  "data": [
+    {
+      "id": "019bff77-befa-771d-bab0-f5909f0a78c9",
+      "name": "Umbreon VMAX",
+      "cardNumber": "215/203",
+      "set": { "slug": "evolving-skies", "name": "Evolving Skies" },
+      "variant": "Holofoil",
+      "rarity": "Secret Rare",
+      "productType": "single",
+      "productFamily": "card",
+      "image": "https://cdn.poketrace.com/cards/umbreon-vmax.webp",
+      "game": "pokemon",
+      "market": "US",
+      "currency": "USD",
+      "refs": { "tcgplayerId": "246012", "cardmarketId": null },
+      "prices": {
+        "ebay": {
+          "NEAR_MINT": {
+            "avg": 540,
+            "low": 470,
+            "high": 640,
+            "saleCount": 61,
+            "approxSaleCount": true,
+            "avg7d": 535,
+            "avg30d": 520
+          }
+        },
+        "tcgplayer": {
+          "NEAR_MINT": {
+            "avg": 505,
+            "low": 460,
+            "high": 560,
+            "saleCount": 88,
+            "approxSaleCount": false,
+            "avg7d": 500,
+            "avg30d": 488
+          }
+        }
+      },
+      "gradedOptions": [],
+      "conditionOptions": ["NEAR_MINT", "LIGHTLY_PLAYED"],
+      "topPrice": 640,
+      "totalSaleCount": 149,
+      "hasGraded": false,
+      "lastUpdated": "2026-06-22T09:00:00Z"
+    }
+  ],
+  "pagination": { "hasMore": false, "count": 1 }
+}

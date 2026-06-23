@@ -9,6 +9,10 @@ const fixture = JSON.parse(
   readFileSync(fileURLToPath(new URL("./__fixtures__/poketrace-cards.json", import.meta.url)), "utf8"),
 );
 
+const freeTierFixture = JSON.parse(
+  readFileSync(fileURLToPath(new URL("./__fixtures__/poketrace-cards-free-tier.json", import.meta.url)), "utf8"),
+);
+
 const card: CardRef = { name: "Charizard ex", setName: "151", number: "199/165" };
 const ctx = (grade: any) => ({ source: "poketrace", card, grade, windowDays: 90 });
 const usdToPence = (usd: number) => Math.round((usd / 1.27) * 100);
@@ -87,7 +91,7 @@ test("PokeTraceSource tries EU first, then falls back to US", async () => {
     if (market === "EU") return Response.json({ data: [] });
     return Response.json(fixture);
   }) as typeof fetch;
-  const source = new PokeTraceSource("secret", fetchImpl, 5);
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0);
   const comp = await source.lookup(card, { grade: "RAW" });
 
   assert.deepEqual(requestedMarkets, ["EU", "US"]);
@@ -135,12 +139,83 @@ test("PokeTraceSource degrades without keys or failed fetches", async () => {
     assert.ok(init?.signal, "live requests should carry a timeout signal");
     throw new Error("network timeout");
   }) as typeof fetch;
-  const live = new PokeTraceSource("secret", fetchImpl, 5);
+  const live = new PokeTraceSource("secret", fetchImpl, 5, 0);
   const comp = await live.lookup(card, { grade: "RAW" });
 
   assert.equal(comp.sampleSize, 0);
   assert.equal(comp.medianPence, 0);
   assert.match((comp.raw as { reason?: string }).reason ?? "", /failed|no response/);
+});
+
+test("free tier: spaces the fallback US request to clear the 1-req/2s burst window", async () => {
+  const callTimes: number[] = [];
+  const fetchImpl = (async (url: string | URL | Request) => {
+    callTimes.push(Date.now());
+    const market = new URL(String(url)).searchParams.get("market") ?? "";
+    if (market === "EU") return Response.json({ data: [] });
+    return Response.json(freeTierFixture);
+  }) as typeof fetch;
+  // 40ms spacing keeps the test fast while still proving the gap is applied.
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 40);
+  const comp = await source.lookup(
+    { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(callTimes.length, 2);
+  assert.ok(callTimes[1]! - callTimes[0]! >= 35, "US fallback should be spaced after EU");
+  assert.equal(comp.medianPence > 0, true);
+});
+
+test("free tier (US only): RAW resolves to the US TCGPlayer baseline", () => {
+  const freeCard: CardRef = { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" };
+  const comp = mapPokeTraceCardsToComp(freeTierFixture, {
+    source: "poketrace",
+    card: freeCard,
+    grade: "RAW",
+    windowDays: 90,
+  });
+
+  // No Cardmarket on free tier, so the stable US TCGPlayer near-mint baseline is used.
+  assert.equal(comp.medianPence, usdToPence(505));
+  assert.equal(comp.sampleSize, 88);
+  assert.equal((comp.raw as { priceSource?: string }).priceSource, "tcgplayer");
+  assert.equal((comp.raw as { kind?: string }).kind, "market-baseline");
+  assert.equal((comp.raw as { market?: string }).market, "US");
+});
+
+test("free tier: graded lookups degrade to empty (graded tiers are Pro-only)", () => {
+  const freeCard: CardRef = { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" };
+  const comp = mapPokeTraceCardsToComp(freeTierFixture, {
+    source: "poketrace",
+    card: freeCard,
+    grade: "PSA_10",
+    windowDays: 90,
+  });
+
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.medianPence, 0);
+  assert.match((comp.raw as { reason?: string }).reason ?? "", /price tier/);
+});
+
+test("free tier: EU market request comes back empty, source falls back to US", async () => {
+  const requestedMarkets: string[] = [];
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const market = new URL(String(url)).searchParams.get("market") ?? "";
+    requestedMarkets.push(market);
+    // Free tier has no EU/Cardmarket access — emulate an empty EU response.
+    if (market === "EU") return Response.json({ data: [] });
+    return Response.json(freeTierFixture);
+  }) as typeof fetch;
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0);
+  const comp = await source.lookup(
+    { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" },
+    { grade: "RAW" },
+  );
+
+  assert.deepEqual(requestedMarkets, ["EU", "US"]);
+  assert.equal(comp.medianPence, usdToPence(505));
+  assert.equal((comp.raw as { market?: string }).market, "US");
 });
 
 test("malformed or unsupported payloads return empty comps", () => {

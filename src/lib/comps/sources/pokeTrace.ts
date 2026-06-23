@@ -5,6 +5,11 @@ import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
 
 const BASE_URL = "https://api.poketrace.com/v1";
 const DEFAULT_FETCH_TIMEOUT_MS = 2200;
+// Free tier allows only 1 request / 2s. The EU-first then US fallback fires two
+// requests, so without spacing the second call is rate-limited (429) and PokeTrace
+// silently returns nothing. We pause before the fallback market to clear the burst
+// window. Pro tier usually returns on the first (EU) call, so this delay rarely fires.
+const DEFAULT_INTER_MARKET_DELAY_MS = 2100;
 const MARKET_FALLBACKS: PokeTraceMarket[] = ["EU", "US"];
 
 type PokeTraceMarket = "US" | "EU";
@@ -58,6 +63,7 @@ export class PokeTraceSource implements CompSource {
     private readonly apiKey: string | undefined = process.env.POKETRACE_API_KEY,
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
+    private readonly interMarketDelayMs = DEFAULT_INTER_MARKET_DELAY_MS,
   ) {
     this.live = Boolean(apiKey && apiKey.trim().length > 0);
   }
@@ -69,7 +75,10 @@ export class PokeTraceSource implements CompSource {
     if (!this.live) return emptyComp(ctx, "PokeTrace key missing");
 
     let lastEmpty: CompResult | null = null;
-    for (const market of MARKET_FALLBACKS) {
+    for (let i = 0; i < MARKET_FALLBACKS.length; i += 1) {
+      const market = MARKET_FALLBACKS[i]!;
+      // Respect the free-tier 1-req/2s burst limit before the fallback market call.
+      if (i > 0 && this.interMarketDelayMs > 0) await sleep(this.interMarketDelayMs);
       const payload = await this.fetchCards(card, market);
       const comp = payload == null
         ? emptyComp(ctx, `PokeTrace ${market} lookup failed or returned no response`)
@@ -241,4 +250,8 @@ function trendPct(tier: PokeTracePriceTier): number | null {
 
 function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
   return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

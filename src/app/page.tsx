@@ -37,6 +37,21 @@ import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/l
 
 type View = "today" | "acquire" | "inventory" | "listings" | "pnl";
 type Grade = DomainGrade;
+type PsaCertView = {
+  found: boolean;
+  certNumber: string;
+  subject?: string;
+  brand?: string;
+  year?: string;
+  cardNumber?: string;
+  variety?: string;
+  gradeLabel?: string;
+  grade: Grade | null;
+  totalPopulation?: number;
+  populationHigher?: number;
+  live: boolean;
+  reason?: string;
+};
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type AcquireListingState = "DRAFT" | "ACTIVE";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
@@ -362,6 +377,7 @@ export default function Home() {
   const [location, setLocation] = useState("Box A");
   const [condition, setCondition] = useState("NM");
   const [graderCert, setGraderCert] = useState("");
+  const [psaResult, setPsaResult] = useState<PsaCertView | null>(null);
   const [strategy, setStrategy] = useState<PricingStrategy>("market");
   const [channel, setChannel] = useState<Channel>("EBAY");
   const [listPriceOverride, setListPriceOverride] = useState("");
@@ -1114,6 +1130,44 @@ export default function Home() {
       setGradeComp(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "lookup failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function verifyPsaCert() {
+    const cert = graderCert.trim();
+    if (!cert) {
+      setError("Enter a PSA cert number first.");
+      return;
+    }
+    setBusy("psa");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/psa/cert?cert=${encodeURIComponent(cert)}`);
+      const payload = await readJson(res);
+      const result = payload.result as PsaCertView | undefined;
+      if (!res.ok || !result) {
+        throw new Error(payload.error ?? "PSA lookup failed");
+      }
+      setPsaResult(result);
+      if (!result.found) {
+        setNotice(result.reason ?? "No PSA cert data found.");
+        return;
+      }
+      // Auto-fill the buy form from the verified slab so a comp can follow.
+      if (result.subject) setName(toTitleCase(result.subject));
+      if (result.cardNumber) setNumber(result.cardNumber);
+      if (result.grade) setGrade(result.grade);
+      clearCheckedComp();
+      setNotice(
+        `Verified PSA ${result.gradeLabel ?? ""} ${toTitleCase(result.subject ?? "card")}${
+          result.live ? "" : " (demo cert — add PSA_API_TOKEN for live)"
+        }. Card filled — run a comp.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "PSA lookup failed");
     } finally {
       setBusy(null);
     }
@@ -2945,14 +2999,51 @@ export default function Home() {
               </label>
               <label>
                 Cert
-                <input
-                  inputMode="numeric"
-                  value={graderCert}
-                  onChange={(event) => setGraderCert(event.target.value)}
-                  placeholder={grade === "RAW" ? "optional" : "PSA/BGS/CGC cert"}
-                />
+                <div className="quick-intake-row">
+                  <input
+                    inputMode="numeric"
+                    value={graderCert}
+                    onChange={(event) => setGraderCert(event.target.value)}
+                    placeholder={grade === "RAW" ? "optional" : "PSA cert number"}
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyPsaCert}
+                    disabled={busy === "psa" || !graderCert.trim()}
+                  >
+                    {busy === "psa" ? "..." : "Verify PSA"}
+                  </button>
+                </div>
               </label>
             </div>
+            {psaResult && (
+              <div className={`psa-cert-card ${psaResult.found ? "good" : "warn"}`}>
+                {psaResult.found ? (
+                  <>
+                    <div className="psa-cert-heading">
+                      <div>
+                        <span>PSA cert {psaResult.certNumber}{psaResult.live ? "" : " · demo"}</span>
+                        <strong>{toTitleCase(psaResult.subject ?? "Unknown card")}</strong>
+                        <small>
+                          {[psaResult.year, psaResult.brand ? toTitleCase(psaResult.brand) : null, psaResult.cardNumber ? `#${psaResult.cardNumber}` : null]
+                            .filter(Boolean)
+                            .join(" · ")}
+                          {psaResult.variety ? ` · ${toTitleCase(psaResult.variety)}` : ""}
+                        </small>
+                      </div>
+                      <span className="pill good">{psaResult.gradeLabel ?? psaResult.grade?.replace(/_/g, " ")}</span>
+                    </div>
+                    <div className="psa-cert-pop">
+                      <Metric label="Pop at grade" value={psaResult.totalPopulation != null ? String(psaResult.totalPopulation) : "—"} />
+                      <Metric label="Pop higher" value={psaResult.populationHigher != null ? String(psaResult.populationHigher) : "—"} />
+                    </div>
+                    <p className="hint">Card and grade filled from the slab. Run a comp to value it, then acquire.</p>
+                  </>
+                ) : (
+                  <p className="hint">{psaResult.reason ?? "Cert not found."}</p>
+                )}
+              </div>
+            )}
             <div className="preset-row" aria-label="Source presets">
               {sourcePresets.map((preset) => (
                 <button
@@ -4699,6 +4790,17 @@ function sparklineY(value: number, points: ProfitTrendPoint[], height: number, p
   const span = max - min || 1;
   const drawableHeight = height - padding * 2;
   return padding + ((max - value) / span) * drawableHeight;
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (m) => m.toUpperCase())
+    .replace(/\bEx\b/g, "ex")
+    .replace(/\bGx\b/g, "GX")
+    .replace(/\bVmax\b/g, "VMAX")
+    .replace(/\bVstar\b/g, "VSTAR")
+    .trim();
 }
 
 function ageLabel(value: string): string {
