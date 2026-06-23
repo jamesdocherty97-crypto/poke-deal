@@ -665,6 +665,26 @@ label {
   filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.42));
 }
 
+.quick-intake-field {
+  min-width: 0;
+}
+
+.quick-intake-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 8px;
+  align-items: center;
+}
+
+.quick-intake-row button {
+  min-width: 72px;
+  border-color: rgba(255, 203, 5, 0.42);
+  background: rgba(255, 203, 5, 0.14);
+  color: #fff4b0;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .set-field {
   position: relative;
 }

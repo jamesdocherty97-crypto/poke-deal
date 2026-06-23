@@ -19,6 +19,7 @@ import {
 } from "@/lib/dealer/quickHunts";
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
+import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
 import { estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
@@ -314,6 +315,7 @@ export default function Home() {
   const [name, setName] = useState("Charizard ex");
   const [setNameValue, setSetNameValue] = useState("151");
   const [number, setNumber] = useState("199/165");
+  const [quickIntake, setQuickIntake] = useState("");
   const [grade, setGrade] = useState<Grade>("RAW");
   const [cost, setCost] = useState("18.00");
   const [quantity, setQuantity] = useState("1");
@@ -737,6 +739,48 @@ export default function Home() {
     setSuggestion(null);
     setCardArtUrl(null);
     setGradeComp(null);
+  }
+
+  function applyQuickIntake() {
+    const parsed = parseQuickIntake(quickIntake);
+    const filled: string[] = [];
+
+    if (parsed.name) {
+      setName(parsed.name);
+      filled.push("card");
+    }
+    if (parsed.setName) {
+      setSetNameValue(parsed.setName);
+      filled.push("set");
+    }
+    if (parsed.number) {
+      setNumber(parsed.number);
+      filled.push("number");
+    }
+    if (parsed.grade) {
+      setGrade(parsed.grade);
+      filled.push("grade");
+    }
+    if (parsed.cost) {
+      setCost(parsed.cost);
+      filled.push("cost");
+    }
+    if (parsed.quantity) {
+      setQuantity(parsed.quantity);
+      filled.push("qty");
+    }
+
+    if (filled.length === 0) {
+      setError("Quick fill needs a card, set, number, grade, cost or quantity.");
+      return;
+    }
+
+    setComp(null);
+    setSuggestion(null);
+    setCardArtUrl(null);
+    setGradeComp(null);
+    setNotice(`Filled ${filled.join(", ")}.`);
+    setError(null);
   }
 
   async function lookup(event?: FormEvent) {
@@ -1776,6 +1820,26 @@ export default function Home() {
                 />
               )}
             </div>
+            <label className="quick-intake-field">
+              Quick fill
+              <div className="quick-intake-row">
+                <input
+                  value={quickIntake}
+                  onChange={(event) => setQuickIntake(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && quickIntake.trim()) {
+                      event.preventDefault();
+                      applyQuickIntake();
+                    }
+                  }}
+                  placeholder="Gengar Lost Origin TG06 raw £10"
+                  autoComplete="off"
+                />
+                <button type="button" onClick={applyQuickIntake} disabled={!quickIntake.trim()}>
+                  Fill
+                </button>
+              </div>
+            </label>
             <label className="set-field">
               Card
               <input
