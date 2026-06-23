@@ -18,3 +18,9 @@ The six open decisions from the brief (§11), settled so the build can proceed w
 - **The cleaning engine is pure and dependency-free.** No DB, no network, no framework imports — so it's fast to test and impossible to break by accident. This is the app's core IP.
 - **Sources are swappable and degrade gracefully.** Missing API key → the adapter runs in fixture mode rather than throwing, so the whole spine is demoable offline.
 - **The domain is card-agnostic.** Inventory/Listing/Sale reference a generic `Card`, so sports cards (§9) slot in without touching the dealer loop.
+
+## Comp source stance
+
+- **Current suite is enough for launch once PokeTrace is enabled in production.** Price Tracker is the primary sold-comp source, Pokémon TCG API resolves card identity/images and raw market baselines, PokeTrace is the required second opinion for bigger raw buys, and owned sales become a private source after James books sales.
+- **UK relevance means EU/Cardmarket signals matter.** PokeTrace is queried EU-first, then US fallback, so raw cross-checks can use Cardmarket-style baselines before leaning on US TCGPlayer/eBay signals.
+- **Do not trust noisy RAW sold buckets alone.** When smart RAW, catalog/PokeTrace baselines, and owned sales disagree materially, the UI should say to manually check rather than pretending a single median is safe.

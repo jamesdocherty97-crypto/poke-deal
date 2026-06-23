@@ -5,6 +5,7 @@ import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
 
 const BASE_URL = "https://api.poketrace.com/v1";
 const DEFAULT_FETCH_TIMEOUT_MS = 2200;
+const MARKET_FALLBACKS: PokeTraceMarket[] = ["EU", "US"];
 
 type PokeTraceMarket = "US" | "EU";
 
@@ -67,16 +68,24 @@ export class PokeTraceSource implements CompSource {
     const ctx = { source: this.name, card, grade, windowDays };
     if (!this.live) return emptyComp(ctx, "PokeTrace key missing");
 
-    const payload = await this.fetchCards(card);
-    if (payload == null) return emptyComp(ctx, "PokeTrace lookup failed or returned no response");
-    return mapPokeTraceCardsToComp(payload, ctx);
+    let lastEmpty: CompResult | null = null;
+    for (const market of MARKET_FALLBACKS) {
+      const payload = await this.fetchCards(card, market);
+      const comp = payload == null
+        ? emptyComp(ctx, `PokeTrace ${market} lookup failed or returned no response`)
+        : mapPokeTraceCardsToComp(payload, ctx);
+      if (comp.sampleSize > 0 && comp.medianPence > 0) return comp;
+      lastEmpty = comp;
+    }
+
+    return lastEmpty ?? emptyComp(ctx, "PokeTrace lookup failed or returned no response");
   }
 
-  private async fetchCards(card: CardRef): Promise<unknown | null> {
+  private async fetchCards(card: CardRef, market: PokeTraceMarket): Promise<unknown | null> {
     const search = [card.name, card.number].filter(Boolean).join(" ");
     const params = new URLSearchParams({
       search,
-      market: "US" satisfies PokeTraceMarket,
+      market,
       product_type: "single",
       limit: "1",
     });
@@ -154,6 +163,8 @@ export function mapPokeTraceCardsToComp(
 function chooseTier(card: PokeTraceCard, grade: Grade): PokeTraceTierChoice | null {
   const tierKey = gradeToPokeTraceTier(grade);
   if (grade === "RAW") {
+    const cardmarket = card.prices?.cardmarket?.[tierKey] ?? card.prices?.cardmarket_unsold?.[tierKey];
+    if (cardmarket) return { tier: cardmarket, tierKey, priceSource: "cardmarket", kind: "market-baseline" };
     const tcgplayer = card.prices?.tcgplayer?.[tierKey];
     if (tcgplayer) return { tier: tcgplayer, tierKey, priceSource: "tcgplayer", kind: "market-baseline" };
     const ebay = card.prices?.ebay?.[tierKey];

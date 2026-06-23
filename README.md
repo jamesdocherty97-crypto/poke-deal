@@ -67,12 +67,14 @@ The frame runs without any of these (fixture mode). Add them to `.env` (copy fro
 | **Pokemon Price Tracker** | Primary comps (raw + graded), GBP-capable | Free tier → $9.99/mo | https://www.pokemonpricetracker.com/pricing |
 | **Pokémon TCG API** | Catalog, images, baseline price | Free | https://dev.pokemontcg.io |
 | **PSA Public API** | Cert lookup / slab verification | Free | https://www.psacard.com/publicapi |
-| **PokeTrace** (optional) | Secondary comps / cross-check | Free tier → Pro | https://poketrace.com/developers |
+| **PokeTrace** | Secondary comps / EU-first raw cross-check | Free tier → Pro | https://poketrace.com/developers |
 | **eBay Developer** (Phase 3) | Push your *own* listings via Sell API | Free | https://developer.ebay.com |
 | **Discord webhook** | Price/repricing alerts | Free | Server Settings → Integrations → Webhooks |
 | **Postgres** | Storage | Free local / Neon free tier | docker or https://neon.tech |
 
 **Pokemon Price Tracker live path:** set `POKEMON_PRICE_TRACKER_API_KEY` to use the live v2 adapter. The response shape is pinned in `src/lib/comps/sources/__fixtures__/ppt-cards-ebay.json`; the adapter requests `limit=1` to keep credit usage low and maps provider aggregates into GBP `CompResult`s without caching stale prices as truth.
+
+**PokeTrace cross-check path:** set `POKETRACE_API_KEY` in Vercel before relying on bigger raw-card buys. The adapter asks PokeTrace for EU market data first, then falls back to US, and maps Cardmarket/TCGPlayer/eBay tiers into GBP `CompResult`s so noisy RAW buckets can be challenged by a second source.
 
 ---
 

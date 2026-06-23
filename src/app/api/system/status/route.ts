@@ -44,12 +44,12 @@ export async function GET() {
     {
       id: "poketrace",
       label: "PokeTrace",
-      role: "secondary cross-check",
+      role: "EU-first secondary cross-check",
       status: pokeTrace.live ? "ready" : "missing",
       required: false,
       setupHint: pokeTrace.live
-        ? "Second comp source is available for raw-noise cross-checks."
-        : "Add POKETRACE_API_KEY in Vercel to cross-check noisy raw prices.",
+        ? "EU/Cardmarket and US PokeTrace signals are available for raw-noise checks."
+        : "Add POKETRACE_API_KEY in Vercel for EU/Cardmarket and US cross-checks.",
     },
     {
       id: "owned-sales",

@@ -97,6 +97,7 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
     chosenSignal?: CatalogPriceSignal;
     reason?: string;
     priceSource?: string;
+    market?: string;
     tier?: string;
     sales?: OwnedSaleCompRow[];
     source?: CheckedCompSource;
@@ -4561,10 +4562,18 @@ function compBasis(result: CompResult): string {
   }
   if (result.source === "owned-sales") return "Your sold prices";
   if (result.source === "poketrace") {
-    const raw = result.raw as { priceSource?: string; tier?: string; kind?: string } | undefined;
-    const source = raw?.priceSource === "tcgplayer" ? "TCGPlayer" : raw?.priceSource === "ebay" ? "eBay" : "PokeTrace";
+    const raw = result.raw as { priceSource?: string; tier?: string; kind?: string; market?: string } | undefined;
+    const source =
+      raw?.priceSource === "tcgplayer"
+        ? "TCGPlayer"
+        : raw?.priceSource === "ebay"
+          ? "eBay"
+          : raw?.priceSource === "cardmarket"
+            ? "Cardmarket"
+            : "PokeTrace";
+    const market = raw?.market ? ` ${raw.market}` : "";
     const tier = raw?.tier ? raw.tier.replace(/_/g, " ") : result.grade.replace(/_/g, " ");
-    return raw?.kind === "market-baseline" ? `${source} ${tier} baseline` : `${source} ${tier} aggregate`;
+    return raw?.kind === "market-baseline" ? `${source}${market} ${tier} baseline` : `${source}${market} ${tier} aggregate`;
   }
   if (result.raw?.kind === "catalog-market-baseline") {
     return result.raw.chosenSignal?.label ?? "TCGPlayer/Cardmarket baseline";
