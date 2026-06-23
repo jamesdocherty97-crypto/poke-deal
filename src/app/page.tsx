@@ -30,7 +30,7 @@ import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
-import { estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
+import { breakEvenSalePricePence, estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
 
@@ -312,6 +312,7 @@ type SystemSource = {
   role: string;
   status: "ready" | "public" | "fixture" | "missing" | "building";
   required: boolean;
+  setupHint?: string;
 };
 
 const quickGrades: Grade[] = ["RAW", "PSA_8", "PSA_9", "PSA_10", "BGS_9_5", "CGC_10"];
@@ -1527,20 +1528,50 @@ export default function Home() {
     setPostageTouched(false);
   }
 
-  function useListingSalePrice() {
-    if (!sellingItem) return;
-    const price = saleListPrice(sellingItem) ?? sellingItem.costBasis;
-    const estimate = estimateSaleCosts(saleChannel, price);
-    setSalePrice(penceToPounds(price));
+  function saleQuantityForShortcuts(): number {
+    const parsed = parseIntakeQuantity(saleQuantity) ?? 1;
+    return Math.max(1, Math.min(sellingItem?.quantity ?? 1, parsed));
+  }
+
+  function saleUnitReferencePence(): number {
+    if (!sellingItem) return 0;
+    const quantityForPrice = saleQuantityForShortcuts();
+    const currentTotal = poundsToPence(salePrice);
+    if (currentTotal > 0) return Math.round(currentTotal / quantityForPrice);
+    return saleListPrice(sellingItem) ?? sellingItem.costBasis;
+  }
+
+  function applySaleTotalPrice(totalPence: number) {
+    const safeTotal = Math.max(0, Math.round(totalPence));
+    const estimate = estimateSaleCosts(saleChannel, safeTotal);
+    setSalePrice(penceToPounds(safeTotal));
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
     setFeesTouched(false);
     setPostageTouched(false);
   }
 
+  function useListingSalePrice() {
+    if (!sellingItem) return;
+    const unitPrice = saleListPrice(sellingItem) ?? sellingItem.costBasis;
+    applySaleTotalPrice(unitPrice * saleQuantityForShortcuts());
+  }
+
+  function applySalePriceMultiplier(multiplier: number) {
+    if (!sellingItem) return;
+    applySaleTotalPrice(Math.round(saleUnitReferencePence() * multiplier) * saleQuantityForShortcuts());
+  }
+
+  function useBreakEvenSalePrice() {
+    if (!sellingItem) return;
+    applySaleTotalPrice(breakEvenSalePricePence(saleChannel, sellingItem.costBasis * saleQuantityForShortcuts()));
+  }
+
   function sellAllQuantity() {
     if (!sellingItem) return;
+    const unitPrice = saleUnitReferencePence();
     setSaleQuantity(String(sellingItem.quantity));
+    applySaleTotalPrice(unitPrice * sellingItem.quantity);
   }
 
   function applyCashSale() {
@@ -3694,7 +3725,16 @@ export default function Home() {
           </div>
           <div className="sale-shortcuts" aria-label="Sale shortcuts">
             <button type="button" onClick={useListingSalePrice} disabled={!sellingItem}>
-              List price
+              List
+            </button>
+            <button type="button" onClick={() => applySalePriceMultiplier(0.95)} disabled={!sellingItem}>
+              95%
+            </button>
+            <button type="button" onClick={() => applySalePriceMultiplier(0.9)} disabled={!sellingItem}>
+              90%
+            </button>
+            <button type="button" onClick={useBreakEvenSalePrice} disabled={!sellingItem}>
+              Break even
             </button>
             {sellingItem && sellingItem.quantity > 1 && (
               <button type="button" onClick={sellAllQuantity}>
@@ -3702,10 +3742,10 @@ export default function Home() {
               </button>
             )}
             <button type="button" onClick={applyCashSale}>
-              Cash sale
+              Cash
             </button>
             <button type="button" onClick={resetSaleCosts}>
-              Reset fees
+              Reset
             </button>
             <button type="button" onClick={clearSalePostage}>
               No post
@@ -4065,6 +4105,7 @@ function SourceHealthRow({ source }: { source: SystemSource }) {
       <div>
         <strong>{source.label}</strong>
         <span>{source.role}</span>
+        {source.setupHint && <small>{source.setupHint}</small>}
       </div>
       <span>{sourceStatusLabel(source.status)}</span>
     </div>

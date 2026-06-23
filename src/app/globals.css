@@ -950,6 +950,7 @@ label {
 .today-action small,
 .launch-plan-row small,
 .source-health-row span,
+.source-health-row small,
 .readiness-row small,
 .setup-step small {
   color: var(--muted);
@@ -1062,11 +1063,17 @@ label {
 }
 
 .source-health-row > span {
+  align-self: start;
   min-height: 26px;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 5px 8px;
   text-transform: uppercase;
+}
+
+.source-health-row small {
+  overflow-wrap: anywhere;
+  color: #cfe6ff;
 }
 
 .source-health-row.good > span,
@@ -2548,13 +2555,13 @@ label {
 
 .sale-shortcuts {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
 .sale-shortcuts button {
   min-height: 36px;
-  padding: 6px 7px;
+  padding: 6px 5px;
   border-color: rgba(42, 117, 187, 0.32);
   background: rgba(42, 117, 187, 0.12);
   color: #cfe6ff;

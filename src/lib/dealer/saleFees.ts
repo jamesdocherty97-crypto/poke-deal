@@ -39,3 +39,20 @@ export function saleNetPence({
 }): number {
   return salePricePence - feesPence - postagePence;
 }
+
+export function breakEvenSalePricePence(channel: SaleChannel, costPence: number): number {
+  const target = Math.max(0, Math.round(costPence));
+  if (target <= 0) return 0;
+
+  let price = target;
+  const maxPrice = target * 3 + 5000;
+  while (price <= maxPrice) {
+    const costs = estimateSaleCosts(channel, price);
+    if (saleNetPence({ salePricePence: price, feesPence: costs.feesPence, postagePence: costs.postagePence }) >= target) {
+      return price;
+    }
+    price += 1;
+  }
+
+  return maxPrice;
+}
