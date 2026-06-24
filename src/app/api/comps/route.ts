@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import {
   catalogToCardRef,
   createAppCompService,
+  findCatalogAlternatives,
   resolveCatalogCard,
 } from "@/lib/comps/appCompLookup";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
@@ -36,6 +37,8 @@ export async function GET(request: Request) {
     const compCard = catalog ? catalogToCardRef(catalog, card) : card;
     const compService = createAppCompService(catalogSource, catalog);
     const result = await compService.lookup(compCard, { grade });
+    const needsRecovery = !catalog || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
+    const alternatives = needsRecovery ? await findCatalogAlternatives(card, catalogSource, 4) : [];
     if (process.env.DATABASE_URL) {
       await new PrismaCompResultRepo().create(result.headline).catch((err) => {
         console.warn(
@@ -44,7 +47,7 @@ export async function GET(request: Request) {
         );
       });
     }
-    return NextResponse.json({ ...result, catalog });
+    return NextResponse.json({ ...result, catalog, alternatives });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "lookup failed" },

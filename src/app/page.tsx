@@ -172,6 +172,7 @@ type Reconciled = {
   all: CompResult[];
   sourcesDisagree: boolean;
   catalog?: CatalogCard | null;
+  alternatives?: CatalogCard[];
 };
 type Suggestion = {
   pricePence: number;
@@ -1935,6 +1936,29 @@ export default function Home() {
     setNotice(`${entry.name} loaded.`);
   }
 
+  function chooseCatalogAlternative(card: CatalogCard) {
+    const nextLookup = {
+      name: card.name,
+      setName: card.setName,
+      number: card.number ?? "",
+      grade,
+    };
+
+    setName(card.name);
+    setSetNameValue(card.setName);
+    pinRecentSetName(card.setName);
+    setNumber(card.number ?? "");
+    setComp(null);
+    setSuggestion(null);
+    setCardArtUrl(card.imageUrl ?? null);
+    setGradeComp(null);
+    setManualCompQuery("");
+    clearCheckedComp();
+    setError(null);
+    setNotice(`Rechecking ${card.name}...`);
+    void lookupComp(nextLookup);
+  }
+
   function removeRecentCompEntry(entry: RecentCompEntry) {
     setRecentComps((current) => {
       const next = removeRecentComp(current, entry);
@@ -3504,6 +3528,42 @@ export default function Home() {
                     <li>Use same grade, edition, language and condition.</li>
                     <li>Enter the checked sold price below, then stock it.</li>
                   </ol>
+                </div>
+              )}
+              {comp?.alternatives && comp.alternatives.length > 0 && (
+                <div className="catalog-alternatives" aria-label="Possible catalog matches">
+                  <div className="catalog-alternatives-heading">
+                    <span>Possible matches</span>
+                    <strong>Tap to recheck</strong>
+                  </div>
+                  <div className="catalog-alternative-row">
+                    {comp.alternatives.map((card) => (
+                      <button
+                        key={card.tcgApiId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
+                        className="catalog-alternative-card"
+                        type="button"
+                        onClick={() => chooseCatalogAlternative(card)}
+                        disabled={busy === "lookup"}
+                      >
+                        <CardImage
+                          src={card.imageUrl ?? null}
+                          className="catalog-alternative-art"
+                          fallbackClassName="catalog-alternative-art blank"
+                          alt=""
+                        />
+                        <span>
+                          <strong>{card.name}</strong>
+                          <small>
+                            {card.setName}
+                            {card.number ? ` #${card.number}` : ""}
+                          </small>
+                        </span>
+                        {(card.setLogoUrl || card.setSymbolUrl) && (
+                          <img src={card.setLogoUrl ?? card.setSymbolUrl} alt="" onError={hideBrokenImage} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {needsManualComp && renderManualCompLinks("priority")}

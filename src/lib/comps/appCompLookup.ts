@@ -1,5 +1,10 @@
 import { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
-import { catalogCardMatchesLookupContext } from "../catalog/cardSearch.js";
+import {
+  catalogCardMatchesLookupContext,
+  normalizeCatalogCardSearchInput,
+  rankCatalogCards,
+} from "../catalog/cardSearch.js";
+import { searchChaseCards } from "../catalog/chaseCards.js";
 import type { CatalogCard, CatalogSource } from "../catalog/types.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
@@ -22,6 +27,36 @@ export async function resolveCatalogCard(
   if (!best?.tcgApiId) return best;
 
   return catalogSource.resolve({ ...card, tcgApiId: best.tcgApiId }).catch(() => best);
+}
+
+export async function findCatalogAlternatives(
+  card: CardRef,
+  catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
+  limit = 4,
+): Promise<CatalogCard[]> {
+  const safeLimit = Math.max(1, Math.min(8, Math.round(limit)));
+  const normalized = normalizeCatalogCardSearchInput(card.name, card.setName);
+  const query = [normalized.name || card.name, normalized.number ?? card.number].filter(Boolean).join(" ");
+  if (!query.trim()) return [];
+
+  const liveCards = await catalogSource.search(card, Math.max(safeLimit * 2, 8)).catch(() => []);
+  const chaseCards = searchChaseCards(query, card.setName ?? normalized.setName, Math.max(safeLimit * 2, 8));
+  const ranked = rankCatalogCards(query, [...liveCards, ...chaseCards], {
+    setName: card.setName ?? normalized.setName,
+    limit: Math.max(safeLimit * 3, 12),
+  });
+
+  const seen = new Set<string>();
+  const alternatives: CatalogCard[] = [];
+  for (const candidate of ranked) {
+    if (catalogCardMatchesLookupContext(candidate, card)) continue;
+    const key = catalogIdentityKey(candidate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    alternatives.push(candidate);
+    if (alternatives.length >= safeLimit) break;
+  }
+  return alternatives;
 }
 
 export function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardRef {
@@ -56,4 +91,15 @@ export function fixedCatalogSource(live: boolean, catalog: CatalogCard): Catalog
       return catalog;
     },
   };
+}
+
+function catalogIdentityKey(card: CatalogCard): string {
+  return (
+    card.tcgApiId ??
+    [
+      card.name.trim().toLowerCase(),
+      card.setName.trim().toLowerCase(),
+      (card.number ?? "").trim().toLowerCase(),
+    ].join("|")
+  );
 }

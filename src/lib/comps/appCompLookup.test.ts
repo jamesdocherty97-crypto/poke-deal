@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { catalogToCardRef, resolveCatalogCard } from "./appCompLookup.js";
+import { catalogToCardRef, findCatalogAlternatives, resolveCatalogCard } from "./appCompLookup.js";
 import type { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
 import type { CatalogCard } from "../catalog/types.js";
 import type { CardRef } from "../domain/types.js";
@@ -100,6 +100,40 @@ test("resolveCatalogCard rejects same-name cards from the wrong requested set", 
   );
 
   assert.equal(resolved, null);
+});
+
+test("findCatalogAlternatives returns safe wrong-set recovery candidates", async () => {
+  const wrongSetCard: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Hitmontop",
+    setName: "Neo Discovery",
+    setCode: "neo2",
+    number: "3/75",
+    imageUrl: "https://images.pokemontcg.io/neo2/3_hires.png",
+    tcgApiId: "neo2-3",
+  };
+  const wrongNameCard: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Bellossom",
+    setName: "Neo Genesis",
+    setCode: "neo1",
+    number: "3/111",
+    tcgApiId: "neo1-3",
+  };
+  const source = {
+    async search() {
+      return [wrongNameCard, wrongSetCard, wrongSetCard];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const alternatives = await findCatalogAlternatives(
+    { name: "Hitmontop 1st Edition", setName: "Neo Genesis", number: "3/111" },
+    source,
+  );
+
+  assert.deepEqual(alternatives, [wrongSetCard]);
 });
 
 test("resolveCatalogCard rejects same-set cards when the requested name differs", async () => {

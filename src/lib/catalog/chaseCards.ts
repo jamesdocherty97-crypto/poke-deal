@@ -49,6 +49,17 @@ const CHASE_CARDS: CatalogCard[] = [
   {
     game: "POKEMON",
     language: "EN",
+    name: "Hitmontop",
+    setName: "Neo Discovery",
+    setCode: "neo2",
+    number: "3/75",
+    rarity: "Rare Holo",
+    imageUrl: "https://images.pokemontcg.io/neo2/3_hires.png",
+    tcgApiId: "neo2-3",
+  },
+  {
+    game: "POKEMON",
+    language: "EN",
     name: "Mr. Mime",
     setName: "Base",
     setCode: "base1",
