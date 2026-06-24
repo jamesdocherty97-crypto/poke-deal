@@ -6,7 +6,7 @@ export interface QuickHuntCard {
   setMarkUrl?: string;
 }
 
-export const MAX_QUICK_HUNTS = 12;
+export const MAX_QUICK_HUNTS = 14;
 
 export const DEFAULT_QUICK_HUNTS: QuickHuntCard[] = [
   {
@@ -35,6 +35,13 @@ export const DEFAULT_QUICK_HUNTS: QuickHuntCard[] = [
     setName: "Evolving Skies",
     number: "215/203",
     imageUrl: "https://images.pokemontcg.io/swsh7/215_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/swsh7/logo.png",
+  },
+  {
+    name: "Rayquaza VMAX",
+    setName: "Evolving Skies",
+    number: "218/203",
+    imageUrl: "https://images.pokemontcg.io/swsh7/218_hires.png",
     setMarkUrl: "https://images.pokemontcg.io/swsh7/logo.png",
   },
   {
@@ -85,6 +92,11 @@ export const DEFAULT_QUICK_HUNTS: QuickHuntCard[] = [
     number: "SVP085",
     imageUrl: "https://images.pokemontcg.io/svp/85_hires.png",
     setMarkUrl: "https://images.pokemontcg.io/svp/logo.png",
+  },
+  {
+    name: "Snivy",
+    setName: "Mega Evolution Promos",
+    number: "MEP049",
   },
   {
     name: "Charizard",

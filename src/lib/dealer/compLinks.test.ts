@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildManualCompLinks, cardSearchQuery, normalizeManualCompSearchText } from "./compLinks.js";
+import { buildManualCompLinks, cardSearchQuery, ebaySoldSearchQuery, normalizeManualCompSearchText } from "./compLinks.js";
 
 const card = {
   name: "Gengar",
@@ -17,12 +17,13 @@ test("buildManualCompLinks creates UK-relevant raw comp links", () => {
   const links = buildManualCompLinks(card, "RAW");
   const ebay = new URL(links[0]!.url);
 
-  assert.equal(links[0]?.label, "eBay UK sold");
+  assert.equal(links[0]?.label, "eBay UK");
   assert.equal(ebay.hostname, "www.ebay.co.uk");
   assert.equal(ebay.searchParams.get("LH_Sold"), "1");
   assert.equal(ebay.searchParams.get("LH_PrefLoc"), "1");
-  assert.equal(ebay.searchParams.get("_nkw"), "Gengar TG06/TG30 Lost Origin Trainer Gallery");
-  assert.equal(links[1]?.label, "eBay all sold");
+  assert.equal(ebay.searchParams.get("_nkw"), "Gengar TG06/TG30 Lost Origin Trainer Gallery -PSA -BGS -CGC -ACE -SGC -graded");
+  assert.equal(links[0]?.primary, true);
+  assert.equal(links[1]?.label, "Widen");
   assert.equal(new URL(links[1]!.url).searchParams.get("LH_PrefLoc"), null);
   assert.equal(new URL(links[2]!.url).hostname, "www.cardmarket.com");
   assert.equal(new URL(links[3]!.url).hostname, "www.tcgplayer.com");
@@ -32,6 +33,7 @@ test("buildManualCompLinks adds slab grade only to eBay sold searches", () => {
   const links = buildManualCompLinks(card, "BGS_9_5");
 
   assert.match(new URL(links[0]!.url).searchParams.get("_nkw") ?? "", /BGS 9\.5/);
+  assert.doesNotMatch(new URL(links[0]!.url).searchParams.get("_nkw") ?? "", /-PSA/);
   assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /BGS/);
   assert.doesNotMatch(new URL(links[3]!.url).searchParams.get("q") ?? "", /BGS/);
 });
@@ -44,7 +46,7 @@ test("buildManualCompLinks preserves typed vintage qualifiers for eBay", () => {
   );
   const ebay = new URL(links[0]!.url);
 
-  assert.equal(ebay.searchParams.get("_nkw"), "Hitmontop Neo Genesis 1st Edition LP");
+  assert.equal(ebay.searchParams.get("_nkw"), "Hitmontop Neo Genesis 1st Edition LP -PSA -BGS -CGC -ACE -SGC -graded");
   assert.equal(ebay.searchParams.get("LH_PrefLoc"), "1");
 });
 
@@ -58,4 +60,14 @@ test("normalizeManualCompSearchText strips buy-flow noise but keeps comp qualifi
     normalizeManualCompSearchText("2x Hitmontop - Neo Genesis - 1st Edition - LP raw £12 vinted binder"),
     "Hitmontop Neo Genesis 1st Edition LP",
   );
+});
+
+test("normalizeManualCompSearchText joins modern promo codes for manual eBay searches", () => {
+  assert.equal(normalizeManualCompSearchText("Snivy MEP 049 raw £2"), "Snivy MEP049");
+  assert.equal(normalizeManualCompSearchText("Pikachu SVP 085 LP"), "Pikachu SVP085 LP");
+});
+
+test("ebaySoldSearchQuery keeps explicit graded wording instead of adding raw exclusions", () => {
+  assert.equal(ebaySoldSearchQuery("Umbreon VMAX PSA 10", "RAW"), "Umbreon VMAX PSA 10");
+  assert.equal(ebaySoldSearchQuery("Umbreon VMAX", "PSA_10"), "Umbreon VMAX PSA 10");
 });

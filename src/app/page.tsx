@@ -374,7 +374,7 @@ const RECENT_SETS_STORAGE_KEY = "pokemon-dealer-os.recent-sets.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
-const VISIBLE_POPULAR_SET_LIMIT = 18;
+const VISIBLE_POPULAR_SET_LIMIT = 30;
 const VISIBLE_QUICK_HUNT_LIMIT = 6;
 const expensePresets: Array<{ category: ExpenseCategory; description: string; amount?: string; channel?: Channel }> = [
   { category: "POSTAGE", description: "Postage supplies", amount: "5.00" },
@@ -1195,10 +1195,11 @@ export default function Home() {
     const parsed = parseQuickIntake(quickIntake);
     const filled: string[] = [];
     const manualQuery = normalizeManualCompSearchText(quickIntake);
+    const identityChanged = Boolean(parsed.name || parsed.setName);
     const nextLookup: LookupInput = {
       name: parsed.name ?? name,
       setName: parsed.setName ?? setNameValue,
-      number: parsed.number ?? number,
+      number: parsed.number ?? (identityChanged ? "" : number),
       grade: parsed.grade ?? grade,
     };
 
@@ -1214,6 +1215,8 @@ export default function Home() {
     if (parsed.number) {
       setNumber(parsed.number);
       filled.push("number");
+    } else if (identityChanged) {
+      setNumber("");
     }
     if (parsed.grade) {
       setGrade(parsed.grade);
@@ -2423,10 +2426,26 @@ export default function Home() {
     }
   }
 
+  async function copyManualCompQuery() {
+    const query = manualCompLinks.find((link) => link.kind === "EBAY_UK_SOLD")?.query ?? manualCompFallbackQuery;
+    if (!query.trim()) return;
+    try {
+      await navigator.clipboard.writeText(query);
+      setNotice("Manual comp query copied.");
+      setError(null);
+    } catch {
+      setError("Copy failed. Select the manual search text and copy it.");
+    }
+  }
+
   function renderManualCompLinks(variant: "compact" | "full" = "full") {
+    const ebayQuery = manualCompLinks.find((link) => link.kind === "EBAY_UK_SOLD")?.query ?? manualCompFallbackQuery;
     return (
       <div className={`manual-comp-links ${variant}`} aria-label="Manual comp checks">
-        <span>Manual checks</span>
+        <div className="manual-comp-heading">
+          <span>Manual checks</span>
+          <strong>UK sold first</strong>
+        </div>
         <label className="manual-comp-search">
           <span>Search</span>
           <input
@@ -2435,8 +2454,17 @@ export default function Home() {
             placeholder={manualCompFallbackQuery || "Hitmontop Neo Genesis 1st Edition LP"}
           />
         </label>
+        <div className="manual-comp-actions">
+          <button type="button" onClick={() => setManualCompQuery(manualCompFallbackQuery)} disabled={!manualCompFallbackQuery.trim()}>
+            Use fields
+          </button>
+          <button type="button" onClick={() => void copyManualCompQuery()} disabled={!ebayQuery.trim()}>
+            Copy
+          </button>
+        </div>
+        {ebayQuery && <div className="manual-comp-query">{ebayQuery}</div>}
         {manualCompLinks.map((link) => (
-          <a key={link.kind} href={link.url} target="_blank" rel="noreferrer">
+          <a key={link.kind} className={link.primary ? "primary-link" : ""} href={link.url} target="_blank" rel="noreferrer">
             {link.label}
           </a>
         ))}

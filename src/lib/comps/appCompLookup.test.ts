@@ -55,3 +55,57 @@ test("resolveCatalogCard falls back through catalogue search and refreshes the c
   assert.equal(resolved?.tcgApiId, "svp-85");
   assert.equal(resolved?.priceSignals?.[0]?.pricePence, 8700);
 });
+
+test("resolveCatalogCard rejects same-name cards from the wrong requested set", async () => {
+  const wrongSetCard: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Hitmontop",
+    setName: "Neo Discovery",
+    setCode: "neo2",
+    number: "3/75",
+    tcgApiId: "neo2-3",
+  };
+  const source = {
+    async resolve() {
+      return wrongSetCard;
+    },
+    async search() {
+      return [wrongSetCard];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const resolved = await resolveCatalogCard(
+    { name: "Hitmontop", setName: "Neo Genesis", number: "3/111" },
+    source,
+  );
+
+  assert.equal(resolved, null);
+});
+
+test("resolveCatalogCard rejects same-set cards when the requested name differs", async () => {
+  const wrongCard: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Bellossom",
+    setName: "Neo Genesis",
+    setCode: "neo1",
+    number: "3/111",
+    tcgApiId: "neo1-3",
+  };
+  const source = {
+    async resolve() {
+      return wrongCard;
+    },
+    async search() {
+      return [wrongCard];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const resolved = await resolveCatalogCard(
+    { name: "Hitmontop", setName: "Neo Genesis", number: "3/111" },
+    source,
+  );
+
+  assert.equal(resolved, null);
+});

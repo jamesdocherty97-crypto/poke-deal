@@ -73,6 +73,58 @@ test("PokemonTcgMarketSource returns empty comps for graded cards", async () => 
   assert.equal((comp.raw as { reason?: string }).reason, "catalog market prices are raw-card signals only");
 });
 
+test("PokemonTcgMarketSource rejects catalog cards from the wrong requested set", async () => {
+  const catalog: CatalogSource = {
+    name: "fake-catalog",
+    live: true,
+    async resolve() {
+      return {
+        ...catalogCard,
+        name: "Hitmontop",
+        setName: "Neo Discovery",
+        setCode: "neo2",
+        number: "3/75",
+        tcgApiId: "neo2-3",
+      };
+    },
+  };
+  const source = new PokemonTcgMarketSource(catalog);
+  const comp = await source.lookup(
+    { name: "Hitmontop", setName: "Neo Genesis", number: "3/111" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.medianPence, 0);
+  assert.equal((comp.raw as { reason?: string }).reason, "catalog card did not match requested set");
+});
+
+test("PokemonTcgMarketSource rejects catalog cards with the wrong requested name", async () => {
+  const catalog: CatalogSource = {
+    name: "fake-catalog",
+    live: true,
+    async resolve() {
+      return {
+        ...catalogCard,
+        name: "Bellossom",
+        setName: "Neo Genesis",
+        setCode: "neo1",
+        number: "3/111",
+        tcgApiId: "neo1-3",
+      };
+    },
+  };
+  const source = new PokemonTcgMarketSource(catalog);
+  const comp = await source.lookup(
+    { name: "Hitmontop", setName: "Neo Genesis", number: "3/111" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.medianPence, 0);
+  assert.equal((comp.raw as { reason?: string }).reason, "catalog card did not match requested card");
+});
+
 test("mapCatalogCardToMarketComp degrades when no market prices exist", () => {
   const comp = mapCatalogCardToMarketComp(
     { ...catalogCard, priceSignals: undefined },

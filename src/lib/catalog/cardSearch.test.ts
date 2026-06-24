@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  catalogCardMatchesLookupContext,
   normalizeCatalogCardSearchInput,
   parseCardSearchQuery,
   rankCatalogCards,
@@ -197,6 +198,41 @@ test("rankCatalogCards does not cross-match unavailable promo sets", () => {
   ];
 
   assert.deepEqual(rankCatalogCards("Snivy 049", mixed, { setName: "MEP" }), []);
+  assert.deepEqual(rankCatalogCards("Snivy MEP049", mixed, { setName: "MEP" }), []);
+});
+
+test("rankCatalogCards keeps future promo numbers from borrowing same-name art", () => {
+  const mixed: CatalogCard[] = [
+    { game: "POKEMON", language: "EN", name: "Snivy", setName: "Black & White", setCode: "bw1", number: "1/114" },
+    { game: "POKEMON", language: "EN", name: "Snivy", setName: "BW Black Star Promos", setCode: "bwp", number: "BW06" },
+  ];
+
+  assert.deepEqual(parseCardSearchQuery("Snivy XYZ001"), { name: "Snivy", number: "XYZ001" });
+  assert.deepEqual(rankCatalogCards("Snivy XYZ001", mixed), []);
+});
+
+test("catalogCardMatchesLookupContext rejects a same-set number when the name differs", () => {
+  const bellossom: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Bellossom",
+    setName: "Neo Genesis",
+    setCode: "neo1",
+    number: "3/111",
+  };
+  const hitmontop: CatalogCard = {
+    ...bellossom,
+    name: "Hitmontop",
+  };
+
+  assert.equal(
+    catalogCardMatchesLookupContext(bellossom, { name: "Hitmontop", setName: "Neo Genesis", number: "3/111" }),
+    false,
+  );
+  assert.equal(
+    catalogCardMatchesLookupContext(hitmontop, { name: "Hitmontop 1st Edition", setName: "Neo Genesis", number: "3/111" }),
+    true,
+  );
 });
 
 test("scoreCatalogCardForSearch does not surface unrelated cards just because they have images", () => {

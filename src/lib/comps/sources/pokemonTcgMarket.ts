@@ -1,4 +1,5 @@
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "../../catalog/types.js";
+import { catalogCardMatchesLookupContext, catalogCardMatchesSetContext } from "../../catalog/cardSearch.js";
 import { PokemonTcgApiCatalogSource, pickCatalogPriceSignal } from "../../catalog/pokemonTcgApi.js";
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
 import type { CompSource } from "../CompSource.js";
@@ -36,6 +37,12 @@ export class PokemonTcgMarketSource implements CompSource {
 
     try {
       const catalogCard = await this.catalog.resolve(card);
+      if (!catalogCardMatchesSetContext(catalogCard, card.setName)) {
+        return emptyMarketComp(ctx, "catalog card did not match requested set");
+      }
+      if (!catalogCardMatchesLookupContext(catalogCard, card)) {
+        return emptyMarketComp(ctx, "catalog card did not match requested card");
+      }
       return mapCatalogCardToMarketComp(catalogCard, ctx);
     } catch {
       return emptyMarketComp(ctx, "catalog market lookup failed");

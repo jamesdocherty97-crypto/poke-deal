@@ -1,4 +1,5 @@
 import { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
+import { catalogCardMatchesLookupContext } from "../catalog/cardSearch.js";
 import type { CatalogCard, CatalogSource } from "../catalog/types.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
@@ -13,10 +14,10 @@ export async function resolveCatalogCard(
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
 ): Promise<CatalogCard | null> {
   const direct = await catalogSource.resolve(card).catch(() => null);
-  if (direct) return direct;
+  if (direct && catalogCardMatchesLookupContext(direct, card)) return direct;
 
   const searched = await catalogSource.search(card, 5).catch(() => []);
-  const best = searched[0] ?? null;
+  const best = searched.find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null;
   if (!best?.tcgApiId) return best;
 
   return catalogSource.resolve({ ...card, tcgApiId: best.tcgApiId }).catch(() => best);

@@ -27,6 +27,12 @@ export interface NormalizedCatalogCardSearchInput {
   number?: string;
 }
 
+export interface CatalogCardLookupContext {
+  name?: string | null;
+  setName?: string | null;
+  number?: string | null;
+}
+
 interface SetPhraseMatch {
   phrase: string;
   setName: string;
@@ -55,9 +61,10 @@ export function rankCatalogCards(
 export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setName?: string): number {
   const parsed = parseCardSearchQuery(query);
   const nameScore = parsed.name ? scoreSearchText(parsed.name, card.name) : 0;
-  const numberScore = parsed.number && card.number && sameCollectorNumber(parsed.number, card.number) ? 1100 : 0;
+  const numberScore = parsed.number && card.number && sameCollectorNumberForCard(parsed.number, card) ? 1100 : 0;
   if (parsed.name && nameScore === 0) return 0;
   if (nameScore === 0 && numberScore === 0) return 0;
+  if (parsed.number && isStrictPrefixedCollectorNumber(parsed.number) && numberScore === 0) return 0;
 
   const resolvedSetId = setName?.trim() ? resolveSetId(setName) : undefined;
   if (isApiUnavailableSetId(resolvedSetId) && card.setCode !== resolvedSetId) return 0;
@@ -71,6 +78,42 @@ export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setN
   if (card.imageUrl) score += 8;
   if (card.tcgApiId) score += 10;
   return score;
+}
+
+export function catalogCardMatchesSetContext(
+  card: CatalogCard | null | undefined,
+  setName?: string | null,
+): boolean {
+  if (!setName?.trim()) return true;
+  if (!card) return false;
+
+  const resolvedSetId = resolveSetId(setName);
+  if (resolvedSetId) {
+    const resolvedSet = getSetById(resolvedSetId);
+    return (
+      card.setCode === resolvedSetId ||
+      normalizeSearchText(card.setName) === normalizeSearchText(resolvedSet?.name ?? "") ||
+      normalizeSearchText(card.setCode ?? "") === normalizeSearchText(resolvedSet?.ptcgoCode ?? "")
+    );
+  }
+
+  return scoreSetContextForSearch(setName, card) > 0;
+}
+
+export function catalogCardMatchesLookupContext(
+  card: CatalogCard | null | undefined,
+  request: CatalogCardLookupContext,
+): boolean {
+  if (!card) return false;
+  if (!catalogCardMatchesSetContext(card, request.setName)) return false;
+
+  const requestedName = normalizeNameForSearch(stripLookupNoise(request.name ?? ""));
+  if (requestedName && scoreSearchText(requestedName, card.name) === 0) return false;
+
+  const requestedNumber = request.number?.trim();
+  if (requestedNumber && card.number && !sameCollectorNumberForCard(requestedNumber, card)) return false;
+
+  return true;
 }
 
 export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
@@ -252,6 +295,19 @@ function sameCollectorNumber(queryNumber: string, cardNumber: string): boolean {
   );
 }
 
+function sameCollectorNumberForCard(queryNumber: string, card: CatalogCard): boolean {
+  if (!card.number || !sameCollectorNumber(queryNumber, card.number)) return false;
+
+  const queryPrefix = strictCollectorPrefix(queryNumber);
+  if (!queryPrefix) return true;
+  if (collectorNumberHasPrefix(card.number, queryPrefix)) return true;
+
+  const stripped = stripAlphaPrefix(normalizeCollectorNumberForSearch(queryNumber).split("/")[0] ?? "");
+  const cardLeft = normalizeCollectorNumberForSearch(card.number).split("/")[0] ?? "";
+  const expectedSetCode = promoSetCodeForPrefix(queryPrefix);
+  return Boolean(stripped && expectedSetCode && card.setCode === expectedSetCode && stripped === cardLeft);
+}
+
 function normalizeCollectorNumberForSearch(number: string): string {
   const trimmed = number.trim();
   const parts = trimmed.split("/").map((part) => normalizeSearchText(part));
@@ -277,6 +333,32 @@ function stripAlphaPrefix(value: string): string | undefined {
   const match = value.match(/^[a-z]{2,5}0*(\d{1,4})$/);
   if (!match) return undefined;
   return String(Number.parseInt(match[1]!, 10));
+}
+
+function isStrictPrefixedCollectorNumber(value: string): boolean {
+  return /^[A-Za-z]{2,5}0?\d{1,4}(?:\/[A-Za-z]{0,5}0?\d{1,4})?$/.test(value.trim());
+}
+
+function strictCollectorPrefix(value: string): string | undefined {
+  return value.trim().match(/^([A-Za-z]{2,5})0?\d{1,4}/)?.[1]?.toUpperCase();
+}
+
+function collectorNumberHasPrefix(number: string, prefix: string): boolean {
+  return normalizeCollectorNumberForSearch(number).startsWith(prefix.toLowerCase());
+}
+
+function promoSetCodeForPrefix(prefix: string): string | undefined {
+  const setByPrefix: Record<string, string> = {
+    SVP: "svp",
+    MEP: "mep",
+    SWSH: "swshp",
+    SM: "smp",
+    XY: "xyp",
+    BW: "bwp",
+    DP: "dpp",
+    HGSS: "hsp",
+  };
+  return setByPrefix[prefix];
 }
 
 function readCollectorNumber(value: string | undefined): string | undefined {

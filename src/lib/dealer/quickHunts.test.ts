@@ -71,6 +71,7 @@ test("DEFAULT_QUICK_HUNTS covers common modern, promo and vintage comp shapes", 
   assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.setName.includes("Trainer Gallery") && card.number.startsWith("TG")));
   assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.setName.includes("Galarian Gallery") && card.number.startsWith("GG")));
   assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.number.startsWith("SVP")));
+  assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.number.startsWith("MEP")));
   assert.ok(DEFAULT_QUICK_HUNTS.some((card) => card.setName === "Base" && card.number === "4/102"));
 });
 
