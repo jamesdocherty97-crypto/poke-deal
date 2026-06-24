@@ -2717,11 +2717,12 @@ export default function Home() {
       setRepriceRecommendations(recommendations);
       setRepriceCheckedAt(payload.checkedAt ?? new Date().toISOString());
       setDiscordReady(Boolean(payload.notifierConfigured));
-      setRepriceMessage(
+      const message =
         count === 0
           ? "No repricing alerts right now."
-          : `${count} repricing action${count === 1 ? "" : "s"} found${payload.notified ? " and sent" : ""}.`,
-      );
+          : `${count} repricing action${count === 1 ? "" : "s"} found${payload.notified ? " and sent" : ""}.`;
+      setRepriceMessage(message);
+      setNotice(message);
     } catch (err) {
       setError(err instanceof Error ? err.message : "reprice check failed");
     } finally {
@@ -2786,13 +2787,14 @@ export default function Home() {
       setWatchCheckedAt(payload.checkedAt ?? new Date().toISOString());
       setWatchDiscordReady(Boolean(payload.notifierConfigured));
       const alertsCreated = Number(payload.alertsCreated ?? hits.length);
-      setWatchMessage(
+      const message =
         hits.length === 0
           ? "No sourcing targets hit right now."
           : alertsCreated === 0
             ? `${hits.length} sourcing target${hits.length === 1 ? "" : "s"} still hit. No duplicate alert sent.`
-            : `${hits.length} sourcing target${hits.length === 1 ? "" : "s"} hit; ${alertsCreated} new alert${alertsCreated === 1 ? "" : "s"}${payload.notified ? " sent" : ""}.`,
-      );
+            : `${hits.length} sourcing target${hits.length === 1 ? "" : "s"} hit; ${alertsCreated} new alert${alertsCreated === 1 ? "" : "s"}${payload.notified ? " sent" : ""}.`;
+      setWatchMessage(message);
+      setNotice(message);
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "watch check failed");
@@ -3180,6 +3182,15 @@ export default function Home() {
               <button type="button" onClick={() => setView("acquire")}>Comp buy</button>
               <button type="button" onClick={() => setView("inventory")}>Sell stock</button>
               <button type="button" onClick={() => setView("listings")}>List drafts</button>
+              <button type="button" onClick={takePortfolioSnapshot} disabled={busy === "snapshot"}>
+                {busy === "snapshot" ? "Snapshot..." : "Snapshot"}
+              </button>
+              <button type="button" onClick={checkWatches} disabled={busy === "watch-check"}>
+                {busy === "watch-check" ? "Checking..." : "Targets"}
+              </button>
+              <button type="button" onClick={checkReprices} disabled={busy === "reprice"}>
+                {busy === "reprice" ? "Checking..." : "Reprice"}
+              </button>
               <button type="button" onClick={() => setView("pnl")}>Profit</button>
               <button type="button" onClick={() => setView("pnl")}>Add cost</button>
               <a className="export-link" href="/api/export/books" download>Books CSV</a>
