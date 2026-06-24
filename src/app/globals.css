@@ -115,6 +115,43 @@ label {
   font-weight: 700;
 }
 
+.legal-page {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: max(24px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+}
+
+.legal-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 22px;
+  box-shadow: var(--shadow);
+}
+
+.legal-panel h1,
+.legal-panel h2,
+.legal-panel p {
+  margin: 0;
+}
+
+.legal-panel h1 {
+  margin-bottom: 16px;
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  line-height: 0.95;
+}
+
+.legal-panel h2 {
+  margin-top: 22px;
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+
+.legal-panel p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .app-shell {
   width: min(1040px, 100%);
   margin: 0 auto;
