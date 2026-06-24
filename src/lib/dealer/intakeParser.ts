@@ -48,6 +48,8 @@ const SUPPORTED_QUICK_GRADES = new Set<ParsedQuickIntakeGrade>([
   "CGC_9",
   "CGC_9_5",
   "CGC_10",
+  "ACE_9",
+  "ACE_10",
 ]);
 
 const STRONG_SET_ALIASES = new Set([
@@ -199,7 +201,7 @@ function extractCondition(input: string): { value: string; match: string } | nul
 }
 
 function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: string } | null {
-  const slab = input.match(/\b(PSA|BGS|CGC)\s*(10|9(?:[.,]5)?|[1-8])\b/i);
+  const slab = input.match(/\b(PSA|BGS|CGC|ACE)\s*(10|9(?:[.,]5)?|[1-8])\b/i);
   if (slab?.[0] && slab[1] && slab[2]) {
     const company = slab[1].toUpperCase();
     const numeric = slab[2].replace(",", ".").replace(".", "_");

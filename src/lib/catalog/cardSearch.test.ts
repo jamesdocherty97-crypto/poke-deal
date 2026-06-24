@@ -65,6 +65,13 @@ test("normalizeCatalogCardSearchInput splits dealer shorthand into card, set and
     number: "199/165",
   });
 
+  assert.deepEqual(normalizeCatalogCardSearchInput("Charizard ex 151 199/165 ACE 10"), {
+    query: "Charizard ex 199/165",
+    name: "Charizard ex",
+    setName: "151",
+    number: "199/165",
+  });
+
   assert.deepEqual(normalizeCatalogCardSearchInput("Charizard 151"), {
     query: "Charizard",
     name: "Charizard",

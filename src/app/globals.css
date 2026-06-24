@@ -1831,6 +1831,11 @@ label {
   color: var(--green);
 }
 
+.grade-badge.ace {
+  border-color: rgba(245, 158, 11, 0.46);
+  color: #fde68a;
+}
+
 .pill.warn,
 .grade-verdict.warn strong {
   color: var(--yellow);

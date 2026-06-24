@@ -28,6 +28,13 @@ Pikachu ex,Surging Sparks,238/191,PSA 10,200,1,eBay,Slabs,,12345678,eBay,240,dra
   assert.equal(parsed.rows[1]?.channel, "EBAY");
 });
 
+test("parseStockImportText accepts ACE slabs", () => {
+  const parsed = parseStockImportText("Charizard,151,199/165,ACE10,120.00,1,Card fair,Slabs");
+
+  assert.equal(parsed.errors.length, 0);
+  assert.equal(parsed.rows[0]?.grade, "ACE_10");
+});
+
 test("parseStockImportText keeps old ordered listing rows backward compatible", () => {
   const parsed = parseStockImportText(
     "Gengar,Lost Origin Trainer Gallery,TG06/TG30,RAW,10.00,1,Card fair,Binder,Vinted,25.00",

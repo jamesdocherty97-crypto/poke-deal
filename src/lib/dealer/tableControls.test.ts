@@ -129,5 +129,7 @@ test("buildListingView sorts by current list price", () => {
 
 test("gradeRank keeps slab grades above raw for sort order", () => {
   assert.equal(gradeRank("RAW") < gradeRank("CGC_10"), true);
+  assert.equal(gradeRank("RAW") < gradeRank("ACE_9"), true);
+  assert.equal(gradeRank("ACE_10") < gradeRank("CGC_10"), true);
   assert.equal(gradeRank("BGS_9_5") < gradeRank("PSA_10"), true);
 });

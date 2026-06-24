@@ -12,6 +12,7 @@ const gradeSchema = z.enum([
   "PSA_6", "PSA_7", "PSA_8", "PSA_9", "PSA_10",
   "BGS_9", "BGS_9_5", "BGS_10",
   "CGC_9", "CGC_9_5", "CGC_10",
+  "ACE_9", "ACE_10",
 ]);
 
 const patchWatchSchema = z.object({

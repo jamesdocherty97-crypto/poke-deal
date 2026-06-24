@@ -29,6 +29,7 @@ test("gradeToProviderKey maps our grades to provider keys", () => {
   assert.equal(gradeToProviderKey("PSA_9"), "psa9");
   assert.equal(gradeToProviderKey("BGS_9_5"), "bgs9_5");
   assert.equal(gradeToProviderKey("CGC_10"), "cgc10");
+  assert.equal(gradeToProviderKey("ACE_10"), "ace10");
 });
 
 test("RAW prefers smartMarketPrice from noisy ungraded aggregate, converted to GBP", () => {

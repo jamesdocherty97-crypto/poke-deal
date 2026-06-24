@@ -36,12 +36,15 @@ test("grade label normalization", () => {
   assert.equal(normalizeGradeLabel("psa10"), "PSA_10");
   assert.equal(normalizeGradeLabel("BGS 9.5"), "BGS_9_5");
   assert.equal(normalizeGradeLabel("CGC 10"), "CGC_10");
+  assert.equal(normalizeGradeLabel("ACE 10"), "ACE_10");
+  assert.equal(normalizeGradeLabel("ace9"), "ACE_9");
   assert.equal(normalizeGradeLabel("totally unknown"), null);
 });
 
 test("grade matching", () => {
   assert.equal(gradeMatches("RAW", "Ungraded"), true);
   assert.equal(gradeMatches("PSA_10", "PSA 10"), true);
+  assert.equal(gradeMatches("ACE_10", "ACE 10"), true);
   assert.equal(gradeMatches("RAW", "PSA 10"), false);
 });
 

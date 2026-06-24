@@ -246,6 +246,8 @@ enum Grade {
   CGC_9
   CGC_9_5
   CGC_10
+  ACE_9
+  ACE_10
 }
 
 enum InventoryStatus {

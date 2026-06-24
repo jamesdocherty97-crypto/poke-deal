@@ -25,6 +25,8 @@ const gradeSchema = z.enum([
   "CGC_9",
   "CGC_9_5",
   "CGC_10",
+  "ACE_9",
+  "ACE_10",
 ]);
 
 const cardSchema = z.object({

@@ -70,6 +70,8 @@ const SUPPORTED_GRADES = new Set<Grade>([
   "CGC_9",
   "CGC_9_5",
   "CGC_10",
+  "ACE_9",
+  "ACE_10",
 ]);
 
 
@@ -303,8 +305,9 @@ function parseQuantity(value: string | undefined): number | null {
 function normalizeGrade(value: string | undefined): Grade | null {
   const normalized = clean(value).toUpperCase().replace(/\s+/g, "_").replace(".", "_");
   if (!normalized || ["RAW", "UNGRADED", "NM", "NEAR_MINT"].includes(normalized)) return "RAW";
-  const grade = /^PSA_?\d+$/.test(normalized)
-    ? (`PSA_${normalized.match(/\d+/)?.[0]}` as Grade)
+  const gradeMatch = normalized.match(/^(PSA|BGS|CGC|ACE)_?(\d+)(?:_(\d+))?$/);
+  const grade = gradeMatch
+    ? ([gradeMatch[1], gradeMatch[2], gradeMatch[3]].filter(Boolean).join("_") as Grade)
     : (normalized as Grade);
   return SUPPORTED_GRADES.has(grade) ? grade : null;
 }

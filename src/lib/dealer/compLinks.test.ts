@@ -38,6 +38,13 @@ test("buildManualCompLinks adds slab grade only to eBay sold searches", () => {
   assert.doesNotMatch(new URL(links[3]!.url).searchParams.get("q") ?? "", /BGS/);
 });
 
+test("buildManualCompLinks adds ACE slab grades to eBay sold searches", () => {
+  const links = buildManualCompLinks(card, "ACE_10");
+
+  assert.match(new URL(links[0]!.url).searchParams.get("_nkw") ?? "", /ACE 10/);
+  assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /ACE/);
+});
+
 test("buildManualCompLinks preserves typed vintage qualifiers for eBay", () => {
   const links = buildManualCompLinks(
     { name: "Hitmontop", setName: "Neo Genesis" },

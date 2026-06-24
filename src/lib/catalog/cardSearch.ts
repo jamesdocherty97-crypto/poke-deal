@@ -200,7 +200,7 @@ function stripLookupNoise(input: string): string {
     .replace(/(?:£\s*)\d+(?:[.,]\d{1,2})?/gi, " ")
     .replace(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?\d+(?:[.,]\d{1,2})?\b/gi, " ")
     .replace(/\bbgs\s*9(?:\.|,)?5\b/gi, " ")
-    .replace(/\b(?:psa|cgc)\s*(?:9|10)\b/gi, " ")
+    .replace(/\b(?:psa|cgc|ace)\s*(?:9|10)\b/gi, " ")
     .replace(/\b(?:1st|first)\s*(?:edition|ed)\b/gi, " ")
     .replace(/\b(?:unlimited|shadowless)\b/gi, " ")
     .replace(/\b(?:raw|ungraded|nm|near mint|lp|light(?:ly)?\s*played|mp|moderately\s*played|hp|heavily\s*played|dmg|damaged)\b/gi, " ")

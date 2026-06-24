@@ -44,7 +44,7 @@ export function normalizeGradeLabel(label: string | undefined): Grade | null {
   if (t === "") return "RAW";
   if (/\b(raw|ungraded|not graded|nm|near mint|loose)\b/.test(t)) return "RAW";
 
-  const m = t.match(/\b(psa|bgs|cgc)\s*\.?\s*(10|9\.5|9|8|7|6|5|4|3|2|1)\b/);
+  const m = t.match(/\b(psa|bgs|cgc|ace)\s*\.?\s*(10|9\.5|9|8|7|6|5|4|3|2|1)\b/);
   if (m) {
     const company = m[1]!.toUpperCase();
     const num = m[2]!.replace(".", "_");

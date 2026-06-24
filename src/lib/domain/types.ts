@@ -10,7 +10,8 @@ export type Grade =
   | "PSA_1" | "PSA_2" | "PSA_3" | "PSA_4" | "PSA_5"
   | "PSA_6" | "PSA_7" | "PSA_8" | "PSA_9" | "PSA_10"
   | "BGS_9" | "BGS_9_5" | "BGS_10"
-  | "CGC_9" | "CGC_9_5" | "CGC_10";
+  | "CGC_9" | "CGC_9_5" | "CGC_10"
+  | "ACE_9" | "ACE_10";
 
 export type Currency = "GBP" | "EUR" | "USD" | "JPY";
 

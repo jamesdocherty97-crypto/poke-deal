@@ -57,9 +57,9 @@ export function buildListingView<T extends ListingTableRow>(
 export function gradeRank(grade: string): number {
   const normalized = grade.toUpperCase();
   if (normalized === "RAW") return 0;
-  const match = normalized.match(/^(PSA|BGS|CGC)_(\d+)(?:_(\d+))?$/);
+  const match = normalized.match(/^(PSA|BGS|CGC|ACE)_(\d+)(?:_(\d+))?$/);
   if (!match) return 1;
-  const companyRank = match[1] === "PSA" ? 30 : match[1] === "BGS" ? 20 : 10;
+  const companyRank = match[1] === "PSA" ? 40 : match[1] === "BGS" ? 30 : match[1] === "CGC" ? 20 : 10;
   const whole = Number(match[2] ?? 0);
   const decimal = Number(match[3] ?? 0) / 10;
   return companyRank + whole + decimal;

@@ -22,6 +22,7 @@ test("gradeToPokeTraceTier maps raw and slab grades to PokeTrace tiers", () => {
   assert.equal(gradeToPokeTraceTier("RAW"), "NEAR_MINT");
   assert.equal(gradeToPokeTraceTier("PSA_10"), "PSA_10");
   assert.equal(gradeToPokeTraceTier("BGS_9_5"), "BGS_9_5");
+  assert.equal(gradeToPokeTraceTier("ACE_10"), "ACE_10");
 });
 
 test("RAW maps the stable TCGPlayer near-mint baseline when present", () => {

@@ -96,6 +96,14 @@ test("parseQuickIntake accepts broader slab grades", () => {
     grade: "CGC_9_5",
     cost: "20.00",
   });
+
+  assert.deepEqual(parseQuickIntake("Charizard 151 199/165 ACE 10 £120"), {
+    name: "Charizard",
+    setName: "151",
+    number: "199/165",
+    grade: "ACE_10",
+    cost: "120.00",
+  });
 });
 
 test("parseQuickIntake captures fair-flow source, location and condition", () => {

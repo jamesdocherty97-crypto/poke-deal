@@ -57,6 +57,17 @@ test("item specifics include grader + cert for graded cards", () => {
   assert.equal(specifics.Set, "151");
 });
 
+test("ACE slabs produce ACE listing titles and specifics", () => {
+  const aceSlab = { ...slab, grade: "ACE_10", certNumber: "ACE12345" };
+  const title = buildEbayTitle(aceSlab);
+  const specifics = buildItemSpecifics(aceSlab);
+
+  assert.match(title, /ACE 10/);
+  assert.equal(specifics["Professional Grader"], "ACE");
+  assert.equal(specifics.Grade, "10");
+  assert.equal(specifics.Certification, "ACE12345");
+});
+
 test("raw item specifics carry the condition, not a grader", () => {
   const specifics = buildItemSpecifics(moonbreon);
   assert.equal(specifics["Card Condition"], "Near Mint");
