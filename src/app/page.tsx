@@ -1130,6 +1130,7 @@ export default function Home() {
       (ebayPolicies?.paymentPolicyId && ebayPolicies.fulfillmentPolicyId && ebayPolicies.returnPolicyId),
   );
   const ebayHasMerchantLocation = Boolean(ebayStatus?.hasMerchantLocation || ebayPolicies?.merchantLocationKey);
+  const ebayNeedsMerchantLocation = Boolean(ebayStatus?.connected && ebayHasPolicies && !ebayHasMerchantLocation);
   const ebayHealthSource = useMemo<SystemSource>(
     () => ({
       id: "ebay-sell-api",
@@ -4931,6 +4932,14 @@ export default function Home() {
                   <a href="/api/ebay/connect">Connect eBay</a>
                 </>
               )}
+            </div>
+          )}
+          {ebayNeedsMerchantLocation && listings.some((l) => l.channel === "EBAY") && (
+            <div className="ebay-setup-banner">
+              <span>eBay is connected and policies are ready. Add a seller location in Seller Hub before relying on app-created offers.</span>
+              <a href="https://www.ebay.co.uk/sh/landing" target="_blank" rel="noreferrer">
+                Open Seller Hub
+              </a>
             </div>
           )}
           {ebayPublishTarget !== null && (() => {
