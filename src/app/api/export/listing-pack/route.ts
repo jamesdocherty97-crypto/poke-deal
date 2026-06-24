@@ -1,8 +1,8 @@
 // Listing-pack CSV export: GET /api/export/listing-pack
-// Builds an eBay-ready listing pack CSV for every IN_STOCK / LISTED item, using
-// each item's last persisted comp median as the price anchor. Copy-ready titles,
-// item specifics, suggested price and UK postage. Works without eBay credentials;
-// the eBay Sell API draft-push (Priority 4) can reuse buildListingPack() later.
+// Builds an eBay-ready listing pack CSV for every IN_STOCK / LISTED item. Saved
+// draft/active listing prices are used exactly; otherwise the pack falls back to
+// cost + margin. Works without eBay credentials, and the eBay Sell API draft-push
+// can reuse buildListingPack() later.
 
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
@@ -25,7 +25,13 @@ export async function GET() {
 
     const items = await prisma.inventoryItem.findMany({
       where: { status: { in: ["IN_STOCK", "LISTED"] } },
-      include: { card: true },
+      include: {
+        card: true,
+        listings: {
+          where: { state: { in: ["DRAFT", "ACTIVE"] } },
+          orderBy: { updatedAt: "desc" },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -40,8 +46,7 @@ export async function GET() {
           language: (card.language as string | null) ?? "EN",
         },
         grade: String(item.grade ?? "RAW"),
-        // No comp median is persisted on the item, so price anchors on cost + margin.
-        // The eBay Sell API step can pass a live comp median into buildListingPack().
+        listPricePence: preferredListingPricePence(item.listings),
         costBasisPence: numberOrUndefined(item.costBasis),
         condition: (item.condition as string | null) ?? null,
         certNumber: (item.graderCert as string | null) ?? null,
@@ -67,4 +72,20 @@ export async function GET() {
 function numberOrUndefined(value: unknown): number | undefined {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+function preferredListingPricePence(listings: unknown): number | undefined {
+  if (!Array.isArray(listings)) return undefined;
+
+  return listings
+    .map((listing) => {
+      const row = listing as Record<string, unknown>;
+      return {
+        price: numberOrUndefined(row.listPrice) ?? numberOrUndefined(row.suggestedPrice),
+        stateRank: row.state === "ACTIVE" ? 0 : row.state === "DRAFT" ? 1 : 2,
+        updatedAt: Date.parse(String(row.updatedAt ?? row.createdAt ?? "")) || 0,
+      };
+    })
+    .filter((listing): listing is { price: number; stateRank: number; updatedAt: number } => listing.price != null)
+    .sort((a, b) => a.stateRank - b.stateRank || b.updatedAt - a.updatedAt)[0]?.price;
 }

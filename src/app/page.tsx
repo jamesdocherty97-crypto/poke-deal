@@ -608,6 +608,7 @@ export default function Home() {
   const listingPack = useMemo(() => {
     if (!listingPackTarget?.item) return null;
     const { item } = listingPackTarget;
+    const savedListPrice = listingPackTarget.listPrice ?? listingPackTarget.suggestedPrice ?? undefined;
     return buildListingPack({
       card: {
         name: item.card.name,
@@ -616,7 +617,7 @@ export default function Home() {
         language: "EN",
       },
       grade: item.grade,
-      compMedianPence: listingPackTarget.listPrice ?? listingPackTarget.suggestedPrice ?? undefined,
+      listPricePence: savedListPrice,
       costBasisPence: item.costBasis,
       condition: item.condition,
       certNumber: item.graderCert,

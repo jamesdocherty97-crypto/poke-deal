@@ -71,6 +71,23 @@ test("suggested price anchors on comp but never lists below cost+margin", () => 
   assert.equal(suggestListPricePence({ card: { name: "X" }, grade: "RAW", compMedianPence: 320 }), 350);
 });
 
+test("saved listing prices are used exactly in packs and CSV exports", () => {
+  const input = {
+    ...moonbreon,
+    listPricePence: 1234,
+    compMedianPence: 1200,
+    costBasisPence: 1000,
+  };
+
+  assert.equal(suggestListPricePence(input), 1234);
+
+  const pack = buildListingPack(input);
+  assert.match(pack.copyReady, /PRICE: £12\.34/);
+
+  const csv = buildListingPackCsv([input]);
+  assert.match(csv, /,12\.34,/);
+});
+
 test("postage is tracked/signed for graded slabs, large letter for raw", () => {
   assert.match(suggestPostage(slab).service, /Special Delivery|Tracked|signed/i);
   assert.match(suggestPostage(moonbreon).service, /Large Letter/);

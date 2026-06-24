@@ -20,6 +20,8 @@ export interface ListingPackInput {
   card: ListingPackCard;
   /** Canonical grade, e.g. "RAW", "PSA_10". */
   grade: string;
+  /** Saved listing price in pence. Used exactly when present. */
+  listPricePence?: number;
   /** Cleaned comp median in pence (the value anchor). 0/undefined = unknown. */
   compMedianPence?: number;
   /** What you paid, in pence. Used as a price floor with a minimum margin. */
@@ -134,17 +136,26 @@ export function suggestPostage(input: ListingPackInput): { service: string; pric
 }
 
 /**
- * Suggested list price: anchor on the comp median; never list below
- * cost * (1 + minMargin). Rounds to a tidy .99/.00 ish boundary (whole pounds).
+ * Suggested list price: respect an explicit saved listing price first; otherwise
+ * anchor on the comp median and never list below cost * (1 + minMargin).
+ * Derived prices round to a tidy boundary, but saved prices stay exact.
  */
 export function suggestListPricePence(input: ListingPackInput): number {
+  const explicit = positivePence(input.listPricePence);
+  if (explicit > 0) return explicit;
+
   const minMargin = Number.isFinite(input.minMargin) && (input.minMargin ?? -1) >= 0 ? input.minMargin! : 0.35;
-  const comp = Number.isFinite(input.compMedianPence) && (input.compMedianPence ?? 0) > 0 ? input.compMedianPence! : 0;
-  const cost = Number.isFinite(input.costBasisPence) && (input.costBasisPence ?? 0) > 0 ? input.costBasisPence! : 0;
+  const comp = positivePence(input.compMedianPence);
+  const cost = positivePence(input.costBasisPence);
   const floor = cost > 0 ? Math.round(cost * (1 + minMargin)) : 0;
   const anchor = Math.max(comp, floor);
   if (anchor <= 0) return 0;
   return roundToTidyPence(anchor);
+}
+
+function positivePence(value: number | undefined): number {
+  if (!Number.isFinite(value) || (value ?? 0) <= 0) return 0;
+  return Math.round(value!);
 }
 
 /** Round up to the nearest whole pound for prices >= £10, else nearest 50p. */
