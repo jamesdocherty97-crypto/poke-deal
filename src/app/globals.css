@@ -2774,6 +2774,10 @@ label {
   padding: 8px;
 }
 
+.catalog-strip.source-match-strip {
+  grid-template-columns: 42px minmax(0, 1fr);
+}
+
 .catalog-strip div {
   display: grid;
   min-width: 0;

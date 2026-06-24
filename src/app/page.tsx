@@ -776,6 +776,7 @@ export default function Home() {
     ],
   );
   const headline = checkedComp ?? apiHeadline;
+  const sourceMatchedCard = !catalogCard && apiHeadline?.card ? apiHeadline.card : null;
   const compForReceipt = useMemo<Reconciled | null>(() => {
     if (!comp) return null;
     if (!checkedComp) return comp;
@@ -3719,6 +3720,24 @@ export default function Home() {
                       onError={hideBrokenImage}
                     />
                   )}
+                </div>
+              )}
+              {sourceMatchedCard && (
+                <div className="catalog-strip source-match-strip">
+                  <CardImage
+                    src={null}
+                    className="catalog-art"
+                    fallbackClassName="catalog-art blank"
+                    alt=""
+                  />
+                  <div>
+                    <span>Source match</span>
+                    <strong>{sourceMatchedCard.name}</strong>
+                    <small>
+                      {sourceMatchedCard.setName ?? "No set"}
+                      {sourceMatchedCard.number ? ` #${sourceMatchedCard.number}` : ""}
+                    </small>
+                  </div>
                 </div>
               )}
               {headline.raw?.chosenPriceSource === "smartMarketPrice" && (
