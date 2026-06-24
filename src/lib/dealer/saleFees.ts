@@ -5,20 +5,31 @@ export interface SaleCostEstimate {
   postagePence: number;
 }
 
-export function estimateSaleCosts(channel: SaleChannel, salePricePence: number): SaleCostEstimate {
+export interface SaleCostOptions {
+  grade?: string | null;
+}
+
+const RAW_POSTAGE_PENCE = 175;
+const GRADED_POSTAGE_PENCE = 499;
+
+export function estimateSaleCosts(
+  channel: SaleChannel,
+  salePricePence: number,
+  options: SaleCostOptions = {},
+): SaleCostEstimate {
   const price = Math.max(0, Math.round(salePricePence));
 
   if (channel === "EBAY") {
     return {
       feesPence: Math.round(price * 0.128) + (price > 0 ? 30 : 0),
-      postagePence: 120,
+      postagePence: postedSalePostagePence(options.grade),
     };
   }
 
   if (channel === "CARDMARKET") {
     return {
       feesPence: Math.round(price * 0.05),
-      postagePence: 120,
+      postagePence: postedSalePostagePence(options.grade),
     };
   }
 
@@ -26,6 +37,10 @@ export function estimateSaleCosts(channel: SaleChannel, salePricePence: number):
     feesPence: 0,
     postagePence: 0,
   };
+}
+
+export function postedSalePostagePence(grade: string | null | undefined): number {
+  return isGradedSaleGrade(grade) ? GRADED_POSTAGE_PENCE : RAW_POSTAGE_PENCE;
 }
 
 export function saleNetPence({
@@ -40,14 +55,18 @@ export function saleNetPence({
   return salePricePence - feesPence - postagePence;
 }
 
-export function breakEvenSalePricePence(channel: SaleChannel, costPence: number): number {
+export function breakEvenSalePricePence(
+  channel: SaleChannel,
+  costPence: number,
+  options: SaleCostOptions = {},
+): number {
   const target = Math.max(0, Math.round(costPence));
   if (target <= 0) return 0;
 
   let price = target;
   const maxPrice = target * 3 + 5000;
   while (price <= maxPrice) {
-    const costs = estimateSaleCosts(channel, price);
+    const costs = estimateSaleCosts(channel, price, options);
     if (saleNetPence({ salePricePence: price, feesPence: costs.feesPence, postagePence: costs.postagePence }) >= target) {
       return price;
     }
@@ -55,4 +74,9 @@ export function breakEvenSalePricePence(channel: SaleChannel, costPence: number)
   }
 
   return maxPrice;
+}
+
+function isGradedSaleGrade(grade: string | null | undefined): boolean {
+  const normalized = grade?.trim().toUpperCase();
+  return Boolean(normalized && normalized !== "RAW");
 }

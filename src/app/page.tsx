@@ -554,12 +554,17 @@ export default function Home() {
     return () => clearTimeout(handle);
   }, [name, setNameValue, cardSuggestionsOpen]);
 
+  const sellingItem = useMemo(
+    () => inventory.find((item) => item.id === sellingId) ?? null,
+    [inventory, sellingId],
+  );
+
   useEffect(() => {
     if (!sellingId) return;
-    const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice));
+    const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice), { grade: sellingItem?.grade });
     if (!feesTouched) setFees(penceToPounds(estimate.feesPence));
     if (!postageTouched) setPostage(penceToPounds(estimate.postagePence));
-  }, [feesTouched, postageTouched, saleChannel, salePrice, sellingId]);
+  }, [feesTouched, postageTouched, saleChannel, salePrice, sellingId, sellingItem?.grade]);
 
   const activeInventory = useMemo(
     () => inventory.filter((item) => item.status !== "SOLD"),
@@ -610,10 +615,6 @@ export default function Home() {
   const recentIntakeCostPence = useMemo(
     () => recentIntake.reduce((sum, item) => sum + item.costBasis * item.quantity, 0),
     [recentIntake],
-  );
-  const sellingItem = useMemo(
-    () => inventory.find((item) => item.id === sellingId) ?? null,
-    [inventory, sellingId],
   );
   const creatingListingItem = useMemo(
     () => inventory.find((item) => item.id === creatingListingItemId) ?? null,
@@ -683,8 +684,8 @@ export default function Home() {
     };
   }, [checkedComp, comp]);
   const deal = useMemo(
-    () => (headline ? judgeDeal(headline, poundsToPence(cost), channel) : null),
-    [channel, headline, cost],
+    () => (headline ? judgeDeal(headline, poundsToPence(cost), channel, grade) : null),
+    [channel, headline, cost, grade],
   );
   const gradeEv = useMemo(
     () =>
@@ -786,6 +787,7 @@ export default function Home() {
       quantity: intakeQuantity,
       listPricePence,
       channel,
+      grade,
       cautious: checkedComp
         ? checkedComp.sampleSize < 2
         : Boolean(compForReceipt?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
@@ -796,6 +798,7 @@ export default function Home() {
     cost,
     checkedComp,
     dealerVerdict,
+    grade,
     headline?.medianPence,
     listPriceOverride,
     projectedListSuggestion?.pricePence,
@@ -1755,7 +1758,7 @@ export default function Home() {
     const saleListing = listing ?? item.listings[0];
     const price = saleListing?.listPrice ?? saleListing?.suggestedPrice ?? item.costBasis;
     const nextChannel = saleListing?.channel ?? "EBAY";
-    const estimate = estimateSaleCosts(nextChannel, price);
+    const estimate = estimateSaleCosts(nextChannel, price, { grade: item.grade });
     setSellingId(item.id);
     setEditingItemId(null);
     setEditingListingId(null);
@@ -1785,7 +1788,7 @@ export default function Home() {
   }
 
   function applySaleChannelPreset(nextChannel: Channel) {
-    const estimate = estimateSaleCosts(nextChannel, poundsToPence(salePrice));
+    const estimate = estimateSaleCosts(nextChannel, poundsToPence(salePrice), { grade: sellingItem?.grade });
     setSaleChannel(nextChannel);
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
@@ -1808,7 +1811,7 @@ export default function Home() {
 
   function applySaleTotalPrice(totalPence: number) {
     const safeTotal = Math.max(0, Math.round(totalPence));
-    const estimate = estimateSaleCosts(saleChannel, safeTotal);
+    const estimate = estimateSaleCosts(saleChannel, safeTotal, { grade: sellingItem?.grade });
     setSalePrice(penceToPounds(safeTotal));
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
@@ -1829,7 +1832,11 @@ export default function Home() {
 
   function useBreakEvenSalePrice() {
     if (!sellingItem) return;
-    applySaleTotalPrice(breakEvenSalePricePence(saleChannel, sellingItem.costBasis * saleQuantityForShortcuts()));
+    applySaleTotalPrice(
+      breakEvenSalePricePence(saleChannel, sellingItem.costBasis * saleQuantityForShortcuts(), {
+        grade: sellingItem.grade,
+      }),
+    );
   }
 
   function sellAllQuantity() {
@@ -1848,7 +1855,7 @@ export default function Home() {
   }
 
   function resetSaleCosts() {
-    const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice));
+    const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice), { grade: sellingItem?.grade });
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
     setFeesTouched(false);
@@ -5138,6 +5145,7 @@ function judgeDeal(
   comp: CompResult,
   costBasisPence: number,
   channel: Channel,
+  grade: Grade,
 ): {
   label: string;
   tone: "good" | "warn" | "danger";
@@ -5147,7 +5155,7 @@ function judgeDeal(
   if (comp.sampleSize === 0 || comp.medianPence <= 0) {
     return { label: "No signal", tone: "danger", expectedProfitPence: 0, targetBuyPence: 0 };
   }
-  const costs = estimateSaleCosts(channel, comp.medianPence);
+  const costs = estimateSaleCosts(channel, comp.medianPence, { grade });
   const net = comp.medianPence - costs.feesPence - costs.postagePence;
   const expectedProfitPence = net - costBasisPence;
   const targetBuyPence = Math.max(0, Math.round(net * 0.7));

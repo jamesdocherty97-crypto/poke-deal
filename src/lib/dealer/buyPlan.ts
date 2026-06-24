@@ -7,6 +7,7 @@ export interface BuyPlanInput {
   quantity: number;
   listPricePence: number;
   channel: SaleChannel;
+  grade?: string | null;
   cautious?: boolean;
   minRoiPct?: number;
 }
@@ -42,7 +43,7 @@ export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
   const unitCostPence = Math.max(0, Math.round(input.unitCostPence));
   const quantity = Math.max(1, Math.round(input.quantity));
   const unitListPence = Math.max(0, Math.round(input.listPricePence));
-  const costs = estimateSaleCosts(input.channel, unitListPence);
+  const costs = estimateSaleCosts(input.channel, unitListPence, { grade: input.grade });
   const unitNetPence = unitListPence - costs.feesPence - costs.postagePence;
   const unitProfitPence = unitNetPence - unitCostPence;
   const roiPct = unitCostPence > 0 ? roundPct(unitProfitPence / unitCostPence) : null;
