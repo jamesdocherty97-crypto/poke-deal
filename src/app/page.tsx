@@ -432,6 +432,7 @@ const gradeOptions: Grade[] = [
 ];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCGPLAYER", "OTHER"];
+const checkedCompSampleOptions = ["1", "2", "3", "5"];
 const expenseCategories: ExpenseCategory[] = ["SUPPLIES", "POSTAGE", "GRADING", "TABLE_FEE", "TRAVEL", "PLATFORM", "OTHER"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
@@ -3068,6 +3069,18 @@ export default function Home() {
             </select>
           </label>
         </div>
+        <div className="checked-comp-presets" role="group" aria-label="Checked comp source">
+          {checkedCompSources.map((source) => (
+            <button
+              key={source}
+              type="button"
+              className={source === checkedCompSource ? "selected" : ""}
+              onClick={() => setCheckedCompSource(source)}
+            >
+              {checkedCompSourceLabel(source)}
+            </button>
+          ))}
+        </div>
         <div className="form-grid">
           <label>
             Sample
@@ -3087,6 +3100,18 @@ export default function Home() {
               placeholder="NM solds, same language"
             />
           </label>
+        </div>
+        <div className="checked-comp-presets" role="group" aria-label="Checked comp sample size">
+          {checkedCompSampleOptions.map((sample) => (
+            <button
+              key={sample}
+              type="button"
+              className={String(Math.max(1, Math.round(Number(checkedCompSample)))) === sample ? "selected" : ""}
+              onClick={() => setCheckedCompSample(sample)}
+            >
+              {sample} sold{sample === "1" ? "" : "s"}
+            </button>
+          ))}
         </div>
         {checkedComp && (
           <p className="hint">

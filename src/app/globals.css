@@ -2763,6 +2763,26 @@ label {
   font-weight: 900;
 }
 
+.checked-comp-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.checked-comp-presets button {
+  min-height: 38px;
+  padding: 7px 6px;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.checked-comp-presets .selected {
+  border-color: rgba(255, 203, 5, 0.86);
+  background: linear-gradient(180deg, var(--yellow), #f59e0b);
+  color: #1b2235;
+}
+
 .owned-sales-signal {
   display: grid;
   gap: 8px;
