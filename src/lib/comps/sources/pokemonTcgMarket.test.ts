@@ -57,6 +57,89 @@ test("PokemonTcgMarketSource returns a low-confidence RAW market baseline", asyn
   assert.equal((comp.raw as { chosenSignal?: { source?: string } }).chosenSignal?.source, "cardmarket");
 });
 
+test("PokemonTcgMarketSource prefers first-edition catalog prices when requested", async () => {
+  const catalog: CatalogSource = {
+    name: "fake-catalog",
+    live: true,
+    async resolve() {
+      return {
+        ...catalogCard,
+        name: "Hitmontop",
+        setName: "Neo Genesis",
+        number: "3/111",
+        tcgApiId: "neo1-3",
+        priceSignals: [
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer Normal Market",
+            pricePence: 1800,
+            originalAmount: 22,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "normal",
+            updatedAt: "2026/06/20",
+          },
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer 1st Edition Normal Market",
+            pricePence: 4200,
+            originalAmount: 52,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "1stEditionNormal",
+            updatedAt: "2026/06/20",
+          },
+        ],
+      };
+    },
+  };
+  const source = new PokemonTcgMarketSource(catalog);
+  const comp = await source.lookup(
+    { name: "Hitmontop 1st Edition", setName: "Neo Genesis", number: "3/111" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(comp.medianPence, 4200);
+  assert.equal((comp.raw as { chosenSignal?: { variant?: string } }).chosenSignal?.variant, "1stEditionNormal");
+});
+
+test("PokemonTcgMarketSource refuses regular market prices for first-edition requests", async () => {
+  const catalog: CatalogSource = {
+    name: "fake-catalog",
+    live: true,
+    async resolve() {
+      return {
+        ...catalogCard,
+        name: "Hitmontop",
+        setName: "Neo Genesis",
+        number: "3/111",
+        tcgApiId: "neo1-3",
+        priceSignals: [
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer Normal Market",
+            pricePence: 1800,
+            originalAmount: 22,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "normal",
+            updatedAt: "2026/06/20",
+          },
+        ],
+      };
+    },
+  };
+  const source = new PokemonTcgMarketSource(catalog);
+  const comp = await source.lookup(
+    { name: "Hitmontop 1st Edition", setName: "Neo Genesis", number: "3/111" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.medianPence, 0);
+  assert.equal((comp.raw as { reason?: string }).reason, "no first edition catalog market price");
+});
+
 test("PokemonTcgMarketSource returns empty comps for graded cards", async () => {
   const catalog: CatalogSource = {
     name: "fake-catalog",

@@ -25,6 +25,16 @@ test("buildPokemonTcgSearchQuery (most specific level) resolves set names to set
   );
 });
 
+test("buildPokemonTcgSearchQueries strips first-edition dealer qualifiers for catalog lookup", () => {
+  assert.deepEqual(
+    buildPokemonTcgSearchQueries({
+      name: "Hitmontop 1st Edition",
+      setName: "Neo Genesis",
+    }).slice(0, 2),
+    ['name:"Hitmontop" set.id:neo1', 'name:"Hitmontop"'],
+  );
+});
+
 test("buildPokemonTcgSearchQueries produces progressively looser fallback levels", () => {
   // This reproduces the exact bug James reported: searching "Charizard",
   // collector number "04/102", set "base set" used to return nothing

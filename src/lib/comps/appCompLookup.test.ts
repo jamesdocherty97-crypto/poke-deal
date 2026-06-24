@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveCatalogCard } from "./appCompLookup.js";
+import { catalogToCardRef, resolveCatalogCard } from "./appCompLookup.js";
 import type { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
 import type { CatalogCard } from "../catalog/types.js";
 import type { CardRef } from "../domain/types.js";
@@ -54,6 +54,25 @@ test("resolveCatalogCard falls back through catalogue search and refreshes the c
   ]);
   assert.equal(resolved?.tcgApiId, "svp-85");
   assert.equal(resolved?.priceSignals?.[0]?.pricePence, 8700);
+});
+
+test("catalogToCardRef preserves first-edition intent after catalog canonicalization", () => {
+  const catalog: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Lugia",
+    setName: "Neo Genesis",
+    setCode: "neo1",
+    number: "9/111",
+    tcgApiId: "neo1-9",
+  };
+
+  const card = catalogToCardRef(catalog, { name: "Lugia 1st Edition", setName: "Neo Genesis" });
+
+  assert.equal(card.name, "Lugia 1st Edition");
+  assert.equal(card.setName, "Neo Genesis");
+  assert.equal(card.number, "9/111");
+  assert.equal(card.tcgApiId, "neo1-9");
 });
 
 test("resolveCatalogCard rejects same-name cards from the wrong requested set", async () => {

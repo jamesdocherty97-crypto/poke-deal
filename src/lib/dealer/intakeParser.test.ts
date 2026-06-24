@@ -71,6 +71,13 @@ test("parseQuickIntake resolves Mega Evolution promo shorthand", () => {
     grade: "RAW",
     cost: "2.00",
   });
+
+  assert.deepEqual(parseQuickIntake("Snivy XYZ 001 raw £2"), {
+    name: "Snivy",
+    number: "XYZ001",
+    grade: "RAW",
+    cost: "2.00",
+  });
 });
 
 test("parseQuickIntake accepts broader slab grades", () => {

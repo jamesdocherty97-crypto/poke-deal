@@ -39,6 +39,8 @@ interface SetPhraseMatch {
   score: number;
 }
 
+const COLLECTOR_NUMBER_TEXT = String.raw`(?:(?!SET\b)[A-Za-z]{1,5}\s*\d{1,4}|\d{1,4})(?:\s*/\s*[A-Za-z]{0,5}\s*\d{1,4})?`;
+
 export function rankCatalogCards(
   query: string,
   cards: CatalogCard[],
@@ -123,7 +125,7 @@ export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
   const wholeNumber = readCollectorNumber(trimmed);
   if (wholeNumber) return { name: "", number: wholeNumber };
 
-  const trailing = trimmed.match(/^(.*?)\s+#?([A-Za-z]{1,5}\d{1,4}(?:\/[A-Za-z]{0,5}\d{1,4})?|\d{1,4}\/\d{1,4}|\d{1,4})$/);
+  const trailing = trimmed.match(new RegExp(`^(.*?)\\s+#?(${COLLECTOR_NUMBER_TEXT})$`, "i"));
   const name = trailing?.[1]?.trim();
   const number = readCollectorNumber(trailing?.[2]);
   if (name && number) return { name, number };
@@ -147,6 +149,11 @@ export function normalizeCatalogCardSearchInput(
       setName = getSetById(numericSetId)?.name;
       number = undefined;
     }
+  }
+  if (!setName && number && !isPlainCollectorNumber(number)) {
+    const prefix = strictCollectorPrefix(number);
+    const prefixedSetId = prefix ? resolveExactSetId(prefix) ?? promoSetCodeForPrefix(prefix) : undefined;
+    if (prefixedSetId) setName = getSetById(prefixedSetId)?.name;
   }
 
   if (setName) {
@@ -364,9 +371,17 @@ function promoSetCodeForPrefix(prefix: string): string | undefined {
 function readCollectorNumber(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
-  return /^(?:[A-Za-z]{1,5}\d{1,4}|\d{1,4})(?:\/[A-Za-z]{0,5}\d{1,4})?$/.test(trimmed)
-    ? trimmed
+  return new RegExp(`^${COLLECTOR_NUMBER_TEXT}$`, "i").test(trimmed)
+    ? normalizeCollectorNumberText(trimmed)
     : undefined;
+}
+
+function normalizeCollectorNumberText(value: string): string {
+  return value
+    .replace(/\s*\/\s*/g, "/")
+    .replace(/\s+/g, "")
+    .replace(/^([a-z]+)/i, (prefix) => prefix.toUpperCase())
+    .replace(/\/([a-z]+)/i, (_, prefix: string) => `/${prefix.toUpperCase()}`);
 }
 
 function escapeRegExp(value: string): string {

@@ -17,6 +17,7 @@ import { normalizeSearchText, tokenizeSearchText } from "../../catalog/fuzzy.js"
 import type { CompSource } from "../CompSource.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
+import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
 import { sampleRawSales } from "./fixtures.js";
 
 const BASE_URL = "https://www.pokemonpricetracker.com/api/v2";
@@ -284,6 +285,8 @@ export function providerPayloadMatchesRequest(json: unknown, request: CardRef): 
   const providerCard = firstProviderCard(json);
   if (!providerCard) return false;
 
+  if (requestsFirstEdition(request) && !providerPayloadMentionsFirstEdition(providerCard)) return false;
+
   const providerName = normalizeSearchText(readProviderString(providerCard, "name") ?? "");
   const requestedName = normalizeSearchText(request.name);
   if (providerName && requestedName && !providerName.includes(requestedName) && !requestedName.includes(providerName)) {
@@ -309,6 +312,16 @@ export function providerPayloadMatchesRequest(json: unknown, request: CardRef): 
   }
 
   return true;
+}
+
+function providerPayloadMentionsFirstEdition(card: Record<string, unknown>): boolean {
+  return [
+    readProviderString(card, "name"),
+    readProviderString(card, "variant"),
+    readProviderString(card, "printing"),
+    readProviderString(card, "edition"),
+    readProviderSetName(card),
+  ].some((value) => textMentionsFirstEdition(value));
 }
 
 function firstProviderCard(json: unknown): Record<string, unknown> | null {

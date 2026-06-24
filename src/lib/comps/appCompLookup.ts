@@ -8,6 +8,7 @@ import { OwnedSalesSource, type OwnedSalesDb } from "./sources/ownedSales.js";
 import { PokeTraceSource } from "./sources/pokeTrace.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
 import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
+import { requestsFirstEdition } from "./variants.js";
 
 export async function resolveCatalogCard(
   card: CardRef,
@@ -26,7 +27,7 @@ export async function resolveCatalogCard(
 export function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardRef {
   return {
     ...fallback,
-    name: catalog.name,
+    name: requestsFirstEdition(fallback) ? fallback.name : catalog.name,
     setName: catalog.setName,
     number: catalog.number ?? fallback.number,
     tcgApiId: catalog.tcgApiId,

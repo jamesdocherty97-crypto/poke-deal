@@ -3,6 +3,7 @@ import { STATIC_RATES, toGbpPence, type FxRates } from "../comps/currency.js";
 import { isApiUnavailableSetId, resolveSetIdForCard } from "./setCatalog.js";
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js";
 import { tokenizeSearchText } from "./fuzzy.js";
+import { normalizeCatalogCardSearchInput } from "./cardSearch.js";
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
 const CARD_IDENTITY_FIELDS = "id,name,number,rarity,images,set";
@@ -192,18 +193,25 @@ function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
 // API's literal set name "Base"), whereas `set.id:base1` is an exact,
 // unambiguous match once resolved.
 export function buildPokemonTcgSearchQueries(card: CardRef): string[] {
-  const name = card.name.trim();
+  const normalized = normalizeCatalogCardSearchInput(card.name, card.setName);
+  const name = (normalized.name || card.name).trim();
   if (!name) return [];
   const nameTerm = `name:${quoteQueryValue(name)}`;
   const relaxedNameTerm = buildRelaxedNameTerm(name);
+  const lookupCard = {
+    ...card,
+    name,
+    setName: card.setName ?? normalized.setName,
+    number: card.number ?? normalized.number,
+  };
 
-  const numberTerms = buildPokemonTcgCollectorNumberTerms(card.number).map(
+  const numberTerms = buildPokemonTcgCollectorNumberTerms(lookupCard.number).map(
     (number) => `number:${quoteQueryValue(number)}`,
   );
 
-  const resolvedSetId = resolveSetIdForCard(card.setName, card.number);
+  const resolvedSetId = resolveSetIdForCard(lookupCard.setName, lookupCard.number);
   const setTerm = resolvedSetId ? `set.id:${resolvedSetId}` : undefined;
-  const strictPromoLookup = shouldKeepPromoLookupStrict(card, resolvedSetId);
+  const strictPromoLookup = shouldKeepPromoLookupStrict(lookupCard, resolvedSetId);
 
   const queries: string[] = [];
   const seen = new Set<string>();

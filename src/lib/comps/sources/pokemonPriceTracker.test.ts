@@ -167,6 +167,24 @@ test("providerPayloadMatchesRequest validates fallback provider cards", () => {
       },
     ],
   };
+  const unlimitedVintage = {
+    data: [
+      {
+        name: "Hitmontop",
+        setName: "Neo Genesis",
+        cardNumber: "3/111",
+      },
+    ],
+  };
+  const firstEditionVintage = {
+    data: [
+      {
+        name: "Hitmontop 1st Edition",
+        setName: "Neo Genesis",
+        cardNumber: "3/111",
+      },
+    ],
+  };
 
   assert.equal(
     providerPayloadMatchesRequest(celebrationReprint, { name: "Charizard", setName: "Base", number: "4/102" }),
@@ -185,6 +203,22 @@ test("providerPayloadMatchesRequest validates fallback provider cards", () => {
       name: "Mew ex",
       setName: "Paldean Fates",
       number: "232/091",
+    }),
+    true,
+  );
+  assert.equal(
+    providerPayloadMatchesRequest(unlimitedVintage, {
+      name: "Hitmontop 1st Edition",
+      setName: "Neo Genesis",
+      number: "3/111",
+    }),
+    false,
+  );
+  assert.equal(
+    providerPayloadMatchesRequest(firstEditionVintage, {
+      name: "Hitmontop 1st Edition",
+      setName: "Neo Genesis",
+      number: "3/111",
     }),
     true,
   );

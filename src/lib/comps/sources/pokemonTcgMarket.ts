@@ -4,6 +4,7 @@ import { PokemonTcgApiCatalogSource, pickCatalogPriceSignal } from "../../catalo
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
+import { requestsFirstEdition } from "../variants.js";
 
 const MARKET_WINDOW_DAYS = 30;
 
@@ -54,9 +55,12 @@ export function mapCatalogCardToMarketComp(
   catalogCard: CatalogCard | null,
   ctx: MarketContext,
 ): CompResult {
-  const bestSignal = pickCatalogPriceSignal(catalogCard?.priceSignals);
+  const bestSignal = pickCatalogPriceSignalForRequest(catalogCard?.priceSignals, ctx.card);
   if (!catalogCard || !bestSignal) {
-    return emptyMarketComp(ctx, "no catalog market price");
+    return emptyMarketComp(
+      ctx,
+      requestsFirstEdition(ctx.card) ? "no first edition catalog market price" : "no catalog market price",
+    );
   }
 
   const canonicalCard: CardRef = {
@@ -90,6 +94,15 @@ export function mapCatalogCardToMarketComp(
       signals: catalogCard.priceSignals ?? [],
     },
   };
+}
+
+export function pickCatalogPriceSignalForRequest(
+  signals: CatalogPriceSignal[] | undefined,
+  card: CardRef,
+): CatalogPriceSignal | null {
+  if (!requestsFirstEdition(card)) return pickCatalogPriceSignal(signals);
+  const firstEditionSignals = signals?.filter((signal) => signal.variant?.startsWith("1stEdition"));
+  return pickCatalogPriceSignal(firstEditionSignals);
 }
 
 function emptyMarketComp(ctx: MarketContext, reason: string): CompResult {

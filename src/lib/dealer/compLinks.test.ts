@@ -65,6 +65,7 @@ test("normalizeManualCompSearchText strips buy-flow noise but keeps comp qualifi
 test("normalizeManualCompSearchText joins modern promo codes for manual eBay searches", () => {
   assert.equal(normalizeManualCompSearchText("Snivy MEP 049 raw £2"), "Snivy MEP049");
   assert.equal(normalizeManualCompSearchText("Pikachu SVP 085 LP"), "Pikachu SVP085 LP");
+  assert.equal(normalizeManualCompSearchText("Snivy XYZ 001 raw £2"), "Snivy XYZ001");
 });
 
 test("ebaySoldSearchQuery keeps explicit graded wording instead of adding raw exclusions", () => {

@@ -44,6 +44,7 @@ test("rankCatalogCards understands collector numbers typed alongside names", () 
   ];
 
   assert.deepEqual(parseCardSearchQuery("Gengar TG06"), { name: "Gengar", number: "TG06" });
+  assert.deepEqual(parseCardSearchQuery("Snivy XYZ 001"), { name: "Snivy", number: "XYZ001" });
   assert.deepEqual(parseCardSearchQuery("Magikarp 203"), { name: "Magikarp", number: "203" });
   assert.equal(rankCatalogCards("Gengar TG06", mixed, { setName: "Lost Origin" })[0]?.setCode, "swsh11tg");
   assert.equal(scoreCatalogCardForSearch("TG06", mixed[1]!), 1100);
@@ -95,10 +96,17 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
   });
 
   assert.deepEqual(normalizeCatalogCardSearchInput("Snivy MEP 049 raw £2"), {
-    query: "Snivy 049",
+    query: "Snivy MEP049",
     name: "Snivy",
     setName: "Mega Evolution Promos",
-    number: "049",
+    number: "MEP049",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Snivy XYZ 001 raw £2"), {
+    query: "Snivy XYZ001",
+    name: "Snivy",
+    setName: undefined,
+    number: "XYZ001",
   });
 
   assert.deepEqual(normalizeCatalogCardSearchInput("Hitmontop Neo Genesis 1st Edition LP"), {

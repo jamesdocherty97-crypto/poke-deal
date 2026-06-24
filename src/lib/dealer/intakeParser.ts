@@ -24,10 +24,10 @@ interface SetMatch {
 
 const NUMBER_PATTERNS = [
   /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,4}\s*\/\s*(?:TG|GG|SV|MEP)?\s*0?\d{1,4}\b/i,
-  /\b(?!SET\b)[A-Z]{2,5}0?\d{1,4}\s*\/\s*[A-Z]{0,5}\s*0?\d{1,4}\b/i,
+  /\b(?!SET\b)[A-Z]{2,5}\s*0?\d{1,4}\s*\/\s*[A-Z]{0,5}\s*0?\d{1,4}\b/i,
   /\b\d{1,3}\s*\/\s*\d{1,3}\b/i,
   /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,4}\b/i,
-  /\b(?!SET\b)[A-Z]{2,5}0?\d{1,4}\b/i,
+  /\b(?!SET\b)[A-Z]{2,5}\s*0?\d{1,4}\b/i,
 ];
 
 const SUPPORTED_QUICK_GRADES = new Set<ParsedQuickIntakeGrade>([
