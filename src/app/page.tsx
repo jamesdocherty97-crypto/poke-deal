@@ -3445,10 +3445,11 @@ export default function Home() {
                 </div>
               </div>
             )}
-            <label className="quick-intake-field">
-              Quick fill
+            <div className="quick-intake-field">
+              <label htmlFor="quick-intake">Quick fill</label>
               <div className="quick-intake-row quick-intake-actions">
                 <input
+                  id="quick-intake"
                   ref={quickIntakeRef}
                   value={quickIntake}
                   onChange={(event) => setQuickIntake(event.target.value)}
@@ -3468,11 +3469,12 @@ export default function Home() {
                   type="button"
                   onClick={() => applyQuickIntake({ lookupAfter: true })}
                   disabled={!quickIntake.trim() || busy === "lookup"}
+                  aria-label="Comp quick fill"
                 >
                   Comp
                 </button>
               </div>
-            </label>
+            </div>
             {quickIntakePreview && (
               <div className={`quick-intake-preview ${quickIntakePreview.tone}`} aria-label="Quick fill preview">
                 <div className="quick-intake-preview-heading">
@@ -4352,16 +4354,21 @@ export default function Home() {
                       </div>
                       <strong className="recent-intake-total">{gbp(item.costBasis * item.quantity)}</strong>
                       <div className="recent-intake-actions">
-                        <button type="button" onClick={() => loadRecentBuy(item)}>
+                        <button type="button" onClick={() => loadRecentBuy(item)} aria-label={`Buy ${item.card.name} again`}>
                           Again
                         </button>
-                        <button type="button" onClick={() => loadRecentBuy(item, { lookupAfter: true })} disabled={busy === "lookup"}>
+                        <button
+                          type="button"
+                          onClick={() => loadRecentBuy(item, { lookupAfter: true })}
+                          disabled={busy === "lookup"}
+                          aria-label={`Comp ${item.card.name}`}
+                        >
                           Comp
                         </button>
-                        <button type="button" onClick={() => openRecentListingWork(item)}>
+                        <button type="button" onClick={() => openRecentListingWork(item)} aria-label={`${listing ? "Open pack for" : "List"} ${item.card.name}`}>
                           {listing ? "Pack" : "List"}
                         </button>
-                        <button type="button" onClick={() => sellRecentBuy(item)} disabled={item.status === "SOLD"}>
+                        <button type="button" onClick={() => sellRecentBuy(item)} disabled={item.status === "SOLD"} aria-label={`Sell ${item.card.name}`}>
                           Sell
                         </button>
                       </div>
