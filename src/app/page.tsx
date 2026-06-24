@@ -34,7 +34,12 @@ import {
   type RecentCompEntry,
 } from "@/lib/dealer/recentComps";
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
-import { buildManualCompLinks, cardSearchQuery, normalizeManualCompSearchText } from "@/lib/dealer/compLinks";
+import {
+  buildManualCompLinks,
+  cardSearchQuery,
+  normalizeManualCompSearchText,
+  type ManualCompLinkKind,
+} from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
@@ -3073,6 +3078,15 @@ export default function Home() {
     }
   }
 
+  function openManualCompLink(kind: ManualCompLinkKind = "EBAY_UK_SOLD") {
+    const link = manualCompLinks.find((candidate) => candidate.kind === kind);
+    if (!link?.url) return;
+    setManualCompQuery(link.query);
+    window.open(link.url, "_blank", "noopener,noreferrer");
+    setNotice(kind === "EBAY_UK_SOLD" ? "Opened eBay UK solds." : "Opened manual comp source.");
+    setError(null);
+  }
+
   function renderManualCompLinks(variant: "compact" | "full" | "priority" = "full") {
     const ebayQuery = manualCompLinks.find((link) => link.kind === "EBAY_UK_SOLD")?.query ?? manualCompFallbackQuery;
     return (
@@ -3086,6 +3100,12 @@ export default function Home() {
           <input
             value={manualCompQuery}
             onChange={(event) => setManualCompQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && ebayQuery.trim()) {
+                event.preventDefault();
+                openManualCompLink("EBAY_UK_SOLD");
+              }
+            }}
             placeholder={quickIntakeManualQuery || manualCompFallbackQuery || "Hitmontop Neo Genesis 1st Edition LP"}
           />
         </label>
@@ -3097,6 +3117,9 @@ export default function Home() {
           )}
           <button type="button" onClick={() => setManualCompQuery(manualCompFallbackQuery)} disabled={!manualCompFallbackQuery.trim()}>
             Use fields
+          </button>
+          <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")} disabled={!ebayQuery.trim()}>
+            Open UK
           </button>
           <button type="button" onClick={() => void copyManualCompQuery()} disabled={!ebayQuery.trim()}>
             Copy
