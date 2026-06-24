@@ -1,0 +1,9 @@
+.env
+.env.*
+APP_LOGIN_PASSWORD.txt
+HANDOVER_*.md
+node_modules
+.next
+.vercel
+*.tsbuildinfo
+public/icon 2.svg
