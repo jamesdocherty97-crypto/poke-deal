@@ -1,7 +1,12 @@
 "use client";
 
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
-import { suggestListPrice, type PricingStrategy } from "@/lib/comps/pricing";
+import {
+  conditionAdjustedPricePence,
+  rawConditionPriceFactor,
+  suggestListPrice,
+  type PricingStrategy,
+} from "@/lib/comps/pricing";
 import type { CompResult as DomainCompResult, Grade as DomainGrade } from "@/lib/domain/types";
 import {
   buildInventoryView,
@@ -690,8 +695,8 @@ export default function Home() {
     };
   }, [checkedComp, comp]);
   const deal = useMemo(
-    () => (headline ? judgeDeal(headline, poundsToPence(cost), channel, grade) : null),
-    [channel, headline, cost, grade],
+    () => (headline ? judgeDeal(headline, poundsToPence(cost), channel, grade, condition) : null),
+    [channel, condition, headline, cost, grade],
   );
   const gradeEv = useMemo(
     () =>
@@ -778,10 +783,12 @@ export default function Home() {
             comp: headline,
             strategy,
             costBasisPence: poundsToPence(cost),
+            condition,
           })
         : null,
-    [headline, strategy, cost],
+    [condition, headline, strategy, cost],
   );
+  const conditionAdjustmentActive = grade === "RAW" && rawConditionPriceFactor(grade, condition) < 1;
   const buyPlan = useMemo(() => {
     const intakeQuantity = parseIntakeQuantity(quantity) ?? 1;
     const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
@@ -3305,7 +3312,11 @@ export default function Home() {
                 <div>
                   <span>Auto list</span>
                   <strong>{gbp(projectedListSuggestion.pricePence)}</strong>
-                  <small>{projectedListSuggestion.confidence}{projectedListSuggestion.flooredToMargin ? " · margin floor" : ""}</small>
+                  <small>
+                    {projectedListSuggestion.confidence}
+                    {conditionAdjustmentActive ? " · condition adjusted" : ""}
+                    {projectedListSuggestion.flooredToMargin ? " · margin floor" : ""}
+                  </small>
                 </div>
                 <button type="button" onClick={() => setListPriceOverride(penceToPounds(projectedListSuggestion.pricePence))}>
                   Use
@@ -5174,6 +5185,7 @@ function judgeDeal(
   costBasisPence: number,
   channel: Channel,
   grade: Grade,
+  condition: string | null | undefined,
 ): {
   label: string;
   tone: "good" | "warn" | "danger";
@@ -5183,7 +5195,8 @@ function judgeDeal(
   if (comp.sampleSize === 0 || comp.medianPence <= 0) {
     return { label: "No signal", tone: "danger", expectedProfitPence: 0, targetBuyPence: 0 };
   }
-  const grossSalePence = defaultGrossSalePence(channel, comp.medianPence, { grade });
+  const adjustedCompPence = conditionAdjustedPricePence(comp.medianPence, grade, condition);
+  const grossSalePence = defaultGrossSalePence(channel, adjustedCompPence, { grade });
   const costs = estimateSaleCosts(channel, grossSalePence, { grade });
   const net = grossSalePence - costs.feesPence - costs.postagePence;
   const expectedProfitPence = net - costBasisPence;

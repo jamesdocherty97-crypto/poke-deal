@@ -61,6 +61,7 @@ export async function acquireToInventory(
     strategy: input.strategy,
     costBasisPence: input.costBasisPence,
     minMargin: input.minMargin,
+    condition: input.condition,
   });
 
   const item = await repo.create({

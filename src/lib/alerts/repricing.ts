@@ -9,6 +9,7 @@ export interface RepriceInput {
   currentPricePence: number;
   costBasisPence: number;
   comp: CompResult;
+  condition?: string | null;
   strategy?: PricingStrategy;
   thresholdPct?: number;
   sourcesDisagree?: boolean;
@@ -33,6 +34,7 @@ export function recommendReprice(input: RepriceInput): RepriceRecommendation | n
     comp: input.comp,
     strategy: input.strategy ?? "market",
     costBasisPence: input.costBasisPence,
+    condition: input.condition,
   });
   const movePct = roundOne(
     ((suggestion.pricePence - input.currentPricePence) / input.currentPricePence) * 100,

@@ -58,6 +58,7 @@ export async function runRepriceCheck({
       currentPricePence,
       costBasisPence: item.costBasis,
       comp: comps.headline,
+      condition: item.condition,
       thresholdPct,
       sourcesDisagree: comps.sourcesDisagree,
     });

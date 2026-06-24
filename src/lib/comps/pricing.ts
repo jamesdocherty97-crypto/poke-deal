@@ -17,6 +17,8 @@ export interface PriceSuggestionInput {
   costBasisPence?: number;
   /** Minimum margin over cost basis, as a fraction. Default 0.10 (10%). */
   minMargin?: number;
+  /** Raw card condition. Used to avoid pricing LP/MP/HP raw buys from an NM-ish comp. */
+  condition?: string | null;
 }
 
 export interface PriceSuggestion {
@@ -34,13 +36,21 @@ const STRATEGY_FACTORS: Record<PricingStrategy, number> = {
   quick: 0.85,
 };
 
+const RAW_CONDITION_FACTORS: Record<string, number> = {
+  NM: 1,
+  LP: 0.85,
+  MP: 0.7,
+  HP: 0.55,
+  DMG: 0.4,
+};
+
 /**
  * Suggest a list price from a comp. Strategy nudges around the median; a cost-basis
  * floor guarantees a minimum margin even if the market is soft. Confidence flows
  * straight from the comp's sample size so the UI can warn on thin data.
  */
 export function suggestListPrice(input: PriceSuggestionInput): PriceSuggestion {
-  const { comp, strategy = "market", costBasisPence, minMargin = 0.1 } = input;
+  const { comp, strategy = "market", costBasisPence, minMargin = 0.1, condition } = input;
 
   if (comp.sampleSize === 0) {
     return {
@@ -56,7 +66,9 @@ export function suggestListPrice(input: PriceSuggestionInput): PriceSuggestion {
     };
   }
 
-  const base = comp.medianPence * STRATEGY_FACTORS[strategy];
+  const conditionFactor = rawConditionPriceFactor(comp.grade, condition);
+  const conditionCode = conditionFactor < 1 ? normalizeRawCondition(condition) : null;
+  const base = comp.medianPence * STRATEGY_FACTORS[strategy] * conditionFactor;
   let pricePence = Math.round(base);
   let flooredToMargin = false;
 
@@ -76,11 +88,40 @@ export function suggestListPrice(input: PriceSuggestionInput): PriceSuggestion {
 
   const rationale =
     `${strategy} pricing off median (n=${comp.sampleSize}, ${comp.windowDays}d).` +
+    (conditionCode ? ` Raw ${conditionCode} adjustment applied.` : "") +
     (flooredToMargin ? " Raised to protect minimum margin." : "") +
     trendNote +
     (confidence === "low" ? " ⚠ Thin sample — treat as indicative." : "");
 
   return { pricePence, strategy, confidence, flooredToMargin, rationale };
+}
+
+export function conditionAdjustedPricePence(
+  pricePence: number,
+  grade: string | null | undefined,
+  condition: string | null | undefined,
+): number {
+  return Math.round(Math.max(0, pricePence) * rawConditionPriceFactor(grade, condition));
+}
+
+export function rawConditionPriceFactor(
+  grade: string | null | undefined,
+  condition: string | null | undefined,
+): number {
+  if (grade !== "RAW") return 1;
+  const normalized = normalizeRawCondition(condition);
+  return normalized ? RAW_CONDITION_FACTORS[normalized] ?? 1 : 1;
+}
+
+function normalizeRawCondition(condition: string | null | undefined): string | null {
+  const normalized = condition?.trim().toUpperCase();
+  if (!normalized) return null;
+  if (/\b(DMG|DAMAGED|DAMAGE)\b/.test(normalized)) return "DMG";
+  if (/\b(HP|HEAVY|HEAVILY\s+PLAYED)\b/.test(normalized)) return "HP";
+  if (/\b(MP|MODERATE|MODERATELY\s+PLAYED)\b/.test(normalized)) return "MP";
+  if (/\b(LP|LIGHT|LIGHTLY\s+PLAYED)\b/.test(normalized)) return "LP";
+  if (/\b(NM|NEAR\s+MINT|MINT)\b/.test(normalized)) return "NM";
+  return null;
 }
 
 /** Realized profit on a sale (all GBP pence). */

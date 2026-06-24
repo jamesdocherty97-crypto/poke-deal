@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { suggestListPrice, realizedProfit } from "./pricing.js";
+import { conditionAdjustedPricePence, rawConditionPriceFactor, suggestListPrice, realizedProfit } from "./pricing.js";
 import type { CompResult } from "../domain/types.js";
 
 function comp(medianPence: number, sampleSize = 8): CompResult {
@@ -38,6 +38,25 @@ test("cost-basis floor protects minimum margin", () => {
   const s = suggestListPrice({ comp: comp(1000), strategy: "market", costBasisPence: 1800, minMargin: 0.1 });
   assert.equal(s.pricePence, 1980);
   assert.equal(s.flooredToMargin, true);
+});
+
+test("raw condition discounts NM-ish comps before pricing", () => {
+  const lp = suggestListPrice({ comp: comp(3000), strategy: "market", condition: "LP" });
+  const mp = suggestListPrice({ comp: comp(3000), strategy: "market", condition: "moderately played" });
+
+  assert.equal(lp.pricePence, 2550);
+  assert.match(lp.rationale, /Raw LP adjustment/);
+  assert.equal(mp.pricePence, 2100);
+  assert.equal(rawConditionPriceFactor("RAW", "HP"), 0.55);
+  assert.equal(rawConditionPriceFactor("RAW", "damaged"), 0.4);
+});
+
+test("condition discount does not apply to graded cards", () => {
+  const slab = { ...comp(3000), grade: "PSA_10" as const };
+  const priced = suggestListPrice({ comp: slab, strategy: "market", condition: "LP" });
+
+  assert.equal(priced.pricePence, 3000);
+  assert.equal(conditionAdjustedPricePence(3000, "PSA_10", "LP"), 3000);
 });
 
 test("thin sample is flagged low confidence", () => {

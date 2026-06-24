@@ -52,6 +52,23 @@ test("recommendReprice recommends material price changes", () => {
   assert.match(rec?.reason ?? "", /raise/);
 });
 
+test("recommendReprice respects raw condition when repricing stock", () => {
+  const rec = recommendReprice({
+    itemId: "item_1",
+    cardName: "Charizard ex",
+    grade: "RAW",
+    currentPricePence: 3000,
+    costBasisPence: 1800,
+    comp: comp(3900),
+    condition: "LP",
+    thresholdPct: 10,
+  });
+
+  assert.equal(rec?.suggestedPricePence, 3315);
+  assert.equal(rec?.movePct, 10.5);
+  assert.match(rec?.reason ?? "", /Raw LP adjustment/);
+});
+
 test("formatRepriceDigest is compact for Discord", () => {
   const rec = recommendReprice({
     itemId: "item_1",
