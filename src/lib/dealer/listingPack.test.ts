@@ -6,6 +6,7 @@ import {
   buildListingPack,
   buildListingPackCsv,
   ebayCondition,
+  listingPackCopyFields,
   suggestListPricePence,
   suggestPostage,
 } from "./listingPack.js";
@@ -99,6 +100,16 @@ test("listing pack produces a copy-ready block", () => {
   assert.match(pack.copyReady, /PRICE: £1063\.00/); // 1062.20 rounded up to a tidy whole pound
   assert.match(pack.copyReady, /ITEM SPECIFICS:/);
   assert.match(pack.copyReady, /DESCRIPTION:/);
+});
+
+test("listing pack exposes field-level copy values for manual listing", () => {
+  const pack = buildListingPack(slab);
+  const fields = listingPackCopyFields(pack);
+
+  assert.equal(fields.find((field) => field.key === "title")?.value, pack.title);
+  assert.equal(fields.find((field) => field.key === "price")?.value, "1063.00");
+  assert.match(fields.find((field) => field.key === "description")?.value ?? "", /Charizard ex/);
+  assert.match(fields.find((field) => field.key === "specifics")?.value ?? "", /Professional Grader: PSA/);
 });
 
 test("CSV export has a header and one row per item, with quoting", () => {

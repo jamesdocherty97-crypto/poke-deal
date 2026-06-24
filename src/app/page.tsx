@@ -32,7 +32,12 @@ import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTar
 import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
 import { buildCheckedComp, checkedCompSourceLabel, type CheckedCompSource } from "@/lib/dealer/checkedComp";
-import { buildListingPack, type ListingPack } from "@/lib/dealer/listingPack";
+import {
+  buildListingPack,
+  listingPackCopyFields,
+  type ListingPack,
+  type ListingPackCopyField,
+} from "@/lib/dealer/listingPack";
 import { listingVenueAction, nextDraftListingId } from "@/lib/dealer/listingWorkflow";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
@@ -470,6 +475,7 @@ export default function Home() {
   const [listingExternalUrl, setListingExternalUrl] = useState("");
   const [listingPackId, setListingPackId] = useState<string | null>(null);
   const [listingPackCopied, setListingPackCopied] = useState(false);
+  const [listingPackCopiedField, setListingPackCopiedField] = useState<string | null>(null);
   const [cardArtUrl, setCardArtUrl] = useState<string | null>(null);
   const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
   const [gradeOdds, setGradeOdds] = useState("45");
@@ -2294,6 +2300,7 @@ export default function Home() {
     }
     setListingPackId(listing.id);
     setListingPackCopied(false);
+    setListingPackCopiedField(null);
     setEditingListingId(null);
     setCreatingListingItemId(null);
     setSellingId(null);
@@ -2306,9 +2313,21 @@ export default function Home() {
     try {
       await navigator.clipboard.writeText(listingPack.copyReady);
       setListingPackCopied(true);
+      setListingPackCopiedField(null);
       setNotice("Listing pack copied.");
     } catch {
       setError("Copy failed. Select the listing block and copy it manually.");
+    }
+  }
+
+  async function copyListingPackField(field: ListingPackCopyField) {
+    try {
+      await navigator.clipboard.writeText(field.value);
+      setListingPackCopied(false);
+      setListingPackCopiedField(field.key);
+      setNotice(`${field.label} copied.`);
+    } catch {
+      setError("Copy failed. Select the field and copy it manually.");
     }
   }
 
@@ -2316,6 +2335,7 @@ export default function Home() {
     if (!nextListingPackTarget) return;
     setListingPackId(nextListingPackTarget.id);
     setListingPackCopied(false);
+    setListingPackCopiedField(null);
     setError(null);
     setNotice(null);
   }
@@ -2331,6 +2351,7 @@ export default function Home() {
     if (!ok) return;
     setListingPackId(nextId);
     setListingPackCopied(false);
+    setListingPackCopiedField(null);
   }
 
   async function patchListing(
@@ -3987,12 +4008,18 @@ export default function Home() {
               listing={listingPackTarget}
               pack={listingPack}
               copied={listingPackCopied}
+              copiedField={listingPackCopiedField}
               busy={busy === `listing-${listingPackTarget.id}`}
               nextListingLabel={nextListingPackTarget ? listingQueueLabel(nextListingPackTarget) : null}
               onCopy={copyListingPack}
+              onCopyField={copyListingPackField}
               onActivate={activateListingPackTarget}
               onNext={openNextListingPack}
-              onClose={() => setListingPackId(null)}
+              onClose={() => {
+                setListingPackId(null);
+                setListingPackCopied(false);
+                setListingPackCopiedField(null);
+              }}
             />
           )}
         </section>
@@ -4577,9 +4604,11 @@ function ListingPackSheet({
   listing,
   pack,
   copied,
+  copiedField,
   busy,
   nextListingLabel,
   onCopy,
+  onCopyField,
   onActivate,
   onNext,
   onClose,
@@ -4587,15 +4616,18 @@ function ListingPackSheet({
   listing: Listing;
   pack: ListingPack;
   copied: boolean;
+  copiedField: string | null;
   busy: boolean;
   nextListingLabel: string | null;
   onCopy: () => void;
+  onCopyField: (field: ListingPackCopyField) => void;
   onActivate: () => void;
   onNext: () => void;
   onClose: () => void;
 }) {
   const item = listing.item;
   const specifics = Object.entries(pack.itemSpecifics);
+  const copyFields = listingPackCopyFields(pack);
   const venueAction = listingVenueAction(listing.channel);
   const canActivate = listing.state === "DRAFT";
 
@@ -4624,6 +4656,18 @@ function ListingPackSheet({
           <span>Postage</span>
           <strong>{gbp(pack.postage.pricePence)}</strong>
         </div>
+      </div>
+      <div className="listing-field-actions" aria-label="Copy listing fields">
+        {copyFields.map((field) => (
+          <button
+            key={field.key}
+            className={copiedField === field.key ? "selected" : ""}
+            type="button"
+            onClick={() => onCopyField(field)}
+          >
+            {copiedField === field.key ? `${field.label} copied` : `Copy ${field.label}`}
+          </button>
+        ))}
       </div>
       <div className="listing-pack-specifics">
         {specifics.map(([label, value]) => (

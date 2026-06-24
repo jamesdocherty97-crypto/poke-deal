@@ -47,6 +47,12 @@ export interface ListingPack {
   copyReady: string;
 }
 
+export interface ListingPackCopyField {
+  key: string;
+  label: string;
+  value: string;
+}
+
 const EBAY_TITLE_MAX = 80;
 
 export function gradeDisplay(grade: string): string {
@@ -203,6 +209,21 @@ export function buildListingPack(input: ListingPackInput): ListingPack {
   ].join("\n");
 
   return { title, subtitle, condition, conditionNote, itemSpecifics, suggestedPricePence, postage, description, copyReady };
+}
+
+export function listingPackCopyFields(pack: ListingPack): ListingPackCopyField[] {
+  return [
+    { key: "title", label: "Title", value: pack.title },
+    { key: "price", label: "Price", value: (pack.suggestedPricePence / 100).toFixed(2) },
+    { key: "description", label: "Description", value: pack.description },
+    {
+      key: "specifics",
+      label: "Specifics",
+      value: Object.entries(pack.itemSpecifics)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join("\n"),
+    },
+  ];
 }
 
 // ── CSV export (eBay-style flat columns) ─────────────────────────────────────
