@@ -3533,6 +3533,50 @@ label {
   font-size: 18px;
 }
 
+.listing-economics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.36);
+  padding: 10px;
+}
+
+.listing-economics div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.listing-economics span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.listing-economics strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.08;
+}
+
+.listing-economics small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.listing-economics.good div:last-child strong {
+  color: var(--green);
+}
+
+.listing-economics.warn div:last-child strong {
+  color: var(--yellow);
+}
+
 .listing-flow-steps {
   display: grid;
   gap: 7px;
@@ -4061,6 +4105,7 @@ label {
   .quick-stock-grid,
   .buy-plan,
   .sale-preview,
+  .listing-economics,
   .listing-pack-summary,
   .listing-pack-specifics {
     grid-template-columns: 1fr;

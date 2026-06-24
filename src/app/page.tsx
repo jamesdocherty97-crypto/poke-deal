@@ -52,6 +52,7 @@ import {
   type ListingPack,
   type ListingPackCopyField,
 } from "@/lib/dealer/listingPack";
+import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
 import {
   buildListingSellFlow,
   listingVenueAction,
@@ -5707,6 +5708,14 @@ function ListingPackSheet({
   const venueAction = listingVenueAction(listing.channel);
   const canActivate = listing.state === "DRAFT";
   const canSell = Boolean(item && item.status !== "SOLD" && listing.state !== "SOLD");
+  const economics = item
+    ? buildListingEconomics({
+        channel: listing.channel,
+        grade: item.grade,
+        itemPricePence: pack.suggestedPricePence,
+        costBasisPence: item.costBasis,
+      })
+    : null;
 
   const isEbayListing = listing.channel === "EBAY";
   const hasOffer = Boolean(listing.externalRef?.startsWith("offer:"));
@@ -5758,6 +5767,31 @@ function ListingPackSheet({
           <strong>{gbp(pack.postage.pricePence)}</strong>
         </div>
       </div>
+      {economics && (
+        <div className={`listing-economics ${economics.profitPence >= 0 ? "good" : "warn"}`}>
+          <div>
+            <span>Net after sale</span>
+            <strong>{gbp(economics.netPence)}</strong>
+            <small>
+              Gross {gbp(economics.grossPence)} · fees {gbp(economics.feesPence)} · post {gbp(economics.postagePence)}
+            </small>
+          </div>
+          <div>
+            <span>Cost</span>
+            <strong>{gbp(economics.costPence)}</strong>
+            <small>{item?.quantity && item.quantity > 1 ? "Per copy" : "Stock cost"}</small>
+          </div>
+          <div>
+            <span>Profit</span>
+            <strong>{gbp(economics.profitPence)}</strong>
+            <small>
+              {economics.roiPct == null ? "n/a ROI" : `${economics.roiPct}% ROI`}
+              {" · "}
+              {economics.marginPct == null ? "n/a margin" : `${economics.marginPct}% margin`}
+            </small>
+          </div>
+        </div>
+      )}
       <ListingFlowSteps steps={sellingSteps} />
       <div className="listing-field-actions" aria-label="Copy listing fields">
         {copyFields.map((field) => (
