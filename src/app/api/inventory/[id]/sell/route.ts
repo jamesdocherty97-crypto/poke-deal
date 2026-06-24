@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
 import { realizedProfit } from "@/lib/comps/pricing";
-import { planUnitSale, splitPence } from "@/lib/dealer/unitSale";
+import { planSaleListingClosure, planUnitSale, splitPence } from "@/lib/dealer/unitSale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +14,7 @@ const sellSchema = z.object({
   postagePence: z.coerce.number().int().nonnegative().default(0),
   quantity: z.coerce.number().int().positive().default(1),
   soldAt: z.coerce.date().optional(),
+  listingId: z.string().trim().min(1).optional(),
 });
 
 export async function POST(
@@ -82,9 +83,23 @@ export async function POST(
         },
       });
 
-      if (salePlan.closeOpenListings) {
+      const listingClosure = planSaleListingClosure({
+        itemId: item.id,
+        soldListingId: d.listingId,
+        closeOpenListings: salePlan.closeOpenListings,
+      });
+      if (listingClosure?.kind === "all-open") {
         await tx.listing.updateMany({
-          where: { itemId: item.id, state: { in: ["DRAFT", "ACTIVE"] } },
+          where: { itemId: listingClosure.itemId, state: { in: ["DRAFT", "ACTIVE"] } },
+          data: { state: "SOLD", endedAt: soldAt },
+        });
+      } else if (listingClosure?.kind === "one") {
+        await tx.listing.updateMany({
+          where: {
+            id: listingClosure.listingId,
+            itemId: listingClosure.itemId,
+            state: { in: ["DRAFT", "ACTIVE"] },
+          },
           data: { state: "SOLD", endedAt: soldAt },
         });
       }

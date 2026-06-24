@@ -25,6 +25,11 @@ export interface UnitSaleUndoPlan {
   restoredQuantity: number;
 }
 
+export type SaleListingClosure =
+  | { kind: "all-open"; itemId: string }
+  | { kind: "one"; itemId: string; listingId: string }
+  | null;
+
 export function planUnitSale(input: UnitSalePlanInput): UnitSalePlan {
   if (input.status === "SOLD") {
     throw new Error("Stock row is already sold.");
@@ -57,6 +62,19 @@ export function planUnitSale(input: UnitSalePlanInput): UnitSalePlan {
     closeOpenListings: false,
     fullySold: false,
   };
+}
+
+export function planSaleListingClosure(input: {
+  itemId: string;
+  soldListingId?: string | null;
+  closeOpenListings: boolean;
+}): SaleListingClosure {
+  const itemId = input.itemId.trim();
+  const listingId = input.soldListingId?.trim();
+  if (!itemId) return null;
+  if (input.closeOpenListings) return { kind: "all-open", itemId };
+  if (listingId) return { kind: "one", itemId, listingId };
+  return null;
 }
 
 export function planSaleUndo(input: UnitSaleUndoInput): UnitSaleUndoPlan {

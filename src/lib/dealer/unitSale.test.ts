@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { planSaleUndo, planUnitSale, splitPence } from "./unitSale.js";
+import { planSaleListingClosure, planSaleUndo, planUnitSale, splitPence } from "./unitSale.js";
 
 test("planUnitSale fully sells a single-copy stock row", () => {
   assert.deepEqual(planUnitSale({ quantity: 1, status: "LISTED" }), {
@@ -50,6 +50,35 @@ test("planUnitSale rejects already sold stock", () => {
 test("planUnitSale rejects impossible sold quantities", () => {
   assert.throws(() => planUnitSale({ quantity: 2, soldQuantity: 0, status: "IN_STOCK" }), /above 0/);
   assert.throws(() => planUnitSale({ quantity: 2, soldQuantity: 3, status: "IN_STOCK" }), /exceed stock/);
+});
+
+test("planSaleListingClosure closes the tapped listing on partial sales", () => {
+  assert.deepEqual(
+    planSaleListingClosure({
+      itemId: "item_1",
+      soldListingId: "listing_1",
+      closeOpenListings: false,
+    }),
+    { kind: "one", itemId: "item_1", listingId: "listing_1" },
+  );
+});
+
+test("planSaleListingClosure closes all open listings when stock is fully sold", () => {
+  assert.deepEqual(
+    planSaleListingClosure({
+      itemId: "item_1",
+      soldListingId: "listing_1",
+      closeOpenListings: true,
+    }),
+    { kind: "all-open", itemId: "item_1" },
+  );
+  assert.equal(
+    planSaleListingClosure({
+      itemId: "item_1",
+      closeOpenListings: false,
+    }),
+    null,
+  );
 });
 
 test("planSaleUndo restores a fully sold row as one active copy", () => {

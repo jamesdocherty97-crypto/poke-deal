@@ -498,6 +498,7 @@ export default function Home() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
+  const [sellingListingId, setSellingListingId] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemQuantity, setItemQuantity] = useState("1");
   const [itemCost, setItemCost] = useState("");
@@ -707,6 +708,10 @@ export default function Home() {
   const sellingItem = useMemo(
     () => inventory.find((item) => item.id === sellingId) ?? null,
     [inventory, sellingId],
+  );
+  const sellingListing = useMemo(
+    () => listings.find((listing) => listing.id === sellingListingId) ?? null,
+    [listings, sellingListingId],
   );
 
   useEffect(() => {
@@ -2219,6 +2224,7 @@ export default function Home() {
     setPostage(penceToPounds(estimate.postagePence));
     setSoldAt(todayInputValue());
     setSaleChannel(nextChannel);
+    setSellingListingId(saleListing?.id ?? null);
     setFeesTouched(false);
     setPostageTouched(false);
     setError(null);
@@ -2343,6 +2349,7 @@ export default function Home() {
   function openInventoryEditor(item: InventoryItem) {
     setEditingItemId(item.id);
     setSellingId(null);
+    setSellingListingId(null);
     setCreatingListingItemId(null);
     setItemQuantity(String(item.quantity));
     setItemCost(penceToPounds(item.costBasis));
@@ -2421,12 +2428,14 @@ export default function Home() {
           postagePence: poundsToPence(postage),
           quantity: soldQuantity,
           soldAt: soldAtIso(soldAt),
+          listingId: sellingListingId ?? undefined,
         }),
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "mark sold failed");
       setNotice(`${soldQuantity > 1 ? `${soldQuantity} copies sold` : "Sold"}. Profit ${gbp(payload.profitPence)}.`);
       setSellingId(null);
+      setSellingListingId(null);
       await refreshAll();
       setView("pnl");
     } catch (err) {
@@ -2554,6 +2563,7 @@ export default function Home() {
     setEditingListingId(null);
     setListingPackId(null);
     setSellingId(null);
+    setSellingListingId(null);
     setListingPrice(penceToPounds(defaults.listPricePence));
     setListingState("DRAFT");
     setListingChannel(item.listings[0]?.channel ?? "EBAY");
@@ -2688,6 +2698,7 @@ export default function Home() {
     setEditingListingId(null);
     setCreatingListingItemId(null);
     setSellingId(null);
+    setSellingListingId(null);
     setError(null);
     setNotice(null);
   }
@@ -5262,8 +5273,23 @@ export default function Home() {
                   {sellingItem.card.name} · cost {gbp(sellingItem.costBasis)} each · {sellingItem.quantity} in stock
                 </span>
               )}
+              {sellingListing && (
+                <span className="muted">
+                  {channelLabel(sellingListing.channel)} listing ·{" "}
+                  {gbp(sellingListing.listPrice ?? sellingListing.suggestedPrice ?? 0)}
+                </span>
+              )}
             </div>
-            <button className="ghost-button" type="button" onClick={() => setSellingId(null)}>Close</button>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => {
+                setSellingId(null);
+                setSellingListingId(null);
+              }}
+            >
+              Close
+            </button>
           </div>
           <div className="sale-channel-presets" aria-label="Sale channel presets">
             {channels.map((c) => (
