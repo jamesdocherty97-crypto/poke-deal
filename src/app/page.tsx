@@ -1862,16 +1862,24 @@ export default function Home() {
     setNotice(null);
   }
 
-  function openSellFromListing(listing: Listing) {
+  function openSellFromListing(listing: Listing): boolean {
     if (!listing.item) {
       setError("This listing is missing its stock row.");
-      return;
+      return false;
     }
     if (listing.item.status === "SOLD") {
       setError("That stock row is already sold.");
-      return;
+      return false;
     }
     openSell(listing.item, listing);
+    return true;
+  }
+
+  function openSellFromListingPack(listing: Listing) {
+    if (!openSellFromListing(listing)) return;
+    setListingPackId(null);
+    setListingPackCopied(false);
+    setListingPackCopiedField(null);
   }
 
   function applySaleChannelPreset(nextChannel: Channel) {
@@ -4138,6 +4146,7 @@ export default function Home() {
               onCopy={copyListingPack}
               onCopyField={copyListingPackField}
               onActivate={activateListingPackTarget}
+              onSell={openSellFromListingPack}
               onNext={openNextListingPack}
               onClose={() => {
                 setListingPackId(null);
@@ -4734,6 +4743,7 @@ function ListingPackSheet({
   onCopy,
   onCopyField,
   onActivate,
+  onSell,
   onNext,
   onClose,
 }: {
@@ -4746,6 +4756,7 @@ function ListingPackSheet({
   onCopy: () => void;
   onCopyField: (field: ListingPackCopyField) => void;
   onActivate: () => void;
+  onSell: (listing: Listing) => void;
   onNext: () => void;
   onClose: () => void;
 }) {
@@ -4754,6 +4765,7 @@ function ListingPackSheet({
   const copyFields = listingPackCopyFields(pack);
   const venueAction = listingVenueAction(listing.channel);
   const canActivate = listing.state === "DRAFT";
+  const canSell = Boolean(item && item.status !== "SOLD" && listing.state !== "SOLD");
 
   return (
     <form className="sell-sheet listing-pack-sheet" onSubmit={(event) => event.preventDefault()}>
@@ -4817,6 +4829,11 @@ function ListingPackSheet({
         {canActivate && (
           <button className="ghost-button" type="button" onClick={onActivate} disabled={busy}>
             {busy ? "Activating..." : "Mark active"}
+          </button>
+        )}
+        {canSell && (
+          <button className="ghost-button listing-pack-sale-action" type="button" onClick={() => onSell(listing)} disabled={busy}>
+            Record sale
           </button>
         )}
         {nextListingLabel && (
