@@ -41,6 +41,7 @@ import {
   type ManualCompLinkKind,
 } from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
+import { normalizeListingUrl } from "@/lib/dealer/listingUrl";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
@@ -2858,6 +2859,33 @@ export default function Home() {
     setEbayPreflight(null);
   }
 
+  async function pasteListingUrlAndActivate() {
+    if (!listingPackTarget) return;
+    let clipboardText = "";
+    try {
+      clipboardText = await navigator.clipboard.readText();
+    } catch {
+      setError("Clipboard read failed. Use Edit to paste the listing URL manually.");
+      return;
+    }
+
+    const externalUrl = normalizeListingUrl(clipboardText);
+    if (!externalUrl) {
+      setError("Clipboard does not contain a valid listing URL.");
+      return;
+    }
+
+    const ok = await patchListing(
+      listingPackTarget,
+      { state: "ACTIVE", externalUrl },
+      "Live URL saved. Listing marked active.",
+    );
+    if (!ok) return;
+    setListingPackCopied(false);
+    setListingPackCopiedField(null);
+    setEbayPreflight(null);
+  }
+
   async function runEbayPreflight(listingId: string) {
     setBusy(`ebay-preflight-${listingId}`);
     setError(null);
@@ -5015,6 +5043,7 @@ export default function Home() {
               onCopyAndOpen={copyListingPackAndOpenVenue}
               onCopyField={copyListingPackField}
               onActivate={activateListingPackTarget}
+              onPasteLiveUrl={pasteListingUrlAndActivate}
               onSell={openSellFromListingPack}
               onNext={openNextListingPack}
               onPreflight={() => void runEbayPreflight(listingPackTarget.id)}
@@ -5650,6 +5679,7 @@ function ListingPackSheet({
   onCreateOffer,
   onRequestPublish,
   onCopyAndOpen,
+  onPasteLiveUrl,
 }: {
   listing: Listing;
   pack: ListingPack;
@@ -5669,6 +5699,7 @@ function ListingPackSheet({
   onCreateOffer: () => void;
   onRequestPublish: () => void;
   onCopyAndOpen: () => void;
+  onPasteLiveUrl: () => void;
 }) {
   const item = listing.item;
   const specifics = Object.entries(pack.itemSpecifics);
@@ -5769,6 +5800,15 @@ function ListingPackSheet({
         {canActivate && (
           <button className="ghost-button" type="button" onClick={onActivate} disabled={busy}>
             {busy ? "Activating..." : "Mark active"}
+          </button>
+        )}
+        {listing.externalUrl ? (
+          <a className="export-link" href={listing.externalUrl} target="_blank" rel="noreferrer">
+            View live
+          </a>
+        ) : (
+          <button className="ghost-button" type="button" onClick={onPasteLiveUrl} disabled={busy}>
+            Paste URL + active
           </button>
         )}
         {canSell && (
