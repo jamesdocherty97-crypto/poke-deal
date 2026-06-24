@@ -58,6 +58,7 @@ import {
   serializeIntakePreferences,
 } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
+import { checkEbayReadiness } from "@/lib/ebay/readiness";
 import {
   buyerPaidPostagePence,
   breakEvenSalePricePence,
@@ -505,7 +506,7 @@ export default function Home() {
   const [listingPackCopied, setListingPackCopied] = useState(false);
   const [listingPackCopiedField, setListingPackCopiedField] = useState<string | null>(null);
   const [ebayStatus, setEbayStatus] = useState<EbayStatus | null>(null);
-  const [ebayPublishConfirm, setEbayPublishConfirm] = useState(false);
+  const [ebayPublishTarget, setEbayPublishTarget] = useState<string | null>(null);
   const [cardArtUrl, setCardArtUrl] = useState<string | null>(null);
   const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
   const [gradeOdds, setGradeOdds] = useState("45");
@@ -2666,13 +2667,12 @@ export default function Home() {
     setListingPackCopiedField(null);
   }
 
-  async function createEbayOffer() {
-    if (!listingPackId) return;
-    setBusy(`ebay-offer-${listingPackId}`);
+  async function createEbayOfferForListing(listingId: string) {
+    setBusy(`ebay-offer-${listingId}`);
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(`/api/listings/${listingPackId}/ebay/offer`, { method: "POST" });
+      const res = await fetch(`/api/listings/${listingId}/ebay/offer`, { method: "POST" });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "eBay offer creation failed");
       setNotice(payload.message ?? "eBay offer created.");
@@ -2684,14 +2684,13 @@ export default function Home() {
     }
   }
 
-  async function publishEbayListing() {
-    if (!listingPackId) return;
-    setEbayPublishConfirm(false);
-    setBusy(`ebay-publish-${listingPackId}`);
+  async function publishEbayListing(listingId: string) {
+    setEbayPublishTarget(null);
+    setBusy(`ebay-publish-${listingId}`);
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(`/api/listings/${listingPackId}/ebay/publish`, { method: "POST" });
+      const res = await fetch(`/api/listings/${listingId}/ebay/publish`, { method: "POST" });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "eBay publish failed");
       setNotice(payload.message ?? "Published on eBay.");
@@ -4578,11 +4577,57 @@ export default function Home() {
             <h2>Listings</h2>
             <span>{rowCountLabel(visibleListings.length, listings.length)}</span>
           </div>
+          {ebayStatus !== null && !ebayStatus.connected && listings.some((l) => l.channel === "EBAY") && (
+            <div className="ebay-setup-banner">
+              {!ebayStatus.configured ? (
+                <span>eBay credentials not configured — set env vars to enable API automation.</span>
+              ) : (
+                <>
+                  <span>eBay not connected — authorise your seller account to enable offer creation.</span>
+                  <a href="/api/ebay/connect">Connect eBay</a>
+                </>
+              )}
+            </div>
+          )}
+          {ebayPublishTarget !== null && (() => {
+            const pl = listings.find((l) => l.id === ebayPublishTarget);
+            return pl ? (
+              <div className="ebay-publish-overlay">
+                <div className="ebay-publish-confirm">
+                  <p>
+                    <strong>Publish to eBay?</strong>
+                    <small>
+                      {pl.title ?? pl.item?.card.name ?? "Untitled"}{" "}
+                      · {gbp(pl.listPrice ?? pl.suggestedPrice ?? 0)}
+                    </small>
+                  </p>
+                  <div>
+                    <button
+                      className="primary-action"
+                      type="button"
+                      disabled={busy === `ebay-publish-${pl.id}`}
+                      onClick={() => void publishEbayListing(pl.id)}
+                    >
+                      {busy === `ebay-publish-${pl.id}` ? "Publishing..." : "Yes, publish live"}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setEbayPublishTarget(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null;
+          })()}
           {visibleListings.map((listing) => (
             <ListingRow
               key={listing.id}
               listing={listing}
               busy={busy}
+              ebayConnected={Boolean(ebayStatus?.connected)}
               onEdit={openListingEditor}
               onPack={openListingPack}
               onSell={openSellFromListing}
@@ -4593,6 +4638,8 @@ export default function Home() {
                   state === "ACTIVE" ? "Listing activated." : "Listing ended.",
                 )
               }
+              onEbayOffer={() => void createEbayOfferForListing(listing.id)}
+              onEbayPublish={() => setEbayPublishTarget(listing.id)}
             />
           ))}
           {listings.length === 0 ? (
@@ -4646,21 +4693,18 @@ export default function Home() {
                 busy === `ebay-publish-${listingPackTarget.id}`}
               nextListingLabel={nextListingPackTarget ? listingQueueLabel(nextListingPackTarget) : null}
               ebayStatus={ebayStatus}
-              ebayPublishConfirm={ebayPublishConfirm}
               onCopy={copyListingPack}
               onCopyField={copyListingPackField}
               onActivate={activateListingPackTarget}
               onSell={openSellFromListingPack}
               onNext={openNextListingPack}
-              onCreateOffer={createEbayOffer}
-              onRequestPublish={() => setEbayPublishConfirm(true)}
-              onConfirmPublish={publishEbayListing}
-              onCancelPublish={() => setEbayPublishConfirm(false)}
+              onCreateOffer={() => void createEbayOfferForListing(listingPackTarget.id)}
+              onRequestPublish={() => setEbayPublishTarget(listingPackTarget.id)}
               onClose={() => {
                 setListingPackId(null);
                 setListingPackCopied(false);
                 setListingPackCopiedField(null);
-                setEbayPublishConfirm(false);
+                setEbayPublishTarget(null);
               }}
             />
           )}
@@ -5258,7 +5302,6 @@ function ListingPackSheet({
   busy,
   nextListingLabel,
   ebayStatus,
-  ebayPublishConfirm,
   onCopy,
   onCopyField,
   onActivate,
@@ -5267,8 +5310,6 @@ function ListingPackSheet({
   onClose,
   onCreateOffer,
   onRequestPublish,
-  onConfirmPublish,
-  onCancelPublish,
 }: {
   listing: Listing;
   pack: ListingPack;
@@ -5277,7 +5318,6 @@ function ListingPackSheet({
   busy: boolean;
   nextListingLabel: string | null;
   ebayStatus: EbayStatus | null;
-  ebayPublishConfirm: boolean;
   onCopy: () => void;
   onCopyField: (field: ListingPackCopyField) => void;
   onActivate: () => void;
@@ -5286,8 +5326,6 @@ function ListingPackSheet({
   onClose: () => void;
   onCreateOffer: () => void;
   onRequestPublish: () => void;
-  onConfirmPublish: () => void;
-  onCancelPublish: () => void;
 }) {
   const item = listing.item;
   const specifics = Object.entries(pack.itemSpecifics);
@@ -5297,10 +5335,20 @@ function ListingPackSheet({
   const canSell = Boolean(item && item.status !== "SOLD" && listing.state !== "SOLD");
 
   const isEbayListing = listing.channel === "EBAY";
-  const ebayConfigured = Boolean(ebayStatus?.configured);
-  const ebayConnected = Boolean(ebayStatus?.connected);
   const hasOffer = Boolean(listing.externalRef?.startsWith("offer:"));
   const isPublished = Boolean(listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl);
+
+  const ebayReadiness = isEbayListing
+    ? checkEbayReadiness({
+        ebayConfigured: Boolean(ebayStatus?.configured),
+        ebayConnected: Boolean(ebayStatus?.connected),
+        channel: listing.channel,
+        listingState: listing.state,
+        pricePence: listing.listPrice ?? listing.suggestedPrice ?? null,
+        externalRef: listing.externalRef,
+        hasImage: Boolean(listing.item?.card.imageUrl),
+      })
+    : null;
 
   return (
     <form className="sell-sheet listing-pack-sheet" onSubmit={(event) => event.preventDefault()}>
@@ -5377,13 +5425,9 @@ function ListingPackSheet({
           </button>
         )}
       </div>
-      {isEbayListing && (
+      {isEbayListing && ebayReadiness && (
         <div className="listing-pack-ebay-actions">
-          {!ebayConfigured ? null : !ebayConnected ? (
-            <a className="ghost-button" href="/api/ebay/connect">
-              Connect eBay
-            </a>
-          ) : isPublished ? (
+          {isPublished ? (
             <a
               className="export-link"
               href={listing.externalUrl!}
@@ -5392,7 +5436,7 @@ function ListingPackSheet({
             >
               View on eBay
             </a>
-          ) : hasOffer && !ebayPublishConfirm ? (
+          ) : hasOffer ? (
             <button
               className="ghost-button"
               type="button"
@@ -5401,25 +5445,7 @@ function ListingPackSheet({
             >
               {busy ? "Working..." : "Publish to eBay"}
             </button>
-          ) : hasOffer && ebayPublishConfirm ? (
-            <div className="ebay-publish-confirm">
-              <p>
-                <strong>Confirm publish to eBay</strong>
-                <small>
-                  {pack.title} · {gbp(pack.suggestedPricePence)} ·{" "}
-                  {pack.postage.service}
-                </small>
-              </p>
-              <div>
-                <button className="primary-action" type="button" onClick={onConfirmPublish} disabled={busy}>
-                  {busy ? "Publishing..." : "Yes, publish live"}
-                </button>
-                <button className="ghost-button" type="button" onClick={onCancelPublish} disabled={busy}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
+          ) : ebayReadiness.ready ? (
             <button
               className="ghost-button"
               type="button"
@@ -5428,7 +5454,29 @@ function ListingPackSheet({
             >
               {busy ? "Creating offer..." : "Create eBay offer"}
             </button>
+          ) : (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={onCreateOffer}
+              disabled={busy || !ebayReadiness.ready}
+            >
+              {busy ? "Creating offer..." : "Create eBay offer"}
+            </button>
           )}
+          <ul className="ebay-readiness-list">
+            {ebayReadiness.checks.map((check) => (
+              <li key={check.key} className={`readiness-${check.status}`}>
+                <span className="readiness-icon">
+                  {check.status === "pass" ? "✓" : check.status === "warn" ? "!" : "✗"}
+                </span>
+                <span>
+                  {check.label}
+                  {check.detail && check.status !== "pass" ? ` — ${check.detail}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </form>
@@ -5628,27 +5676,46 @@ function ListingQueueRow({
 function ListingRow({
   listing,
   busy,
+  ebayConnected,
   onEdit,
   onPack,
   onSell,
   onState,
+  onEbayOffer,
+  onEbayPublish,
 }: {
   listing: Listing;
   busy: string | null;
+  ebayConnected: boolean;
   onEdit: (listing: Listing) => void;
   onPack: (listing: Listing) => void;
   onSell: (listing: Listing) => void;
   onState: (state: Exclude<ListingState, "SOLD">) => void;
+  onEbayOffer: () => void;
+  onEbayPublish: () => void;
 }) {
   const card = listing.item?.card;
   const title = listing.title ?? card?.name ?? "Untitled listing";
   const price = listing.listPrice ?? listing.suggestedPrice ?? 0;
   const isBusy = busy === `listing-${listing.id}`;
+  const isEbayOfferBusy = busy === `ebay-offer-${listing.id}`;
+  const isEbayPublishBusy = busy === `ebay-publish-${listing.id}`;
   const canSell = Boolean(listing.item && listing.item.status !== "SOLD" && listing.state !== "SOLD");
   const stockNotes = [
     listing.item?.condition,
     listing.item?.graderCert ? `cert ${listing.item.graderCert}` : null,
   ].filter(Boolean).join(" · ");
+
+  const isEbay = listing.channel === "EBAY";
+  const hasOffer = listing.externalRef?.startsWith("offer:");
+  const isPublished = listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl;
+  const ebayStatusLabel = hasOffer
+    ? " · offer pending"
+    : isPublished
+    ? " · eBay live"
+    : listing.externalRef
+    ? " · ref saved"
+    : "";
 
   return (
     <article className="item-row">
@@ -5665,7 +5732,7 @@ function ListingRow({
           {channelLabel(listing.channel)}
           {listing.item?.card.setName ? ` · ${listing.item.card.setName}` : ""}
           {stockNotes ? ` · ${stockNotes}` : ""}
-          {listing.externalRef?.startsWith("offer:") ? " · offer pending" : listing.externalUrl ? " · eBay live" : listing.externalRef ? " · ref saved" : ""}
+          {ebayStatusLabel}
         </p>
         <p>{gbp(price)}</p>
         <div className="row-actions">
@@ -5691,6 +5758,33 @@ function ListingRow({
             <button type="button" onClick={() => onSell(listing)} disabled={Boolean(busy?.startsWith("sell-"))}>
               Sell
             </button>
+          )}
+          {isEbay && ebayConnected && !isPublished && !hasOffer && listing.state !== "SOLD" && (
+            <button
+              type="button"
+              onClick={onEbayOffer}
+              disabled={isEbayOfferBusy}
+            >
+              {isEbayOfferBusy ? "Creating..." : "eBay offer"}
+            </button>
+          )}
+          {isEbay && ebayConnected && hasOffer && !isPublished && (
+            <button
+              type="button"
+              onClick={onEbayPublish}
+              disabled={isEbayPublishBusy}
+            >
+              {isEbayPublishBusy ? "Publishing..." : "Publish"}
+            </button>
+          )}
+          {isEbay && isPublished && (
+            <a
+              href={listing.externalUrl!}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View on eBay
+            </a>
           )}
         </div>
       </div>

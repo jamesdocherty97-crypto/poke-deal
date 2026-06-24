@@ -9,6 +9,7 @@ import { isEbayConfigured, EBAY_UK_CATEGORY_POKEMON } from "./config.js";
 import type { EbayConfig } from "./config.js";
 import type { EbayPolicies } from "./policies.js";
 import { buildListingPack } from "../dealer/listingPack.js";
+import { checkEbayReadiness } from "./readiness.js";
 
 const TEST_CONFIG: EbayConfig = {
   clientId: "TestClient-123",
@@ -349,4 +350,85 @@ test("fetchEbayPolicies throws when payment policy is missing", async () => {
     () => fetchEbayPolicies(TEST_CONFIG, "token-xyz", fetch),
     /Missing required eBay business policies.*payment policy/,
   );
+});
+
+// ── checkEbayReadiness ────────────────────────────────────────────────────────
+
+const READY_INPUT = {
+  ebayConfigured: true,
+  ebayConnected: true,
+  channel: "EBAY",
+  listingState: "DRAFT",
+  pricePence: 5000,
+  externalRef: null,
+  hasImage: true,
+};
+
+test("checkEbayReadiness returns ready when all checks pass", () => {
+  const result = checkEbayReadiness(READY_INPUT);
+  assert.equal(result.ready, true);
+  assert.ok(result.checks.every((c) => c.status !== "fail"));
+});
+
+test("checkEbayReadiness fails when eBay not configured", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, ebayConfigured: false });
+  assert.equal(result.ready, false);
+  const check = result.checks.find((c) => c.key === "ebay_configured");
+  assert.equal(check?.status, "fail");
+});
+
+test("checkEbayReadiness fails when eBay not connected", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, ebayConnected: false });
+  assert.equal(result.ready, false);
+  const check = result.checks.find((c) => c.key === "ebay_connected");
+  assert.equal(check?.status, "fail");
+});
+
+test("checkEbayReadiness fails when price is zero", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, pricePence: 0 });
+  assert.equal(result.ready, false);
+  const check = result.checks.find((c) => c.key === "has_price");
+  assert.equal(check?.status, "fail");
+});
+
+test("checkEbayReadiness fails when price is null", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, pricePence: null });
+  assert.equal(result.ready, false);
+  const check = result.checks.find((c) => c.key === "has_price");
+  assert.equal(check?.status, "fail");
+});
+
+test("checkEbayReadiness fails when listing is already sold", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, listingState: "SOLD" });
+  assert.equal(result.ready, false);
+  const check = result.checks.find((c) => c.key === "not_sold");
+  assert.equal(check?.status, "fail");
+});
+
+test("checkEbayReadiness fails when already published", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, externalRef: "123456789" });
+  assert.equal(result.ready, false);
+  const check = result.checks.find((c) => c.key === "not_published");
+  assert.equal(check?.status, "fail");
+});
+
+test("checkEbayReadiness does not fail for pending offer state", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, externalRef: "offer:abc123" });
+  assert.equal(result.ready, true);
+  const check = result.checks.find((c) => c.key === "not_published");
+  assert.equal(check?.status, "pass");
+});
+
+test("checkEbayReadiness warns but stays ready when no image", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, hasImage: false });
+  assert.equal(result.ready, true);
+  const check = result.checks.find((c) => c.key === "has_image");
+  assert.equal(check?.status, "warn");
+});
+
+test("checkEbayReadiness fails when channel is not EBAY", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, channel: "VINTED" });
+  assert.equal(result.ready, false);
+  const check = result.checks.find((c) => c.key === "channel_ebay");
+  assert.equal(check?.status, "fail");
 });

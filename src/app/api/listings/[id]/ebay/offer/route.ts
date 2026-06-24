@@ -48,6 +48,14 @@ export async function POST(
     );
   }
 
+  const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? 0;
+  if (effectivePricePence <= 0) {
+    return NextResponse.json(
+      { error: "Set a price on the listing before creating an eBay offer." },
+      { status: 400 },
+    );
+  }
+
   const config = getEbayConfig()!;
 
   try {
