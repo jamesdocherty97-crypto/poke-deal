@@ -208,6 +208,7 @@ type Listing = {
   channel: Channel;
   state: ListingState;
   title: string | null;
+  externalRef: string | null;
   externalUrl: string | null;
   suggestedPrice: number | null;
   listPrice: number | null;
@@ -215,6 +216,14 @@ type Listing = {
   listedAt: string | null;
   endedAt: string | null;
   item?: InventoryItem;
+};
+
+type EbayStatus = {
+  configured: boolean;
+  connected: boolean;
+  env?: string;
+  marketplaceId?: string;
+  error?: string;
 };
 
 type Sale = {
@@ -495,6 +504,8 @@ export default function Home() {
   const [listingPackId, setListingPackId] = useState<string | null>(null);
   const [listingPackCopied, setListingPackCopied] = useState(false);
   const [listingPackCopiedField, setListingPackCopiedField] = useState<string | null>(null);
+  const [ebayStatus, setEbayStatus] = useState<EbayStatus | null>(null);
+  const [ebayPublishConfirm, setEbayPublishConfirm] = useState(false);
   const [cardArtUrl, setCardArtUrl] = useState<string | null>(null);
   const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
   const [gradeOdds, setGradeOdds] = useState("45");
@@ -525,6 +536,10 @@ export default function Home() {
   useEffect(() => {
     void refreshAll();
     void loadSetCatalog();
+    void fetch("/api/ebay/status")
+      .then((r) => r.json() as Promise<EbayStatus>)
+      .then(setEbayStatus)
+      .catch(() => setEbayStatus({ configured: false, connected: false }));
   }, []);
 
   useEffect(() => {
@@ -2651,6 +2666,43 @@ export default function Home() {
     setListingPackCopiedField(null);
   }
 
+  async function createEbayOffer() {
+    if (!listingPackId) return;
+    setBusy(`ebay-offer-${listingPackId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/listings/${listingPackId}/ebay/offer`, { method: "POST" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "eBay offer creation failed");
+      setNotice(payload.message ?? "eBay offer created.");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "eBay offer creation failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function publishEbayListing() {
+    if (!listingPackId) return;
+    setEbayPublishConfirm(false);
+    setBusy(`ebay-publish-${listingPackId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/listings/${listingPackId}/ebay/publish`, { method: "POST" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "eBay publish failed");
+      setNotice(payload.message ?? "Published on eBay.");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "eBay publish failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function patchListing(
     listing: Listing,
     patch: Partial<{
@@ -4589,17 +4641,26 @@ export default function Home() {
               pack={listingPack}
               copied={listingPackCopied}
               copiedField={listingPackCopiedField}
-              busy={busy === `listing-${listingPackTarget.id}`}
+              busy={busy === `listing-${listingPackTarget.id}` ||
+                busy === `ebay-offer-${listingPackTarget.id}` ||
+                busy === `ebay-publish-${listingPackTarget.id}`}
               nextListingLabel={nextListingPackTarget ? listingQueueLabel(nextListingPackTarget) : null}
+              ebayStatus={ebayStatus}
+              ebayPublishConfirm={ebayPublishConfirm}
               onCopy={copyListingPack}
               onCopyField={copyListingPackField}
               onActivate={activateListingPackTarget}
               onSell={openSellFromListingPack}
               onNext={openNextListingPack}
+              onCreateOffer={createEbayOffer}
+              onRequestPublish={() => setEbayPublishConfirm(true)}
+              onConfirmPublish={publishEbayListing}
+              onCancelPublish={() => setEbayPublishConfirm(false)}
               onClose={() => {
                 setListingPackId(null);
                 setListingPackCopied(false);
                 setListingPackCopiedField(null);
+                setEbayPublishConfirm(false);
               }}
             />
           )}
@@ -5196,12 +5257,18 @@ function ListingPackSheet({
   copiedField,
   busy,
   nextListingLabel,
+  ebayStatus,
+  ebayPublishConfirm,
   onCopy,
   onCopyField,
   onActivate,
   onSell,
   onNext,
   onClose,
+  onCreateOffer,
+  onRequestPublish,
+  onConfirmPublish,
+  onCancelPublish,
 }: {
   listing: Listing;
   pack: ListingPack;
@@ -5209,12 +5276,18 @@ function ListingPackSheet({
   copiedField: string | null;
   busy: boolean;
   nextListingLabel: string | null;
+  ebayStatus: EbayStatus | null;
+  ebayPublishConfirm: boolean;
   onCopy: () => void;
   onCopyField: (field: ListingPackCopyField) => void;
   onActivate: () => void;
   onSell: (listing: Listing) => void;
   onNext: () => void;
   onClose: () => void;
+  onCreateOffer: () => void;
+  onRequestPublish: () => void;
+  onConfirmPublish: () => void;
+  onCancelPublish: () => void;
 }) {
   const item = listing.item;
   const specifics = Object.entries(pack.itemSpecifics);
@@ -5222,6 +5295,12 @@ function ListingPackSheet({
   const venueAction = listingVenueAction(listing.channel);
   const canActivate = listing.state === "DRAFT";
   const canSell = Boolean(item && item.status !== "SOLD" && listing.state !== "SOLD");
+
+  const isEbayListing = listing.channel === "EBAY";
+  const ebayConfigured = Boolean(ebayStatus?.configured);
+  const ebayConnected = Boolean(ebayStatus?.connected);
+  const hasOffer = Boolean(listing.externalRef?.startsWith("offer:"));
+  const isPublished = Boolean(listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl);
 
   return (
     <form className="sell-sheet listing-pack-sheet" onSubmit={(event) => event.preventDefault()}>
@@ -5298,6 +5377,60 @@ function ListingPackSheet({
           </button>
         )}
       </div>
+      {isEbayListing && (
+        <div className="listing-pack-ebay-actions">
+          {!ebayConfigured ? null : !ebayConnected ? (
+            <a className="ghost-button" href="/api/ebay/connect">
+              Connect eBay
+            </a>
+          ) : isPublished ? (
+            <a
+              className="export-link"
+              href={listing.externalUrl!}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View on eBay
+            </a>
+          ) : hasOffer && !ebayPublishConfirm ? (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={onRequestPublish}
+              disabled={busy}
+            >
+              {busy ? "Working..." : "Publish to eBay"}
+            </button>
+          ) : hasOffer && ebayPublishConfirm ? (
+            <div className="ebay-publish-confirm">
+              <p>
+                <strong>Confirm publish to eBay</strong>
+                <small>
+                  {pack.title} · {gbp(pack.suggestedPricePence)} ·{" "}
+                  {pack.postage.service}
+                </small>
+              </p>
+              <div>
+                <button className="primary-action" type="button" onClick={onConfirmPublish} disabled={busy}>
+                  {busy ? "Publishing..." : "Yes, publish live"}
+                </button>
+                <button className="ghost-button" type="button" onClick={onCancelPublish} disabled={busy}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={onCreateOffer}
+              disabled={busy}
+            >
+              {busy ? "Creating offer..." : "Create eBay offer"}
+            </button>
+          )}
+        </div>
+      )}
     </form>
   );
 }
@@ -5532,7 +5665,7 @@ function ListingRow({
           {channelLabel(listing.channel)}
           {listing.item?.card.setName ? ` · ${listing.item.card.setName}` : ""}
           {stockNotes ? ` · ${stockNotes}` : ""}
-          {listing.externalUrl ? " · URL saved" : ""}
+          {listing.externalRef?.startsWith("offer:") ? " · offer pending" : listing.externalUrl ? " · eBay live" : listing.externalRef ? " · ref saved" : ""}
         </p>
         <p>{gbp(price)}</p>
         <div className="row-actions">

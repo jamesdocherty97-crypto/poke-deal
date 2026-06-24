@@ -1,0 +1,119 @@
+// eBay Offer API helpers.
+// Creates, looks up by SKU, and publishes eBay offers for a FIXED_PRICE listing.
+
+import type { EbayConfig } from "./config.js";
+import { ebayJson } from "./client.js";
+import type { ListingPack } from "../dealer/listingPack.js";
+import type { EbayPolicies } from "./policies.js";
+import { EBAY_UK_CATEGORY_POKEMON } from "./config.js";
+
+export interface EbayOfferPayload {
+  sku: string;
+  marketplaceId: string;
+  format: "FIXED_PRICE";
+  availableQuantity: number;
+  categoryId: string;
+  listingDescription: string;
+  listingPolicies: {
+    fulfillmentPolicyId: string;
+    paymentPolicyId: string;
+    returnPolicyId: string;
+  };
+  pricingSummary: {
+    price: { value: string; currency: "GBP" };
+  };
+  merchantLocationKey?: string;
+  includeCatalogProductDetails: boolean;
+}
+
+export interface EbayOfferResponse {
+  offerId: string;
+}
+
+export interface EbayPublishResponse {
+  listingId: string;
+}
+
+export function buildOfferPayload(
+  sku: string,
+  pack: ListingPack,
+  policies: EbayPolicies,
+  config: EbayConfig,
+  categoryId = EBAY_UK_CATEGORY_POKEMON,
+): EbayOfferPayload {
+  const priceGbp = (pack.suggestedPricePence / 100).toFixed(2);
+
+  const payload: EbayOfferPayload = {
+    sku,
+    marketplaceId: config.marketplaceId,
+    format: "FIXED_PRICE",
+    availableQuantity: 1,
+    categoryId,
+    listingDescription: pack.description,
+    listingPolicies: {
+      fulfillmentPolicyId: policies.fulfillmentPolicyId,
+      paymentPolicyId: policies.paymentPolicyId,
+      returnPolicyId: policies.returnPolicyId,
+    },
+    pricingSummary: {
+      price: { value: priceGbp, currency: "GBP" },
+    },
+    includeCatalogProductDetails: false,
+  };
+
+  if (policies.merchantLocationKey) {
+    payload.merchantLocationKey = policies.merchantLocationKey;
+  }
+
+  return payload;
+}
+
+export async function createEbayOffer(
+  config: EbayConfig,
+  payload: EbayOfferPayload,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EbayOfferResponse> {
+  return ebayJson<EbayOfferResponse>(
+    config,
+    "/sell/inventory/v1/offer",
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+    fetchImpl,
+  );
+}
+
+export async function getOfferBySku(
+  config: EbayConfig,
+  sku: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  try {
+    const result = await ebayJson<{ offers?: Array<{ offerId?: string }> }>(
+      config,
+      `/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}&marketplace_id=${config.marketplaceId}`,
+      accessToken,
+      {},
+      fetchImpl,
+    );
+    return result.offers?.[0]?.offerId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function publishEbayOffer(
+  config: EbayConfig,
+  offerId: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EbayPublishResponse> {
+  return ebayJson<EbayPublishResponse>(
+    config,
+    `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}/publish`,
+    accessToken,
+    { method: "POST", body: JSON.stringify({}) },
+    fetchImpl,
+  );
+}

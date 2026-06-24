@@ -1,0 +1,45 @@
+// eBay REST API fetch wrapper.
+// Adds Authorization + marketplace headers. Throws on non-ok with eBay error detail.
+
+import type { EbayConfig } from "./config.js";
+
+export async function ebayFetch(
+  config: EbayConfig,
+  path: string,
+  accessToken: string,
+  options: RequestInit & { marketplaceId?: string } = {},
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  const { marketplaceId, headers: extraHeaders, ...rest } = options;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(marketplaceId ? { "X-EBAY-C-MARKETPLACE-ID": marketplaceId } : {}),
+    ...(extraHeaders as Record<string, string> | undefined ?? {}),
+  };
+  return fetchImpl(`${config.apiBaseUrl}${path}`, { ...rest, headers });
+}
+
+export async function ebayJson<T>(
+  config: EbayConfig,
+  path: string,
+  accessToken: string,
+  options: RequestInit & { marketplaceId?: string } = {},
+  fetchImpl: typeof fetch = fetch,
+): Promise<T> {
+  const response = await ebayFetch(config, path, accessToken, options, fetchImpl);
+  if (!response.ok) {
+    let msg = `HTTP ${response.status}`;
+    try {
+      const body = (await response.json()) as {
+        errors?: Array<{ longMessage?: string; message?: string }>;
+      };
+      msg = body.errors?.[0]?.longMessage ?? body.errors?.[0]?.message ?? msg;
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(`eBay API (${path}): ${msg}`);
+  }
+  return (await response.json()) as T;
+}
