@@ -90,6 +90,25 @@ test("buildPokemonTcgSearchQueries keeps unavailable promo sets strict", () => {
   ]);
 });
 
+test("buildPokemonTcgSearchQueries keeps future promo prefixes from falling back to name-only", () => {
+  assert.deepEqual(
+    buildPokemonTcgSearchQueries({
+      name: "Snivy",
+      setName: "Future Promos",
+      number: "XYZ001",
+    }),
+    ['name:"Snivy" number:"XYZ001"'],
+  );
+
+  assert.deepEqual(
+    buildPokemonTcgSearchQueries({
+      name: "Snivy",
+      number: "XYZ001",
+    }),
+    ['name:"Snivy" number:"XYZ001"'],
+  );
+});
+
 test("buildPokemonTcgSearchQueries drops the set term entirely when it can't be resolved", () => {
   const queries = buildPokemonTcgSearchQueries({
     name: "Charizard",

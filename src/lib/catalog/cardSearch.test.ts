@@ -99,6 +99,13 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     setName: "Mega Evolution Promos",
     number: "049",
   });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Hitmontop Neo Genesis 1st Edition LP"), {
+    query: "Hitmontop",
+    name: "Hitmontop",
+    setName: "Neo Genesis",
+    number: undefined,
+  });
 });
 
 test("rankCatalogCards treats shortened prefixed subset totals as equivalent", () => {

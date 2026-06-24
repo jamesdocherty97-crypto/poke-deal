@@ -203,6 +203,7 @@ export function buildPokemonTcgSearchQueries(card: CardRef): string[] {
 
   const resolvedSetId = resolveSetIdForCard(card.setName, card.number);
   const setTerm = resolvedSetId ? `set.id:${resolvedSetId}` : undefined;
+  const strictPromoLookup = shouldKeepPromoLookupStrict(card, resolvedSetId);
 
   const queries: string[] = [];
   const seen = new Set<string>();
@@ -222,10 +223,12 @@ export function buildPokemonTcgSearchQueries(card: CardRef): string[] {
       addQuery(relaxedNameTerm, numberTerm, setTerm);
     }
   }
-  addQuery(nameTerm, setTerm);
-  if (relaxedNameTerm) addQuery(relaxedNameTerm, setTerm);
+  if (setTerm) {
+    addQuery(nameTerm, setTerm);
+    if (relaxedNameTerm) addQuery(relaxedNameTerm, setTerm);
+  }
 
-  if (isApiUnavailableSetId(resolvedSetId)) return queries;
+  if (strictPromoLookup) return queries;
 
   for (const numberTerm of numberTerms) {
     addQuery(nameTerm, numberTerm);
@@ -413,6 +416,13 @@ function buildRelaxedNameTerm(name: string): string | undefined {
   const firstUsefulToken = tokens.find((token) => token.length >= 3);
   if (!firstUsefulToken || tokens.length <= 1) return undefined;
   return `name:${firstUsefulToken}`;
+}
+
+function shouldKeepPromoLookupStrict(card: CardRef, resolvedSetId: string | undefined): boolean {
+  if (isApiUnavailableSetId(resolvedSetId)) return true;
+  const setText = card.setName?.trim() ?? "";
+  if (setText && !resolvedSetId && /\bpromos?\b/i.test(setText)) return true;
+  return Boolean(card.number && /^[A-Za-z]{2,5}\s*0?\d{1,4}/.test(card.number.trim()) && !resolvedSetId);
 }
 
 function stripPromoPrefixForApiNumber(number: string): string | undefined {

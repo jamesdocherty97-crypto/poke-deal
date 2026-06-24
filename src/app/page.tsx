@@ -21,7 +21,7 @@ import {
 } from "@/lib/dealer/quickHunts";
 import { parseRecentSetIds, pinRecentSetId } from "@/lib/dealer/recentSets";
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
-import { buildManualCompLinks } from "@/lib/dealer/compLinks";
+import { buildManualCompLinks, cardSearchQuery, normalizeManualCompSearchText } from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
@@ -382,6 +382,7 @@ export default function Home() {
   const [setNameValue, setSetNameValue] = useState("151");
   const [number, setNumber] = useState("199/165");
   const [quickIntake, setQuickIntake] = useState("");
+  const [manualCompQuery, setManualCompQuery] = useState("");
   const [stockImportText, setStockImportText] = useState("");
   const [grade, setGrade] = useState<Grade>("RAW");
   const [cost, setCost] = useState("18.00");
@@ -727,17 +728,21 @@ export default function Home() {
   const ownedSalesComp =
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
+  const manualCompCard = useMemo(
+    () => ({
+      name: catalogCard?.name ?? name,
+      setName: catalogCard?.setName ?? setNameValue,
+      number: catalogCard?.number ?? number,
+    }),
+    [catalogCard?.name, catalogCard?.number, catalogCard?.setName, name, number, setNameValue],
+  );
+  const manualCompFallbackQuery = useMemo(
+    () => cardSearchQuery(manualCompCard, { condition }),
+    [condition, manualCompCard],
+  );
   const manualCompLinks = useMemo(
-    () =>
-      buildManualCompLinks(
-        {
-          name: catalogCard?.name ?? name,
-          setName: catalogCard?.setName ?? setNameValue,
-          number: catalogCard?.number ?? number,
-        },
-        grade,
-      ),
-    [catalogCard?.name, catalogCard?.number, catalogCard?.setName, grade, name, number, setNameValue],
+    () => buildManualCompLinks(manualCompCard, grade, { searchText: manualCompQuery, condition }),
+    [condition, grade, manualCompCard, manualCompQuery],
   );
   const compSpreadPct = useMemo(() => (compForReceipt ? medianSpreadPct(compForReceipt.all) : null), [compForReceipt]);
   const dealerVerdict = useMemo(
@@ -1157,6 +1162,7 @@ export default function Home() {
     setCardArtUrl(null);
     setGradeComp(null);
     setListPriceOverride("");
+    setManualCompQuery("");
     clearCheckedComp();
     setGraderCert("");
   }
@@ -1164,6 +1170,7 @@ export default function Home() {
   function applyQuickIntake(options: { lookupAfter?: boolean } = {}) {
     const parsed = parseQuickIntake(quickIntake);
     const filled: string[] = [];
+    const manualQuery = normalizeManualCompSearchText(quickIntake);
     const nextLookup: LookupInput = {
       name: parsed.name ?? name,
       setName: parsed.setName ?? setNameValue,
@@ -1207,6 +1214,9 @@ export default function Home() {
     if (parsed.condition) {
       setCondition(parsed.condition);
       filled.push("condition");
+    }
+    if (manualQuery) {
+      setManualCompQuery(manualQuery);
     }
 
     if (filled.length === 0) {
@@ -1668,6 +1678,7 @@ export default function Home() {
     setSuggestion(null);
     setCardArtUrl(card.imageUrl ?? null);
     setGradeComp(null);
+    setManualCompQuery("");
     clearCheckedComp();
     setNotice(null);
     setError(null);
@@ -1697,6 +1708,7 @@ export default function Home() {
     setSetNameValue(set.name);
     setSetSuggestionsOpen(false);
     pinRecentSet(set.id);
+    setManualCompQuery("");
     clearCheckedComp();
   }
 
@@ -1707,6 +1719,7 @@ export default function Home() {
     if (card.number) setNumber(card.number);
     if (card.imageUrl) setCardArtUrl(card.imageUrl);
     setCardSuggestionsOpen(false);
+    setManualCompQuery("");
     clearCheckedComp();
     setError(null);
   }
@@ -2615,6 +2628,7 @@ export default function Home() {
                 value={name}
                 onChange={(event) => {
                   setName(event.target.value);
+                  setManualCompQuery("");
                   clearCheckedComp();
                 }}
                 onFocus={() => setCardSuggestionsOpen(true)}
@@ -2651,6 +2665,7 @@ export default function Home() {
                   value={setNameValue}
                   onChange={(event) => {
                     setSetNameValue(event.target.value);
+                    setManualCompQuery("");
                     clearCheckedComp();
                   }}
                   onFocus={() => setSetSuggestionsOpen(true)}
@@ -2676,6 +2691,7 @@ export default function Home() {
                   value={number}
                   onChange={(event) => {
                     setNumber(event.target.value);
+                    setManualCompQuery("");
                     clearCheckedComp();
                   }}
                   placeholder="199/165"
@@ -2939,6 +2955,14 @@ export default function Home() {
               )}
               <div className="manual-comp-links" aria-label="Manual comp checks">
                 <span>Manual checks</span>
+                <label className="manual-comp-search">
+                  <span>Search</span>
+                  <input
+                    value={manualCompQuery}
+                    onChange={(event) => setManualCompQuery(event.target.value)}
+                    placeholder={manualCompFallbackQuery || "Hitmontop Neo Genesis 1st Edition LP"}
+                  />
+                </label>
                 {manualCompLinks.map((link) => (
                   <a key={link.kind} href={link.url} target="_blank" rel="noreferrer">
                     {link.label}

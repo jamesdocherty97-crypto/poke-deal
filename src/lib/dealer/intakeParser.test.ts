@@ -40,6 +40,12 @@ test("parseQuickIntake resolves vintage dealer shorthand", () => {
     setName: "Base",
     number: "4/102",
   });
+
+  assert.deepEqual(parseQuickIntake("Hitmontop Neo Genesis 1st Edition LP"), {
+    name: "Hitmontop 1st Edition",
+    setName: "Neo Genesis",
+    condition: "LP",
+  });
 });
 
 test("parseQuickIntake resolves Mega Evolution promo shorthand", () => {
@@ -55,6 +61,13 @@ test("parseQuickIntake resolves Mega Evolution promo shorthand", () => {
     name: "Snivy",
     setName: "Mega Evolution Promos",
     number: "MEP049",
+    grade: "RAW",
+    cost: "2.00",
+  });
+
+  assert.deepEqual(parseQuickIntake("Snivy XYZ001 raw £2"), {
+    name: "Snivy",
+    number: "XYZ001",
     grade: "RAW",
     cost: "2.00",
   });

@@ -1,4 +1,4 @@
-import { getSetById, searchSets, resolveSetIdForCard } from "../catalog/setCatalog.js";
+import { getSetById, searchSets, resolveExactSetId, resolveSetIdForCard } from "../catalog/setCatalog.js";
 import { normalizeSearchText, tokenizeSearchText, tokenMatches } from "../catalog/fuzzy.js";
 import type { Grade } from "../domain/types.js";
 
@@ -23,9 +23,11 @@ interface SetMatch {
 }
 
 const NUMBER_PATTERNS = [
-  /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,3}\s*\/\s*(?:TG|GG|SV|MEP)?\s*0?\d{1,3}\b/i,
+  /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,4}\s*\/\s*(?:TG|GG|SV|MEP)?\s*0?\d{1,4}\b/i,
+  /\b(?!SET\b)[A-Z]{2,5}0?\d{1,4}\s*\/\s*[A-Z]{0,5}\s*0?\d{1,4}\b/i,
   /\b\d{1,3}\s*\/\s*\d{1,3}\b/i,
-  /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,3}\b/i,
+  /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,4}\b/i,
+  /\b(?!SET\b)[A-Z]{2,5}0?\d{1,4}\b/i,
 ];
 
 const SUPPORTED_QUICK_GRADES = new Set<ParsedQuickIntakeGrade>([
@@ -298,7 +300,7 @@ function normalizeCollectorNumber(value: string): string {
 function inferSetNameFromCollectorNumber(number: string): string | undefined {
   const prefix = number.match(/^([A-Z]{2,5})\d{1,4}/)?.[1];
   if (!prefix) return undefined;
-  const setId = resolveSetIdForCard(prefix, number);
+  const setId = resolveExactSetId(prefix);
   return setId ? getSetById(setId)?.name : undefined;
 }
 

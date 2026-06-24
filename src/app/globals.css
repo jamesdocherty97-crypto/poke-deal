@@ -2129,7 +2129,7 @@ label {
 
 .manual-comp-links {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   align-items: center;
   border: 1px solid rgba(255, 203, 5, 0.22);
@@ -2144,6 +2144,22 @@ label {
   color: #fff2a6;
   font-size: 12px;
   font-weight: 1000;
+}
+
+.manual-comp-search {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 5px;
+}
+
+.manual-comp-search span {
+  grid-column: auto;
+}
+
+.manual-comp-search input {
+  min-height: 38px;
+  border-color: rgba(255, 203, 5, 0.28);
+  background: rgba(3, 8, 20, 0.42);
 }
 
 .manual-comp-links a {
