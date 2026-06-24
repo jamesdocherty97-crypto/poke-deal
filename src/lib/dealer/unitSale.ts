@@ -25,6 +25,23 @@ export interface UnitSaleUndoPlan {
   restoredQuantity: number;
 }
 
+export interface SalePreviewInput {
+  salePricePence: number;
+  feesPence: number;
+  postagePence: number;
+  unitCostPence: number;
+  soldQuantity: number;
+}
+
+export interface SalePreview {
+  soldQuantity: number;
+  netPence: number;
+  costPence: number;
+  profitPence: number;
+  roiPct: number | null;
+  marginPct: number | null;
+}
+
 export type SaleListingClosure =
   | { kind: "all-open"; itemId: string }
   | { kind: "one"; itemId: string; listingId: string }
@@ -104,4 +121,28 @@ export function splitPence(totalPence: number, parts: number): number[] {
     remainder -= 1;
     return value;
   });
+}
+
+export function buildSalePreview(input: SalePreviewInput): SalePreview {
+  const soldQuantity = Math.max(1, Math.floor(input.soldQuantity));
+  const salePricePence = Math.max(0, Math.round(input.salePricePence));
+  const feesPence = Math.max(0, Math.round(input.feesPence));
+  const postagePence = Math.max(0, Math.round(input.postagePence));
+  const unitCostPence = Math.max(0, Math.round(input.unitCostPence));
+  const netPence = salePricePence - feesPence - postagePence;
+  const costPence = unitCostPence * soldQuantity;
+  const profitPence = netPence - costPence;
+
+  return {
+    soldQuantity,
+    netPence,
+    costPence,
+    profitPence,
+    roiPct: costPence > 0 ? roundPct(profitPence / costPence) : null,
+    marginPct: salePricePence > 0 ? roundPct(profitPence / salePricePence) : null,
+  };
+}
+
+function roundPct(value: number): number {
+  return Math.round(value * 1000) / 10;
 }

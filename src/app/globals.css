@@ -3774,6 +3774,13 @@ label {
   line-height: 1.08;
 }
 
+.sale-preview small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
 .sale-preview.good strong {
   color: var(--green);
 }

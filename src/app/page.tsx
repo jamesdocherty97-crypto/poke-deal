@@ -71,13 +71,13 @@ import {
   serializeIntakePreferences,
 } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
+import { buildSalePreview } from "@/lib/dealer/unitSale";
 import { checkEbayReadiness } from "@/lib/ebay/readiness";
 import {
   buyerPaidPostagePence,
   breakEvenSalePricePence,
   defaultGrossSalePence,
   estimateSaleCosts,
-  saleNetPence,
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
@@ -810,17 +810,14 @@ export default function Home() {
   const salePreview = useMemo(() => {
     if (!sellingItem) return null;
     const soldQuantity = parseIntakeQuantity(saleQuantity) ?? 0;
-    const salePricePence = poundsToPence(salePrice);
-    const feesPence = poundsToPence(fees);
-    const postagePence = poundsToPence(postage);
-    const netPence = saleNetPence({ salePricePence, feesPence, postagePence });
-    const costPence = sellingItem.costBasis * soldQuantity;
-    return {
+    if (soldQuantity <= 0) return null;
+    return buildSalePreview({
+      salePricePence: poundsToPence(salePrice),
+      feesPence: poundsToPence(fees),
+      postagePence: poundsToPence(postage),
+      unitCostPence: sellingItem.costBasis,
       soldQuantity,
-      netPence,
-      costPence,
-      profitPence: netPence - costPence,
-    };
+    });
   }, [fees, postage, salePrice, saleQuantity, sellingItem]);
   const apiHeadline = comp?.headline ?? null;
   const catalogCard = comp?.catalog ?? null;
@@ -5550,14 +5547,17 @@ export default function Home() {
               <div>
                 <span>Net</span>
                 <strong>{gbp(salePreview.netPence)}</strong>
+                <small>After fees + post</small>
               </div>
               <div>
                 <span>Cost</span>
                 <strong>{gbp(salePreview.costPence)}</strong>
+                <small>{salePreview.soldQuantity} sold</small>
               </div>
               <div>
                 <span>Profit</span>
                 <strong>{gbp(salePreview.profitPence)}</strong>
+                <small>{formatPct(salePreview.roiPct)} ROI · {formatPct(salePreview.marginPct)} margin</small>
               </div>
             </div>
           )}
