@@ -9,27 +9,17 @@ import {
   resolveCatalogCard,
 } from "@/lib/comps/appCompLookup";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
+import { readCompLookupRequest } from "@/lib/comps/request";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
-import type { CardRef, Grade } from "@/lib/domain/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const name = searchParams.get("name");
-  if (!name) {
-    return NextResponse.json({ error: "name is required" }, { status: 400 });
-  }
-
-  const card: CardRef = {
-    name,
-    setName: searchParams.get("set") ?? undefined,
-    number: searchParams.get("number") ?? undefined,
-    game: "POKEMON",
-    language: "EN",
-  };
-  const grade = (searchParams.get("grade") as Grade | null) ?? "RAW";
+  const lookup = readCompLookupRequest(searchParams);
+  if ("error" in lookup) return NextResponse.json({ error: lookup.error }, { status: 400 });
+  const { card, grade } = lookup;
 
   try {
     const catalogSource = new PokemonTcgApiCatalogSource();
