@@ -767,9 +767,11 @@ export default function Home() {
     () => cardSearchQuery(manualCompCard, { condition }),
     [condition, manualCompCard],
   );
+  const quickIntakeManualQuery = useMemo(() => normalizeManualCompSearchText(quickIntake), [quickIntake]);
+  const manualCompSearchText = manualCompQuery || quickIntakeManualQuery;
   const manualCompLinks = useMemo(
-    () => buildManualCompLinks(manualCompCard, grade, { searchText: manualCompQuery, condition }),
-    [condition, grade, manualCompCard, manualCompQuery],
+    () => buildManualCompLinks(manualCompCard, grade, { searchText: manualCompSearchText, condition }),
+    [condition, grade, manualCompCard, manualCompSearchText],
   );
   const compSpreadPct = useMemo(() => (compForReceipt ? medianSpreadPct(compForReceipt.all) : null), [compForReceipt]);
   const dealerVerdict = useMemo(
@@ -2551,10 +2553,15 @@ export default function Home() {
           <input
             value={manualCompQuery}
             onChange={(event) => setManualCompQuery(event.target.value)}
-            placeholder={manualCompFallbackQuery || "Hitmontop Neo Genesis 1st Edition LP"}
+            placeholder={quickIntakeManualQuery || manualCompFallbackQuery || "Hitmontop Neo Genesis 1st Edition LP"}
           />
         </label>
         <div className="manual-comp-actions">
+          {quickIntakeManualQuery && quickIntakeManualQuery !== manualCompQuery && (
+            <button type="button" onClick={() => setManualCompQuery(quickIntakeManualQuery)}>
+              Use typed
+            </button>
+          )}
           <button type="button" onClick={() => setManualCompQuery(manualCompFallbackQuery)} disabled={!manualCompFallbackQuery.trim()}>
             Use fields
           </button>
