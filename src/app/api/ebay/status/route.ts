@@ -30,6 +30,7 @@ export async function GET() {
       connected: true,
       env: config.env,
       marketplaceId: config.marketplaceId,
+      hasPolicies: Boolean(policies.paymentPolicyId && policies.fulfillmentPolicyId && policies.returnPolicyId),
       policies,
     });
   } catch (err) {

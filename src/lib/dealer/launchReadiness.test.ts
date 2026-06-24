@@ -53,6 +53,9 @@ test("buildLaunchReadiness marks operating systems done when they are ready", ()
     livePrimaryComps: true,
     liveCatalogKey: true,
     secondaryCrossCheck: true,
+    ebayConfigured: true,
+    ebayConnected: true,
+    ebayHasPolicies: true,
     alertDelivery: true,
     stockCount: 6,
     draftListings: 0,
@@ -64,7 +67,31 @@ test("buildLaunchReadiness marks operating systems done when they are ready", ()
 
   assert.equal(items.find((item) => item.id === "live-comps")?.state, "done");
   assert.equal(items.find((item) => item.id === "cross-check")?.state, "done");
+  assert.equal(items.find((item) => item.id === "ebay-automation")?.state, "done");
   assert.equal(items.find((item) => item.id === "alerts")?.state, "done");
   assert.equal(items.find((item) => item.id === "listing-pipeline")?.state, "done");
   assert.equal(items.find((item) => item.id === "sale-loop")?.state, "done");
+});
+
+test("buildLaunchReadiness flags eBay policy setup after account connection", () => {
+  const items = buildLaunchReadiness({
+    livePrimaryComps: true,
+    liveCatalogKey: true,
+    secondaryCrossCheck: true,
+    ebayConfigured: true,
+    ebayConnected: true,
+    ebayHasPolicies: false,
+    alertDelivery: false,
+    stockCount: 1,
+    draftListings: 1,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 0,
+  });
+
+  const ebay = items.find((item) => item.id === "ebay-automation");
+
+  assert.equal(ebay?.state, "warn");
+  assert.match(ebay?.detail ?? "", /payment, postage and return policies/);
 });

@@ -5,6 +5,9 @@ export interface LaunchReadinessInput {
   livePrimaryComps: boolean;
   liveCatalogKey: boolean;
   secondaryCrossCheck: boolean;
+  ebayConfigured?: boolean;
+  ebayConnected?: boolean;
+  ebayHasPolicies?: boolean;
   alertDelivery: boolean;
   stockCount: number;
   draftListings: number;
@@ -28,6 +31,7 @@ export function buildLaunchReadiness(input: LaunchReadinessInput): LaunchReadine
   const items: LaunchReadinessItem[] = [
     buildCompReadiness(input),
     buildCrossCheckReadiness(input),
+    buildEbayReadiness(input),
     buildListingReadiness(input),
     buildSaleReadiness(input),
     buildAlertReadiness(input),
@@ -48,6 +52,54 @@ export function buildLaunchReadiness(input: LaunchReadinessInput): LaunchReadine
   }
 
   return items.sort((left, right) => readinessRank(right.state) - readinessRank(left.state) || right.priority - left.priority);
+}
+
+function buildEbayReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
+  if (input.ebayConnected && input.ebayHasPolicies) {
+    return {
+      id: "ebay-automation",
+      title: "eBay automation",
+      detail: "Seller account and policies are ready for offer creation.",
+      state: "done",
+      action: "Listings",
+      target: "listings",
+      priority: 86,
+    };
+  }
+
+  if (input.ebayConnected && !input.ebayHasPolicies) {
+    return {
+      id: "ebay-automation",
+      title: "eBay automation",
+      detail: "Account is connected. Add payment, postage and return policies before creating offers.",
+      state: "warn",
+      action: "Setup",
+      target: "external",
+      priority: 86,
+    };
+  }
+
+  if (input.ebayConfigured) {
+    return {
+      id: "ebay-automation",
+      title: "eBay automation",
+      detail: "Connect the seller account before pushing listing offers from the app.",
+      state: "warn",
+      action: "Setup",
+      target: "external",
+      priority: 86,
+    };
+  }
+
+  return {
+    id: "ebay-automation",
+    title: "eBay automation",
+    detail: "Add eBay production credentials when you are ready to automate listings.",
+    state: "next",
+    action: "Setup",
+    target: "external",
+    priority: 46,
+  };
 }
 
 function buildCompReadiness(input: LaunchReadinessInput): LaunchReadinessItem {

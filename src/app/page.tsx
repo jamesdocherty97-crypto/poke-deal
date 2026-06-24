@@ -224,6 +224,13 @@ type EbayStatus = {
   connected: boolean;
   env?: string;
   marketplaceId?: string;
+  hasPolicies?: boolean;
+  policies?: {
+    paymentPolicyId?: string;
+    fulfillmentPolicyId?: string;
+    returnPolicyId?: string;
+    merchantLocationKey?: string | null;
+  };
   error?: string;
 };
 
@@ -873,14 +880,17 @@ export default function Home() {
       card.setName.trim().toLowerCase() === setNameValue.trim().toLowerCase() &&
       card.number.trim().toLowerCase() === number.trim().toLowerCase(),
   );
+  const hasActiveCardIdentity = Boolean(name.trim() || setNameValue.trim() || number.trim() || comp);
   const selectedCardImage = cardArtUrl ?? catalogCard?.imageUrl ?? matchingQuickHunt?.imageUrl ?? null;
   const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
   const spotlightImage =
     selectedCardImage ??
-    activeInventory.find((item) => item.card.imageUrl)?.card.imageUrl ??
-    listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
-    quickHunts[0]?.imageUrl ??
-    null;
+    (hasActiveCardIdentity
+      ? null
+      : activeInventory.find((item) => item.card.imageUrl)?.card.imageUrl ??
+        listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
+        quickHunts[0]?.imageUrl ??
+        null);
   const marketBaseline =
     comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
   const ownedSalesComp =
@@ -913,6 +923,11 @@ export default function Home() {
   const dealerVerdict = useMemo(
     () => (checkedComp ? null : compForReceipt ? buildDealerCompVerdict(compForReceipt) : null),
     [checkedComp, compForReceipt],
+  );
+  const shouldOfferManualComp = Boolean(
+    headline &&
+      !checkedComp &&
+      (needsManualComp || !catalogCard || comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
   );
   const confidenceLabel = dealerVerdict
     ? { label: dealerVerdict.label, tone: dealerVerdict.tone }
@@ -1046,6 +1061,33 @@ export default function Home() {
   const draftListingCount = Number(dashboard?.listingsByState.DRAFT ?? 0);
   const activeListingCount = Number(dashboard?.listingsByState.ACTIVE ?? 0);
   const activeWatchCount = watches.filter((watch) => watch.active).length;
+  const ebayPolicies = ebayStatus?.policies;
+  const ebayHasPolicies = Boolean(
+    ebayStatus?.hasPolicies ||
+      (ebayPolicies?.paymentPolicyId && ebayPolicies.fulfillmentPolicyId && ebayPolicies.returnPolicyId),
+  );
+  const ebayHealthSource = useMemo<SystemSource>(
+    () => ({
+      id: "ebay-sell-api",
+      label: "eBay Sell API",
+      role: "listing offer automation",
+      status: ebayStatus?.connected && ebayHasPolicies ? "ready" : ebayStatus?.connected ? "building" : "missing",
+      required: false,
+      setupHint:
+        ebayStatus?.connected && ebayHasPolicies
+          ? "Seller account and business policies are ready for app-created offers."
+          : ebayStatus?.connected
+            ? "Seller account is connected; finish business policies before offer creation."
+            : ebayStatus?.configured
+              ? "Seller credentials are present; connect the eBay account to create offers."
+              : "Add production eBay credentials when you are ready to automate listing offers.",
+    }),
+    [ebayHasPolicies, ebayStatus?.configured, ebayStatus?.connected],
+  );
+  const setupSources = useMemo(
+    () => (systemStatus ? [...systemStatus.sources, ebayHealthSource] : []),
+    [ebayHealthSource, systemStatus],
+  );
   const unlistedStock = useMemo(
     () =>
       activeInventory.filter(
@@ -1091,6 +1133,9 @@ export default function Home() {
             livePrimaryComps: systemStatus.summary.livePrimaryComps,
             liveCatalogKey: systemStatus.summary.liveCatalogKey,
             secondaryCrossCheck: systemStatus.summary.secondaryCrossCheck,
+            ebayConfigured: Boolean(ebayStatus?.configured),
+            ebayConnected: Boolean(ebayStatus?.connected),
+            ebayHasPolicies,
             alertDelivery: systemStatus.summary.alertDelivery,
             stockCount: dashboard?.metrics.stockCount ?? activeInventory.length,
             draftListings: draftListingCount,
@@ -1108,6 +1153,9 @@ export default function Home() {
       dashboard?.metrics.soldCount,
       dashboard?.metrics.stockCount,
       draftListingCount,
+      ebayHasPolicies,
+      ebayStatus?.configured,
+      ebayStatus?.connected,
       soldInventory.length,
       systemStatus?.summary.alertDelivery,
       systemStatus?.summary.liveCatalogKey,
@@ -3165,7 +3213,7 @@ export default function Home() {
               </span>
             </div>
             <div className="source-health-list">
-              {(systemStatus?.sources ?? []).map((source) => (
+              {setupSources.map((source) => (
                 <SourceHealthRow key={source.id} source={source} />
               ))}
             </div>
@@ -3688,7 +3736,25 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {needsManualComp && renderManualCompLinks("priority")}
+              {shouldOfferManualComp && !needsManualComp && (
+                <div className="manual-rescue-card soft">
+                  <div>
+                    <span>Worth a quick check</span>
+                    <strong>
+                      {!catalogCard
+                        ? "Catalog image missing"
+                        : comp?.sourcesDisagree
+                          ? "Sources disagree"
+                          : "Confidence is cautious"}
+                    </strong>
+                  </div>
+                  <ol>
+                    <li>Open eBay UK solds before buying bigger quantities.</li>
+                    <li>Use the exact typed wording for promos, editions and condition.</li>
+                  </ol>
+                </div>
+              )}
+              {shouldOfferManualComp && renderManualCompLinks(needsManualComp ? "priority" : "compact")}
               {needsManualComp && renderCheckedCompCard("priority")}
               {!needsManualComp && deal && (
                 <div className={`deal-banner ${deal.tone}`}>
@@ -3852,7 +3918,7 @@ export default function Home() {
                     alt=""
                   />
                   <div>
-                    <span>Source match</span>
+                    <span>{apiHeadline?.source ? `Source match · ${apiHeadline.source}` : "Source match"}</span>
                     <strong>{sourceMatchedCard.name}</strong>
                     <small>
                       {sourceMatchedCard.setName ?? "No set"}
@@ -3860,6 +3926,12 @@ export default function Home() {
                     </small>
                   </div>
                 </div>
+              )}
+              {!catalogCard && headline.medianPence > 0 && (
+                <p className="hint">
+                  Card art/catalog was not found, so the price is coming from source matching. Use manual checks for promos,
+                  very new sets or unusual variants before relying on the image or set identity.
+                </p>
               )}
               {headline.raw?.chosenPriceSource === "smartMarketPrice" && (
                 <p className="hint">

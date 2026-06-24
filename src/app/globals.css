@@ -2199,6 +2199,13 @@ label {
   padding: 11px;
 }
 
+.manual-rescue-card.soft {
+  border-color: rgba(255, 203, 5, 0.3);
+  background:
+    linear-gradient(125deg, rgba(255, 203, 5, 0.12), transparent 54%),
+    rgba(3, 8, 20, 0.42);
+}
+
 .manual-rescue-card div {
   display: grid;
   gap: 3px;
@@ -2216,6 +2223,10 @@ label {
   color: var(--danger);
   font-size: 17px;
   line-height: 1.12;
+}
+
+.manual-rescue-card.soft strong {
+  color: var(--yellow);
 }
 
 .manual-rescue-card ol {
