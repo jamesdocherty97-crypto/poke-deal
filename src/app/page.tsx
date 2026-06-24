@@ -6222,6 +6222,14 @@ function ListingRow({
   const card = listing.item?.card;
   const title = listing.title ?? card?.name ?? "Untitled listing";
   const price = listing.listPrice ?? listing.suggestedPrice ?? 0;
+  const economics = listing.item
+    ? buildListingEconomics({
+        channel: listing.channel,
+        grade: listing.item.grade,
+        itemPricePence: price,
+        costBasisPence: listing.item.costBasis,
+      })
+    : null;
   const isBusy = busy === `listing-${listing.id}`;
   const isEbayPublishBusy = busy === `ebay-publish-${listing.id}`;
   const canSell = Boolean(listing.item && listing.item.status !== "SOLD" && listing.state !== "SOLD");
@@ -6258,7 +6266,12 @@ function ListingRow({
           {stockNotes ? ` · ${stockNotes}` : ""}
           {ebayStatusLabel}
         </p>
-        <p>{gbp(price)}</p>
+        <p className="listing-row-price">{gbp(price)}</p>
+        {economics && (
+          <p className={`listing-row-economics ${economics.profitPence >= 0 ? "good" : "warn"}`}>
+            Profit {gbp(economics.profitPence)} · net {gbp(economics.netPence)} · {formatPct(economics.roiPct)} ROI
+          </p>
+        )}
         <div className="row-actions">
           <button type="button" onClick={() => onEdit(listing)} disabled={isBusy || listing.state === "SOLD"}>
             Edit

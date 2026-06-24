@@ -3095,6 +3095,30 @@ label {
   line-height: 1.14;
 }
 
+.listing-row-price {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 1000;
+}
+
+.listing-row-economics {
+  border-left: 3px solid rgba(255, 203, 5, 0.44);
+  padding-left: 8px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.listing-row-economics.good {
+  border-color: rgba(52, 211, 153, 0.62);
+  color: var(--green);
+}
+
+.listing-row-economics.warn {
+  border-color: rgba(255, 203, 5, 0.62);
+  color: var(--yellow);
+}
+
 .item-main {
   display: grid;
   min-width: 0;
