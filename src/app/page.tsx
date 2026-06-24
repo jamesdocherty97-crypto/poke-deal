@@ -362,7 +362,8 @@ const RECENT_SETS_STORAGE_KEY = "pokemon-dealer-os.recent-sets.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
-const VISIBLE_POPULAR_SET_LIMIT = 36;
+const VISIBLE_POPULAR_SET_LIMIT = 18;
+const VISIBLE_QUICK_HUNT_LIMIT = 6;
 const expensePresets: Array<{ category: ExpenseCategory; description: string; amount?: string; channel?: Channel }> = [
   { category: "POSTAGE", description: "Postage supplies", amount: "5.00" },
   { category: "SUPPLIES", description: "Sleeves / toploaders", amount: "10.00" },
@@ -464,6 +465,7 @@ export default function Home() {
   const [popularSets, setPopularSets] = useState<CatalogSet[]>([]);
   const [allSets, setAllSets] = useState<CatalogSet[]>([]);
   const [showAllPopularSets, setShowAllPopularSets] = useState(false);
+  const [showAllQuickHunts, setShowAllQuickHunts] = useState(false);
   const [scrollToComp, setScrollToComp] = useState(false);
   const [setSuggestions, setSetSuggestions] = useState<CatalogSet[]>([]);
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
@@ -698,6 +700,7 @@ export default function Home() {
     setSuggestions,
   ]);
   const visiblePopularSets = showAllPopularSets ? popularSets : popularSets.slice(0, VISIBLE_POPULAR_SET_LIMIT);
+  const visibleQuickHunts = showAllQuickHunts ? quickHunts : quickHunts.slice(0, VISIBLE_QUICK_HUNT_LIMIT);
   const recentSets = useMemo(() => {
     const byId = new Map([...allSets, ...popularSets, ...setSuggestions].map((set) => [set.id, set]));
     return recentSetIds
@@ -1660,6 +1663,7 @@ export default function Home() {
 
   function resetQuickHunts() {
     persistQuickHunts(DEFAULT_QUICK_HUNTS);
+    setShowAllQuickHunts(false);
     setNotice("Quick hunts reset.");
     setError(null);
   }
@@ -2355,6 +2359,27 @@ export default function Home() {
     }
   }
 
+  function renderManualCompLinks(variant: "compact" | "full" = "full") {
+    return (
+      <div className={`manual-comp-links ${variant}`} aria-label="Manual comp checks">
+        <span>Manual checks</span>
+        <label className="manual-comp-search">
+          <span>Search</span>
+          <input
+            value={manualCompQuery}
+            onChange={(event) => setManualCompQuery(event.target.value)}
+            placeholder={manualCompFallbackQuery || "Hitmontop Neo Genesis 1st Edition LP"}
+          />
+        </label>
+        {manualCompLinks.map((link) => (
+          <a key={link.kind} href={link.url} target="_blank" rel="noreferrer">
+            {link.label}
+          </a>
+        ))}
+      </div>
+    );
+  }
+
   const pullReady = shouldTriggerPullRefresh(pullDistance);
   const pullVisible = userRefreshing || pullDistance > 0;
   const pullOffset = pullVisible ? Math.round(pullRefreshProgress(pullDistance) * 16) : -64;
@@ -2792,6 +2817,7 @@ export default function Home() {
             <button className="primary-action" type="submit" disabled={busy === "lookup"}>
               {busy === "lookup" ? "Looking up..." : "Look up comp"}
             </button>
+            {!headline && renderManualCompLinks("compact")}
             {!headline && (
               <>
                 <div className="quick-hunt-toolbar" aria-label="Quick hunt controls">
@@ -2808,7 +2834,7 @@ export default function Home() {
                   </button>
                 </div>
                 <div className="quick-hunts" aria-label="Quick card picks">
-                  {quickHunts.map((card) => (
+                  {visibleQuickHunts.map((card) => (
                     <article className="quick-hunt-card" key={`${card.name}-${card.setName}-${card.number}`}>
                       <button
                         className="quick-hunt-pick"
@@ -2837,6 +2863,15 @@ export default function Home() {
                       </button>
                     </article>
                   ))}
+                  {quickHunts.length > VISIBLE_QUICK_HUNT_LIMIT && (
+                    <button
+                      className="quick-hunt-more ghost-button"
+                      type="button"
+                      onClick={() => setShowAllQuickHunts((current) => !current)}
+                    >
+                      {showAllQuickHunts ? "Fewer picks" : `${quickHunts.length - VISIBLE_QUICK_HUNT_LIMIT} more picks`}
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -2953,22 +2988,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              <div className="manual-comp-links" aria-label="Manual comp checks">
-                <span>Manual checks</span>
-                <label className="manual-comp-search">
-                  <span>Search</span>
-                  <input
-                    value={manualCompQuery}
-                    onChange={(event) => setManualCompQuery(event.target.value)}
-                    placeholder={manualCompFallbackQuery || "Hitmontop Neo Genesis 1st Edition LP"}
-                  />
-                </label>
-                {manualCompLinks.map((link) => (
-                  <a key={link.kind} href={link.url} target="_blank" rel="noreferrer">
-                    {link.label}
-                  </a>
-                ))}
-              </div>
+              {renderManualCompLinks()}
               <div className={`checked-comp-card ${checkedComp ? "active" : ""}`}>
                 <div className="checked-comp-heading">
                   <div>

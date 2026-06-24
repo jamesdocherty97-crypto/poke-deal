@@ -661,6 +661,11 @@ label {
   font-weight: 1000;
 }
 
+.quick-hunt-more {
+  grid-column: 1 / -1;
+  min-height: 36px;
+}
+
 .quick-art-stack {
   position: relative;
   display: grid;
@@ -2136,6 +2141,12 @@ label {
   border-radius: 8px;
   background: rgba(255, 203, 5, 0.08);
   padding: 9px 10px;
+}
+
+.manual-comp-links.compact {
+  margin-top: -2px;
+  border-color: rgba(52, 211, 153, 0.2);
+  background: rgba(52, 211, 153, 0.07);
 }
 
 .manual-comp-links span {
