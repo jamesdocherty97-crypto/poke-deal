@@ -3967,16 +3967,26 @@ label {
   gap: 10px;
 }
 
+.ebay-publish-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
 .ebay-publish-confirm p {
   display: flex;
   flex-direction: column;
   gap: 3px;
   margin: 0;
+  min-width: 0;
 }
 
-.ebay-publish-confirm small {
+.ebay-publish-confirm small,
+.ebay-publish-confirm span {
   font-size: 0.8125rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .ebay-publish-confirm > div {

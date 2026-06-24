@@ -4594,13 +4594,25 @@ export default function Home() {
             return pl ? (
               <div className="ebay-publish-overlay">
                 <div className="ebay-publish-confirm">
-                  <p>
-                    <strong>Publish to eBay?</strong>
-                    <small>
-                      {pl.title ?? pl.item?.card.name ?? "Untitled"}{" "}
-                      · {gbp(pl.listPrice ?? pl.suggestedPrice ?? 0)}
-                    </small>
-                  </p>
+                  <div className="ebay-publish-card">
+                    <CardImage
+                      src={pl.item?.card.imageUrl ?? null}
+                      className="mini-card-art"
+                      fallbackClassName="mini-card-art blank"
+                      alt=""
+                    />
+                    <p>
+                      <strong>Publish to eBay?</strong>
+                      <small>{pl.title ?? pl.item?.card.name ?? "Untitled listing"}</small>
+                      <span>
+                        {pl.item?.card.setName ? `${pl.item.card.setName} · ` : ""}
+                        {pl.item?.grade?.replace(/_/g, " ") ?? "Ungraded"}
+                        {pl.item?.quantity && pl.item.quantity > 1 ? ` · qty ${pl.item.quantity}` : ""}
+                        {" · "}
+                        {gbp(pl.listPrice ?? pl.suggestedPrice ?? 0)}
+                      </span>
+                    </p>
+                  </div>
                   <div>
                     <button
                       className="primary-action"
