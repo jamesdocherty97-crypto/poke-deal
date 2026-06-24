@@ -62,7 +62,7 @@ test("pickHeadline uses catalog market baseline when raw eBay bucket disagrees w
   assert.equal(pickHeadline([noisyRaw, catalogBaseline]), catalogBaseline);
 });
 
-test("pickHeadline uses the lower RAW signal when smart price and market baseline disagree", () => {
+test("pickHeadline keeps smart RAW as the headline when market baselines disagree", () => {
   const smartRaw = comp({
     source: "pokemon-price-tracker",
     medianPence: 6500,
@@ -78,7 +78,7 @@ test("pickHeadline uses the lower RAW signal when smart price and market baselin
   });
 
   assert.equal(detectDisagreement([smartRaw, catalogBaseline]), true);
-  assert.equal(pickHeadline([smartRaw, catalogBaseline]), catalogBaseline);
+  assert.equal(pickHeadline([smartRaw, catalogBaseline]), smartRaw);
 });
 
 test("pickHeadline keeps smart RAW when it agrees with the market baseline", () => {

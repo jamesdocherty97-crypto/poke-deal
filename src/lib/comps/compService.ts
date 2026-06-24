@@ -123,9 +123,6 @@ function pickRawHeadline(results: CompResult[]): CompResult | null {
   );
 
   if (smart) {
-    if (baseline && detectDisagreement([smart, baseline])) {
-      return smart.medianPence <= baseline.medianPence ? smart : baseline;
-    }
     return smart;
   }
 
