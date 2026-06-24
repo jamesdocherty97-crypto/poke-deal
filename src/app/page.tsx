@@ -46,7 +46,7 @@ import {
   type ListingPack,
   type ListingPackCopyField,
 } from "@/lib/dealer/listingPack";
-import { listingVenueAction, nextDraftListingId } from "@/lib/dealer/listingWorkflow";
+import { listingVenueAction, nextDraftListingId, nextSaleListingId } from "@/lib/dealer/listingWorkflow";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { buildQuickIntakePreview } from "@/lib/dealer/intakePreview";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
@@ -690,6 +690,10 @@ export default function Home() {
   );
   const firstDraftListingTarget = useMemo(() => {
     const nextId = nextDraftListingId(listings, null);
+    return nextId ? listings.find((listing) => listing.id === nextId) ?? null : null;
+  }, [listings]);
+  const firstSaleListingTarget = useMemo(() => {
+    const nextId = nextSaleListingId(listings, null);
     return nextId ? listings.find((listing) => listing.id === nextId) ?? null : null;
   }, [listings]);
   const nextListingPackTarget = useMemo(() => {
@@ -3030,6 +3034,49 @@ export default function Home() {
               ))}
             </div>
           </section>
+
+          {firstSaleListingTarget?.item && (
+            <section className="panel listing-desk-panel sales-desk-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Sales desk</h2>
+                  <span className="muted">
+                    {activeListingCount} active listing{activeListingCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => {
+                    setListingStateFilter("ACTIVE");
+                    setListingSort("newest");
+                    setView("listings");
+                  }}
+                >
+                  Active
+                </button>
+              </div>
+              <div className="listing-desk-card">
+                <CardImage
+                  src={firstSaleListingTarget.item.card.imageUrl}
+                  className="mini-card-art"
+                  fallbackClassName="mini-card-art blank"
+                  alt=""
+                />
+                <div>
+                  <span>Ready to book</span>
+                  <strong>{listingQueueLabel(firstSaleListingTarget)}</strong>
+                  <small>
+                    {channelLabel(firstSaleListingTarget.channel)} ·{" "}
+                    {gbp(firstSaleListingTarget.listPrice ?? firstSaleListingTarget.suggestedPrice ?? 0)}
+                  </small>
+                </div>
+                <button type="button" onClick={() => openSellFromListing(firstSaleListingTarget)}>
+                  Record sale
+                </button>
+              </div>
+            </section>
+          )}
 
           <section className="panel launch-plan-panel">
             <div className="panel-heading">

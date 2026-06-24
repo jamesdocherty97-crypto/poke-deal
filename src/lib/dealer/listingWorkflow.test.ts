@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listingVenueAction, nextDraftListingId } from "./listingWorkflow.js";
+import { listingVenueAction, nextDraftListingId, nextSaleListingId } from "./listingWorkflow.js";
 
 test("nextDraftListingId advances through stocked draft listings", () => {
   const listings = [
@@ -15,6 +15,22 @@ test("nextDraftListingId advances through stocked draft listings", () => {
   assert.equal(nextDraftListingId(listings, "draft-b"), "draft-a");
   assert.equal(nextDraftListingId(listings, "unknown"), "draft-a");
   assert.equal(nextDraftListingId([{ id: "only", state: "DRAFT", item: {} }], "only"), null);
+});
+
+test("nextSaleListingId advances through active sellable listings", () => {
+  const listings = [
+    { id: "draft", state: "DRAFT", item: {} },
+    { id: "active-a", state: "ACTIVE", item: { status: "LISTED" } },
+    { id: "active-sold", state: "ACTIVE", item: { status: "SOLD" } },
+    { id: "active-missing-item", state: "ACTIVE", item: null },
+    { id: "active-b", state: "ACTIVE", item: { status: "IN_STOCK" } },
+  ];
+
+  assert.equal(nextSaleListingId(listings, undefined), "active-a");
+  assert.equal(nextSaleListingId(listings, "active-a"), "active-b");
+  assert.equal(nextSaleListingId(listings, "active-b"), "active-a");
+  assert.equal(nextSaleListingId(listings, "unknown"), "active-a");
+  assert.equal(nextSaleListingId([{ id: "only", state: "ACTIVE", item: {} }], "only"), null);
 });
 
 test("listingVenueAction gives an official UK eBay listing entrypoint only for eBay", () => {

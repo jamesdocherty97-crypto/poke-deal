@@ -3292,6 +3292,19 @@ label {
     var(--panel);
 }
 
+.sales-desk-panel {
+  border-color: rgba(42, 117, 187, 0.34);
+  background:
+    linear-gradient(120deg, rgba(42, 117, 187, 0.16), transparent 48%),
+    var(--panel);
+}
+
+.sales-desk-panel .listing-desk-card button {
+  border-color: rgba(42, 117, 187, 0.46);
+  background: rgba(42, 117, 187, 0.18);
+  color: #cfe6ff;
+}
+
 .listing-desk-card {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) minmax(92px, auto);
