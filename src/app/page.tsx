@@ -520,6 +520,7 @@ export default function Home() {
   const pullStartY = useRef<number | null>(null);
   const pullTracking = useRef(false);
   const compPanelRef = useRef<HTMLElement | null>(null);
+  const quickIntakeRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     void refreshAll();
@@ -1294,7 +1295,7 @@ export default function Home() {
     setCheckedCompNote("");
   }
 
-  function clearCurrentComp() {
+  function clearCurrentComp(message = "Ready for next comp.") {
     setName("");
     setSetNameValue("");
     setNumber("");
@@ -1311,7 +1312,12 @@ export default function Home() {
     setPsaResult(null);
     clearCheckedComp();
     setError(null);
-    setNotice("Ready for next comp.");
+    setNotice(message);
+    window.requestAnimationFrame(() => quickIntakeRef.current?.focus());
+  }
+
+  function skipCurrentComp() {
+    clearCurrentComp("Skipped. Ready for next comp.");
   }
 
   function rememberRecentComp(payload: Reconciled, input: LookupInput) {
@@ -3216,7 +3222,7 @@ export default function Home() {
                 <button
                   className="clear-comp-button"
                   type="button"
-                  onClick={clearCurrentComp}
+                  onClick={() => clearCurrentComp()}
                   aria-label="Clear current comp"
                   title="Clear current comp"
                   disabled={busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
@@ -3276,6 +3282,7 @@ export default function Home() {
               Quick fill
               <div className="quick-intake-row quick-intake-actions">
                 <input
+                  ref={quickIntakeRef}
                   value={quickIntake}
                   onChange={(event) => setQuickIntake(event.target.value)}
                   onKeyDown={(event) => {
@@ -3563,7 +3570,12 @@ export default function Home() {
                   </p>
                   <h2>{needsManualComp ? "No auto price" : gbp(headline.medianPence)}</h2>
                 </div>
-                <span className={`pill ${confidenceLabel?.tone ?? ""}`}>{confidenceLabel?.label}</span>
+                <div className="comp-hero-actions">
+                  <span className={`pill ${confidenceLabel?.tone ?? ""}`}>{confidenceLabel?.label}</span>
+                  <button className="ghost-button comp-skip-button" type="button" onClick={skipCurrentComp}>
+                    Skip
+                  </button>
+                </div>
               </div>
               {needsManualComp && (
                 <div className="manual-rescue-card">
@@ -5089,6 +5101,14 @@ export default function Home() {
                 : "add cost and quantity"}
             </small>
           </div>
+          <button
+            className="mobile-skip-button"
+            type="button"
+            onClick={skipCurrentComp}
+            disabled={busy === "acquire"}
+          >
+            Skip
+          </button>
           <button
             className="primary-action"
             type="button"
