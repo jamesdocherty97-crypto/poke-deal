@@ -1641,7 +1641,7 @@ label {
   padding: 8px;
 }
 
-.recent-intake-row div {
+.recent-intake-copy {
   display: grid;
   min-width: 0;
   gap: 2px;
@@ -1653,7 +1653,7 @@ label {
   font-size: 12px;
 }
 
-.recent-intake-row > strong {
+.recent-intake-total {
   justify-self: end;
   color: #88c8ff;
   white-space: nowrap;
@@ -1663,6 +1663,26 @@ label {
   color: var(--muted);
   font-size: 11px;
   font-weight: 850;
+}
+
+.recent-intake-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.recent-intake-actions button {
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.recent-intake-actions button:disabled {
+  opacity: 0.45;
 }
 
 .mini-card-art {

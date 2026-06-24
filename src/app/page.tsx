@@ -1188,6 +1188,7 @@ export default function Home() {
     setGradeComp(null);
     setListPriceOverride("");
     setManualCompQuery("");
+    setQuickIntake("");
     clearCheckedComp();
     setGraderCert("");
   }
@@ -1753,6 +1754,56 @@ export default function Home() {
     setError(null);
   }
 
+  function loadRecentBuy(item: InventoryItem, options: { lookupAfter?: boolean } = {}) {
+    const nextGrade = item.grade as Grade;
+    const nextCondition = item.condition ?? (nextGrade === "RAW" ? "NM" : "");
+    const nextLookup = {
+      name: item.card.name,
+      setName: item.card.setName,
+      number: item.card.number ?? "",
+      grade: nextGrade,
+    };
+
+    setView("acquire");
+    setName(item.card.name);
+    setSetNameValue(item.card.setName);
+    setNumber(item.card.number ?? "");
+    setGrade(nextGrade);
+    setCost("");
+    setQuantity("1");
+    setSource(item.acquiredFrom ?? source);
+    setLocation(item.location ?? location);
+    setCondition(nextCondition);
+    setGraderCert("");
+    setPsaResult(null);
+    setQuickIntake("");
+    setComp(null);
+    setSuggestion(null);
+    setCardArtUrl(item.card.imageUrl);
+    setGradeComp(null);
+    setListPriceOverride("");
+    setManualCompQuery(
+      cardSearchQuery(
+        {
+          name: item.card.name,
+          setName: item.card.setName,
+          number: item.card.number ?? undefined,
+        },
+        { condition: nextCondition },
+      ),
+    );
+    clearCheckedComp();
+    setError(null);
+
+    if (options.lookupAfter) {
+      setNotice(`Looking up ${item.card.name}...`);
+      void lookupComp(nextLookup);
+      return;
+    }
+
+    setNotice(`${item.card.name} loaded for another buy.`);
+  }
+
   function pinRecentSetName(value: string | null | undefined) {
     if (!value?.trim()) return;
     const match = findSelectedSet([...popularSets, ...setSuggestions, ...allSets], value);
@@ -2162,6 +2213,33 @@ export default function Home() {
       return;
     }
     await patchListing(listing, { state: "ACTIVE" }, "Listing activated.");
+  }
+
+  function listingForInventoryItem(item: InventoryItem): Listing | null {
+    const listing =
+      item.listings.find((row) => row.state === "DRAFT") ??
+      item.listings.find((row) => row.state === "ACTIVE") ??
+      item.listings.find((row) => row.state !== "SOLD" && row.state !== "ENDED") ??
+      item.listings[0];
+    if (!listing) return null;
+    return listings.find((row) => row.id === listing.id) ?? { ...listing, item };
+  }
+
+  function openRecentListingWork(item: InventoryItem) {
+    const listing = listingForInventoryItem(item);
+    setView("listings");
+    if (!listing) {
+      openListingCreator(item);
+      setListingStateFilter("DRAFT");
+      return;
+    }
+    setListingStateFilter(listing.state === "ACTIVE" || listing.state === "DRAFT" ? listing.state : "ALL");
+    openListingPack(listing);
+  }
+
+  function sellRecentBuy(item: InventoryItem) {
+    setView("inventory");
+    openSell(item, listingForInventoryItem(item) ?? undefined);
   }
 
   function requestDeleteItem(item: InventoryItem) {
@@ -3534,23 +3612,40 @@ export default function Home() {
                 <strong>{gbp(recentIntakeCostPence)}</strong>
               </div>
               <div className="recent-intake-list">
-                {recentIntake.map((item) => (
-                  <article className="recent-intake-row" key={item.id}>
-                    <CardImage src={item.card.imageUrl} className="mini-card-art" fallbackClassName="mini-card-art blank" alt="" />
-                    <div>
-                      <strong>{item.card.name}</strong>
-                      <span>
-                        {item.card.setName}
-                        {item.card.number ? ` #${item.card.number}` : ""}
-                        {" · "}
-                        {item.quantity} @ {gbp(item.costBasis)}
-                        {item.condition ? ` · ${item.condition}` : ""}
-                        {item.graderCert ? ` · cert ${item.graderCert}` : ""}
-                      </span>
-                    </div>
-                    <strong>{gbp(item.costBasis * item.quantity)}</strong>
-                  </article>
-                ))}
+                {recentIntake.map((item) => {
+                  const listing = listingForInventoryItem(item);
+                  return (
+                    <article className="recent-intake-row" key={item.id}>
+                      <CardImage src={item.card.imageUrl} className="mini-card-art" fallbackClassName="mini-card-art blank" alt="" />
+                      <div className="recent-intake-copy">
+                        <strong>{item.card.name}</strong>
+                        <span>
+                          {item.card.setName}
+                          {item.card.number ? ` #${item.card.number}` : ""}
+                          {" · "}
+                          {item.quantity} @ {gbp(item.costBasis)}
+                          {item.condition ? ` · ${item.condition}` : ""}
+                          {item.graderCert ? ` · cert ${item.graderCert}` : ""}
+                        </span>
+                      </div>
+                      <strong className="recent-intake-total">{gbp(item.costBasis * item.quantity)}</strong>
+                      <div className="recent-intake-actions">
+                        <button type="button" onClick={() => loadRecentBuy(item)}>
+                          Again
+                        </button>
+                        <button type="button" onClick={() => loadRecentBuy(item, { lookupAfter: true })} disabled={busy === "lookup"}>
+                          Comp
+                        </button>
+                        <button type="button" onClick={() => openRecentListingWork(item)}>
+                          {listing ? "Pack" : "List"}
+                        </button>
+                        <button type="button" onClick={() => sellRecentBuy(item)} disabled={item.status === "SOLD"}>
+                          Sell
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           )}
