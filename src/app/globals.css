@@ -2948,6 +2948,58 @@ label {
   background: rgba(3, 8, 20, 0.34);
 }
 
+.listing-desk-panel {
+  border-color: rgba(52, 211, 153, 0.28);
+  background:
+    linear-gradient(120deg, rgba(52, 211, 153, 0.12), transparent 48%),
+    var(--panel);
+}
+
+.listing-desk-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) minmax(92px, auto);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 9px;
+}
+
+.listing-desk-card div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.listing-desk-card span,
+.listing-desk-card small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listing-desk-card strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.08;
+}
+
+.listing-desk-card button {
+  min-height: 38px;
+  padding: 7px 10px;
+  border-color: rgba(52, 211, 153, 0.38);
+  background: rgba(52, 211, 153, 0.14);
+  color: #c7f7df;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
 .listing-pack-summary {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(82px, 0.75fr) minmax(82px, 0.75fr);

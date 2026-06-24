@@ -608,6 +608,10 @@ export default function Home() {
     () => listings.find((listing) => listing.id === listingPackId) ?? null,
     [listingPackId, listings],
   );
+  const firstDraftListingTarget = useMemo(() => {
+    const nextId = nextDraftListingId(listings, null);
+    return nextId ? listings.find((listing) => listing.id === nextId) ?? null : null;
+  }, [listings]);
   const nextListingPackTarget = useMemo(() => {
     const nextId = nextDraftListingId(visibleListings, listingPackId);
     return nextId ? visibleListings.find((listing) => listing.id === nextId) ?? null : null;
@@ -2348,6 +2352,24 @@ export default function Home() {
     setNotice(null);
   }
 
+  function startListingDesk() {
+    if (firstDraftListingTarget) {
+      setView("listings");
+      setListingStateFilter("DRAFT");
+      openListingPack(firstDraftListingTarget);
+      return;
+    }
+
+    const item = unlistedStock[0];
+    if (!item) {
+      setError("No draft listings or unlisted stock ready.");
+      return;
+    }
+    setView("listings");
+    setListingStateFilter("DRAFT");
+    openListingCreator(item);
+  }
+
   async function activateListingPackTarget() {
     if (!listingPackTarget) return;
     const nextId = nextListingPackTarget?.id ?? null;
@@ -3909,6 +3931,65 @@ export default function Home() {
             <Metric label="Active" value={String(dashboard?.listingsByState.ACTIVE ?? 0)} />
             <Metric label="Sold" value={String(dashboard?.listingsByState.SOLD ?? 0)} />
           </div>
+          {(firstDraftListingTarget || unlistedStock.length > 0) && (
+            <section className="panel listing-desk-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Listing desk</h2>
+                  <span className="muted">
+                    {firstDraftListingTarget
+                      ? `${draftListingCount} draft${draftListingCount === 1 ? "" : "s"} ready`
+                      : `${unlistedStock.length} unlisted stock row${unlistedStock.length === 1 ? "" : "s"}`}
+                  </span>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setView("acquire")}>
+                  Add buy
+                </button>
+              </div>
+              {firstDraftListingTarget?.item ? (
+                <div className="listing-desk-card">
+                  <CardImage
+                    src={firstDraftListingTarget.item.card.imageUrl}
+                    className="mini-card-art"
+                    fallbackClassName="mini-card-art blank"
+                    alt=""
+                  />
+                  <div>
+                    <span>Next draft</span>
+                    <strong>{listingQueueLabel(firstDraftListingTarget)}</strong>
+                    <small>
+                      {channelLabel(firstDraftListingTarget.channel)} ·{" "}
+                      {gbp(firstDraftListingTarget.listPrice ?? firstDraftListingTarget.suggestedPrice ?? 0)}
+                    </small>
+                  </div>
+                  <button type="button" onClick={startListingDesk}>
+                    Open pack
+                  </button>
+                </div>
+              ) : (
+                <div className="listing-desk-card">
+                  <CardImage
+                    src={unlistedStock[0]?.card.imageUrl ?? null}
+                    className="mini-card-art"
+                    fallbackClassName="mini-card-art blank"
+                    alt=""
+                  />
+                  <div>
+                    <span>Next stock</span>
+                    <strong>{unlistedStock[0]?.card.name ?? "No stock"}</strong>
+                    <small>
+                      {unlistedStock[0]
+                        ? `${unlistedStock[0].card.setName} · ${unlistedStock[0].grade.replace(/_/g, " ")}`
+                        : "Buy or import stock first"}
+                    </small>
+                  </div>
+                  <button type="button" onClick={startListingDesk} disabled={!unlistedStock[0]}>
+                    Draft listing
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
           <div className="export-actions" aria-label="Listing exports">
             <a className="export-link" href="/api/export/listings?state=DRAFT" download>
               Draft CSV
