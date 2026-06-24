@@ -14,6 +14,7 @@ export async function ebayFetch(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
+    "Content-Language": config.contentLanguage,
     Accept: "application/json",
     ...(marketplaceId ? { "X-EBAY-C-MARKETPLACE-ID": marketplaceId } : {}),
     ...(extraHeaders as Record<string, string> | undefined ?? {}),

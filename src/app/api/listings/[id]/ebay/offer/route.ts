@@ -90,7 +90,7 @@ export async function POST(
     // Use existing offer if one already exists for this SKU
     let offerId = await getOfferBySku(config, sku, accessToken);
     if (!offerId) {
-      const offerPayload = buildOfferPayload(sku, pack, policies, config);
+      const offerPayload = buildOfferPayload(sku, pack, policies, config, listing.item.quantity ?? 1);
       const created = await createEbayOffer(config, offerPayload, accessToken);
       offerId = created.offerId;
     }

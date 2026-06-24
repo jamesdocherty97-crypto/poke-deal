@@ -39,6 +39,7 @@ export function buildOfferPayload(
   pack: ListingPack,
   policies: EbayPolicies,
   config: EbayConfig,
+  quantity = 1,
   categoryId = EBAY_UK_CATEGORY_POKEMON,
 ): EbayOfferPayload {
   const priceGbp = (pack.suggestedPricePence / 100).toFixed(2);
@@ -47,7 +48,7 @@ export function buildOfferPayload(
     sku,
     marketplaceId: config.marketplaceId,
     format: "FIXED_PRICE",
-    availableQuantity: 1,
+    availableQuantity: Math.max(1, quantity),
     categoryId,
     listingDescription: pack.description,
     listingPolicies: {

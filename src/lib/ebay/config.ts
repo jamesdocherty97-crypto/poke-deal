@@ -10,6 +10,7 @@ export interface EbayConfig {
   ruName: string;
   env: "production" | "sandbox";
   marketplaceId: string;
+  contentLanguage: string;
   apiBaseUrl: string;
   authBaseUrl: string;
   tokenUrl: string;
@@ -25,6 +26,7 @@ export function getEbayConfig(): EbayConfig | null {
   const rawEnv = process.env.EBAY_ENV?.trim().toLowerCase();
   const env: "production" | "sandbox" = rawEnv === "sandbox" ? "sandbox" : "production";
   const marketplaceId = process.env.EBAY_MARKETPLACE_ID?.trim() || "EBAY_GB";
+  const contentLanguage = process.env.EBAY_CONTENT_LANGUAGE?.trim() || "en-GB";
 
   const isSandbox = env === "sandbox";
   const apiBaseUrl = isSandbox
@@ -35,7 +37,7 @@ export function getEbayConfig(): EbayConfig | null {
     : "https://auth.ebay.com";
   const tokenUrl = `${apiBaseUrl}/identity/v1/oauth2/token`;
 
-  return { clientId, clientSecret, ruName, env, marketplaceId, apiBaseUrl, authBaseUrl, tokenUrl };
+  return { clientId, clientSecret, ruName, env, marketplaceId, contentLanguage, apiBaseUrl, authBaseUrl, tokenUrl };
 }
 
 export function isEbayConfigured(): boolean {

@@ -1,7 +1,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { buildAuthUrl, exchangeCodeForTokens, refreshAccessToken } from "./oauth.js";
-import { buildInventoryItemPayload } from "./inventoryItem.js";
+import { buildInventoryItemPayload, upsertInventoryItem } from "./inventoryItem.js";
 import { buildOfferPayload } from "./offer.js";
 import { getAccessToken, clearTokenCache } from "./tokens.js";
 import { fetchEbayPolicies } from "./policies.js";
@@ -17,6 +17,7 @@ const TEST_CONFIG: EbayConfig = {
   ruName: "TestApp-RuName-1234",
   env: "sandbox",
   marketplaceId: "EBAY_GB",
+  contentLanguage: "en-GB",
   apiBaseUrl: "https://api.sandbox.ebay.com",
   authBaseUrl: "https://auth.sandbox.ebay.com",
   tokenUrl: "https://api.sandbox.ebay.com/identity/v1/oauth2/token",
@@ -253,6 +254,29 @@ test("buildInventoryItemPayload clamps quantity to at least 1", () => {
   assert.equal(item.availability.shipToLocationAvailability.quantity, 1);
 });
 
+test("upsertInventoryItem sends eBay-required language header", async () => {
+  let capturedHeaders: Record<string, string> = {};
+  const fetch: typeof globalThis.fetch = (_url, opts) => {
+    capturedHeaders = opts?.headers as Record<string, string>;
+    return Promise.resolve({
+      ok: true,
+      status: 204,
+      text: () => Promise.resolve(""),
+    } as Response);
+  };
+
+  await upsertInventoryItem(
+    TEST_CONFIG,
+    "pdos-test",
+    buildInventoryItemPayload(rawInput, 1),
+    "access-token",
+    fetch,
+  );
+
+  assert.equal(capturedHeaders["Content-Language"], "en-GB");
+  assert.equal(capturedHeaders["Content-Type"], "application/json");
+});
+
 // ── Offer payload ─────────────────────────────────────────────────────────────
 
 test("buildOfferPayload uses correct marketplace and currency", () => {
@@ -274,6 +298,12 @@ test("buildOfferPayload price is correct GBP from pence", () => {
   const pack = buildListingPack({ ...slabInput, listPricePence: 9999 });
   const offer = buildOfferPayload("pdos-xyz", pack, MOCK_POLICIES, TEST_CONFIG);
   assert.equal(offer.pricingSummary.price.value, "99.99");
+});
+
+test("buildOfferPayload carries listing quantity and clamps to one", () => {
+  const pack = buildListingPack(slabInput);
+  assert.equal(buildOfferPayload("pdos-many", pack, MOCK_POLICIES, TEST_CONFIG, 3).availableQuantity, 3);
+  assert.equal(buildOfferPayload("pdos-zero", pack, MOCK_POLICIES, TEST_CONFIG, 0).availableQuantity, 1);
 });
 
 test("buildOfferPayload omits merchantLocationKey when null", () => {
@@ -419,11 +449,11 @@ test("checkEbayReadiness does not fail for pending offer state", () => {
   assert.equal(check?.status, "pass");
 });
 
-test("checkEbayReadiness warns but stays ready when no image", () => {
+test("checkEbayReadiness fails when no image", () => {
   const result = checkEbayReadiness({ ...READY_INPUT, hasImage: false });
-  assert.equal(result.ready, true);
+  assert.equal(result.ready, false);
   const check = result.checks.find((c) => c.key === "has_image");
-  assert.equal(check?.status, "warn");
+  assert.equal(check?.status, "fail");
 });
 
 test("checkEbayReadiness fails when channel is not EBAY", () => {
