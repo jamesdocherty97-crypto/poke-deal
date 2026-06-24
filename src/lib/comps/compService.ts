@@ -118,11 +118,14 @@ function pickRawHeadline(results: CompResult[]): CompResult | null {
   if (rawResults.length === 0) return null;
 
   const smart = rawResults.find((result) => readRawString(result, "chosenPriceSource") === "smartMarketPrice");
-  const baseline = rawResults.find((result) =>
-    ["catalog-market-baseline", "market-baseline"].includes(readRawString(result, "kind") ?? ""),
-  );
+  const baselines = rawResults.filter(isRawMarketBaseline);
+  const baseline = strongestSignal(baselines);
 
   if (smart) {
+    const baselineConsensus = rawBaselineConsensus(baselines);
+    if (baselineConsensus && smartIsHighOutlier(smart, baselineConsensus)) {
+      return baselineConsensus.headline;
+    }
     return smart;
   }
 
@@ -137,6 +140,38 @@ function pickRawHeadline(results: CompResult[]): CompResult | null {
 
   if (!strongestRawBucket) return baseline;
   return detectDisagreement([strongestRawBucket, baseline]) ? baseline : null;
+}
+
+function isRawMarketBaseline(result: CompResult): boolean {
+  return ["catalog-market-baseline", "market-baseline"].includes(readRawString(result, "kind") ?? "");
+}
+
+function strongestSignal(results: CompResult[]): CompResult | null {
+  return results.reduce<CompResult | null>((best, result) => {
+    if (!best) return result;
+    return result.sampleSize > best.sampleSize ? result : best;
+  }, null);
+}
+
+function rawBaselineConsensus(baselines: CompResult[]): { headline: CompResult; highPence: number; spreadPct: number } | null {
+  const priced = baselines.filter((result) => result.medianPence > 0);
+  if (priced.length < 2) return null;
+
+  const medians = priced.map((result) => result.medianPence);
+  const low = Math.min(...medians);
+  const high = Math.max(...medians);
+  const spreadPct = low > 0 ? ((high - low) / low) * 100 : Number.POSITIVE_INFINITY;
+  if (spreadPct > 35) return null;
+
+  return {
+    headline: strongestSignal(priced) ?? priced[0]!,
+    highPence: high,
+    spreadPct,
+  };
+}
+
+function smartIsHighOutlier(smart: CompResult, consensus: { highPence: number }): boolean {
+  return smart.medianPence > consensus.highPence * 1.25;
 }
 
 function readRawString(result: CompResult, key: string): string | null {
