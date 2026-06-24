@@ -25,6 +25,14 @@ import {
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
 import { parseRecentSetIds, pinRecentSetId } from "@/lib/dealer/recentSets";
+import {
+  parseRecentComps,
+  pinRecentComp,
+  recentCompKey,
+  removeRecentComp,
+  serializeRecentComps,
+  type RecentCompEntry,
+} from "@/lib/dealer/recentComps";
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { buildManualCompLinks, cardSearchQuery, normalizeManualCompSearchText } from "@/lib/dealer/compLinks";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
@@ -378,6 +386,7 @@ const expenseCategories: ExpenseCategory[] = ["SUPPLIES", "POSTAGE", "GRADING", 
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
 const RECENT_SETS_STORAGE_KEY = "pokemon-dealer-os.recent-sets.v1";
+const RECENT_COMPS_STORAGE_KEY = "pokemon-dealer-os.recent-comps.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
@@ -498,6 +507,7 @@ export default function Home() {
   const [listingSort, setListingSort] = useState<ListingSort>("newest");
   const [quickHunts, setQuickHunts] = useState<QuickHuntCard[]>(DEFAULT_QUICK_HUNTS);
   const [recentSetIds, setRecentSetIds] = useState<string[]>([]);
+  const [recentComps, setRecentComps] = useState<RecentCompEntry[]>([]);
   const pullStartY = useRef<number | null>(null);
   const pullTracking = useRef(false);
   const compPanelRef = useRef<HTMLElement | null>(null);
@@ -520,6 +530,14 @@ export default function Home() {
       setRecentSetIds(parseRecentSetIds(window.localStorage.getItem(RECENT_SETS_STORAGE_KEY)));
     } catch {
       setRecentSetIds([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      setRecentComps(parseRecentComps(window.localStorage.getItem(RECENT_COMPS_STORAGE_KEY)));
+    } catch {
+      setRecentComps([]);
     }
   }, []);
 
@@ -1230,6 +1248,40 @@ export default function Home() {
     setNotice("Ready for next comp.");
   }
 
+  function rememberRecentComp(payload: Reconciled, input: LookupInput) {
+    const result = payload.headline;
+    if (!result) return;
+    const confidence = compConfidence(result, payload.sourcesDisagree);
+    const catalog = payload.catalog;
+    const entry: RecentCompEntry = {
+      name: catalog?.name ?? input.name,
+      setName: catalog?.setName ?? input.setName,
+      ...(catalog?.number ?? input.number ? { number: catalog?.number ?? input.number } : {}),
+      grade: result.grade ?? input.grade,
+      pricePence: result.medianPence,
+      lowPence: result.lowPence,
+      highPence: result.highPence,
+      sampleSize: result.sampleSize,
+      windowDays: result.windowDays,
+      source: result.source,
+      confidenceLabel: confidence.label,
+      confidenceTone: confidence.tone,
+      ...(catalog?.imageUrl ? { imageUrl: catalog.imageUrl } : {}),
+      ...(catalog?.setLogoUrl || catalog?.setSymbolUrl ? { setMarkUrl: catalog.setLogoUrl ?? catalog.setSymbolUrl } : {}),
+      lookedUpAt: result.asOf,
+    };
+
+    setRecentComps((current) => {
+      const next = pinRecentComp(current, entry);
+      try {
+        window.localStorage.setItem(RECENT_COMPS_STORAGE_KEY, serializeRecentComps(next));
+      } catch {
+        // Recent comps are a device convenience; the live lookup still works.
+      }
+      return next;
+    });
+  }
+
   function applyPostStockFlow() {
     if (!keepBuying) {
       setView("inventory");
@@ -1358,6 +1410,7 @@ export default function Home() {
       setComp(payload);
       setCardArtUrl(payload.catalog?.imageUrl ?? null);
       pinRecentSetName(payload.catalog?.setName ?? input.setName);
+      rememberRecentComp(payload, input);
       setGradeComp(null);
       setScrollToComp(true);
     } catch (err) {
@@ -1457,7 +1510,12 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "acquire failed");
       setSuggestion(payload.suggestion);
-      setComp(payload.comps ?? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false });
+      const acquiredComps = payload.comps ?? (payload.comp ? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false } : null);
+      if (acquiredComps) {
+        const rememberedComps = { ...acquiredComps, catalog: acquiredComps.catalog ?? payload.catalog ?? null };
+        setComp(rememberedComps);
+        rememberRecentComp(rememberedComps, { name, setName: setNameValue, number, grade });
+      }
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
       pinRecentSetName(payload.catalog?.setName ?? setNameValue);
       const listedPence = payload.listing?.listPrice ?? payload.listing?.suggestedPrice ?? payload.suggestion.pricePence;
@@ -1779,6 +1837,67 @@ export default function Home() {
       setNotice(`Looking up ${card.name}...`);
       void lookupComp(nextLookup);
     }
+  }
+
+  function chooseRecentComp(entry: RecentCompEntry, options: { lookupAfter?: boolean } = {}) {
+    const nextGrade = gradeOptions.includes(entry.grade as Grade) ? (entry.grade as Grade) : "RAW";
+    const nextLookup = {
+      name: entry.name,
+      setName: entry.setName,
+      number: entry.number ?? "",
+      grade: nextGrade,
+    };
+
+    setView("acquire");
+    setName(entry.name);
+    setSetNameValue(entry.setName);
+    setNumber(entry.number ?? "");
+    setGrade(nextGrade);
+    setComp(null);
+    setSuggestion(null);
+    setCardArtUrl(entry.imageUrl ?? null);
+    setGradeComp(null);
+    setManualCompQuery(
+      cardSearchQuery(
+        { name: entry.name, setName: entry.setName, number: entry.number },
+        { condition },
+      ),
+    );
+    clearCheckedComp();
+    setError(null);
+
+    if (options.lookupAfter) {
+      setNotice(`Rechecking ${entry.name}...`);
+      void lookupComp(nextLookup);
+      return;
+    }
+
+    setNotice(`${entry.name} loaded.`);
+  }
+
+  function removeRecentCompEntry(entry: RecentCompEntry) {
+    setRecentComps((current) => {
+      const next = removeRecentComp(current, entry);
+      try {
+        window.localStorage.setItem(RECENT_COMPS_STORAGE_KEY, serializeRecentComps(next));
+      } catch {
+        // Device storage is optional; current state still updates.
+      }
+      return next;
+    });
+    setNotice(`${entry.name} removed from recent comps.`);
+    setError(null);
+  }
+
+  function clearRecentComps() {
+    setRecentComps([]);
+    try {
+      window.localStorage.removeItem(RECENT_COMPS_STORAGE_KEY);
+    } catch {
+      // Nothing else to do if storage is unavailable.
+    }
+    setNotice("Recent comps cleared.");
+    setError(null);
   }
 
   async function loadSetCatalog() {
@@ -2974,6 +3093,53 @@ export default function Home() {
                 </button>
               </div>
             </div>
+            {recentComps.length > 0 && (
+              <div className="recent-comp-strip" aria-label="Recent comps">
+                <div className="recent-comp-heading">
+                  <span>Recent comps</span>
+                  <button className="ghost-button" type="button" onClick={clearRecentComps}>
+                    Clear
+                  </button>
+                </div>
+                <div className="recent-comp-row">
+                  {recentComps.map((entry) => (
+                    <article className={`recent-comp-card ${entry.confidenceTone}`} key={recentCompKey(entry)}>
+                      <button
+                        className="recent-comp-pick"
+                        type="button"
+                        onClick={() => chooseRecentComp(entry, { lookupAfter: true })}
+                        disabled={busy === "lookup"}
+                      >
+                        <CardImage
+                          src={entry.imageUrl}
+                          className="recent-comp-art"
+                          fallbackClassName="recent-comp-art blank"
+                          alt=""
+                        />
+                        <span className="recent-comp-copy">
+                          <strong>{entry.name}</strong>
+                          <small>
+                            {entry.setName}
+                            {entry.number ? ` #${entry.number}` : ""} · {entry.grade.replace(/_/g, " ")}
+                          </small>
+                          <em>
+                            {entry.pricePence > 0 ? gbp(entry.pricePence) : "No price"} · {entry.confidenceLabel}
+                          </em>
+                        </span>
+                      </button>
+                      <button
+                        className="recent-comp-remove danger-button"
+                        type="button"
+                        onClick={() => removeRecentCompEntry(entry)}
+                        aria-label={`Remove ${entry.name} recent comp`}
+                      >
+                        x
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
             <label className="quick-intake-field">
               Quick fill
               <div className="quick-intake-row quick-intake-actions">
