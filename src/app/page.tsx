@@ -50,7 +50,13 @@ import { listingVenueAction, nextDraftListingId } from "@/lib/dealer/listingWork
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { buildQuickIntakePreview } from "@/lib/dealer/intakePreview";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
-import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
+import {
+  DEFAULT_INTAKE_PREFERENCES,
+  nextIntakeFormAfterStock,
+  parseIntakePreferences,
+  parseIntakeQuantity,
+  serializeIntakePreferences,
+} from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
 import {
   buyerPaidPostagePence,
@@ -387,6 +393,7 @@ const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
 const RECENT_SETS_STORAGE_KEY = "pokemon-dealer-os.recent-sets.v1";
 const RECENT_COMPS_STORAGE_KEY = "pokemon-dealer-os.recent-comps.v1";
+const INTAKE_PREFERENCES_STORAGE_KEY = "pokemon-dealer-os.intake-preferences.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
@@ -407,29 +414,29 @@ type RefreshOptions = {
 
 export default function Home() {
   const [view, setView] = useState<View>("today");
-  const [name, setName] = useState("Charizard ex");
-  const [setNameValue, setSetNameValue] = useState("151");
-  const [number, setNumber] = useState("199/165");
+  const [name, setName] = useState("");
+  const [setNameValue, setSetNameValue] = useState("");
+  const [number, setNumber] = useState("");
   const [quickIntake, setQuickIntake] = useState("");
   const [manualCompQuery, setManualCompQuery] = useState("");
   const [stockImportText, setStockImportText] = useState("");
   const [grade, setGrade] = useState<Grade>("RAW");
-  const [cost, setCost] = useState("18.00");
+  const [cost, setCost] = useState("");
   const [quantity, setQuantity] = useState("1");
-  const [source, setSource] = useState("Card fair");
-  const [location, setLocation] = useState("Box A");
-  const [condition, setCondition] = useState("NM");
+  const [source, setSource] = useState(DEFAULT_INTAKE_PREFERENCES.source);
+  const [location, setLocation] = useState(DEFAULT_INTAKE_PREFERENCES.location);
+  const [condition, setCondition] = useState(DEFAULT_INTAKE_PREFERENCES.condition);
   const [graderCert, setGraderCert] = useState("");
   const [psaResult, setPsaResult] = useState<PsaCertView | null>(null);
-  const [strategy, setStrategy] = useState<PricingStrategy>("market");
-  const [channel, setChannel] = useState<Channel>("EBAY");
+  const [strategy, setStrategy] = useState<PricingStrategy>(DEFAULT_INTAKE_PREFERENCES.strategy as PricingStrategy);
+  const [channel, setChannel] = useState<Channel>(DEFAULT_INTAKE_PREFERENCES.channel as Channel);
   const [listPriceOverride, setListPriceOverride] = useState("");
   const [checkedCompPrice, setCheckedCompPrice] = useState("");
   const [checkedCompSample, setCheckedCompSample] = useState("1");
   const [checkedCompSource, setCheckedCompSource] = useState<CheckedCompSource>("EBAY_SOLD");
   const [checkedCompNote, setCheckedCompNote] = useState("");
-  const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>("DRAFT");
-  const [keepBuying, setKeepBuying] = useState(true);
+  const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
+  const [keepBuying, setKeepBuying] = useState(DEFAULT_INTAKE_PREFERENCES.keepBuying);
   const [comp, setComp] = useState<Reconciled | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -508,6 +515,7 @@ export default function Home() {
   const [quickHunts, setQuickHunts] = useState<QuickHuntCard[]>(DEFAULT_QUICK_HUNTS);
   const [recentSetIds, setRecentSetIds] = useState<string[]>([]);
   const [recentComps, setRecentComps] = useState<RecentCompEntry[]>([]);
+  const [intakePreferencesLoaded, setIntakePreferencesLoaded] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const pullTracking = useRef(false);
   const compPanelRef = useRef<HTMLElement | null>(null);
@@ -540,6 +548,58 @@ export default function Home() {
       setRecentComps([]);
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const preferences = parseIntakePreferences(window.localStorage.getItem(INTAKE_PREFERENCES_STORAGE_KEY));
+      setSource(preferences.source);
+      setLocation(preferences.location);
+      setCondition(preferences.condition);
+      setChannel(preferences.channel as Channel);
+      setStrategy(preferences.strategy as PricingStrategy);
+      setAcquireListingState(preferences.listingState);
+      setKeepBuying(preferences.keepBuying);
+    } catch {
+      setSource(DEFAULT_INTAKE_PREFERENCES.source);
+      setLocation(DEFAULT_INTAKE_PREFERENCES.location);
+      setCondition(DEFAULT_INTAKE_PREFERENCES.condition);
+      setChannel(DEFAULT_INTAKE_PREFERENCES.channel as Channel);
+      setStrategy(DEFAULT_INTAKE_PREFERENCES.strategy as PricingStrategy);
+      setAcquireListingState(DEFAULT_INTAKE_PREFERENCES.listingState);
+      setKeepBuying(DEFAULT_INTAKE_PREFERENCES.keepBuying);
+    } finally {
+      setIntakePreferencesLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!intakePreferencesLoaded) return;
+    try {
+      window.localStorage.setItem(
+        INTAKE_PREFERENCES_STORAGE_KEY,
+        serializeIntakePreferences({
+          source,
+          location,
+          condition,
+          channel,
+          strategy,
+          listingState: acquireListingState,
+          keepBuying,
+        }),
+      );
+    } catch {
+      // Device storage is optional; the current session still keeps these defaults.
+    }
+  }, [
+    acquireListingState,
+    channel,
+    condition,
+    intakePreferencesLoaded,
+    keepBuying,
+    location,
+    source,
+    strategy,
+  ]);
 
   useEffect(() => {
     if (!notice) return;
