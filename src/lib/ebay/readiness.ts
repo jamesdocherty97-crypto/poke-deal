@@ -10,6 +10,7 @@ export interface EbayReadinessCheck {
 export interface EbayReadinessInput {
   ebayConfigured: boolean;
   ebayConnected: boolean;
+  hasMerchantLocation?: boolean;
   channel: string;
   listingState: string;
   pricePence: number | null;
@@ -37,6 +38,16 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
     label: "eBay account connected",
     status: input.ebayConnected ? "pass" : "fail",
     detail: input.ebayConnected ? undefined : "Complete OAuth at /api/ebay/connect and save EBAY_REFRESH_TOKEN",
+  });
+
+  checks.push({
+    key: "merchant_location",
+    label: "Seller location",
+    status: input.hasMerchantLocation === false ? "warn" : "pass",
+    detail:
+      input.hasMerchantLocation === false
+        ? "No merchant location key found; offer creation may ask for one in eBay business settings"
+        : undefined,
   });
 
   checks.push({

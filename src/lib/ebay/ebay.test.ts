@@ -429,6 +429,15 @@ test("checkEbayReadiness returns ready when all checks pass", () => {
   assert.ok(result.checks.every((c) => c.status !== "fail"));
 });
 
+test("checkEbayReadiness warns but does not block when merchant location is missing", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, hasMerchantLocation: false });
+
+  assert.equal(result.ready, true);
+  const check = result.checks.find((c) => c.key === "merchant_location");
+  assert.equal(check?.status, "warn");
+  assert.match(check?.detail ?? "", /merchant location key/);
+});
+
 test("checkEbayReadiness fails when eBay not configured", () => {
   const result = checkEbayReadiness({ ...READY_INPUT, ebayConfigured: false });
   assert.equal(result.ready, false);

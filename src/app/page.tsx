@@ -231,6 +231,7 @@ type EbayStatus = {
   env?: string;
   marketplaceId?: string;
   hasPolicies?: boolean;
+  hasMerchantLocation?: boolean;
   policies?: {
     paymentPolicyId?: string;
     fulfillmentPolicyId?: string;
@@ -1092,23 +1093,32 @@ export default function Home() {
     ebayStatus?.hasPolicies ||
       (ebayPolicies?.paymentPolicyId && ebayPolicies.fulfillmentPolicyId && ebayPolicies.returnPolicyId),
   );
+  const ebayHasMerchantLocation = Boolean(ebayStatus?.hasMerchantLocation || ebayPolicies?.merchantLocationKey);
   const ebayHealthSource = useMemo<SystemSource>(
     () => ({
       id: "ebay-sell-api",
       label: "eBay Sell API",
       role: "listing offer automation",
-      status: ebayStatus?.connected && ebayHasPolicies ? "ready" : ebayStatus?.connected ? "building" : "missing",
+      status: ebayStatus?.connected && ebayHasPolicies && ebayHasMerchantLocation
+        ? "ready"
+        : ebayStatus?.connected && ebayHasPolicies
+          ? "building"
+          : ebayStatus?.connected
+            ? "building"
+            : "missing",
       required: false,
       setupHint:
-        ebayStatus?.connected && ebayHasPolicies
+        ebayStatus?.connected && ebayHasPolicies && ebayHasMerchantLocation
           ? "Seller account and business policies are ready for app-created offers."
+          : ebayStatus?.connected && ebayHasPolicies
+            ? "Required eBay policies are ready; no merchant location key was returned, so first offer creation may need seller-location setup."
           : ebayStatus?.connected
             ? "Seller account is connected; finish business policies before offer creation."
             : ebayStatus?.configured
               ? "Seller credentials are present; connect the eBay account to create offers."
               : "Add production eBay credentials when you are ready to automate listing offers.",
     }),
-    [ebayHasPolicies, ebayStatus?.configured, ebayStatus?.connected],
+    [ebayHasMerchantLocation, ebayHasPolicies, ebayStatus?.configured, ebayStatus?.connected],
   );
   const setupSources = useMemo(
     () => (systemStatus ? [...systemStatus.sources, ebayHealthSource] : []),
@@ -5483,6 +5493,7 @@ function ListingPackSheet({
         listingState: listing.state,
         pricePence: listing.listPrice ?? listing.suggestedPrice ?? null,
         externalRef: listing.externalRef,
+        hasMerchantLocation: Boolean(ebayStatus?.hasMerchantLocation || ebayStatus?.policies?.merchantLocationKey),
         hasImage: Boolean(listing.item?.card.imageUrl),
       })
     : null;
@@ -5675,10 +5686,19 @@ function EbayPreflightCard({ preflight }: { preflight: EbayPreflight }) {
         </div>
         <div>
           <dt>Policies</dt>
-          <dd>{policyCount}/3 ready{preflight.policyKeys.merchantLocationKey ? " + location" : ""}</dd>
+          <dd>{policyCount}/3 ready</dd>
+        </div>
+        <div>
+          <dt>Location</dt>
+          <dd>{preflight.policyKeys.merchantLocationKey ? "ready" : "not returned"}</dd>
         </div>
       </dl>
-      <p>{preflight.existingOfferId ? "An existing eBay offer was found for this SKU." : "Ready to create a new eBay offer."}</p>
+      <p>
+        {preflight.existingOfferId ? "An existing eBay offer was found for this SKU." : "Ready to create a new eBay offer."}
+        {!preflight.policyKeys.merchantLocationKey
+          ? " If eBay rejects create, add or refresh the seller location in eBay business settings."
+          : ""}
+      </p>
     </div>
   );
 }

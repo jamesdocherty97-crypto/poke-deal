@@ -31,6 +31,7 @@ export async function GET() {
       env: config.env,
       marketplaceId: config.marketplaceId,
       hasPolicies: Boolean(policies.paymentPolicyId && policies.fulfillmentPolicyId && policies.returnPolicyId),
+      hasMerchantLocation: Boolean(policies.merchantLocationKey),
       policies,
     });
   } catch (err) {
