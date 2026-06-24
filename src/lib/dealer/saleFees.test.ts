@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { breakEvenSalePricePence, estimateSaleCosts, postedSalePostagePence, saleNetPence } from "./saleFees.js";
+import {
+  breakEvenSalePricePence,
+  buyerPaidPostagePence,
+  defaultGrossSalePence,
+  estimateSaleCosts,
+  postedSalePostagePence,
+  saleNetPence,
+} from "./saleFees.js";
 
 test("estimateSaleCosts applies UK-friendly selling presets", () => {
   assert.deepEqual(estimateSaleCosts("EBAY", 5000), { feesPence: 670, postagePence: 175 });
@@ -16,6 +23,17 @@ test("estimateSaleCosts uses tracked postage for slab sales", () => {
   });
   assert.equal(postedSalePostagePence("RAW"), 175);
   assert.equal(postedSalePostagePence("CGC_10"), 499);
+});
+
+test("defaultGrossSalePence adds buyer-paid postage for posted marketplaces", () => {
+  assert.equal(buyerPaidPostagePence("EBAY", "RAW"), 175);
+  assert.equal(buyerPaidPostagePence("CARDMARKET", "PSA_10"), 499);
+  assert.equal(buyerPaidPostagePence("VINTED", "RAW"), 0);
+  assert.equal(buyerPaidPostagePence("IN_PERSON", "PSA_10"), 0);
+
+  assert.equal(defaultGrossSalePence("EBAY", 5000, { grade: "RAW" }), 5175);
+  assert.equal(defaultGrossSalePence("EBAY", 5000, { grade: "PSA_10" }), 5499);
+  assert.equal(defaultGrossSalePence("IN_PERSON", 5000, { grade: "PSA_10" }), 5000);
 });
 
 test("saleNetPence nets fees and postage from the booked sale price", () => {

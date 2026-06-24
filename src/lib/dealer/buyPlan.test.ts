@@ -13,13 +13,15 @@ test("buildBuyPlan accounts for eBay fees and postage per unit", () => {
 
   assert.equal(plan.label, "Buy");
   assert.equal(plan.tone, "good");
-  assert.equal(plan.unitFeesPence, 670);
+  assert.equal(plan.unitListPence, 5000);
+  assert.equal(plan.unitGrossSalePence, 5175);
+  assert.equal(plan.unitFeesPence, 692);
   assert.equal(plan.unitPostagePence, 175);
-  assert.equal(plan.unitNetPence, 4155);
-  assert.equal(plan.unitProfitPence, 2355);
-  assert.equal(plan.totalProfitPence, 4710);
-  assert.equal(plan.roiPct, 130.8);
-  assert.equal(plan.marginPct, 47.1);
+  assert.equal(plan.unitNetPence, 4308);
+  assert.equal(plan.unitProfitPence, 2508);
+  assert.equal(plan.totalProfitPence, 5016);
+  assert.equal(plan.roiPct, 139.3);
+  assert.equal(plan.marginPct, 48.5);
 });
 
 test("buildBuyPlan can account for slab postage", () => {
@@ -31,8 +33,9 @@ test("buildBuyPlan can account for slab postage", () => {
     grade: "PSA_10",
   });
 
+  assert.equal(plan.unitGrossSalePence, 5499);
   assert.equal(plan.unitPostagePence, 499);
-  assert.equal(plan.unitProfitPence, 2031);
+  assert.equal(plan.unitProfitPence, 2466);
 });
 
 test("buildBuyPlan warns when profit is positive but below the ROI target", () => {

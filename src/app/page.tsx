@@ -33,7 +33,13 @@ import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
-import { breakEvenSalePricePence, estimateSaleCosts, saleNetPence } from "@/lib/dealer/saleFees";
+import {
+  buyerPaidPostagePence,
+  breakEvenSalePricePence,
+  defaultGrossSalePence,
+  estimateSaleCosts,
+  saleNetPence,
+} from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
 
@@ -430,7 +436,7 @@ export default function Home() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [salePrice, setSalePrice] = useState("");
   const [fees, setFees] = useState("");
-  const [postage, setPostage] = useState("1.20");
+  const [postage, setPostage] = useState("1.75");
   const [soldAt, setSoldAt] = useState(todayInputValue());
   const [saleChannel, setSaleChannel] = useState<Channel>("EBAY");
   const [saleQuantity, setSaleQuantity] = useState("1");
@@ -1758,12 +1764,13 @@ export default function Home() {
     const saleListing = listing ?? item.listings[0];
     const price = saleListing?.listPrice ?? saleListing?.suggestedPrice ?? item.costBasis;
     const nextChannel = saleListing?.channel ?? "EBAY";
-    const estimate = estimateSaleCosts(nextChannel, price, { grade: item.grade });
+    const grossSalePrice = defaultGrossSalePence(nextChannel, price, { grade: item.grade });
+    const estimate = estimateSaleCosts(nextChannel, grossSalePrice, { grade: item.grade });
     setSellingId(item.id);
     setEditingItemId(null);
     setEditingListingId(null);
     setCreatingListingItemId(null);
-    setSalePrice(penceToPounds(price));
+    setSalePrice(penceToPounds(grossSalePrice));
     setSaleQuantity("1");
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
@@ -1788,8 +1795,16 @@ export default function Home() {
   }
 
   function applySaleChannelPreset(nextChannel: Channel) {
-    const estimate = estimateSaleCosts(nextChannel, poundsToPence(salePrice), { grade: sellingItem?.grade });
+    const currentGross = poundsToPence(salePrice);
+    const currentItemSubtotal =
+      currentGross > 0 ? Math.max(0, currentGross - buyerPaidPostagePence(saleChannel, sellingItem?.grade)) : 0;
+    const nextGross =
+      currentItemSubtotal > 0
+        ? defaultGrossSalePence(nextChannel, currentItemSubtotal, { grade: sellingItem?.grade })
+        : currentGross;
+    const estimate = estimateSaleCosts(nextChannel, nextGross, { grade: sellingItem?.grade });
     setSaleChannel(nextChannel);
+    setSalePrice(penceToPounds(nextGross));
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
     setFeesTouched(false);
@@ -1805,7 +1820,10 @@ export default function Home() {
     if (!sellingItem) return 0;
     const quantityForPrice = saleQuantityForShortcuts();
     const currentTotal = poundsToPence(salePrice);
-    if (currentTotal > 0) return Math.round(currentTotal / quantityForPrice);
+    if (currentTotal > 0) {
+      const itemSubtotal = Math.max(0, currentTotal - buyerPaidPostagePence(saleChannel, sellingItem.grade));
+      return Math.round(itemSubtotal / quantityForPrice);
+    }
     return saleListPrice(sellingItem) ?? sellingItem.costBasis;
   }
 
@@ -1819,15 +1837,19 @@ export default function Home() {
     setPostageTouched(false);
   }
 
+  function applySaleItemSubtotal(itemSubtotalPence: number) {
+    applySaleTotalPrice(defaultGrossSalePence(saleChannel, itemSubtotalPence, { grade: sellingItem?.grade }));
+  }
+
   function useListingSalePrice() {
     if (!sellingItem) return;
     const unitPrice = saleListPrice(sellingItem) ?? sellingItem.costBasis;
-    applySaleTotalPrice(unitPrice * saleQuantityForShortcuts());
+    applySaleItemSubtotal(unitPrice * saleQuantityForShortcuts());
   }
 
   function applySalePriceMultiplier(multiplier: number) {
     if (!sellingItem) return;
-    applySaleTotalPrice(Math.round(saleUnitReferencePence() * multiplier) * saleQuantityForShortcuts());
+    applySaleItemSubtotal(Math.round(saleUnitReferencePence() * multiplier) * saleQuantityForShortcuts());
   }
 
   function useBreakEvenSalePrice() {
@@ -1843,7 +1865,7 @@ export default function Home() {
     if (!sellingItem) return;
     const unitPrice = saleUnitReferencePence();
     setSaleQuantity(String(sellingItem.quantity));
-    applySaleTotalPrice(unitPrice * sellingItem.quantity);
+    applySaleItemSubtotal(unitPrice * sellingItem.quantity);
   }
 
   function applyCashSale() {
@@ -3301,7 +3323,8 @@ export default function Home() {
                   <span>Net/unit</span>
                   <strong>{gbp(buyPlan.unitNetPence)}</strong>
                   <small>
-                    fees {gbp(buyPlan.unitFeesPence)} · post {gbp(buyPlan.unitPostagePence)}
+                    gross {gbp(buyPlan.unitGrossSalePence)} · fees {gbp(buyPlan.unitFeesPence)} · post{" "}
+                    {gbp(buyPlan.unitPostagePence)}
                   </small>
                 </div>
                 <div>
@@ -4216,7 +4239,7 @@ export default function Home() {
           </div>
           <div className="sale-shortcuts" aria-label="Sale shortcuts">
             <button type="button" onClick={useListingSalePrice} disabled={!sellingItem}>
-              List
+              List + post
             </button>
             <button type="button" onClick={() => applySalePriceMultiplier(0.95)} disabled={!sellingItem}>
               95%
@@ -4236,15 +4259,15 @@ export default function Home() {
               Cash
             </button>
             <button type="button" onClick={resetSaleCosts}>
-              Reset
+              Default costs
             </button>
             <button type="button" onClick={clearSalePostage}>
-              No post
+              Post £0
             </button>
           </div>
           <div className="form-grid">
             <label>
-              Total sale
+              Gross received
               <MoneyInput value={salePrice} onChange={setSalePrice} />
             </label>
             <label>
@@ -4285,6 +4308,11 @@ export default function Home() {
               }}
             />
           </label>
+          {sellingItem && buyerPaidPostagePence(saleChannel, sellingItem.grade) > 0 && (
+            <p className="hint sale-assumption">
+              Default gross includes {gbp(buyerPaidPostagePence(saleChannel, sellingItem.grade))} buyer-paid postage.
+            </p>
+          )}
           {salePreview && (
             <div className={`sale-preview ${salePreview.profitPence >= 0 ? "good" : "warn"}`}>
               <div>
@@ -5155,8 +5183,9 @@ function judgeDeal(
   if (comp.sampleSize === 0 || comp.medianPence <= 0) {
     return { label: "No signal", tone: "danger", expectedProfitPence: 0, targetBuyPence: 0 };
   }
-  const costs = estimateSaleCosts(channel, comp.medianPence, { grade });
-  const net = comp.medianPence - costs.feesPence - costs.postagePence;
+  const grossSalePence = defaultGrossSalePence(channel, comp.medianPence, { grade });
+  const costs = estimateSaleCosts(channel, grossSalePence, { grade });
+  const net = grossSalePence - costs.feesPence - costs.postagePence;
   const expectedProfitPence = net - costBasisPence;
   const targetBuyPence = Math.max(0, Math.round(net * 0.7));
   const roi = costBasisPence > 0 ? expectedProfitPence / costBasisPence : 0;

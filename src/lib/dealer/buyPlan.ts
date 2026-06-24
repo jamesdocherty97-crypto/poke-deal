@@ -1,4 +1,4 @@
-import { estimateSaleCosts, type SaleChannel } from "./saleFees.js";
+import { defaultGrossSalePence, estimateSaleCosts, type SaleChannel } from "./saleFees.js";
 
 export type BuyPlanTone = "good" | "warn" | "danger";
 
@@ -24,6 +24,7 @@ export interface BuyPlan {
   roiPct: number | null;
   marginPct: number | null;
   note: string;
+  unitGrossSalePence: number;
 }
 
 export interface BuyTargetSuggestionInput {
@@ -43,11 +44,12 @@ export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
   const unitCostPence = Math.max(0, Math.round(input.unitCostPence));
   const quantity = Math.max(1, Math.round(input.quantity));
   const unitListPence = Math.max(0, Math.round(input.listPricePence));
-  const costs = estimateSaleCosts(input.channel, unitListPence, { grade: input.grade });
-  const unitNetPence = unitListPence - costs.feesPence - costs.postagePence;
+  const unitGrossSalePence = defaultGrossSalePence(input.channel, unitListPence, { grade: input.grade });
+  const costs = estimateSaleCosts(input.channel, unitGrossSalePence, { grade: input.grade });
+  const unitNetPence = unitGrossSalePence - costs.feesPence - costs.postagePence;
   const unitProfitPence = unitNetPence - unitCostPence;
   const roiPct = unitCostPence > 0 ? roundPct(unitProfitPence / unitCostPence) : null;
-  const marginPct = unitListPence > 0 ? roundPct(unitProfitPence / unitListPence) : null;
+  const marginPct = unitGrossSalePence > 0 ? roundPct(unitProfitPence / unitGrossSalePence) : null;
   const minRoiPct = input.minRoiPct ?? 25;
 
   if (unitListPence <= 0 || unitProfitPence <= 0) {
@@ -62,6 +64,7 @@ export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
       totalProfitPence: unitProfitPence * quantity,
       roiPct,
       marginPct,
+      unitGrossSalePence,
       note: "The planned sale price does not clear cost, fees and postage.",
     };
   }
@@ -78,6 +81,7 @@ export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
       totalProfitPence: unitProfitPence * quantity,
       roiPct,
       marginPct,
+      unitGrossSalePence,
       note: "Maths works, but the comp needs a second look before committing hard.",
     };
   }
@@ -94,6 +98,7 @@ export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
       totalProfitPence: unitProfitPence * quantity,
       roiPct,
       marginPct,
+      unitGrossSalePence,
       note: `Profit is positive but below the ${minRoiPct}% ROI target.`,
     };
   }
@@ -109,6 +114,7 @@ export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
     totalProfitPence: unitProfitPence * quantity,
     roiPct,
     marginPct,
+    unitGrossSalePence,
     note: "Planned sale clears costs with a useful margin.",
   };
 }

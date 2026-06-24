@@ -43,6 +43,20 @@ export function postedSalePostagePence(grade: string | null | undefined): number
   return isGradedSaleGrade(grade) ? GRADED_POSTAGE_PENCE : RAW_POSTAGE_PENCE;
 }
 
+export function buyerPaidPostagePence(channel: SaleChannel, grade: string | null | undefined): number {
+  if (channel === "EBAY" || channel === "CARDMARKET") return postedSalePostagePence(grade);
+  return 0;
+}
+
+export function defaultGrossSalePence(
+  channel: SaleChannel,
+  itemPricePence: number,
+  options: SaleCostOptions = {},
+): number {
+  const itemPrice = Math.max(0, Math.round(itemPricePence));
+  return itemPrice + buyerPaidPostagePence(channel, options.grade);
+}
+
 export function saleNetPence({
   salePricePence,
   feesPence,
