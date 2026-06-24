@@ -760,6 +760,12 @@ export default function Home() {
   const displayCardName = catalogCard?.name ?? name;
   const displaySetName = catalogCard?.setName ?? setNameValue;
   const displayNumber = catalogCard?.number ?? number;
+  const selectedCardTitle = displayCardName.trim() || "Next card";
+  const selectedCardMeta = [
+    displaySetName.trim() || null,
+    displayNumber ? `#${displayNumber}` : null,
+    grade.replace(/_/g, " "),
+  ].filter(Boolean).join(" · ");
   const matchingQuickHunt = quickHunts.find(
     (card) =>
       card.name.trim().toLowerCase() === name.trim().toLowerCase() &&
@@ -1202,6 +1208,26 @@ export default function Home() {
     setCheckedCompSample("1");
     setCheckedCompSource("EBAY_SOLD");
     setCheckedCompNote("");
+  }
+
+  function clearCurrentComp() {
+    setName("");
+    setSetNameValue("");
+    setNumber("");
+    setQuickIntake("");
+    setManualCompQuery("");
+    setCost("");
+    setQuantity("1");
+    setComp(null);
+    setSuggestion(null);
+    setCardArtUrl(null);
+    setGradeComp(null);
+    setListPriceOverride("");
+    setGraderCert("");
+    setPsaResult(null);
+    clearCheckedComp();
+    setError(null);
+    setNotice("Ready for next comp.");
   }
 
   function applyPostStockFlow() {
@@ -2920,26 +2946,33 @@ export default function Home() {
                 src={selectedCardImage}
                 className="selected-card-art"
                 fallbackClassName="selected-card-art blank"
-                alt={`${displayCardName} card art`}
+                alt={`${selectedCardTitle} card art`}
               />
               <div>
                 <span>Current card</span>
-                <strong>{displayCardName}</strong>
-                <small>
-                  {displaySetName}
-                  {displayNumber ? ` #${displayNumber}` : ""}
-                  {" · "}
-                  {grade.replace(/_/g, " ")}
-                </small>
+                <strong>{selectedCardTitle}</strong>
+                <small>{selectedCardMeta}</small>
               </div>
-              {selectedCardMarkUrl && (
-                <img
-                  className="selected-set-mark"
-                  src={selectedCardMarkUrl}
-                  alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
-                  onError={hideBrokenImage}
-                />
-              )}
+              <div className="selected-card-actions">
+                {selectedCardMarkUrl && (
+                  <img
+                    className="selected-set-mark"
+                    src={selectedCardMarkUrl}
+                    alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+                    onError={hideBrokenImage}
+                  />
+                )}
+                <button
+                  className="clear-comp-button"
+                  type="button"
+                  onClick={clearCurrentComp}
+                  aria-label="Clear current comp"
+                  title="Clear current comp"
+                  disabled={busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
+                >
+                  X
+                </button>
+              </div>
             </div>
             <label className="quick-intake-field">
               Quick fill
