@@ -19,6 +19,8 @@ export type DealerCompVerdict = {
   label: string;
   title: string;
   detail: string;
+  stockActionLabel: string;
+  requiresCheckedComp: boolean;
   pricedSignalCount: number;
   totalSignalCount: number;
   spreadPct: number | null;
@@ -41,6 +43,8 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
       label: "No comp",
       title: "Stock manually",
       detail: "No priced signal came back. Save the buy and price it after a manual check.",
+      stockActionLabel: "Add checked comp",
+      requiresCheckedComp: true,
     };
   }
 
@@ -61,6 +65,8 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
           : extremeSpread
             ? `${priced.length} priced signals are ${spreadPct}% apart. Open the manual checks and enter a checked comp before relying on this price.`
             : `${priced.length} priced signals are ${spreadPct}% apart. Use the headline as a buy ceiling and inspect the receipt before listing.`,
+      stockActionLabel: extremeSpread ? "Add checked comp" : "Check solds first",
+      requiresCheckedComp: extremeSpread,
     };
   }
 
@@ -71,6 +77,8 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
       label: "Catalog only",
       title: "Manual sold check",
       detail: "This is a TCGPlayer/Cardmarket market signal, not a cleaned sold-comps sample. Good for context, but check sold listings before a bigger buy.",
+      stockActionLabel: "Check solds first",
+      requiresCheckedComp: false,
     };
   }
 
@@ -81,6 +89,8 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
       label: "Thin",
       title: "Guide price only",
       detail: "The price is based on a thin signal. Use it for a rough buy decision and re-check before listing.",
+      stockActionLabel: "Stock with care",
+      requiresCheckedComp: false,
     };
   }
 
@@ -91,6 +101,8 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
       label: "Single graded",
       title: "Manual check needed",
       detail: "This slab price has no live cross-check. Treat it as indicative until PokeTrace, owned sales, or a manual eBay check confirms it.",
+      stockActionLabel: "Check slab solds",
+      requiresCheckedComp: false,
     };
   }
 
@@ -101,6 +113,8 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
       label: "Single source",
       title: "Usable with care",
       detail: "One priced source is available. Good enough to move fast, but worth a second check on larger buys.",
+      stockActionLabel: "Stock with care",
+      requiresCheckedComp: false,
     };
   }
 
@@ -110,6 +124,8 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
     label: "Usable",
     title: "Good daily comp",
     detail: "Priced sources are aligned enough for normal buying and repricing decisions.",
+    stockActionLabel: "Stock this",
+    requiresCheckedComp: false,
   };
 }
 

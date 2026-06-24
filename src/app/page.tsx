@@ -956,6 +956,8 @@ export default function Home() {
       !checkedComp &&
       (needsManualComp || !catalogCard || comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
   );
+  const requiresCheckedCompBeforeStock = Boolean(!checkedComp && dealerVerdict?.requiresCheckedComp);
+  const stockActionLabel = checkedComp ? "Stock checked comp" : dealerVerdict?.stockActionLabel ?? "Stock this";
   const confidenceLabel = dealerVerdict
     ? { label: dealerVerdict.label, tone: dealerVerdict.tone }
     : headline
@@ -1010,6 +1012,7 @@ export default function Home() {
     ? poundsToPence(listPriceOverride)
     : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
   const quickStockReady = Boolean(headline && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
+  const quickStockCanSubmit = quickStockReady && !requiresCheckedCompBeforeStock;
   const buyTargetSuggestion = useMemo(
     () =>
       headline
@@ -3836,7 +3839,13 @@ export default function Home() {
                   <div className="quick-stock-heading">
                     <div>
                       <span>Ready to stock</span>
-                      <strong>{quickStockReady ? `${quickStockQuantity} to ${acquireListingState === "ACTIVE" ? "list" : "draft"}` : "Add cost"}</strong>
+                      <strong>
+                        {requiresCheckedCompBeforeStock
+                          ? "Add checked comp"
+                          : quickStockReady
+                            ? `${quickStockQuantity} to ${acquireListingState === "ACTIVE" ? "list" : "draft"}`
+                            : "Add cost"}
+                      </strong>
                     </div>
                     <span className={`pill ${buyPlan?.tone ?? "warn"}`}>{buyPlan?.label ?? "Check"}</span>
                   </div>
@@ -3866,9 +3875,9 @@ export default function Home() {
                     className="primary-action"
                     type="button"
                     onClick={() => void acquire()}
-                    disabled={busy === "acquire" || !quickStockReady}
+                    disabled={busy === "acquire" || !quickStockCanSubmit}
                   >
-                    {busy === "acquire" ? "Stocking..." : "Stock this"}
+                    {busy === "acquire" ? "Stocking..." : quickStockReady ? stockActionLabel : "Add cost"}
                   </button>
                 </div>
               )}
@@ -4246,8 +4255,16 @@ export default function Home() {
               />
               <span>Keep buying</span>
             </label>
-            <button className="primary-action" type="submit" disabled={busy === "acquire" || needsManualComp}>
-              {busy === "acquire" ? "Stocking..." : needsManualComp ? "Add checked comp first" : "Acquire + price"}
+            <button
+              className="primary-action"
+              type="submit"
+              disabled={busy === "acquire" || needsManualComp || requiresCheckedCompBeforeStock}
+            >
+              {busy === "acquire"
+                ? "Stocking..."
+                : needsManualComp || requiresCheckedCompBeforeStock
+                  ? "Add checked comp first"
+                  : "Acquire + price"}
             </button>
             <button className="secondary-action" type="button" onClick={stockWithoutComp} disabled={busy === "manual-stock"}>
               {busy === "manual-stock" ? "Stocking..." : "Stock now, price later"}
@@ -5363,7 +5380,9 @@ export default function Home() {
             <strong>{gbp(headline.medianPence)}</strong>
             <small>
               {quickStockReady
-                ? `${quickStockQuantity} @ ${gbp(quickStockCostPence)} · ${deal?.label ?? "ready"}`
+                ? `${quickStockQuantity} @ ${gbp(quickStockCostPence)} · ${
+                    requiresCheckedCompBeforeStock ? "check solds" : deal?.label ?? "ready"
+                  }`
                 : "add cost and quantity"}
             </small>
           </div>
@@ -5379,9 +5398,9 @@ export default function Home() {
             className="primary-action"
             type="button"
             onClick={() => void acquire()}
-            disabled={busy === "acquire" || !quickStockReady}
+            disabled={busy === "acquire" || !quickStockCanSubmit}
           >
-            {busy === "acquire" ? "Stocking..." : quickStockReady ? "Stock" : "Add cost"}
+            {busy === "acquire" ? "Stocking..." : quickStockReady ? stockActionLabel : "Add cost"}
           </button>
         </section>
       )}
