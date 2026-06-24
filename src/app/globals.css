@@ -2875,6 +2875,22 @@ label {
   line-height: 1.35;
 }
 
+.listing-pack-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.listing-pack-actions .primary-action,
+.listing-pack-actions a,
+.listing-pack-actions button {
+  width: 100%;
+}
+
+.listing-pack-actions .primary-action {
+  grid-column: 1 / -1;
+}
+
 .sale-preview {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

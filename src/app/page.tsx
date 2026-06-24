@@ -28,6 +28,7 @@ import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/l
 import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
 import { buildCheckedComp, checkedCompSourceLabel, type CheckedCompSource } from "@/lib/dealer/checkedComp";
 import { buildListingPack, type ListingPack } from "@/lib/dealer/listingPack";
+import { listingVenueAction, nextDraftListingId } from "@/lib/dealer/listingWorkflow";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
@@ -584,6 +585,10 @@ export default function Home() {
     () => listings.find((listing) => listing.id === listingPackId) ?? null,
     [listingPackId, listings],
   );
+  const nextListingPackTarget = useMemo(() => {
+    const nextId = nextDraftListingId(visibleListings, listingPackId);
+    return nextId ? visibleListings.find((listing) => listing.id === nextId) ?? null : null;
+  }, [listingPackId, visibleListings]);
   const listingPack = useMemo(() => {
     if (!listingPackTarget?.item) return null;
     const { item } = listingPackTarget;
@@ -2189,6 +2194,27 @@ export default function Home() {
     }
   }
 
+  function openNextListingPack() {
+    if (!nextListingPackTarget) return;
+    setListingPackId(nextListingPackTarget.id);
+    setListingPackCopied(false);
+    setError(null);
+    setNotice(null);
+  }
+
+  async function activateListingPackTarget() {
+    if (!listingPackTarget) return;
+    const nextId = nextListingPackTarget?.id ?? null;
+    const ok = await patchListing(
+      listingPackTarget,
+      { state: "ACTIVE" },
+      nextId ? "Listing activated. Next draft ready." : "Listing activated.",
+    );
+    if (!ok) return;
+    setListingPackId(nextId);
+    setListingPackCopied(false);
+  }
+
   async function patchListing(
     listing: Listing,
     patch: Partial<{
@@ -2212,8 +2238,10 @@ export default function Home() {
       if (!res.ok) throw new Error(payload.error ?? "listing update failed");
       setNotice(message);
       await refreshAll();
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "listing update failed");
+      return false;
     } finally {
       setBusy(null);
     }
@@ -3794,7 +3822,11 @@ export default function Home() {
               listing={listingPackTarget}
               pack={listingPack}
               copied={listingPackCopied}
+              busy={busy === `listing-${listingPackTarget.id}`}
+              nextListingLabel={nextListingPackTarget ? listingQueueLabel(nextListingPackTarget) : null}
               onCopy={copyListingPack}
+              onActivate={activateListingPackTarget}
+              onNext={openNextListingPack}
               onClose={() => setListingPackId(null)}
             />
           )}
@@ -4375,17 +4407,27 @@ function ListingPackSheet({
   listing,
   pack,
   copied,
+  busy,
+  nextListingLabel,
   onCopy,
+  onActivate,
+  onNext,
   onClose,
 }: {
   listing: Listing;
   pack: ListingPack;
   copied: boolean;
+  busy: boolean;
+  nextListingLabel: string | null;
   onCopy: () => void;
+  onActivate: () => void;
+  onNext: () => void;
   onClose: () => void;
 }) {
   const item = listing.item;
   const specifics = Object.entries(pack.itemSpecifics);
+  const venueAction = listingVenueAction(listing.channel);
+  const canActivate = listing.state === "DRAFT";
 
   return (
     <form className="sell-sheet listing-pack-sheet" onSubmit={(event) => event.preventDefault()}>
@@ -4425,9 +4467,26 @@ function ListingPackSheet({
         Copy block
         <textarea readOnly value={pack.copyReady} rows={9} />
       </label>
-      <button className="primary-action" type="button" onClick={onCopy}>
-        {copied ? "Copied" : "Copy listing pack"}
-      </button>
+      <div className="listing-pack-actions">
+        <button className="primary-action" type="button" onClick={onCopy}>
+          {copied ? "Copied" : "Copy listing pack"}
+        </button>
+        {venueAction && (
+          <a className="export-link" href={venueAction.url} target="_blank" rel="noreferrer">
+            {venueAction.label}
+          </a>
+        )}
+        {canActivate && (
+          <button className="ghost-button" type="button" onClick={onActivate} disabled={busy}>
+            {busy ? "Activating..." : "Mark active"}
+          </button>
+        )}
+        {nextListingLabel && (
+          <button className="ghost-button" type="button" onClick={onNext}>
+            Next: {nextListingLabel}
+          </button>
+        )}
+      </div>
     </form>
   );
 }
@@ -5344,6 +5403,12 @@ function channelLabel(channel: Channel): string {
   if (channel === "CARDMARKET") return "Cardmarket";
   if (channel === "VINTED") return "Vinted";
   return "In person";
+}
+
+function listingQueueLabel(listing: Listing): string {
+  const item = listing.item;
+  if (!item) return listing.title ?? "draft";
+  return [item.card.name, item.card.number].filter(Boolean).join(" ");
 }
 
 function expenseCategoryLabel(category: ExpenseCategory): string {
