@@ -1905,6 +1905,43 @@ label {
   border-color: rgba(251, 113, 133, 0.38);
 }
 
+.manual-rescue-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(251, 113, 133, 0.42);
+  border-radius: 8px;
+  background:
+    linear-gradient(125deg, rgba(251, 113, 133, 0.16), transparent 54%),
+    rgba(3, 8, 20, 0.42);
+  padding: 11px;
+}
+
+.manual-rescue-card div {
+  display: grid;
+  gap: 3px;
+}
+
+.manual-rescue-card span,
+.manual-rescue-card li {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.28;
+}
+
+.manual-rescue-card strong {
+  color: var(--danger);
+  font-size: 17px;
+  line-height: 1.12;
+}
+
+.manual-rescue-card ol {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .quick-stock-heading,
 .quick-stock-grid {
   display: grid;
@@ -2174,6 +2211,13 @@ label {
   background: rgba(52, 211, 153, 0.07);
 }
 
+.manual-comp-links.priority {
+  border-color: rgba(251, 113, 133, 0.38);
+  background:
+    linear-gradient(120deg, rgba(255, 203, 5, 0.14), transparent 58%),
+    rgba(3, 8, 20, 0.42);
+}
+
 .manual-comp-heading {
   grid-column: 1 / -1;
   display: flex;
@@ -2279,6 +2323,13 @@ label {
 .checked-comp-card.active {
   border-color: rgba(52, 211, 153, 0.38);
   background: rgba(52, 211, 153, 0.1);
+}
+
+.checked-comp-card.priority {
+  border-color: rgba(255, 203, 5, 0.38);
+  background:
+    linear-gradient(120deg, rgba(255, 203, 5, 0.12), transparent 58%),
+    rgba(3, 8, 20, 0.42);
 }
 
 .checked-comp-heading {

@@ -756,6 +756,11 @@ export default function Home() {
   const ownedSalesComp =
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
+  const needsManualComp = Boolean(
+    apiHeadline &&
+      !checkedComp &&
+      (apiHeadline.medianPence <= 0 || apiHeadline.sampleSize <= 0),
+  );
   const manualCompCard = useMemo(
     () => ({
       name: catalogCard?.name ?? name,
@@ -2541,7 +2546,7 @@ export default function Home() {
     }
   }
 
-  function renderManualCompLinks(variant: "compact" | "full" = "full") {
+  function renderManualCompLinks(variant: "compact" | "full" | "priority" = "full") {
     const ebayQuery = manualCompLinks.find((link) => link.kind === "EBAY_UK_SOLD")?.query ?? manualCompFallbackQuery;
     return (
       <div className={`manual-comp-links ${variant}`} aria-label="Manual comp checks">
@@ -2576,6 +2581,73 @@ export default function Home() {
             {link.label}
           </a>
         ))}
+      </div>
+    );
+  }
+
+  function renderCheckedCompCard(variant: "full" | "priority" = "full") {
+    return (
+      <div className={`checked-comp-card ${checkedComp ? "active" : ""} ${variant}`}>
+        <div className="checked-comp-heading">
+          <div>
+            <span>Checked comp</span>
+            <strong>{checkedComp ? `${gbp(checkedComp.medianPence)} in use` : "Optional override"}</strong>
+          </div>
+          {checkedComp && (
+            <button className="ghost-button" type="button" onClick={clearCheckedComp}>
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="form-grid">
+          <label>
+            Sold price
+            <MoneyInput value={checkedCompPrice} onChange={setCheckedCompPrice} placeholder="e.g. 24.00" />
+          </label>
+          <label>
+            Seen on
+            <select
+              value={checkedCompSource}
+              onChange={(event) => setCheckedCompSource(event.target.value as CheckedCompSource)}
+            >
+              {checkedCompSources.map((source) => (
+                <option key={source} value={source}>
+                  {checkedCompSourceLabel(source)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="form-grid">
+          <label>
+            Sample
+            <input
+              inputMode="numeric"
+              min="1"
+              step="1"
+              value={checkedCompSample}
+              onChange={(event) => setCheckedCompSample(event.target.value)}
+            />
+          </label>
+          <label>
+            Note
+            <input
+              value={checkedCompNote}
+              onChange={(event) => setCheckedCompNote(event.target.value)}
+              placeholder="NM solds, same language"
+            />
+          </label>
+        </div>
+        {checkedComp && (
+          <p className="hint">
+            Auto list, buy plan and acquire are using this checked comp. API sources stay in the receipt.
+          </p>
+        )}
+        {!checkedComp && variant === "priority" && (
+          <p className="hint">
+            Add one checked sold price and the stock button will use it for the buy plan and draft listing.
+          </p>
+        )}
       </div>
     );
   }
@@ -3082,15 +3154,32 @@ export default function Home() {
               <div className="comp-hero">
                 <div>
                   <p className="eyebrow">
-                    {headline.source === "manual-check"
+                    {needsManualComp
+                      ? "manual comp required"
+                      : headline.source === "manual-check"
                       ? checkedCompSourceLabel(headline.raw?.source)
                       : headline.source}
                   </p>
-                  <h2>{gbp(headline.medianPence)}</h2>
+                  <h2>{needsManualComp ? "No auto price" : gbp(headline.medianPence)}</h2>
                 </div>
                 <span className={`pill ${confidenceLabel?.tone ?? ""}`}>{confidenceLabel?.label}</span>
               </div>
-              {deal && (
+              {needsManualComp && (
+                <div className="manual-rescue-card">
+                  <div>
+                    <span>Vintage, promos and odd variants</span>
+                    <strong>Check solds, then enter the price</strong>
+                  </div>
+                  <ol>
+                    <li>Open eBay UK solds with the exact typed wording.</li>
+                    <li>Use same grade, edition, language and condition.</li>
+                    <li>Enter the checked sold price below, then stock it.</li>
+                  </ol>
+                </div>
+              )}
+              {needsManualComp && renderManualCompLinks("priority")}
+              {needsManualComp && renderCheckedCompCard("priority")}
+              {!needsManualComp && deal && (
                 <div className={`deal-banner ${deal.tone}`}>
                   <div>
                     <span>Deal judge</span>
@@ -3106,45 +3195,47 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              <div className={`quick-stock-card ${buyPlan?.tone ?? "warn"}`}>
-                <div className="quick-stock-heading">
-                  <div>
-                    <span>Ready to stock</span>
-                    <strong>{quickStockReady ? `${quickStockQuantity} to ${acquireListingState === "ACTIVE" ? "list" : "draft"}` : "Add cost"}</strong>
+              {!needsManualComp && (
+                <div className={`quick-stock-card ${buyPlan?.tone ?? "warn"}`}>
+                  <div className="quick-stock-heading">
+                    <div>
+                      <span>Ready to stock</span>
+                      <strong>{quickStockReady ? `${quickStockQuantity} to ${acquireListingState === "ACTIVE" ? "list" : "draft"}` : "Add cost"}</strong>
+                    </div>
+                    <span className={`pill ${buyPlan?.tone ?? "warn"}`}>{buyPlan?.label ?? "Check"}</span>
                   </div>
-                  <span className={`pill ${buyPlan?.tone ?? "warn"}`}>{buyPlan?.label ?? "Check"}</span>
-                </div>
-                <div className="quick-stock-grid">
-                  <label>
-                    Cost
-                    <MoneyInput value={cost} onChange={setCost} />
-                  </label>
-                  <label>
-                    Qty
-                    <input
-                      inputMode="numeric"
-                      min="1"
-                      step="1"
-                      value={quantity}
-                      onChange={(event) => setQuantity(event.target.value)}
+                  <div className="quick-stock-grid">
+                    <label>
+                      Cost
+                      <MoneyInput value={cost} onChange={setCost} />
+                    </label>
+                    <label>
+                      Qty
+                      <input
+                        inputMode="numeric"
+                        min="1"
+                        step="1"
+                        value={quantity}
+                        onChange={(event) => setQuantity(event.target.value)}
+                      />
+                    </label>
+                    <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
+                    <Metric
+                      label="Profit"
+                      value={buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
+                      tone={buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
                     />
-                  </label>
-                  <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
-                  <Metric
-                    label="Profit"
-                    value={buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
-                    tone={buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
-                  />
+                  </div>
+                  <button
+                    className="primary-action"
+                    type="button"
+                    onClick={() => void acquire()}
+                    disabled={busy === "acquire" || !quickStockReady}
+                  >
+                    {busy === "acquire" ? "Stocking..." : "Stock this"}
+                  </button>
                 </div>
-                <button
-                  className="primary-action"
-                  type="button"
-                  onClick={() => void acquire()}
-                  disabled={busy === "acquire" || !quickStockReady}
-                >
-                  {busy === "acquire" ? "Stocking..." : "Stock this"}
-                </button>
-              </div>
+              )}
               <div className="detail-grid">
                 <Metric label="Range" value={`${gbp(headline.lowPence)}-${gbp(headline.highPence)}`} />
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
@@ -3188,64 +3279,8 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {renderManualCompLinks()}
-              <div className={`checked-comp-card ${checkedComp ? "active" : ""}`}>
-                <div className="checked-comp-heading">
-                  <div>
-                    <span>Checked comp</span>
-                    <strong>{checkedComp ? `${gbp(checkedComp.medianPence)} in use` : "Optional override"}</strong>
-                  </div>
-                  {checkedComp && (
-                    <button className="ghost-button" type="button" onClick={clearCheckedComp}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="form-grid">
-                  <label>
-                    Sold price
-                    <MoneyInput value={checkedCompPrice} onChange={setCheckedCompPrice} placeholder="e.g. 24.00" />
-                  </label>
-                  <label>
-                    Seen on
-                    <select
-                      value={checkedCompSource}
-                      onChange={(event) => setCheckedCompSource(event.target.value as CheckedCompSource)}
-                    >
-                      {checkedCompSources.map((source) => (
-                        <option key={source} value={source}>
-                          {checkedCompSourceLabel(source)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="form-grid">
-                  <label>
-                    Sample
-                    <input
-                      inputMode="numeric"
-                      min="1"
-                      step="1"
-                      value={checkedCompSample}
-                      onChange={(event) => setCheckedCompSample(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Note
-                    <input
-                      value={checkedCompNote}
-                      onChange={(event) => setCheckedCompNote(event.target.value)}
-                      placeholder="NM solds, same language"
-                    />
-                  </label>
-                </div>
-                {checkedComp && (
-                  <p className="hint">
-                    Auto list, buy plan and acquire are using this checked comp. API sources stay in the receipt.
-                  </p>
-                )}
-              </div>
+              {!needsManualComp && renderManualCompLinks()}
+              {!needsManualComp && renderCheckedCompCard()}
               {marketBaseline && (
                 <div className="market-signal">
                   <span>Catalog baseline</span>
@@ -3326,7 +3361,7 @@ export default function Home() {
             </section>
           )}
 
-          {headline && grade === "RAW" && (
+          {headline && grade === "RAW" && !needsManualComp && (
             <section className="panel grade-lab">
               <div className="panel-heading">
                 <h2>Grade lab</h2>
@@ -3354,7 +3389,7 @@ export default function Home() {
             </section>
           )}
 
-          {headline && (
+          {headline && !needsManualComp && (
             <section className="panel watch-panel">
               <div className="panel-heading">
                 <h2>Buy target</h2>
@@ -3443,7 +3478,7 @@ export default function Home() {
                 </select>
               </label>
             </div>
-            {projectedListSuggestion && (
+            {projectedListSuggestion && !needsManualComp && (
               <div className={`price-preview ${projectedListSuggestion.confidence}`}>
                 <div>
                   <span>Auto list</span>
@@ -3459,7 +3494,7 @@ export default function Home() {
                 </button>
               </div>
             )}
-            {buyPlan && (
+            {buyPlan && !needsManualComp && (
               <div className={`buy-plan ${buyPlan.tone}`}>
                 <div className="buy-plan-heading">
                   <span>After {channelLabel(channel)}</span>
@@ -3551,8 +3586,8 @@ export default function Home() {
               />
               <span>Keep buying</span>
             </label>
-            <button className="primary-action" type="submit" disabled={busy === "acquire"}>
-              {busy === "acquire" ? "Stocking..." : "Acquire + price"}
+            <button className="primary-action" type="submit" disabled={busy === "acquire" || needsManualComp}>
+              {busy === "acquire" ? "Stocking..." : needsManualComp ? "Add checked comp first" : "Acquire + price"}
             </button>
             <button className="secondary-action" type="button" onClick={stockWithoutComp} disabled={busy === "manual-stock"}>
               {busy === "manual-stock" ? "Stocking..." : "Stock now, price later"}
@@ -4528,7 +4563,7 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && headline && (
+      {view === "acquire" && headline && !needsManualComp && (
         <section className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`} aria-label="Current buy action">
           <div>
             <span>{confidenceLabel?.label ?? "Comp"}</span>

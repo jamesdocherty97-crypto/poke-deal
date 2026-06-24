@@ -75,6 +75,11 @@ test("normalizeManualCompSearchText joins modern promo codes for manual eBay sea
   assert.equal(normalizeManualCompSearchText("Snivy XYZ 001 raw £2"), "Snivy XYZ001");
 });
 
+test("normalizeManualCompSearchText keeps ex card names separate from collector numbers", () => {
+  assert.equal(normalizeManualCompSearchText("Charizard ex 199/165 151"), "Charizard ex 199/165 151");
+  assert.equal(normalizeManualCompSearchText("Mew GX 242/236 Unified Minds"), "Mew GX 242/236 Unified Minds");
+});
+
 test("ebaySoldSearchQuery keeps explicit graded wording instead of adding raw exclusions", () => {
   assert.equal(ebaySoldSearchQuery("Umbreon VMAX PSA 10", "RAW"), "Umbreon VMAX PSA 10");
   assert.equal(ebaySoldSearchQuery("Umbreon VMAX", "PSA_10"), "Umbreon VMAX PSA 10");
