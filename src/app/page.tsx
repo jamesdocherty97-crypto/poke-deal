@@ -2785,6 +2785,25 @@ export default function Home() {
     }
   }
 
+  async function copyListingPackAndOpenVenue() {
+    if (!listingPack || !listingPackTarget) return;
+    const venueAction = listingVenueAction(listingPackTarget.channel);
+    if (venueAction) window.open(venueAction.url, "_blank", "noopener,noreferrer");
+    try {
+      await navigator.clipboard.writeText(listingPack.copyReady);
+      setListingPackCopied(true);
+      setListingPackCopiedField(null);
+      setNotice(
+        venueAction
+          ? "Listing pack copied. eBay Sell opened."
+          : "Listing pack copied.",
+      );
+      setError(null);
+    } catch {
+      setError("Copy failed. Select the listing block and copy it manually.");
+    }
+  }
+
   async function copyListingPackField(field: ListingPackCopyField) {
     try {
       await navigator.clipboard.writeText(field.value);
@@ -4993,6 +5012,7 @@ export default function Home() {
               ebayStatus={ebayStatus}
               ebayPreflight={ebayPreflight?.listingId === listingPackTarget.id ? ebayPreflight : null}
               onCopy={copyListingPack}
+              onCopyAndOpen={copyListingPackAndOpenVenue}
               onCopyField={copyListingPackField}
               onActivate={activateListingPackTarget}
               onSell={openSellFromListingPack}
@@ -5629,6 +5649,7 @@ function ListingPackSheet({
   onPreflight,
   onCreateOffer,
   onRequestPublish,
+  onCopyAndOpen,
 }: {
   listing: Listing;
   pack: ListingPack;
@@ -5647,6 +5668,7 @@ function ListingPackSheet({
   onPreflight: () => void;
   onCreateOffer: () => void;
   onRequestPublish: () => void;
+  onCopyAndOpen: () => void;
 }) {
   const item = listing.item;
   const specifics = Object.entries(pack.itemSpecifics);
@@ -5731,8 +5753,13 @@ function ListingPackSheet({
         <textarea readOnly value={pack.copyReady} rows={9} />
       </label>
       <div className="listing-pack-actions">
-        <button className="primary-action" type="button" onClick={onCopy}>
-          {copied ? "Copied" : "Copy listing pack"}
+        {venueAction && (
+          <button className="primary-action" type="button" onClick={onCopyAndOpen} disabled={busy}>
+            {busy ? "Working..." : "Copy + open"}
+          </button>
+        )}
+        <button className={venueAction ? "ghost-button" : "primary-action"} type="button" onClick={onCopy}>
+          {copied ? "Copied" : venueAction ? "Copy only" : "Copy listing pack"}
         </button>
         {venueAction && (
           <a className="export-link" href={venueAction.url} target="_blank" rel="noreferrer">
