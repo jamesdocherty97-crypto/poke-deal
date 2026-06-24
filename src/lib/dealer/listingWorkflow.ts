@@ -11,6 +11,23 @@ export interface ListingVenueAction {
   url: string;
 }
 
+export type ListingFlowStepState = "done" | "current" | "next" | "blocked";
+
+export interface ListingFlowStep {
+  id: string;
+  label: string;
+  detail: string;
+  state: ListingFlowStepState;
+}
+
+export interface ListingSellFlowInput {
+  channel: ListingWorkflowChannel;
+  state: string;
+  externalRef?: string | null;
+  ebayReady?: boolean;
+  sellable?: boolean;
+}
+
 export function nextDraftListingId(
   listings: ListingWorkflowItem[],
   currentId: string | null | undefined,
@@ -49,6 +66,70 @@ export function listingVenueAction(channel: ListingWorkflowChannel): ListingVenu
     label: "Open eBay Sell",
     url: "https://www.ebay.co.uk/sl/sell",
   };
+}
+
+export function buildListingSellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
+  if (input.channel === "EBAY") return buildEbaySellFlow(input);
+  return buildManualSellFlow(input);
+}
+
+function buildEbaySellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
+  const sold = input.state === "SOLD" || input.sellable === false;
+  const hasOffer = Boolean(input.externalRef?.startsWith("offer:"));
+  const published = Boolean(input.externalRef && !input.externalRef.startsWith("offer:"));
+
+  return [
+    {
+      id: "review",
+      label: "Review pack",
+      detail: "Check title, price, image and specifics.",
+      state: hasOffer || published || sold ? "done" : "current",
+    },
+    {
+      id: "offer",
+      label: "Create offer",
+      detail: "Create the eBay offer without publishing live.",
+      state: hasOffer || published || sold ? "done" : input.ebayReady ? "current" : "blocked",
+    },
+    {
+      id: "publish",
+      label: "Publish live",
+      detail: "Final confirmation before it appears on eBay.",
+      state: published || sold ? "done" : hasOffer ? "current" : "next",
+    },
+    {
+      id: "sale",
+      label: "Book sale",
+      detail: "Record price, fees and postage when it sells.",
+      state: sold ? "done" : published || input.state === "ACTIVE" ? "current" : "next",
+    },
+  ];
+}
+
+function buildManualSellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
+  const sold = input.state === "SOLD" || input.sellable === false;
+  const active = input.state === "ACTIVE";
+
+  return [
+    {
+      id: "copy",
+      label: "Copy pack",
+      detail: "Use the title, price, specifics and description.",
+      state: active || sold ? "done" : "current",
+    },
+    {
+      id: "activate",
+      label: "Mark active",
+      detail: "Track the listing after it is posted or shared.",
+      state: active || sold ? "done" : "next",
+    },
+    {
+      id: "sale",
+      label: "Book sale",
+      detail: "Record price, fees and postage when it sells.",
+      state: sold ? "done" : active ? "current" : "next",
+    },
+  ];
 }
 
 function hasSellableItem(item: ListingWorkflowItem["item"]): boolean {

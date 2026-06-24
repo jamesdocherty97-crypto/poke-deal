@@ -46,7 +46,13 @@ import {
   type ListingPack,
   type ListingPackCopyField,
 } from "@/lib/dealer/listingPack";
-import { listingVenueAction, nextDraftListingId, nextSaleListingId } from "@/lib/dealer/listingWorkflow";
+import {
+  buildListingSellFlow,
+  listingVenueAction,
+  nextDraftListingId,
+  nextSaleListingId,
+  type ListingFlowStep,
+} from "@/lib/dealer/listingWorkflow";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { buildQuickIntakePreview } from "@/lib/dealer/intakePreview";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
@@ -4722,7 +4728,6 @@ export default function Home() {
                   state === "ACTIVE" ? "Listing activated." : "Listing ended.",
                 )
               }
-              onEbayOffer={() => void createEbayOfferForListing(listing.id)}
               onEbayPublish={() => setEbayPublishTarget(listing.id)}
             />
           ))}
@@ -5433,6 +5438,13 @@ function ListingPackSheet({
         hasImage: Boolean(listing.item?.card.imageUrl),
       })
     : null;
+  const sellingSteps = buildListingSellFlow({
+    channel: listing.channel,
+    state: listing.state,
+    externalRef: listing.externalRef,
+    ebayReady: ebayReadiness?.ready ?? false,
+    sellable: canSell,
+  });
 
   return (
     <form className="sell-sheet listing-pack-sheet" onSubmit={(event) => event.preventDefault()}>
@@ -5460,6 +5472,7 @@ function ListingPackSheet({
           <strong>{gbp(pack.postage.pricePence)}</strong>
         </div>
       </div>
+      <ListingFlowSteps steps={sellingSteps} />
       <div className="listing-field-actions" aria-label="Copy listing fields">
         {copyFields.map((field) => (
           <button
@@ -5564,6 +5577,22 @@ function ListingPackSheet({
         </div>
       )}
     </form>
+  );
+}
+
+function ListingFlowSteps({ steps }: { steps: ListingFlowStep[] }) {
+  return (
+    <ol className="listing-flow-steps" aria-label="Selling steps">
+      {steps.map((step, index) => (
+        <li key={step.id} className={`listing-flow-step ${step.state}`}>
+          <span>{index + 1}</span>
+          <div>
+            <strong>{step.label}</strong>
+            <small>{step.detail}</small>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -5765,7 +5794,6 @@ function ListingRow({
   onPack,
   onSell,
   onState,
-  onEbayOffer,
   onEbayPublish,
 }: {
   listing: Listing;
@@ -5775,14 +5803,12 @@ function ListingRow({
   onPack: (listing: Listing) => void;
   onSell: (listing: Listing) => void;
   onState: (state: Exclude<ListingState, "SOLD">) => void;
-  onEbayOffer: () => void;
   onEbayPublish: () => void;
 }) {
   const card = listing.item?.card;
   const title = listing.title ?? card?.name ?? "Untitled listing";
   const price = listing.listPrice ?? listing.suggestedPrice ?? 0;
   const isBusy = busy === `listing-${listing.id}`;
-  const isEbayOfferBusy = busy === `ebay-offer-${listing.id}`;
   const isEbayPublishBusy = busy === `ebay-publish-${listing.id}`;
   const canSell = Boolean(listing.item && listing.item.status !== "SOLD" && listing.state !== "SOLD");
   const stockNotes = [
@@ -5846,10 +5872,10 @@ function ListingRow({
           {isEbay && ebayConnected && !isPublished && !hasOffer && listing.state !== "SOLD" && (
             <button
               type="button"
-              onClick={onEbayOffer}
-              disabled={isEbayOfferBusy}
+              onClick={() => onPack(listing)}
+              disabled={isBusy}
             >
-              {isEbayOfferBusy ? "Creating..." : "eBay offer"}
+              Prepare eBay
             </button>
           )}
           {isEbay && ebayConnected && hasOffer && !isPublished && (

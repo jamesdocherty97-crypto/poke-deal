@@ -3448,6 +3448,87 @@ label {
   font-size: 18px;
 }
 
+.listing-flow-steps {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listing-flow-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.3);
+  padding: 8px;
+}
+
+.listing-flow-step > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 1000;
+}
+
+.listing-flow-step div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.listing-flow-step strong {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.12;
+}
+
+.listing-flow-step small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.listing-flow-step.done {
+  border-color: rgba(52, 211, 153, 0.32);
+}
+
+.listing-flow-step.done > span {
+  background: rgba(52, 211, 153, 0.16);
+  color: var(--green);
+}
+
+.listing-flow-step.current {
+  border-color: rgba(255, 203, 5, 0.38);
+  background:
+    linear-gradient(115deg, rgba(255, 203, 5, 0.12), transparent 56%),
+    rgba(3, 8, 20, 0.34);
+}
+
+.listing-flow-step.current > span {
+  background: rgba(255, 203, 5, 0.16);
+  color: var(--yellow);
+}
+
+.listing-flow-step.blocked {
+  border-color: rgba(251, 113, 133, 0.34);
+}
+
+.listing-flow-step.blocked > span {
+  background: rgba(251, 113, 133, 0.16);
+  color: var(--danger);
+}
+
 .listing-field-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
