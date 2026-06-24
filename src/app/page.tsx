@@ -110,6 +110,21 @@ type LookupInput = {
   grade: Grade;
 };
 
+type LastStockedCard = {
+  itemId: string;
+  listingId: string | null;
+  name: string;
+  setName: string;
+  number: string;
+  grade: Grade;
+  quantity: number;
+  costPence: number;
+  listPricePence: number;
+  channel: Channel;
+  listingState: ListingState;
+  imageUrl: string | null;
+};
+
 type CatalogCard = {
   name: string;
   setName: string;
@@ -540,6 +555,7 @@ export default function Home() {
   const [listingPackId, setListingPackId] = useState<string | null>(null);
   const [listingPackCopied, setListingPackCopied] = useState(false);
   const [listingPackCopiedField, setListingPackCopiedField] = useState<string | null>(null);
+  const [lastStocked, setLastStocked] = useState<LastStockedCard | null>(null);
   const [ebayStatus, setEbayStatus] = useState<EbayStatus | null>(null);
   const [ebayPreflight, setEbayPreflight] = useState<EbayPreflight | null>(null);
   const [ebayPublishTarget, setEbayPublishTarget] = useState<string | null>(null);
@@ -1701,6 +1717,20 @@ export default function Home() {
       pinRecentSetName(payload.catalog?.setName ?? setNameValue);
       const listedPence = payload.listing?.listPrice ?? payload.listing?.suggestedPrice ?? payload.suggestion.pricePence;
       const listingVerb = payload.listing?.state === "ACTIVE" ? "Listed" : "Drafted";
+      setLastStocked({
+        itemId: payload.item.id,
+        listingId: payload.listing?.id ?? null,
+        name: payload.catalog?.name ?? name,
+        setName: payload.catalog?.setName ?? setNameValue,
+        number: payload.catalog?.number ?? number,
+        grade,
+        quantity: intakeQuantity,
+        costPence: poundsToPence(cost),
+        listPricePence: listedPence,
+        channel,
+        listingState: payload.listing?.state ?? "DRAFT",
+        imageUrl: payload.catalog?.imageUrl ?? cardArtUrl,
+      });
       setNotice(
         `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${listingVerb} at ${gbp(listedPence)}.`,
       );
@@ -2641,6 +2671,41 @@ export default function Home() {
     openSell(item, listingForInventoryItem(item) ?? undefined);
   }
 
+  function openLastStockedPack() {
+    if (!lastStocked?.listingId) {
+      setView("listings");
+      setListingStateFilter("DRAFT");
+      setNotice("Open Listings to create a pack for that stock row.");
+      return;
+    }
+    const listing = listings.find((row) => row.id === lastStocked.listingId);
+    setView("listings");
+    setListingStateFilter(lastStocked.listingState === "ACTIVE" ? "ACTIVE" : "DRAFT");
+    if (!listing) {
+      setNotice("Listing saved. Open it from the listing queue.");
+      return;
+    }
+    openListingPack(listing);
+  }
+
+  function sellLastStocked() {
+    if (!lastStocked) return;
+    const item = inventory.find((row) => row.id === lastStocked.itemId);
+    const listing = lastStocked.listingId ? listings.find((row) => row.id === lastStocked.listingId) : null;
+    setView("inventory");
+    if (!item) {
+      setNotice("Stock saved. Open it from Stock to record a sale.");
+      return;
+    }
+    openSell(item, listing ?? listingForInventoryItem(item) ?? undefined);
+  }
+
+  function compNextFromLastStocked() {
+    clearCurrentComp("Ready for the next comp.");
+    setLastStocked(null);
+    setView("acquire");
+  }
+
   function requestDeleteItem(item: InventoryItem) {
     setDeleteTarget({ kind: "inventory", item });
   }
@@ -3399,6 +3464,15 @@ export default function Home() {
       {view === "acquire" && (
         <section className="workspace">
           <BuyFlowRail steps={buyFlowSteps} />
+          {lastStocked && (
+            <LastStockedPanel
+              card={lastStocked}
+              onPack={openLastStockedPack}
+              onSell={sellLastStocked}
+              onNext={compNextFromLastStocked}
+              onDismiss={() => setLastStocked(null)}
+            />
+          )}
           <form className="panel lookup-panel" onSubmit={lookup}>
             <div className="panel-heading">
               <h2>Fast comp</h2>
@@ -6157,6 +6231,52 @@ function SourceHealthRow({ source }: { source: SystemSource }) {
       </div>
       <span>{sourceStatusLabel(source.status)}</span>
     </div>
+  );
+}
+
+function LastStockedPanel({
+  card,
+  onPack,
+  onSell,
+  onNext,
+  onDismiss,
+}: {
+  card: LastStockedCard;
+  onPack: () => void;
+  onSell: () => void;
+  onNext: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <section className="last-stocked-panel" aria-label="Last stocked card">
+      <CardImage src={card.imageUrl} className="mini-card-art" fallbackClassName="mini-card-art blank" alt="" />
+      <div className="last-stocked-copy">
+        <span>Last stocked</span>
+        <strong>{card.name}</strong>
+        <small>
+          {card.setName}
+          {card.number ? ` #${card.number}` : ""} · {card.grade.replace(/_/g, " ")}
+        </small>
+        <small>
+          {card.quantity} @ {gbp(card.costPence)} · {channelLabel(card.channel)} {card.listingState.toLowerCase()}{" "}
+          {gbp(card.listPricePence)}
+        </small>
+      </div>
+      <div className="last-stocked-actions">
+        <button type="button" onClick={onPack} disabled={!card.listingId}>
+          Pack
+        </button>
+        <button type="button" onClick={onSell}>
+          Sell
+        </button>
+        <button type="button" onClick={onNext}>
+          Next
+        </button>
+        <button className="danger-button" type="button" onClick={onDismiss} aria-label="Dismiss last stocked card">
+          x
+        </button>
+      </div>
+    </section>
   );
 }
 
