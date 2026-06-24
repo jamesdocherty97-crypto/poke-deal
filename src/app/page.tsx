@@ -986,7 +986,11 @@ export default function Home() {
       (needsManualComp || !catalogCard || comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
   );
   const requiresCheckedCompBeforeStock = Boolean(!checkedComp && dealerVerdict?.requiresCheckedComp);
-  const stockActionLabel = checkedComp ? "Stock checked comp" : dealerVerdict?.stockActionLabel ?? "Stock this";
+  const stockButtonLabel = checkedComp
+    ? "Stock checked comp"
+    : dealerVerdict && dealerVerdict.tone !== "good"
+      ? "Stock with caution"
+      : "Stock this";
   const confidenceLabel = dealerVerdict
     ? { label: dealerVerdict.label, tone: dealerVerdict.tone }
     : headline
@@ -4058,7 +4062,13 @@ export default function Home() {
                     onClick={() => void acquire()}
                     disabled={busy === "acquire" || !quickStockCanSubmit}
                   >
-                    {busy === "acquire" ? "Stocking..." : quickStockReady ? stockActionLabel : "Add cost"}
+                    {busy === "acquire"
+                      ? "Stocking..."
+                      : !quickStockReady
+                        ? "Add cost"
+                        : requiresCheckedCompBeforeStock
+                          ? "Add checked comp first"
+                          : stockButtonLabel}
                   </button>
                 </div>
               )}
@@ -4105,7 +4115,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {!needsManualComp && renderManualCompLinks()}
+              {!needsManualComp && !shouldOfferManualComp && renderManualCompLinks()}
               {!needsManualComp && renderCheckedCompCard()}
               {marketBaseline && (
                 <div className="market-signal">
@@ -5598,7 +5608,13 @@ export default function Home() {
             onClick={() => void acquire()}
             disabled={busy === "acquire" || !quickStockCanSubmit}
           >
-            {busy === "acquire" ? "Stocking..." : quickStockReady ? stockActionLabel : "Add cost"}
+            {busy === "acquire"
+              ? "Stocking..."
+              : !quickStockReady
+                ? "Add cost"
+                : requiresCheckedCompBeforeStock
+                  ? "Add checked comp first"
+                  : stockButtonLabel}
           </button>
         </section>
       )}
