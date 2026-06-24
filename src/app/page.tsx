@@ -240,6 +240,25 @@ type EbayStatus = {
   error?: string;
 };
 
+type EbayPreflight = {
+  listingId: string;
+  writesToEbay: boolean;
+  existingOfferId: string | null;
+  sku: string;
+  title: string;
+  priceGbp: string;
+  quantity: number;
+  marketplaceId: string;
+  categoryId: string;
+  hasImage: boolean;
+  policyKeys: {
+    paymentPolicyId: boolean;
+    fulfillmentPolicyId: boolean;
+    returnPolicyId: boolean;
+    merchantLocationKey: boolean;
+  };
+};
+
 type Sale = {
   id: string;
   channel: Channel;
@@ -519,6 +538,7 @@ export default function Home() {
   const [listingPackCopied, setListingPackCopied] = useState(false);
   const [listingPackCopiedField, setListingPackCopiedField] = useState<string | null>(null);
   const [ebayStatus, setEbayStatus] = useState<EbayStatus | null>(null);
+  const [ebayPreflight, setEbayPreflight] = useState<EbayPreflight | null>(null);
   const [ebayPublishTarget, setEbayPublishTarget] = useState<string | null>(null);
   const [cardArtUrl, setCardArtUrl] = useState<string | null>(null);
   const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
@@ -2650,6 +2670,7 @@ export default function Home() {
     setListingPackId(listing.id);
     setListingPackCopied(false);
     setListingPackCopiedField(null);
+    setEbayPreflight(null);
     setEditingListingId(null);
     setCreatingListingItemId(null);
     setSellingId(null);
@@ -2685,6 +2706,7 @@ export default function Home() {
     setListingPackId(nextListingPackTarget.id);
     setListingPackCopied(false);
     setListingPackCopiedField(null);
+    setEbayPreflight(null);
     setError(null);
     setNotice(null);
   }
@@ -2719,6 +2741,24 @@ export default function Home() {
     setListingPackId(nextId);
     setListingPackCopied(false);
     setListingPackCopiedField(null);
+    setEbayPreflight(null);
+  }
+
+  async function runEbayPreflight(listingId: string) {
+    setBusy(`ebay-preflight-${listingId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/listings/${listingId}/ebay/preflight`);
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "eBay preflight failed");
+      setEbayPreflight({ ...payload, listingId });
+      setNotice("eBay preflight passed. No offer was created.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "eBay preflight failed");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function createEbayOfferForListing(listingId: string) {
@@ -2729,6 +2769,7 @@ export default function Home() {
       const res = await fetch(`/api/listings/${listingId}/ebay/offer`, { method: "POST" });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "eBay offer creation failed");
+      setEbayPreflight(null);
       setNotice(payload.message ?? "eBay offer created.");
       await refreshAll();
     } catch (err) {
@@ -4778,15 +4819,18 @@ export default function Home() {
               copied={listingPackCopied}
               copiedField={listingPackCopiedField}
               busy={busy === `listing-${listingPackTarget.id}` ||
+                busy === `ebay-preflight-${listingPackTarget.id}` ||
                 busy === `ebay-offer-${listingPackTarget.id}` ||
                 busy === `ebay-publish-${listingPackTarget.id}`}
               nextListingLabel={nextListingPackTarget ? listingQueueLabel(nextListingPackTarget) : null}
               ebayStatus={ebayStatus}
+              ebayPreflight={ebayPreflight?.listingId === listingPackTarget.id ? ebayPreflight : null}
               onCopy={copyListingPack}
               onCopyField={copyListingPackField}
               onActivate={activateListingPackTarget}
               onSell={openSellFromListingPack}
               onNext={openNextListingPack}
+              onPreflight={() => void runEbayPreflight(listingPackTarget.id)}
               onCreateOffer={() => void createEbayOfferForListing(listingPackTarget.id)}
               onRequestPublish={() => setEbayPublishTarget(listingPackTarget.id)}
               onClose={() => {
@@ -5391,12 +5435,14 @@ function ListingPackSheet({
   busy,
   nextListingLabel,
   ebayStatus,
+  ebayPreflight,
   onCopy,
   onCopyField,
   onActivate,
   onSell,
   onNext,
   onClose,
+  onPreflight,
   onCreateOffer,
   onRequestPublish,
 }: {
@@ -5407,12 +5453,14 @@ function ListingPackSheet({
   busy: boolean;
   nextListingLabel: string | null;
   ebayStatus: EbayStatus | null;
+  ebayPreflight: EbayPreflight | null;
   onCopy: () => void;
   onCopyField: (field: ListingPackCopyField) => void;
   onActivate: () => void;
   onSell: (listing: Listing) => void;
   onNext: () => void;
   onClose: () => void;
+  onPreflight: () => void;
   onCreateOffer: () => void;
   onRequestPublish: () => void;
 }) {
@@ -5524,6 +5572,17 @@ function ListingPackSheet({
       </div>
       {isEbayListing && ebayReadiness && (
         <div className="listing-pack-ebay-actions">
+          {!isPublished && (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={onPreflight}
+              disabled={busy || !ebayReadiness.ready}
+            >
+              {busy ? "Checking..." : "Preflight eBay offer"}
+            </button>
+          )}
+          {ebayPreflight && <EbayPreflightCard preflight={ebayPreflight} />}
           {isPublished ? (
             <a
               className="export-link"
@@ -5577,6 +5636,50 @@ function ListingPackSheet({
         </div>
       )}
     </form>
+  );
+}
+
+function EbayPreflightCard({ preflight }: { preflight: EbayPreflight }) {
+  const policyCount = [
+    preflight.policyKeys.paymentPolicyId,
+    preflight.policyKeys.fulfillmentPolicyId,
+    preflight.policyKeys.returnPolicyId,
+  ].filter(Boolean).length;
+
+  return (
+    <div className="ebay-preflight-card">
+      <div>
+        <span>Preflight passed</span>
+        <strong>{preflight.writesToEbay ? "Will write on next action" : "No eBay write made"}</strong>
+      </div>
+      <dl>
+        <div>
+          <dt>SKU</dt>
+          <dd>{preflight.sku}</dd>
+        </div>
+        <div>
+          <dt>Marketplace</dt>
+          <dd>{preflight.marketplaceId}</dd>
+        </div>
+        <div>
+          <dt>Price</dt>
+          <dd>£{preflight.priceGbp}</dd>
+        </div>
+        <div>
+          <dt>Qty</dt>
+          <dd>{preflight.quantity}</dd>
+        </div>
+        <div>
+          <dt>Image</dt>
+          <dd>{preflight.hasImage ? "ready" : "missing"}</dd>
+        </div>
+        <div>
+          <dt>Policies</dt>
+          <dd>{policyCount}/3 ready{preflight.policyKeys.merchantLocationKey ? " + location" : ""}</dd>
+        </div>
+      </dl>
+      <p>{preflight.existingOfferId ? "An existing eBay offer was found for this SKU." : "Ready to create a new eBay offer."}</p>
+    </div>
   );
 }
 

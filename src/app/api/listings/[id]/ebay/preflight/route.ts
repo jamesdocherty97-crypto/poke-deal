@@ -3,14 +3,13 @@ import { getPrisma } from "@/lib/db/prisma";
 import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
-import { upsertInventoryItem } from "@/lib/ebay/inventoryItem";
-import { createEbayOffer, getOfferBySku } from "@/lib/ebay/offer";
-import { buildEbayOfferPreflight } from "@/lib/ebay/preflight";
+import { getOfferBySku } from "@/lib/ebay/offer";
+import { buildEbayOfferPreflight, toEbaySku } from "@/lib/ebay/preflight";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(
+export async function GET(
   _request: Request,
   { params }: { params: { id: string } },
 ) {
@@ -36,12 +35,6 @@ export async function POST(
   if (listing.item.status === "SOLD") {
     return NextResponse.json({ error: "Item is already sold." }, { status: 400 });
   }
-  if (listing.state === "ACTIVE" && listing.externalRef && !listing.externalRef.startsWith("offer:")) {
-    return NextResponse.json(
-      { error: "Listing is already published on eBay.", listingId: listing.externalRef },
-      { status: 409 },
-    );
-  }
 
   const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? 0;
   if (effectivePricePence <= 0) {
@@ -56,6 +49,8 @@ export async function POST(
   try {
     const accessToken = await getAccessToken(config);
     const policies = await fetchEbayPolicies(config, accessToken);
+    const sku = toEbaySku(params.id);
+    const existingOfferId = await getOfferBySku(config, sku, accessToken);
 
     const packInput = {
       card: {
@@ -80,33 +75,15 @@ export async function POST(
       config,
     });
 
-    // Upsert the inventory item (idempotent — safe to call multiple times)
-    await upsertInventoryItem(config, preflight.sku, preflight.inventoryItem, accessToken);
-
-    // Use existing offer if one already exists for this SKU
-    let offerId = await getOfferBySku(config, preflight.sku, accessToken);
-    if (!offerId) {
-      const created = await createEbayOffer(config, preflight.offer, accessToken);
-      offerId = created.offerId;
-    }
-
-    // Persist offer ID with prefix so we can distinguish it from a published listing ID
-    await prisma.listing.update({
-      where: { id: params.id },
-      data: { externalRef: `offer:${offerId}` },
-    });
-
     return NextResponse.json({
       success: true,
-      offerId,
-      sku: preflight.sku,
-      title: preflight.title,
-      priceGbp: preflight.priceGbp,
-      message: "eBay offer created. Review and publish when ready.",
+      writesToEbay: false,
+      existingOfferId,
+      ...preflight,
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "eBay offer creation failed" },
+      { error: err instanceof Error ? err.message : "eBay preflight failed" },
       { status: 500 },
     );
   }

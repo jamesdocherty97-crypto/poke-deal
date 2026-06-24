@@ -4024,6 +4024,71 @@ label {
   margin-top: 4px;
 }
 
+.ebay-preflight-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(125deg, rgba(52, 211, 153, 0.1), transparent 58%),
+    rgba(3, 8, 20, 0.34);
+  padding: 10px;
+}
+
+.ebay-preflight-card > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.ebay-preflight-card span,
+.ebay-preflight-card dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.ebay-preflight-card strong {
+  color: var(--green);
+  font-size: 14px;
+  line-height: 1.12;
+}
+
+.ebay-preflight-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.ebay-preflight-card dl div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 7px;
+}
+
+.ebay-preflight-card dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.12;
+}
+
+.ebay-preflight-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
 .ebay-readiness-list {
   list-style: none;
   padding: 0;

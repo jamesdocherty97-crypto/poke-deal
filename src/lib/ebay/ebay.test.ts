@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildAuthUrl, exchangeCodeForTokens, refreshAccessToken } from "./oauth.js";
 import { buildInventoryItemPayload, upsertInventoryItem } from "./inventoryItem.js";
 import { buildOfferPayload } from "./offer.js";
+import { buildEbayOfferPreflight, toEbaySku } from "./preflight.js";
 import { getAccessToken, clearTokenCache } from "./tokens.js";
 import { fetchEbayPolicies } from "./policies.js";
 import { isEbayConfigured, EBAY_UK_CATEGORY_POKEMON } from "./config.js";
@@ -311,6 +312,34 @@ test("buildOfferPayload omits merchantLocationKey when null", () => {
   const noloc = { ...MOCK_POLICIES, merchantLocationKey: null };
   const offer = buildOfferPayload("pdos-xyz", pack, noloc, TEST_CONFIG);
   assert.equal(offer.merchantLocationKey, undefined);
+});
+
+test("toEbaySku creates stable app-owned SKUs", () => {
+  assert.equal(toEbaySku("listing-123"), "pdos-listing-123");
+});
+
+test("buildEbayOfferPreflight previews inventory and offer payloads without writing", () => {
+  const preflight = buildEbayOfferPreflight({
+    listingId: "listing-123",
+    packInput: slabInput,
+    quantity: 2,
+    imageUrl: "https://images.pokemontcg.io/sv3pt5/199_hires.png",
+    policies: MOCK_POLICIES,
+    config: TEST_CONFIG,
+  });
+
+  assert.equal(preflight.sku, "pdos-listing-123");
+  assert.equal(preflight.quantity, 2);
+  assert.equal(preflight.priceGbp, "1063.00");
+  assert.equal(preflight.marketplaceId, "EBAY_GB");
+  assert.equal(preflight.policyKeys.paymentPolicyId, true);
+  assert.equal(preflight.policyKeys.fulfillmentPolicyId, true);
+  assert.equal(preflight.policyKeys.returnPolicyId, true);
+  assert.equal(preflight.policyKeys.merchantLocationKey, true);
+  assert.deepEqual(preflight.inventoryItem.product.imageUrls, ["https://images.pokemontcg.io/sv3pt5/199_hires.png"]);
+  assert.equal(preflight.offer.sku, preflight.sku);
+  assert.equal(preflight.offer.availableQuantity, 2);
+  assert.equal(preflight.offer.pricingSummary.price.currency, "GBP");
 });
 
 // ── fetchEbayPolicies ─────────────────────────────────────────────────────────
