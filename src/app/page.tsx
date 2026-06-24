@@ -40,6 +40,7 @@ import {
 } from "@/lib/dealer/listingPack";
 import { listingVenueAction, nextDraftListingId } from "@/lib/dealer/listingWorkflow";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
+import { buildQuickIntakePreview } from "@/lib/dealer/intakePreview";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import { nextIntakeFormAfterStock, parseIntakeQuantity } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
@@ -730,6 +731,24 @@ export default function Home() {
   ]);
   const visiblePopularSets = showAllPopularSets ? popularSets : popularSets.slice(0, VISIBLE_POPULAR_SET_LIMIT);
   const visibleQuickHunts = showAllQuickHunts ? quickHunts : quickHunts.slice(0, VISIBLE_QUICK_HUNT_LIMIT);
+  const parsedQuickIntake = useMemo(
+    () => (quickIntake.trim() ? parseQuickIntake(quickIntake) : null),
+    [quickIntake],
+  );
+  const quickIntakePreview = useMemo(
+    () =>
+      parsedQuickIntake
+        ? buildQuickIntakePreview(parsedQuickIntake, {
+            currentName: name,
+            currentSetName: setNameValue,
+            currentNumber: number,
+            currentGrade: grade.replace(/_/g, " "),
+            currentCost: cost,
+            currentQuantity: quantity,
+          })
+        : null,
+    [cost, grade, name, number, parsedQuickIntake, quantity, setNameValue],
+  );
   const recentSets = useMemo(() => {
     const byId = new Map([...allSets, ...popularSets, ...setSuggestions].map((set) => [set.id, set]));
     return recentSetIds
@@ -2949,6 +2968,27 @@ export default function Home() {
                 </button>
               </div>
             </label>
+            {quickIntakePreview && (
+              <div className={`quick-intake-preview ${quickIntakePreview.tone}`} aria-label="Quick fill preview">
+                <div className="quick-intake-preview-heading">
+                  <span>Heard</span>
+                  <strong>{quickIntakePreview.summary}</strong>
+                </div>
+                <div className="quick-intake-preview-chips">
+                  {quickIntakePreview.chips.map((chip) => (
+                    <span className={chip.source === "current" ? "current" : ""} key={`${chip.key}-${chip.value}`}>
+                      <b>{chip.label}</b>
+                      {chip.value}
+                    </span>
+                  ))}
+                </div>
+                {(quickIntakePreview.missing.length > 0 || quickIntakePreview.warnings.length > 0) && (
+                  <p>
+                    {[...quickIntakePreview.missing.map((item) => `Needs ${item}`), ...quickIntakePreview.warnings].join(" · ")}
+                  </p>
+                )}
+              </div>
+            )}
             <label className="set-field">
               Card
               <input
