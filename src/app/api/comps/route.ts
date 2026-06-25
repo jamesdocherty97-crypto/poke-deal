@@ -16,6 +16,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RECOVERY_ALTERNATIVES_TIMEOUT_MS = 1600;
+const CATALOG_RESOLVE_TIMEOUT_MS = 3600;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
 
   try {
     const catalogSource = new PokemonTcgApiCatalogSource();
-    const catalog = await resolveCatalogCard(card, catalogSource);
+    const catalog = await resolveCatalogCard(card, catalogSource, { timeoutMs: CATALOG_RESOLVE_TIMEOUT_MS });
     const compCard = catalog ? catalogToCardRef(catalog, card) : card;
     const compService = createAppCompService(catalogSource, catalog);
     const result = await compService.lookup(compCard, { grade });

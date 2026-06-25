@@ -18,6 +18,14 @@ import { requestsFirstEdition } from "./variants.js";
 export async function resolveCatalogCard(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
+  options: { timeoutMs?: number } = {},
+): Promise<CatalogCard | null> {
+  return withOptionalTimeout(resolveCatalogCardUnbounded(card, catalogSource), options.timeoutMs, null);
+}
+
+async function resolveCatalogCardUnbounded(
+  card: CardRef,
+  catalogSource: PokemonTcgApiCatalogSource,
 ): Promise<CatalogCard | null> {
   const direct = await catalogSource.resolve(card).catch(() => null);
   if (direct && catalogCardMatchesLookupContext(direct, card)) return direct;

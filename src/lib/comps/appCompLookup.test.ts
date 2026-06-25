@@ -125,6 +125,27 @@ test("resolveCatalogCard rejects same-name cards from the wrong requested set", 
   assert.equal(resolved, null);
 });
 
+test("resolveCatalogCard can time out slow catalog misses", async () => {
+  const source = {
+    async resolve() {
+      return new Promise<CatalogCard | null>(() => undefined);
+    },
+    async search() {
+      return [];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const started = Date.now();
+  const resolved = await resolveCatalogCard(
+    { name: "Mew ex", setName: "Wrong Set", number: "232/091" },
+    source,
+    { timeoutMs: 10 },
+  );
+
+  assert.equal(resolved, null);
+  assert.ok(Date.now() - started < 500, "slow catalog resolution should not block the comp flow");
+});
+
 test("findCatalogAlternatives returns safe wrong-set recovery candidates", async () => {
   const wrongSetCard: CatalogCard = {
     game: "POKEMON",
