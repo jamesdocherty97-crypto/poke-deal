@@ -914,9 +914,11 @@ export default function Home() {
             currentSource: source,
             currentLocation: location,
             currentCondition: condition,
+            currentChannel: channel,
+            currentListingState: acquireListingState,
           })
         : null,
-    [condition, cost, grade, location, name, number, parsedQuickIntake, quantity, setNameValue, source],
+    [acquireListingState, channel, condition, cost, grade, location, name, number, parsedQuickIntake, quantity, setNameValue, source],
   );
   const recentSets = useMemo(() => {
     const byId = new Map([...allSets, ...popularSets, ...setSuggestions].map((set) => [set.id, set]));
@@ -1574,6 +1576,14 @@ export default function Home() {
     if (parsed.condition) {
       setCondition(parsed.condition);
       filled.push("condition");
+    }
+    if (parsed.channel) {
+      setChannel(parsed.channel as Channel);
+      filled.push("channel");
+    }
+    if (parsed.listingState) {
+      setAcquireListingState(parsed.listingState);
+      filled.push("listing");
     }
     if (manualQuery) {
       setManualCompQuery(manualQuery);

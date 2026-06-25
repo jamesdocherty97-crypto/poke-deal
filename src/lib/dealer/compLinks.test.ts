@@ -67,6 +67,10 @@ test("normalizeManualCompSearchText strips buy-flow noise but keeps comp qualifi
     normalizeManualCompSearchText("2x Hitmontop - Neo Genesis - 1st Edition - LP raw £12 vinted binder"),
     "Hitmontop Neo Genesis 1st Edition LP",
   );
+  assert.equal(
+    normalizeManualCompSearchText("Gengar lor tg TG06 raw £10 from vinted binder list on ebay draft"),
+    "Gengar lor tg TG06",
+  );
 });
 
 test("normalizeManualCompSearchText joins modern promo codes for manual eBay searches", () => {

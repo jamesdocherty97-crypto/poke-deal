@@ -33,6 +33,8 @@ test("buildQuickIntakePreview reuses current grade and quantity without hiding t
     currentSource: "Card fair",
     currentLocation: "Binder",
     currentCondition: "NM",
+    currentChannel: "EBAY",
+    currentListingState: "DRAFT",
   });
 
   assert.equal(preview.readyForComp, true);
@@ -50,7 +52,23 @@ test("buildQuickIntakePreview reuses current grade and quantity without hiding t
       "Source:Card fair:current",
       "Place:Binder:current",
       "Cond.:NM:current",
+      "Channel:eBay:current",
+      "Listing:Draft:current",
     ],
+  );
+});
+
+test("buildQuickIntakePreview shows typed listing channel and state", () => {
+  const preview = buildQuickIntakePreview(parseQuickIntake("Snivy MEP 049 £2 sell on vinted active"), {
+    currentChannel: "EBAY",
+    currentListingState: "DRAFT",
+  });
+
+  assert.deepEqual(
+    preview.chips
+      .filter((chip) => chip.key === "channel" || chip.key === "listingState")
+      .map((chip) => `${chip.label}:${chip.value}:${chip.source}`),
+    ["Channel:Vinted:typed", "Listing:Active:typed"],
   );
 });
 

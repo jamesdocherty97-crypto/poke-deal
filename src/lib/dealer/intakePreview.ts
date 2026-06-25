@@ -19,6 +19,8 @@ export interface IntakePreviewOptions {
   currentSource?: string;
   currentLocation?: string;
   currentCondition?: string;
+  currentChannel?: string;
+  currentListingState?: string;
 }
 
 export interface IntakePreview {
@@ -41,6 +43,8 @@ const fieldLabels: Record<keyof ParsedQuickIntake, string> = {
   source: "Source",
   location: "Place",
   condition: "Cond.",
+  channel: "Channel",
+  listingState: "Listing",
 };
 
 export function buildQuickIntakePreview(
@@ -57,6 +61,8 @@ export function buildQuickIntakePreview(
   addChip(chips, "source", parsed.source, options.currentSource);
   addChip(chips, "location", parsed.location, options.currentLocation);
   addChip(chips, "condition", parsed.condition, options.currentCondition);
+  addChip(chips, "channel", parsed.channel, options.currentChannel);
+  addChip(chips, "listingState", parsed.listingState, options.currentListingState);
 
   const effectiveName = firstText(parsed.name, options.currentName);
   const effectiveSet = firstText(parsed.setName, options.currentSetName);
@@ -94,12 +100,12 @@ function addChip(
 ) {
   const typed = firstText(typedValue);
   if (typed) {
-    chips.push({ key, label: fieldLabels[key], value: typed, source: "typed" });
+    chips.push({ key, label: fieldLabels[key], value: displayChipValue(key, typed), source: "typed" });
     return;
   }
 
   const current = firstText(currentValue);
-  if (current) chips.push({ key, label: fieldLabels[key], value: current, source: "current" });
+  if (current) chips.push({ key, label: fieldLabels[key], value: displayChipValue(key, current), source: "current" });
 }
 
 function previewSummary(input: {
@@ -118,4 +124,18 @@ function previewSummary(input: {
 
 function firstText(...values: Array<string | null | undefined>): string | undefined {
   return values.map((value) => value?.trim()).find((value): value is string => Boolean(value));
+}
+
+function displayChipValue(key: keyof ParsedQuickIntake, value: string): string {
+  if (key === "channel") {
+    if (value === "EBAY") return "eBay";
+    if (value === "CARDMARKET") return "Cardmarket";
+    if (value === "VINTED") return "Vinted";
+    if (value === "IN_PERSON") return "In person";
+  }
+  if (key === "listingState") {
+    if (value === "DRAFT") return "Draft";
+    if (value === "ACTIVE") return "Active";
+  }
+  return value;
 }

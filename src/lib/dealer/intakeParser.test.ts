@@ -129,3 +129,28 @@ test("parseQuickIntake captures fair-flow source, location and condition", () =>
     condition: "NM",
   });
 });
+
+test("parseQuickIntake captures explicit listing channel and state", () => {
+  assert.deepEqual(parseQuickIntake("Gengar lor tg TG06 raw £10 from vinted binder list on ebay draft"), {
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    number: "TG06",
+    grade: "RAW",
+    cost: "10.00",
+    source: "Vinted",
+    location: "Binder",
+    channel: "EBAY",
+    listingState: "DRAFT",
+  });
+
+  assert.deepEqual(parseQuickIntake("Snivy MEP 049 raw £2 card fair sell on vinted active"), {
+    name: "Snivy",
+    setName: "Mega Evolution Promos",
+    number: "MEP049",
+    grade: "RAW",
+    cost: "2.00",
+    source: "Card fair",
+    channel: "VINTED",
+    listingState: "ACTIVE",
+  });
+});

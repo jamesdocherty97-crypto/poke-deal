@@ -1,8 +1,11 @@
 import { getSetById, searchSets, resolveExactSetId, resolveSetIdForCard } from "../catalog/setCatalog.js";
 import { normalizeSearchText, tokenizeSearchText, tokenMatches } from "../catalog/fuzzy.js";
 import type { Grade } from "../domain/types.js";
+import type { SaleChannel } from "./saleFees.js";
 
 export type ParsedQuickIntakeGrade = Grade;
+export type ParsedQuickIntakeChannel = SaleChannel;
+export type ParsedQuickIntakeListingState = "DRAFT" | "ACTIVE";
 
 export interface ParsedQuickIntake {
   name?: string;
@@ -14,6 +17,8 @@ export interface ParsedQuickIntake {
   source?: string;
   location?: string;
   condition?: string;
+  channel?: ParsedQuickIntakeChannel;
+  listingState?: ParsedQuickIntakeListingState;
 }
 
 interface SetMatch {
@@ -100,6 +105,18 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
     working = removeMatch(working, quantity.match);
   }
 
+  const listingChannel = extractListingChannel(working);
+  if (listingChannel) {
+    parsed.channel = listingChannel.value;
+    working = removeMatch(working, listingChannel.match);
+  }
+
+  const listingState = extractListingState(working);
+  if (listingState) {
+    parsed.listingState = listingState.value;
+    working = removeMatch(working, listingState.match);
+  }
+
   const source = extractSource(working);
   if (source) {
     parsed.source = source.value;
@@ -179,6 +196,25 @@ function extractSource(input: string): { value: string; match: string } | null {
   ]);
 }
 
+function extractListingChannel(input: string): { value: ParsedQuickIntakeChannel; match: string } | null {
+  return firstPresetMatch(input, [
+    { value: "EBAY", pattern: /\b(?:list|listing|sell|selling|post|post\s+on|channel)\s+(?:on\s+|to\s+|via\s+)?ebay\b/i },
+    { value: "CARDMARKET", pattern: /\b(?:list|listing|sell|selling|post|post\s+on|channel)\s+(?:on\s+|to\s+|via\s+)?cardmarket\b/i },
+    { value: "VINTED", pattern: /\b(?:list|listing|sell|selling|post|post\s+on|channel)\s+(?:on\s+|to\s+|via\s+)?vinted\b/i },
+    { value: "IN_PERSON", pattern: /\b(?:sell|selling|channel)\s+(?:in\s+person|cash|at\s+show|at\s+fair)\b/i },
+    { value: "EBAY", pattern: /\bebay\s+(?:draft|active|listing|offer)\b/i },
+    { value: "CARDMARKET", pattern: /\bcardmarket\s+(?:draft|active|listing)\b/i },
+    { value: "VINTED", pattern: /\bvinted\s+(?:draft|active|listing)\b/i },
+  ]);
+}
+
+function extractListingState(input: string): { value: ParsedQuickIntakeListingState; match: string } | null {
+  return firstPresetMatch(input, [
+    { value: "ACTIVE", pattern: /\b(?:active|listed|live)\s*(?:listing)?\b/i },
+    { value: "DRAFT", pattern: /\b(?:draft|drafted)\s*(?:listing)?\b/i },
+  ]);
+}
+
 function extractLocation(input: string): { value: string; match: string } | null {
   return firstPresetMatch(input, [
     { value: "Box A", pattern: /\bbox\s*a\b/i },
@@ -215,10 +251,10 @@ function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: st
   return null;
 }
 
-function firstPresetMatch(
+function firstPresetMatch<T extends string>(
   input: string,
-  options: Array<{ value: string; pattern: RegExp }>,
-): { value: string; match: string } | null {
+  options: Array<{ value: T; pattern: RegExp }>,
+): { value: T; match: string } | null {
   for (const option of options) {
     const match = input.match(option.pattern);
     if (match?.[0]) return { value: option.value, match: match[0] };
