@@ -3646,6 +3646,7 @@ export default function Home() {
                           <em>
                             {entry.pricePence > 0 ? gbp(entry.pricePence) : "No price"} · {entry.confidenceLabel}
                           </em>
+                          <small className="recent-comp-meta">{recentCompMeta(entry)}</small>
                         </span>
                       </button>
                       <button
@@ -6797,6 +6798,14 @@ function compConfidence(comp: CompResult, sourcesDisagree: boolean): { label: st
   if (sourcesDisagree) return { label: "Cross-check", tone: "warn" };
   if (comp.sampleSize < 3) return { label: "Thin", tone: "warn" };
   return { label: "Usable", tone: "good" };
+}
+
+function recentCompMeta(entry: RecentCompEntry): string {
+  const sample =
+    entry.sampleSize > 0 && entry.windowDays > 0
+      ? `${entry.sampleSize}/${entry.windowDays}d`
+      : "no sample";
+  return `${sourceLabel(entry.source, false)} · ${sample} · ${ageLabel(entry.lookedUpAt)}`;
 }
 
 function hideBrokenImage(event: SyntheticEvent<HTMLImageElement>) {
