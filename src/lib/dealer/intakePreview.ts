@@ -16,6 +16,9 @@ export interface IntakePreviewOptions {
   currentGrade?: string;
   currentCost?: string;
   currentQuantity?: string;
+  currentSource?: string;
+  currentLocation?: string;
+  currentCondition?: string;
 }
 
 export interface IntakePreview {
@@ -51,9 +54,9 @@ export function buildQuickIntakePreview(
   addChip(chips, "grade", parsed.grade, options.currentGrade);
   addChip(chips, "cost", parsed.cost, options.currentCost);
   addChip(chips, "quantity", parsed.quantity, options.currentQuantity);
-  addChip(chips, "source", parsed.source);
-  addChip(chips, "location", parsed.location);
-  addChip(chips, "condition", parsed.condition);
+  addChip(chips, "source", parsed.source, options.currentSource);
+  addChip(chips, "location", parsed.location, options.currentLocation);
+  addChip(chips, "condition", parsed.condition, options.currentCondition);
 
   const effectiveName = firstText(parsed.name, options.currentName);
   const effectiveSet = firstText(parsed.setName, options.currentSetName);

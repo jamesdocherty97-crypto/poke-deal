@@ -906,9 +906,12 @@ export default function Home() {
             currentGrade: grade.replace(/_/g, " "),
             currentCost: cost,
             currentQuantity: quantity,
+            currentSource: source,
+            currentLocation: location,
+            currentCondition: condition,
           })
         : null,
-    [cost, grade, name, number, parsedQuickIntake, quantity, setNameValue],
+    [condition, cost, grade, location, name, number, parsedQuickIntake, quantity, setNameValue, source],
   );
   const recentSets = useMemo(() => {
     const byId = new Map([...allSets, ...popularSets, ...setSuggestions].map((set) => [set.id, set]));

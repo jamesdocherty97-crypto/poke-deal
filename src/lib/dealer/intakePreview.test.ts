@@ -30,6 +30,9 @@ test("buildQuickIntakePreview reuses current grade and quantity without hiding t
   const preview = buildQuickIntakePreview(parseQuickIntake("Snivy MEP 049 £2"), {
     currentGrade: "RAW",
     currentQuantity: "1",
+    currentSource: "Card fair",
+    currentLocation: "Binder",
+    currentCondition: "NM",
   });
 
   assert.equal(preview.readyForComp, true);
@@ -44,7 +47,25 @@ test("buildQuickIntakePreview reuses current grade and quantity without hiding t
       "Grade:RAW:current",
       "Cost:2.00:typed",
       "Qty:1:current",
+      "Source:Card fair:current",
+      "Place:Binder:current",
+      "Cond.:NM:current",
     ],
+  );
+});
+
+test("buildQuickIntakePreview shows typed condition over the current default", () => {
+  const preview = buildQuickIntakePreview(parseQuickIntake("Hitmontop Neo Genesis LP raw"), {
+    currentCondition: "NM",
+  });
+
+  assert.equal(
+    preview.chips.find((chip) => chip.key === "condition")?.value,
+    "LP",
+  );
+  assert.equal(
+    preview.chips.find((chip) => chip.key === "condition")?.source,
+    "typed",
   );
 });
 
