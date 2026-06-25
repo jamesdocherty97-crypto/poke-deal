@@ -56,6 +56,7 @@ test("buildLaunchReadiness marks operating systems done when they are ready", ()
     ebayConfigured: true,
     ebayConnected: true,
     ebayHasPolicies: true,
+    ebayHasMerchantLocation: true,
     alertDelivery: true,
     stockCount: 6,
     draftListings: 0,
@@ -71,6 +72,33 @@ test("buildLaunchReadiness marks operating systems done when they are ready", ()
   assert.equal(items.find((item) => item.id === "alerts")?.state, "done");
   assert.equal(items.find((item) => item.id === "listing-pipeline")?.state, "done");
   assert.equal(items.find((item) => item.id === "sale-loop")?.state, "done");
+});
+
+test("buildLaunchReadiness keeps eBay offer creation blocked until seller location is ready", () => {
+  const items = buildLaunchReadiness({
+    livePrimaryComps: true,
+    liveCatalogKey: true,
+    secondaryCrossCheck: true,
+    ebayConfigured: true,
+    ebayConnected: true,
+    ebayHasPolicies: true,
+    ebayHasMerchantLocation: false,
+    alertDelivery: false,
+    stockCount: 2,
+    draftListings: 2,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 0,
+  });
+
+  const ebay = items.find((item) => item.id === "ebay-automation");
+  const alerts = items.find((item) => item.id === "alerts");
+
+  assert.equal(ebay?.state, "warn");
+  assert.equal(ebay?.target, "listings");
+  assert.match(ebay?.detail ?? "", /seller location/);
+  assert.equal(alerts?.state, "next");
 });
 
 test("buildLaunchReadiness flags eBay policy setup after account connection", () => {

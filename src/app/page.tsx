@@ -1167,7 +1167,7 @@ export default function Home() {
     [ebayHasMerchantLocation, ebayHasPolicies, ebayStatus?.configured, ebayStatus?.connected],
   );
   const setupSources = useMemo(
-    () => (systemStatus ? [...systemStatus.sources, ebayHealthSource] : []),
+    () => (systemStatus ? [...systemStatus.sources.filter((source) => source.id !== "push-alerts"), ebayHealthSource] : []),
     [ebayHealthSource, systemStatus],
   );
   const unlistedStock = useMemo(
@@ -1218,6 +1218,7 @@ export default function Home() {
             ebayConfigured: Boolean(ebayStatus?.configured),
             ebayConnected: Boolean(ebayStatus?.connected),
             ebayHasPolicies,
+            ebayHasMerchantLocation,
             alertDelivery: systemStatus.summary.alertDelivery,
             stockCount: dashboard?.metrics.stockCount ?? activeInventory.length,
             draftListings: draftListingCount,
@@ -1236,6 +1237,7 @@ export default function Home() {
       dashboard?.metrics.stockCount,
       draftListingCount,
       ebayHasPolicies,
+      ebayHasMerchantLocation,
       ebayStatus?.configured,
       ebayStatus?.connected,
       soldInventory.length,

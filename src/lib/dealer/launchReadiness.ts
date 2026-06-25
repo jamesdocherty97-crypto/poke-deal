@@ -8,6 +8,7 @@ export interface LaunchReadinessInput {
   ebayConfigured?: boolean;
   ebayConnected?: boolean;
   ebayHasPolicies?: boolean;
+  ebayHasMerchantLocation?: boolean;
   alertDelivery: boolean;
   stockCount: number;
   draftListings: number;
@@ -55,12 +56,24 @@ export function buildLaunchReadiness(input: LaunchReadinessInput): LaunchReadine
 }
 
 function buildEbayReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
-  if (input.ebayConnected && input.ebayHasPolicies) {
+  if (input.ebayConnected && input.ebayHasPolicies && input.ebayHasMerchantLocation) {
     return {
       id: "ebay-automation",
       title: "eBay automation",
-      detail: "Seller account and policies are ready for offer creation.",
+      detail: "Seller account, policies and location are ready for offer creation.",
       state: "done",
+      action: "Listings",
+      target: "listings",
+      priority: 86,
+    };
+  }
+
+  if (input.ebayConnected && input.ebayHasPolicies && !input.ebayHasMerchantLocation) {
+    return {
+      id: "ebay-automation",
+      title: "eBay automation",
+      detail: "Policies are ready. Add the seller location before creating eBay offers.",
+      state: "warn",
       action: "Listings",
       target: "listings",
       priority: 86,
@@ -213,9 +226,9 @@ function buildAlertReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
     return {
       id: "alerts",
       title: "Alerts",
-      detail: "Push delivery is ready for buys and reprices.",
+      detail: "Price-drop and reprice checks can notify outside the app.",
       state: "done",
-      priority: 68,
+      priority: 38,
     };
   }
 
@@ -225,18 +238,16 @@ function buildAlertReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
       title: "Alerts",
       detail: "In-app reprices are enough until listings or buy targets are active.",
       state: "next",
-      priority: 42,
+      priority: 18,
     };
   }
 
   return {
     id: "alerts",
     title: "Alerts",
-    detail: "Push delivery is off, so price drops and reprices stay in-app.",
-    state: "warn",
-    action: "Setup",
-    target: "external",
-    priority: 68,
+    detail: "Price drops and reprices stay in-app for now.",
+    state: "next",
+    priority: 18,
   };
 }
 
