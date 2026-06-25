@@ -4306,6 +4306,28 @@ label {
   white-space: nowrap;
 }
 
+.ebay-setup-banner button {
+  border: 1px solid rgba(255, 200, 80, 0.34);
+  border-radius: 6px;
+  background: rgba(255, 200, 80, 0.12);
+  color: rgba(255, 235, 180, 0.96);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.ebay-setup-banner button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.ebay-setup-detail {
+  color: rgba(255, 230, 170, 0.78);
+  overflow-wrap: anywhere;
+}
+
 .ebay-publish-overlay {
   position: sticky;
   top: 12px;

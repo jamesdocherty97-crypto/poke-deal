@@ -260,6 +260,11 @@ type EbayStatus = {
     returnPolicyId?: string;
     merchantLocationKey?: string | null;
   };
+  locationSetup?: {
+    configured: boolean;
+    missingFields?: string[];
+    merchantLocationKey?: string | null;
+  };
   error?: string;
 };
 
@@ -1131,6 +1136,8 @@ export default function Home() {
   );
   const ebayHasMerchantLocation = Boolean(ebayStatus?.hasMerchantLocation || ebayPolicies?.merchantLocationKey);
   const ebayNeedsMerchantLocation = Boolean(ebayStatus?.connected && ebayHasPolicies && !ebayHasMerchantLocation);
+  const ebayCanCreateMerchantLocation = Boolean(ebayNeedsMerchantLocation && ebayStatus?.locationSetup?.configured);
+  const ebayLocationMissingFields = ebayStatus?.locationSetup?.missingFields?.join(", ") ?? "";
   const ebayHealthSource = useMemo<SystemSource>(
     () => ({
       id: "ebay-sell-api",
@@ -2922,6 +2929,26 @@ export default function Home() {
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "eBay offer creation failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function createEbaySellerLocation() {
+    setBusy("ebay-location");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/ebay/location", { method: "POST" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "eBay seller location setup failed");
+      setNotice(payload.message ?? "eBay seller location is ready.");
+      const statusRes = await fetch("/api/ebay/status");
+      const statusPayload = await readJson(statusRes);
+      if (statusRes.ok) setEbayStatus(statusPayload);
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "eBay seller location setup failed");
     } finally {
       setBusy(null);
     }
@@ -4936,7 +4963,16 @@ export default function Home() {
           )}
           {ebayNeedsMerchantLocation && listings.some((l) => l.channel === "EBAY") && (
             <div className="ebay-setup-banner">
-              <span>eBay is connected and policies are ready. Add a seller location in Seller Hub before relying on app-created offers.</span>
+              <span>
+                eBay is connected and policies are ready. Seller location is still missing, so offer creation may fail until this is fixed.
+              </span>
+              {ebayCanCreateMerchantLocation ? (
+                <button type="button" onClick={() => void createEbaySellerLocation()} disabled={busy === "ebay-location"}>
+                  {busy === "ebay-location" ? "Creating location..." : "Create seller location"}
+                </button>
+              ) : ebayLocationMissingFields ? (
+                <span className="ebay-setup-detail">Add env vars: {ebayLocationMissingFields}</span>
+              ) : null}
               <a href="https://www.ebay.co.uk/sh/landing" target="_blank" rel="noreferrer">
                 Open Seller Hub
               </a>

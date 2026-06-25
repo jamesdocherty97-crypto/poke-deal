@@ -11,6 +11,12 @@ import type { EbayConfig } from "./config.js";
 import type { EbayPolicies } from "./policies.js";
 import { buildListingPack } from "../dealer/listingPack.js";
 import { checkEbayReadiness } from "./readiness.js";
+import {
+  buildInventoryLocationPayload,
+  createInventoryLocation,
+  missingEbayLocationSetupFields,
+  readEbayLocationSetup,
+} from "./location.js";
 
 const TEST_CONFIG: EbayConfig = {
   clientId: "TestClient-123",
@@ -340,6 +346,97 @@ test("buildEbayOfferPreflight previews inventory and offer payloads without writ
   assert.equal(preflight.offer.sku, preflight.sku);
   assert.equal(preflight.offer.availableQuantity, 2);
   assert.equal(preflight.offer.pricingSummary.price.currency, "GBP");
+});
+
+// ── merchant location setup ───────────────────────────────────────────────────
+
+test("readEbayLocationSetup reads the seller location from env-style config", () => {
+  const setup = readEbayLocationSetup({
+    EBAY_MERCHANT_LOCATION_KEY: "  pdos-home  ",
+    EBAY_LOCATION_NAME: "  Pokémon stock room  ",
+    EBAY_LOCATION_ADDRESS_LINE1: "  10 Test Street  ",
+    EBAY_LOCATION_CITY: "  Manchester  ",
+    EBAY_LOCATION_POSTAL_CODE: "  M1 1AA  ",
+  });
+
+  assert.deepEqual(setup, {
+    merchantLocationKey: "pdos-home",
+    name: "Pokémon stock room",
+    address: {
+      addressLine1: "10 Test Street",
+      city: "Manchester",
+      postalCode: "M1 1AA",
+      country: "GB",
+    },
+  });
+});
+
+test("missingEbayLocationSetupFields reports required setup env vars", () => {
+  assert.deepEqual(missingEbayLocationSetupFields({}), [
+    "EBAY_MERCHANT_LOCATION_KEY",
+    "EBAY_LOCATION_ADDRESS_LINE1",
+    "EBAY_LOCATION_CITY",
+    "EBAY_LOCATION_POSTAL_CODE",
+  ]);
+  assert.deepEqual(
+    missingEbayLocationSetupFields({
+      EBAY_MERCHANT_LOCATION_KEY: "pdos-home",
+      EBAY_LOCATION_ADDRESS_LINE1: "10 Test Street",
+      EBAY_LOCATION_CITY: "Manchester",
+      EBAY_LOCATION_POSTAL_CODE: "M1 1AA",
+    }),
+    [],
+  );
+});
+
+test("buildInventoryLocationPayload creates an enabled warehouse location", () => {
+  const setup = readEbayLocationSetup({
+    EBAY_MERCHANT_LOCATION_KEY: "pdos-home",
+    EBAY_LOCATION_ADDRESS_LINE1: "10 Test Street",
+    EBAY_LOCATION_CITY: "Manchester",
+    EBAY_LOCATION_POSTAL_CODE: "M1 1AA",
+    EBAY_LOCATION_COUNTRY: "GB",
+  })!;
+
+  assert.deepEqual(buildInventoryLocationPayload(setup), {
+    name: "Pokemon Dealer OS",
+    merchantLocationStatus: "ENABLED",
+    locationTypes: ["WAREHOUSE"],
+    location: {
+      address: {
+        addressLine1: "10 Test Street",
+        city: "Manchester",
+        postalCode: "M1 1AA",
+        country: "GB",
+      },
+    },
+  });
+});
+
+test("createInventoryLocation posts to the configured merchant location key", async () => {
+  const setup = readEbayLocationSetup({
+    EBAY_MERCHANT_LOCATION_KEY: "pdos-home",
+    EBAY_LOCATION_ADDRESS_LINE1: "10 Test Street",
+    EBAY_LOCATION_CITY: "Manchester",
+    EBAY_LOCATION_POSTAL_CODE: "M1 1AA",
+  })!;
+  let capturedUrl = "";
+  let capturedBody: unknown = null;
+  const fetch: typeof globalThis.fetch = (url, opts) => {
+    capturedUrl = String(url);
+    capturedBody = JSON.parse(String(opts?.body));
+    return Promise.resolve({
+      ok: true,
+      status: 204,
+      text: () => Promise.resolve(""),
+    } as Response);
+  };
+
+  const result = await createInventoryLocation(TEST_CONFIG, "token-xyz", setup, fetch);
+
+  assert.equal(result.merchantLocationKey, "pdos-home");
+  assert.equal(capturedUrl, "https://api.sandbox.ebay.com/sell/inventory/v1/location/pdos-home");
+  assert.deepEqual(capturedBody, buildInventoryLocationPayload(setup));
 });
 
 // ── fetchEbayPolicies ─────────────────────────────────────────────────────────
