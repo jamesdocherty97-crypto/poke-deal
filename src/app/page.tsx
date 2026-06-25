@@ -2,7 +2,6 @@
 
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
-  conditionAdjustedPricePence,
   rawConditionPriceFactor,
   suggestListPrice,
   type PricingStrategy,
@@ -34,6 +33,7 @@ import {
   type RecentCompEntry,
 } from "@/lib/dealer/recentComps";
 import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
+import { judgeDeal } from "@/lib/dealer/dealJudge";
 import {
   buildManualCompLinks,
   cardSearchQuery,
@@ -4060,16 +4060,16 @@ export default function Home() {
               {!needsManualComp && deal && (
                 <div className={`deal-banner ${deal.tone}`}>
                   <div>
-                    <span>Deal judge</span>
+                    <span>{quickStockCostPence > 0 ? "Deal judge" : "Buy ceiling"}</span>
                     <strong>{deal.label}</strong>
                   </div>
                   <div>
-                    <span>Net profit</span>
-                    <strong>{gbp(deal.expectedProfitPence)}</strong>
+                    <span>{quickStockCostPence > 0 ? "Net profit" : "Offer up to"}</span>
+                    <strong>{gbp(quickStockCostPence > 0 ? deal.expectedProfitPence : deal.targetBuyPence)}</strong>
                   </div>
                   <div>
-                    <span>Target buy</span>
-                    <strong>{gbp(deal.targetBuyPence)}</strong>
+                    <span>{quickStockCostPence > 0 ? "Target buy" : "List around"}</span>
+                    <strong>{gbp(quickStockCostPence > 0 ? deal.targetBuyPence : quickStockListPence)}</strong>
                   </div>
                 </div>
               )}
@@ -4086,7 +4086,9 @@ export default function Home() {
                             : "Add cost"}
                       </strong>
                     </div>
-                    <span className={`pill ${buyPlan?.tone ?? "warn"}`}>{buyPlan?.label ?? "Check"}</span>
+                    <span className={`pill ${quickStockCostPence > 0 ? buyPlan?.tone ?? "warn" : "warn"}`}>
+                      {quickStockCostPence > 0 ? buyPlan?.label ?? "Check" : "Add cost"}
+                    </span>
                   </div>
                   <div className="quick-stock-grid">
                     <label>
@@ -4106,8 +4108,8 @@ export default function Home() {
                     <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
                     <Metric
                       label="Profit"
-                      value={buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
-                      tone={buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
+                      value={quickStockCostPence > 0 && buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
+                      tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
                     />
                   </div>
                   <button
@@ -6835,37 +6837,6 @@ function recentCompMeta(entry: RecentCompEntry): string {
 
 function hideBrokenImage(event: SyntheticEvent<HTMLImageElement>) {
   event.currentTarget.hidden = true;
-}
-
-function judgeDeal(
-  comp: CompResult,
-  costBasisPence: number,
-  channel: Channel,
-  grade: Grade,
-  condition: string | null | undefined,
-): {
-  label: string;
-  tone: "good" | "warn" | "danger";
-  expectedProfitPence: number;
-  targetBuyPence: number;
-} {
-  if (comp.sampleSize === 0 || comp.medianPence <= 0) {
-    return { label: "No signal", tone: "danger", expectedProfitPence: 0, targetBuyPence: 0 };
-  }
-  const adjustedCompPence = conditionAdjustedPricePence(comp.medianPence, grade, condition);
-  const grossSalePence = defaultGrossSalePence(channel, adjustedCompPence, { grade });
-  const costs = estimateSaleCosts(channel, grossSalePence, { grade });
-  const net = grossSalePence - costs.feesPence - costs.postagePence;
-  const expectedProfitPence = net - costBasisPence;
-  const targetBuyPence = Math.max(0, Math.round(net * 0.7));
-  const roi = costBasisPence > 0 ? expectedProfitPence / costBasisPence : 0;
-  if (expectedProfitPence > 0 && roi >= 0.35 && comp.sampleSize >= 3) {
-    return { label: "Buy", tone: "good", expectedProfitPence, targetBuyPence };
-  }
-  if (expectedProfitPence > 0 && roi >= 0.1) {
-    return { label: "Watch", tone: "warn", expectedProfitPence, targetBuyPence };
-  }
-  return { label: "Pass", tone: "danger", expectedProfitPence, targetBuyPence };
 }
 
 function calculateGradeEv({
