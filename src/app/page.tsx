@@ -471,7 +471,7 @@ const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", 
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
 const VISIBLE_POPULAR_SET_LIMIT = 30;
-const VISIBLE_QUICK_HUNT_LIMIT = 6;
+const VISIBLE_QUICK_HUNT_LIMIT = 8;
 const expensePresets: Array<{ category: ExpenseCategory; description: string; amount?: string; channel?: Channel }> = [
   { category: "POSTAGE", description: "Postage supplies", amount: "5.00" },
   { category: "SUPPLIES", description: "Sleeves / toploaders", amount: "10.00" },

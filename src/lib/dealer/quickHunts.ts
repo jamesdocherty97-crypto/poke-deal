@@ -6,7 +6,7 @@ export interface QuickHuntCard {
   setMarkUrl?: string;
 }
 
-export const MAX_QUICK_HUNTS = 14;
+export const MAX_QUICK_HUNTS = 20;
 
 export const DEFAULT_QUICK_HUNTS: QuickHuntCard[] = [
   {
@@ -99,11 +99,53 @@ export const DEFAULT_QUICK_HUNTS: QuickHuntCard[] = [
     number: "MEP049",
   },
   {
+    name: "Latias ex",
+    setName: "Surging Sparks",
+    number: "239/191",
+    imageUrl: "https://images.pokemontcg.io/sv8/239_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/sv8/logo.png",
+  },
+  {
+    name: "Eevee",
+    setName: "Twilight Masquerade",
+    number: "188/167",
+    imageUrl: "https://images.pokemontcg.io/sv6/188_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/sv6/logo.png",
+  },
+  {
+    name: "Iono",
+    setName: "Paldea Evolved",
+    number: "269/193",
+    imageUrl: "https://images.pokemontcg.io/sv2/269_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/sv2/logo.png",
+  },
+  {
     name: "Charizard",
     setName: "Base",
     number: "4/102",
     imageUrl: "https://images.pokemontcg.io/base1/4_hires.png",
     setMarkUrl: "https://images.pokemontcg.io/base1/logo.png",
+  },
+  {
+    name: "Blastoise",
+    setName: "Base",
+    number: "2/102",
+    imageUrl: "https://images.pokemontcg.io/base1/2_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/base1/logo.png",
+  },
+  {
+    name: "Venusaur",
+    setName: "Base",
+    number: "15/102",
+    imageUrl: "https://images.pokemontcg.io/base1/15_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/base1/logo.png",
+  },
+  {
+    name: "Lugia",
+    setName: "Neo Genesis",
+    number: "9/111",
+    imageUrl: "https://images.pokemontcg.io/neo1/9_hires.png",
+    setMarkUrl: "https://images.pokemontcg.io/neo1/logo.png",
   },
 ];
 
