@@ -82,6 +82,7 @@ import {
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
+import { textMentionsFirstEdition } from "@/lib/comps/variants";
 
 type View = "today" | "acquire" | "inventory" | "listings" | "pnl";
 type Grade = DomainGrade;
@@ -2155,14 +2156,34 @@ export default function Home() {
   }
 
   function chooseCatalogAlternative(card: CatalogCard) {
+    const firstEditionRequested =
+      textMentionsFirstEdition(manualCompSearchText) ||
+      textMentionsFirstEdition(name) ||
+      textMentionsFirstEdition(setNameValue) ||
+      textMentionsFirstEdition(number);
+    const lookupName =
+      firstEditionRequested && !textMentionsFirstEdition(card.name)
+        ? `${card.name} 1st Edition`
+        : card.name;
+    const normalizedCondition = condition.trim().toUpperCase();
+    const conditionSearchTerm = normalizedCondition && normalizedCondition !== "NM" ? condition : "";
+    const manualSearch = normalizeManualCompSearchText(
+      [
+        card.name,
+        card.number ?? "",
+        card.setName,
+        firstEditionRequested ? "1st Edition" : "",
+        conditionSearchTerm,
+      ].filter(Boolean).join(" "),
+    );
     const nextLookup = {
-      name: card.name,
+      name: lookupName,
       setName: card.setName,
       number: card.number ?? "",
       grade,
     };
 
-    setName(card.name);
+    setName(lookupName);
     setSetNameValue(card.setName);
     pinRecentSetName(card.setName);
     setNumber(card.number ?? "");
@@ -2170,10 +2191,10 @@ export default function Home() {
     setSuggestion(null);
     setCardArtUrl(card.imageUrl ?? null);
     setGradeComp(null);
-    setManualCompQuery("");
+    setManualCompQuery(manualSearch);
     clearCheckedComp();
     setError(null);
-    setNotice(`Rechecking ${card.name}...`);
+    setNotice(`Rechecking ${lookupName}...`);
     void lookupComp(nextLookup);
   }
 
