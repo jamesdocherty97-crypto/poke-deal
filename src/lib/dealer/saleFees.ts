@@ -57,6 +57,15 @@ export function defaultGrossSalePence(
   return itemPrice + buyerPaidPostagePence(channel, options.grade);
 }
 
+export function saleItemSubtotalPence(
+  channel: SaleChannel,
+  grossSalePence: number,
+  options: SaleCostOptions = {},
+): number {
+  const gross = Math.max(0, Math.round(grossSalePence));
+  return Math.max(0, gross - buyerPaidPostagePence(channel, options.grade));
+}
+
 export function saleNetPence({
   salePricePence,
   feesPence,

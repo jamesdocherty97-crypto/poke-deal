@@ -6,6 +6,7 @@ import {
   defaultGrossSalePence,
   estimateSaleCosts,
   postedSalePostagePence,
+  saleItemSubtotalPence,
   saleNetPence,
 } from "./saleFees.js";
 
@@ -34,6 +35,13 @@ test("defaultGrossSalePence adds buyer-paid postage for posted marketplaces", ()
   assert.equal(defaultGrossSalePence("EBAY", 5000, { grade: "RAW" }), 5175);
   assert.equal(defaultGrossSalePence("EBAY", 5000, { grade: "PSA_10" }), 5499);
   assert.equal(defaultGrossSalePence("IN_PERSON", 5000, { grade: "PSA_10" }), 5000);
+});
+
+test("saleItemSubtotalPence removes buyer-paid postage from posted marketplace gross", () => {
+  assert.equal(saleItemSubtotalPence("EBAY", 5175, { grade: "RAW" }), 5000);
+  assert.equal(saleItemSubtotalPence("CARDMARKET", 5499, { grade: "PSA_10" }), 5000);
+  assert.equal(saleItemSubtotalPence("IN_PERSON", 5000, { grade: "PSA_10" }), 5000);
+  assert.equal(saleItemSubtotalPence("EBAY", 100, { grade: "RAW" }), 0);
 });
 
 test("saleNetPence nets fees and postage from the booked sale price", () => {

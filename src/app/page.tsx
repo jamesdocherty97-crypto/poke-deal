@@ -78,6 +78,7 @@ import {
   breakEvenSalePricePence,
   defaultGrossSalePence,
   estimateSaleCosts,
+  saleItemSubtotalPence,
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
@@ -2321,7 +2322,7 @@ export default function Home() {
   function applySaleChannelPreset(nextChannel: Channel) {
     const currentGross = poundsToPence(salePrice);
     const currentItemSubtotal =
-      currentGross > 0 ? Math.max(0, currentGross - buyerPaidPostagePence(saleChannel, sellingItem?.grade)) : 0;
+      currentGross > 0 ? saleItemSubtotalPence(saleChannel, currentGross, { grade: sellingItem?.grade }) : 0;
     const nextGross =
       currentItemSubtotal > 0
         ? defaultGrossSalePence(nextChannel, currentItemSubtotal, { grade: sellingItem?.grade })
@@ -2345,7 +2346,7 @@ export default function Home() {
     const quantityForPrice = saleQuantityForShortcuts();
     const currentTotal = poundsToPence(salePrice);
     if (currentTotal > 0) {
-      const itemSubtotal = Math.max(0, currentTotal - buyerPaidPostagePence(saleChannel, sellingItem.grade));
+      const itemSubtotal = saleItemSubtotalPence(saleChannel, currentTotal, { grade: sellingItem.grade });
       return Math.round(itemSubtotal / quantityForPrice);
     }
     return saleListPrice(sellingItem) ?? sellingItem.costBasis;
@@ -2393,7 +2394,11 @@ export default function Home() {
   }
 
   function applyCashSale() {
+    const currentGross = poundsToPence(salePrice);
+    const itemSubtotal =
+      currentGross > 0 ? saleItemSubtotalPence(saleChannel, currentGross, { grade: sellingItem?.grade }) : currentGross;
     setSaleChannel("IN_PERSON");
+    setSalePrice(penceToPounds(itemSubtotal));
     setFees("0.00");
     setPostage("0.00");
     setFeesTouched(true);
