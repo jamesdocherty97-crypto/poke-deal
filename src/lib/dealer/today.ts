@@ -51,8 +51,8 @@ export function buildTodayActions(input: TodayActionInput, limit = 5): TodayActi
     actions.push({
       id: "unlisted-stock",
       title: `${input.unlistedStockCount} stock row${input.unlistedStockCount === 1 ? "" : "s"} not listed`,
-      detail: "Needs a selling channel",
-      target: "stock",
+      detail: "Draft listing packs",
+      target: "drafts",
       tone: "warn",
       priority: 88,
     });
@@ -88,6 +88,17 @@ export function buildTodayActions(input: TodayActionInput, limit = 5): TodayActi
       target: input.activeListings > 0 ? "sales" : "stock",
       tone: "good",
       priority: 64,
+    });
+  }
+
+  if (input.stockCount > 0) {
+    actions.push({
+      id: "comp-next-buy",
+      title: "Comp next buy",
+      detail: "Fast lookup for the next card",
+      target: "buy",
+      tone: "info",
+      priority: 62,
     });
   }
 

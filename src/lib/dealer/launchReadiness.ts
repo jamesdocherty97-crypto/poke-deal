@@ -191,8 +191,8 @@ function buildListingReadiness(input: LaunchReadinessInput): LaunchReadinessItem
     title: "Listing pipeline",
     detail: input.stockCount > 0 ? "Create or activate a listing for stocked cards." : "Your first buy can create a draft listing.",
     state: "next",
-    action: input.stockCount > 0 ? "Stock" : "Buy",
-    target: input.stockCount > 0 ? "stock" : "buy",
+    action: input.stockCount > 0 ? "List" : "Buy",
+    target: input.stockCount > 0 ? "listings" : "buy",
     priority: 82,
   };
 }

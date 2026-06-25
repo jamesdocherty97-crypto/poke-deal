@@ -36,7 +36,9 @@ test("buildTodayActions prioritizes drafts and unlisted stock for an operating s
     "unlisted-stock",
     "reprice",
     "aged-stock",
+    "comp-next-buy",
   ]);
+  assert.equal(actions.find((action) => action.id === "unlisted-stock")?.target, "drafts");
 });
 
 test("buildTodayActions caps noisy queues without dropping the highest priority actions", () => {
@@ -88,4 +90,21 @@ test("buildTodayActions sends first-sale work to active listings when possible",
   const firstSale = actions.find((action) => action.id === "first-sale");
   assert.equal(firstSale?.target, "sales");
   assert.match(firstSale?.detail ?? "", /active listings/);
+});
+
+test("buildTodayActions keeps fast comping available after setup", () => {
+  const actions = buildTodayActions({
+    stockCount: 12,
+    activeStockCount: 8,
+    soldCount: 5,
+    draftListings: 0,
+    activeListings: 0,
+    activeWatches: 1,
+    agedStockCount: 0,
+    unlistedStockCount: 0,
+  });
+
+  const nextBuy = actions.find((action) => action.id === "comp-next-buy");
+  assert.equal(nextBuy?.target, "buy");
+  assert.match(nextBuy?.detail ?? "", /Fast lookup/);
 });

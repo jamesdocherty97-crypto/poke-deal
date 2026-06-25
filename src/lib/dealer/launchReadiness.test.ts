@@ -48,6 +48,27 @@ test("buildLaunchReadiness nudges draft listings and first sale for a new operat
   assert.equal(items.some((item) => item.id === "first-buy"), false);
 });
 
+test("buildLaunchReadiness routes unlisted stock to the listing desk", () => {
+  const items = buildLaunchReadiness({
+    livePrimaryComps: true,
+    liveCatalogKey: true,
+    secondaryCrossCheck: true,
+    alertDelivery: false,
+    stockCount: 3,
+    draftListings: 0,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 0,
+  });
+
+  const listing = items.find((item) => item.id === "listing-pipeline");
+
+  assert.equal(listing?.state, "next");
+  assert.equal(listing?.action, "List");
+  assert.equal(listing?.target, "listings");
+});
+
 test("buildLaunchReadiness marks operating systems done when they are ready", () => {
   const items = buildLaunchReadiness({
     livePrimaryComps: true,
