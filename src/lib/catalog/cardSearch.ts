@@ -39,7 +39,7 @@ interface SetPhraseMatch {
   score: number;
 }
 
-const COLLECTOR_NUMBER_TEXT = String.raw`(?:(?!SET\b)[A-Za-z]{1,5}\s*\d{1,4}|\d{1,4})(?:\s*/\s*[A-Za-z]{0,5}\s*\d{1,4})?`;
+const COLLECTOR_NUMBER_TEXT = String.raw`(?:(?!SET\b|EX\b)[A-Za-z]{1,5}\s*\d{1,4}|\d{1,4})(?:\s*/\s*[A-Za-z]{0,5}\s*\d{1,4})?`;
 
 export function rankCatalogCards(
   query: string,
@@ -124,6 +124,11 @@ export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
 
   const wholeNumber = readCollectorNumber(trimmed);
   if (wholeNumber) return { name: "", number: wholeNumber };
+
+  const trailingPlainSlashNumber = trimmed.match(/^(.+?)\s+#?(\d{1,4}\s*\/\s*[A-Za-z]{0,5}\s*\d{1,4})$/i);
+  const plainSlashName = trailingPlainSlashNumber?.[1]?.trim();
+  const plainSlashNumber = readCollectorNumber(trailingPlainSlashNumber?.[2]);
+  if (plainSlashName && plainSlashNumber) return { name: plainSlashName, number: plainSlashNumber };
 
   const trailing = trimmed.match(new RegExp(`^(.*?)\\s+#?(${COLLECTOR_NUMBER_TEXT})$`, "i"));
   const name = trailing?.[1]?.trim();

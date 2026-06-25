@@ -75,6 +75,29 @@ test("catalogToCardRef preserves first-edition intent after catalog canonicaliza
   assert.equal(card.tcgApiId, "neo1-9");
 });
 
+test("resolveCatalogCard falls back to known chase-card metadata when live catalog misses", async () => {
+  const calls: string[] = [];
+  const source = {
+    async resolve(card: CardRef) {
+      calls.push(`resolve:${card.tcgApiId ?? "freeform"}`);
+      return null;
+    },
+    async search(card: CardRef) {
+      calls.push(`search:${card.name}`);
+      return [];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const resolved = await resolveCatalogCard(
+    { name: "Mew ex", setName: "Paldean Fates", number: "232/091" },
+    source,
+  );
+
+  assert.deepEqual(calls, ["resolve:freeform", "search:Mew ex", "resolve:sv4pt5-232"]);
+  assert.equal(resolved?.tcgApiId, "sv4pt5-232");
+  assert.equal(resolved?.imageUrl, "https://images.pokemontcg.io/sv4pt5/232_hires.png");
+});
+
 test("resolveCatalogCard rejects same-name cards from the wrong requested set", async () => {
   const wrongSetCard: CatalogCard = {
     game: "POKEMON",

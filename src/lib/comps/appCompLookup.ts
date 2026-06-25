@@ -24,9 +24,12 @@ export async function resolveCatalogCard(
 
   const searched = await catalogSource.search(card, 5).catch(() => []);
   const best = searched.find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null;
-  if (!best?.tcgApiId) return best;
+  const fallback = best ?? findChaseCatalogMatch(card);
+  if (!fallback?.tcgApiId) return fallback;
 
-  return catalogSource.resolve({ ...card, tcgApiId: best.tcgApiId }).catch(() => best);
+  return catalogSource.resolve({ ...card, tcgApiId: fallback.tcgApiId })
+    .then((resolved) => (resolved && catalogCardMatchesLookupContext(resolved, card) ? resolved : fallback))
+    .catch(() => fallback);
 }
 
 export async function findCatalogAlternatives(
@@ -101,5 +104,16 @@ function catalogIdentityKey(card: CatalogCard): string {
       card.setName.trim().toLowerCase(),
       (card.number ?? "").trim().toLowerCase(),
     ].join("|")
+  );
+}
+
+function findChaseCatalogMatch(card: CardRef): CatalogCard | null {
+  const normalized = normalizeCatalogCardSearchInput(card.name, card.setName);
+  const query = [normalized.name || card.name, normalized.number ?? card.number].filter(Boolean).join(" ");
+  if (!query.trim()) return null;
+
+  return (
+    searchChaseCards(query, card.setName ?? normalized.setName, 5)
+      .find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null
   );
 }

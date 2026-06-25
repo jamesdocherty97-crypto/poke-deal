@@ -72,6 +72,18 @@ test("normalizeCatalogCardSearchInput splits dealer shorthand into card, set and
     number: "199/165",
   });
 
+  assert.deepEqual(normalizeCatalogCardSearchInput("Mew ex Paldean Fates 232/091 raw"), {
+    query: "Mew ex 232/091",
+    name: "Mew ex",
+    setName: "Paldean Fates",
+    number: "232/091",
+  });
+
+  assert.deepEqual(parseCardSearchQuery("Mew ex 232/091"), {
+    name: "Mew ex",
+    number: "232/091",
+  });
+
   assert.deepEqual(normalizeCatalogCardSearchInput("Charizard 151"), {
     query: "Charizard",
     name: "Charizard",
