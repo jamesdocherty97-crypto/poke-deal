@@ -3176,6 +3176,51 @@ label {
   gap: 6px;
 }
 
+.next-action-strip {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.86fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 203, 5, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 203, 5, 0.08);
+  padding: 7px;
+}
+
+.listing-next-action {
+  border-color: rgba(42, 117, 187, 0.28);
+  background: rgba(42, 117, 187, 0.1);
+}
+
+.next-action-button {
+  display: grid;
+  min-height: 38px;
+  place-items: center;
+  border: 1px solid rgba(255, 203, 5, 0.52);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--yellow), #f59e0b);
+  color: #1b2235;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 1000;
+  text-align: center;
+  text-decoration: none;
+}
+
+.next-action-button.good {
+  border-color: rgba(52, 211, 153, 0.48);
+  background: linear-gradient(180deg, #5ee7a6, #1fbf75);
+  color: #04130b;
+}
+
+.next-action-strip span {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
 .row-actions button,
 .ghost-button,
 .danger-button {

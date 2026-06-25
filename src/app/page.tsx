@@ -4754,6 +4754,7 @@ export default function Home() {
               onEdit={openInventoryEditor}
               onSell={openSell}
               onList={listInventoryItem}
+              onPack={openRecentListingWork}
               onStatus={updateStatus}
               onDelete={requestDeleteItem}
             />
@@ -4894,6 +4895,7 @@ export default function Home() {
                   onEdit={openInventoryEditor}
                   onSell={openSell}
                   onList={listInventoryItem}
+                  onPack={openRecentListingWork}
                   onStatus={updateStatus}
                   onDelete={requestDeleteItem}
                 />
@@ -6169,6 +6171,7 @@ function InventoryRow({
   onEdit,
   onSell,
   onList,
+  onPack,
   onStatus,
   onDelete,
 }: {
@@ -6177,10 +6180,13 @@ function InventoryRow({
   onEdit: (item: InventoryItem) => void;
   onSell: (item: InventoryItem) => void;
   onList: (item: InventoryItem) => void;
+  onPack: (item: InventoryItem) => void;
   onStatus: (item: InventoryItem, status: ItemStatus) => void;
   onDelete: (item: InventoryItem) => void;
 }) {
   const listing = item.listings[0];
+  const draftListing = item.listings.find((row) => row.state === "DRAFT");
+  const activeListing = item.listings.find((row) => row.state === "ACTIVE");
   const sale = item.sales[0];
   const listingStateLabel = listing ? listing.state.charAt(0) + listing.state.slice(1).toLowerCase() : "";
   const soldNote =
@@ -6266,6 +6272,35 @@ function InventoryRow({
             {listing ? `${listingStateLabel} ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
             {soldNote}
           </p>
+          {item.status !== "SOLD" && (
+            <div className="next-action-strip">
+              {draftListing ? (
+                <button className="next-action-button" type="button" onClick={() => onPack(item)}>
+                  Open listing pack
+                </button>
+              ) : activeListing ? (
+                <button className="next-action-button good" type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
+                  Record sale
+                </button>
+              ) : (
+                <button
+                  className="next-action-button"
+                  type="button"
+                  onClick={() => onList(item)}
+                  disabled={busy === `status-${item.id}` || busy?.startsWith("listing-") || busy?.startsWith("create-listing-")}
+                >
+                  Draft listing
+                </button>
+              )}
+              <span>
+                {draftListing
+                  ? `${channelLabel(draftListing.channel)} draft ready`
+                  : activeListing
+                    ? `${channelLabel(activeListing.channel)} active at ${gbp(activeListing.listPrice ?? activeListing.suggestedPrice ?? 0)}`
+                    : "Not listed yet"}
+              </span>
+            </div>
+          )}
           <div className="row-actions">
             {item.status !== "SOLD" && (
               <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
@@ -6424,6 +6459,42 @@ function ListingRow({
           <p className={`listing-row-economics ${economics.profitPence >= 0 ? "good" : "warn"}`}>
             Profit {gbp(economics.profitPence)} · net {gbp(economics.netPence)} · {formatPct(economics.roiPct)} ROI
           </p>
+        )}
+        {listing.state !== "SOLD" && (
+          <div className="next-action-strip listing-next-action">
+            {isEbay && ebayConnected && hasOffer && !isPublished ? (
+              <button className="next-action-button" type="button" onClick={onEbayPublish} disabled={isEbayPublishBusy}>
+                {isEbayPublishBusy ? "Publishing..." : "Publish to eBay"}
+              </button>
+            ) : isEbay && isPublished ? (
+              <a className="next-action-button good" href={listing.externalUrl!} target="_blank" rel="noreferrer">
+                View live listing
+              </a>
+            ) : listing.state === "DRAFT" ? (
+              <button className="next-action-button" type="button" onClick={() => onPack(listing)} disabled={isBusy}>
+                Open listing pack
+              </button>
+            ) : canSell ? (
+              <button className="next-action-button good" type="button" onClick={() => onSell(listing)} disabled={Boolean(busy?.startsWith("sell-"))}>
+                Record sale
+              </button>
+            ) : (
+              <button className="next-action-button" type="button" onClick={() => onPack(listing)} disabled={isBusy}>
+                Review listing
+              </button>
+            )}
+            <span>
+              {listing.state === "DRAFT"
+                ? "copy fields, create offer, or activate"
+                : hasOffer
+                  ? "offer created, publish when ready"
+                  : isPublished
+                    ? "live on eBay"
+                    : listing.state === "ACTIVE"
+                      ? "active listing, ready to sell"
+                      : listing.state.toLowerCase()}
+            </span>
+          </div>
         )}
         <div className="row-actions">
           <button type="button" onClick={() => onEdit(listing)} disabled={isBusy || listing.state === "SOLD"}>
