@@ -4268,12 +4268,22 @@ export default function Home() {
               </div>
               {dealerVerdict && (
                 <div className={`dealer-verdict ${dealerVerdict.tone}`}>
-                  <div>
+                  <div className="dealer-verdict-main">
                     <span>{dealerVerdict.label}</span>
                     <strong>{dealerVerdict.title}</strong>
                     <small>{dealerVerdict.detail}</small>
+                    {dealerVerdict.tone !== "good" && !checkedComp && (
+                      <div className="dealer-verdict-actions">
+                        <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
+                          Open UK
+                        </button>
+                        <button type="button" onClick={jumpToCheckedComp}>
+                          Enter price
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div>
+                  <div className="dealer-verdict-signal">
                     <span>Signals</span>
                     <strong>
                       {dealerVerdict.pricedSignalCount}/{dealerVerdict.totalSignalCount}

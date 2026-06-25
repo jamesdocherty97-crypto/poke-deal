@@ -94,6 +94,18 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
     };
   }
 
+  if (priced.length < 2 && isRawSignal(comp.headline)) {
+    return {
+      ...base,
+      tone: "warn",
+      label: "Single RAW",
+      title: "Check solds first",
+      detail: "Only one RAW priced source came back. Use it for scanning, then open UK solds or enter a checked comp before you buy/list with confidence.",
+      stockActionLabel: "Check solds first",
+      requiresCheckedComp: false,
+    };
+  }
+
   if (priced.length < 2 && isGradedSignal(comp.headline)) {
     return {
       ...base,
@@ -149,4 +161,8 @@ function isMarketBaseline(signal: DealerCompSignal): boolean {
 
 function isGradedSignal(signal: DealerCompSignal): boolean {
   return signal.grade != null && signal.grade !== "RAW";
+}
+
+function isRawSignal(signal: DealerCompSignal): boolean {
+  return signal.grade === "RAW";
 }

@@ -101,3 +101,17 @@ test("buildDealerCompVerdict warns on single-source graded comps", () => {
   assert.equal(verdict.stockActionLabel, "Check slab solds");
   assert.equal(verdict.requiresCheckedComp, false);
 });
+
+test("buildDealerCompVerdict calls out single-source raw comps", () => {
+  const verdict = buildDealerCompVerdict({
+    headline: comp({ grade: "RAW", medianPence: 1347, sampleSize: 298 }),
+    all: [comp({ grade: "RAW", medianPence: 1347, sampleSize: 298 })],
+    sourcesDisagree: false,
+  });
+
+  assert.equal(verdict.tone, "warn");
+  assert.equal(verdict.label, "Single RAW");
+  assert.equal(verdict.title, "Check solds first");
+  assert.equal(verdict.stockActionLabel, "Check solds first");
+  assert.equal(verdict.requiresCheckedComp, false);
+});

@@ -2504,13 +2504,14 @@ label {
   background: rgba(251, 113, 133, 0.12);
 }
 
-.dealer-verdict div {
+.dealer-verdict-main,
+.dealer-verdict-signal {
   display: grid;
   min-width: 0;
   gap: 3px;
 }
 
-.dealer-verdict div:last-child {
+.dealer-verdict-signal {
   justify-items: end;
   text-align: right;
 }
@@ -2538,6 +2539,23 @@ label {
 
 .dealer-verdict.danger strong {
   color: var(--danger);
+}
+
+.dealer-verdict-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.dealer-verdict-actions button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .market-signal {
