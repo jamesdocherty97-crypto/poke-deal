@@ -159,6 +159,25 @@ test("findCatalogAlternatives returns safe wrong-set recovery candidates", async
   assert.deepEqual(alternatives, [wrongSetCard]);
 });
 
+test("findCatalogAlternatives falls back to bundled alternatives when live catalog is slow", async () => {
+  const source = {
+    async search() {
+      return new Promise<CatalogCard[]>(() => undefined);
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const started = Date.now();
+  const alternatives = await findCatalogAlternatives(
+    { name: "Mew ex", setName: "Wrong Set", number: "232/091" },
+    source,
+    4,
+    { timeoutMs: 10 },
+  );
+
+  assert.ok(Date.now() - started < 500, "slow live catalog should not block recovery alternatives");
+  assert.equal(alternatives.some((card) => card.name === "Mew ex" && card.number === "232/091"), true);
+});
+
 test("resolveCatalogCard rejects same-set cards when the requested name differs", async () => {
   const wrongCard: CatalogCard = {
     game: "POKEMON",

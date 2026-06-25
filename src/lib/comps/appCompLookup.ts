@@ -36,14 +36,16 @@ export async function findCatalogAlternatives(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
   limit = 4,
+  options: { timeoutMs?: number } = {},
 ): Promise<CatalogCard[]> {
   const safeLimit = Math.max(1, Math.min(8, Math.round(limit)));
   const normalized = normalizeCatalogCardSearchInput(card.name, card.setName);
   const query = [normalized.name || card.name, normalized.number ?? card.number].filter(Boolean).join(" ");
   if (!query.trim()) return [];
 
-  const liveCards = await catalogSource.search(card, Math.max(safeLimit * 2, 8)).catch(() => []);
   const chaseCards = searchChaseCards(query, card.setName ?? normalized.setName, Math.max(safeLimit * 2, 8));
+  const liveSearch = catalogSource.search(card, Math.max(safeLimit * 2, 8)).catch(() => []);
+  const liveCards = await withOptionalTimeout(liveSearch, options.timeoutMs, []);
   const ranked = rankCatalogCards(query, [...liveCards, ...chaseCards], {
     setName: card.setName ?? normalized.setName,
     limit: Math.max(safeLimit * 3, 12),
@@ -60,6 +62,23 @@ export async function findCatalogAlternatives(
     if (alternatives.length >= safeLimit) break;
   }
   return alternatives;
+}
+
+function withOptionalTimeout<T>(promise: Promise<T>, timeoutMs: number | undefined, fallback: T): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || !timeoutMs || timeoutMs <= 0) return promise;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
 }
 
 export function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardRef {

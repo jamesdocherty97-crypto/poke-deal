@@ -15,6 +15,8 @@ import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const RECOVERY_ALTERNATIVES_TIMEOUT_MS = 1600;
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const lookup = readCompLookupRequest(searchParams);
@@ -28,7 +30,9 @@ export async function GET(request: Request) {
     const compService = createAppCompService(catalogSource, catalog);
     const result = await compService.lookup(compCard, { grade });
     const needsRecovery = !catalog || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
-    const alternatives = needsRecovery ? await findCatalogAlternatives(card, catalogSource, 4) : [];
+    const alternatives = needsRecovery
+      ? await findCatalogAlternatives(card, catalogSource, 4, { timeoutMs: RECOVERY_ALTERNATIVES_TIMEOUT_MS })
+      : [];
     if (process.env.DATABASE_URL) {
       await new PrismaCompResultRepo().create(result.headline).catch((err) => {
         console.warn(
