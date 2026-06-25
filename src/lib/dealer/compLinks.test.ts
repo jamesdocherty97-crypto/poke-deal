@@ -60,6 +60,7 @@ test("buildManualCompLinks preserves typed vintage qualifiers for eBay", () => {
 test("cardSearchQuery includes non-NM condition for manual fallbacks", () => {
   assert.equal(cardSearchQuery({ name: "Hitmontop", setName: "Neo Genesis" }, { condition: "LP" }), "Hitmontop Neo Genesis LP");
   assert.equal(cardSearchQuery({ name: "Hitmontop", setName: "Neo Genesis" }, { condition: "NM" }), "Hitmontop Neo Genesis");
+  assert.equal(cardSearchQuery({ name: "", setName: "", number: "" }, { condition: "LP" }), "");
 });
 
 test("normalizeManualCompSearchText strips buy-flow noise but keeps comp qualifiers", () => {

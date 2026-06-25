@@ -3218,11 +3218,13 @@ export default function Home() {
           </button>
         </div>
         {ebayQuery && <div className="manual-comp-query">{ebayQuery}</div>}
-        {manualCompLinks.map((link) => (
-          <a key={link.kind} className={link.primary ? "primary-link" : ""} href={link.url} target="_blank" rel="noreferrer">
-            {link.label}
-          </a>
-        ))}
+        {ebayQuery
+          ? manualCompLinks.map((link) => (
+              <a key={link.kind} className={link.primary ? "primary-link" : ""} href={link.url} target="_blank" rel="noreferrer">
+                {link.label}
+              </a>
+            ))
+          : null}
       </div>
     );
   }

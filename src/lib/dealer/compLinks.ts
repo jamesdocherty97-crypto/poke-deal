@@ -52,9 +52,10 @@ export function buildManualCompLinks(card: CardRef, grade: Grade, options: Manua
 
 export function cardSearchQuery(card: CardRef, options: { condition?: string } = {}): string {
   const condition = normalizeConditionForSearch(options.condition);
-  return [card.name, card.number, card.setName, condition]
+  const coreParts = [card.name, card.number, card.setName]
     .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part))
+    .filter((part): part is string => Boolean(part));
+  return [...coreParts, ...(coreParts.length > 0 && condition ? [condition] : [])]
     .join(" ");
 }
 
