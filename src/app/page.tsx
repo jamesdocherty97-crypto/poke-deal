@@ -2713,10 +2713,49 @@ export default function Home() {
     }
   }
 
+  async function quickDraftListingForItem(item: InventoryItem): Promise<Listing | null> {
+    const defaults = buildListingDraftDefaults({
+      card: item.card,
+      grade: item.grade,
+      costBasis: item.costBasis,
+    });
+
+    setBusy(`create-listing-${item.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId: item.id,
+          channel: "EBAY",
+          state: "DRAFT",
+          listPricePence: defaults.listPricePence,
+        }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "listing create failed");
+      const listing = payload.listing as Listing;
+      setNotice(`${item.card.name} draft created. Listing pack is ready.`);
+      setCreatingListingItemId(null);
+      setListingStateFilter("DRAFT");
+      setView("listings");
+      openListingPack(listing);
+      await refreshAll();
+      return listing;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "listing create failed");
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function listInventoryItem(item: InventoryItem) {
     const listing = item.listings.find((row) => row.state !== "SOLD" && row.state !== "ENDED") ?? item.listings[0];
     if (!listing) {
-      openListingCreator(item);
+      await quickDraftListingForItem(item);
       return;
     }
     await patchListing(listing, { state: "ACTIVE" }, "Listing activated.");
@@ -2736,8 +2775,8 @@ export default function Home() {
     const listing = listingForInventoryItem(item);
     setView("listings");
     if (!listing) {
-      openListingCreator(item);
       setListingStateFilter("DRAFT");
+      void quickDraftListingForItem(item);
       return;
     }
     setListingStateFilter(listing.state === "ACTIVE" || listing.state === "DRAFT" ? listing.state : "ALL");
@@ -2913,7 +2952,7 @@ export default function Home() {
     }
     setView("listings");
     setListingStateFilter("DRAFT");
-    openListingCreator(item);
+    void quickDraftListingForItem(item);
   }
 
   async function activateListingPackTarget() {
@@ -5034,7 +5073,7 @@ export default function Home() {
                     key={item.id}
                     item={item}
                     busy={busy}
-                    onDraft={openListingCreator}
+                    onDraft={listInventoryItem}
                     onEdit={openInventoryEditor}
                     onSell={openSell}
                   />
@@ -6374,7 +6413,7 @@ function ListingQueueRow({
             onClick={() => onDraft(item)}
             disabled={busy?.startsWith("create-listing-") || busy?.startsWith("listing-")}
           >
-            Draft
+            Draft + pack
           </button>
           <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
             Sell
