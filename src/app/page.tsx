@@ -2201,9 +2201,11 @@ export default function Home() {
     setError(null);
   }
 
-  function loadRecentBuy(item: InventoryItem, options: { lookupAfter?: boolean } = {}) {
+  function loadRecentBuy(item: InventoryItem, options: { lookupAfter?: boolean; repeatBuy?: boolean } = {}) {
     const nextGrade = item.grade as Grade;
     const nextCondition = item.condition ?? (nextGrade === "RAW" ? "NM" : "");
+    const existingListing = listingForInventoryItem(item);
+    const repeatListPrice = existingListing?.listPrice ?? existingListing?.suggestedPrice ?? null;
     const nextLookup = {
       name: item.card.name,
       setName: item.card.setName,
@@ -2216,11 +2218,15 @@ export default function Home() {
     setSetNameValue(item.card.setName);
     setNumber(item.card.number ?? "");
     setGrade(nextGrade);
-    setCost("");
+    setCost(options.repeatBuy ? penceToPounds(item.costBasis) : "");
     setQuantity("1");
     setSource(item.acquiredFrom ?? source);
     setLocation(item.location ?? location);
     setCondition(nextCondition);
+    if (existingListing?.channel) setChannel(existingListing.channel);
+    if (existingListing?.state === "ACTIVE" || existingListing?.state === "DRAFT") {
+      setAcquireListingState(existingListing.state);
+    }
     setGraderCert("");
     setPsaResult(null);
     setQuickIntake("");
@@ -2228,7 +2234,7 @@ export default function Home() {
     setSuggestion(null);
     setCardArtUrl(item.card.imageUrl);
     setGradeComp(null);
-    setListPriceOverride("");
+    setListPriceOverride(options.repeatBuy && repeatListPrice ? penceToPounds(repeatListPrice) : "");
     setManualCompQuery(
       cardSearchQuery(
         {
@@ -2248,7 +2254,7 @@ export default function Home() {
       return;
     }
 
-    setNotice(`${item.card.name} loaded for another buy.`);
+    setNotice(options.repeatBuy ? `${item.card.name} loaded with the last buy details.` : `${item.card.name} loaded for another buy.`);
   }
 
   function pinRecentSetName(value: string | null | undefined) {
@@ -4605,7 +4611,7 @@ export default function Home() {
                       </div>
                       <strong className="recent-intake-total">{gbp(item.costBasis * item.quantity)}</strong>
                       <div className="recent-intake-actions">
-                        <button type="button" onClick={() => loadRecentBuy(item)} aria-label={`Buy ${item.card.name} again`}>
+                        <button type="button" onClick={() => loadRecentBuy(item, { repeatBuy: true })} aria-label={`Buy ${item.card.name} again`}>
                           Again
                         </button>
                         <button
