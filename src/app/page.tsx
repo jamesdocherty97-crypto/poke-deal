@@ -597,6 +597,7 @@ export default function Home() {
   const pullStartY = useRef<number | null>(null);
   const pullTracking = useRef(false);
   const compPanelRef = useRef<HTMLElement | null>(null);
+  const checkedCompRef = useRef<HTMLDivElement | null>(null);
   const quickIntakeRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -1054,6 +1055,41 @@ export default function Home() {
     : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
   const quickStockReady = Boolean(headline && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
   const quickStockCanSubmit = quickStockReady && !requiresCheckedCompBeforeStock;
+  const quickOfferOptions = useMemo(() => {
+    const targetPence = deal?.targetBuyPence ?? 0;
+    const options: Array<{ label: string; valuePence: number }> = [];
+    if (targetPence > 0) {
+      options.push({ label: "Target", valuePence: targetPence });
+      options.push({ label: "Safe", valuePence: Math.max(1, Math.round(targetPence * 0.9)) });
+    }
+    if (quickStockListPence > 0) {
+      options.push({ label: "Half list", valuePence: Math.max(1, Math.round(quickStockListPence * 0.5)) });
+    }
+    const seen = new Set<number>();
+    return options.filter((option) => {
+      if (seen.has(option.valuePence)) return false;
+      seen.add(option.valuePence);
+      return true;
+    });
+  }, [deal?.targetBuyPence, quickStockListPence]);
+  const checkedCompPriceOptions = useMemo(() => {
+    if (!apiHeadline || apiHeadline.medianPence <= 0) return [];
+    const options = [
+      { label: "Use comp", valuePence: apiHeadline.medianPence },
+      ...(apiHeadline.lowPence > 0 && apiHeadline.lowPence !== apiHeadline.medianPence
+        ? [{ label: "Low", valuePence: apiHeadline.lowPence }]
+        : []),
+      ...(apiHeadline.highPence > 0 && apiHeadline.highPence !== apiHeadline.medianPence
+        ? [{ label: "High", valuePence: apiHeadline.highPence }]
+        : []),
+    ];
+    const seen = new Set<number>();
+    return options.filter((option) => {
+      if (seen.has(option.valuePence)) return false;
+      seen.add(option.valuePence);
+      return true;
+    });
+  }, [apiHeadline]);
   const buyTargetSuggestion = useMemo(
     () =>
       headline
@@ -3190,6 +3226,22 @@ export default function Home() {
     setError(null);
   }
 
+  function applyQuickCost(valuePence: number) {
+    setCost(penceToPounds(valuePence));
+    setError(null);
+  }
+
+  function applyCheckedCompPrice(valuePence: number) {
+    setCheckedCompPrice(penceToPounds(valuePence));
+    setCheckedCompSample((current) => (Number(current) > 0 ? current : "1"));
+    setNotice("Checked comp price filled. Adjust it if the sold listing differs.");
+    setError(null);
+  }
+
+  function jumpToCheckedComp() {
+    checkedCompRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   function renderManualCompLinks(variant: "compact" | "full" | "priority" = "full") {
     const ebayQuery = manualCompLinks.find((link) => link.kind === "EBAY_UK_SOLD")?.query ?? manualCompFallbackQuery;
     return (
@@ -3242,7 +3294,10 @@ export default function Home() {
 
   function renderCheckedCompCard(variant: "full" | "priority" = "full") {
     return (
-      <div className={`checked-comp-card ${checkedComp ? "active" : ""} ${variant}`}>
+      <div
+        className={`checked-comp-card ${checkedComp ? "active" : ""} ${variant}`}
+        ref={variant === "priority" ? checkedCompRef : undefined}
+      >
         <div className="checked-comp-heading">
           <div>
             <span>Checked comp</span>
@@ -3273,6 +3328,15 @@ export default function Home() {
             </select>
           </label>
         </div>
+        {checkedCompPriceOptions.length > 0 && (
+          <div className="checked-comp-price-presets" aria-label="Checked comp price shortcuts">
+            {checkedCompPriceOptions.map((option) => (
+              <button key={`${option.label}-${option.valuePence}`} type="button" onClick={() => applyCheckedCompPrice(option.valuePence)}>
+                {option.label} {gbp(option.valuePence)}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="checked-comp-presets" role="group" aria-label="Checked comp source">
           {checkedCompSources.map((source) => (
             <button
@@ -4112,6 +4176,15 @@ export default function Home() {
                       tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
                     />
                   </div>
+                  {quickOfferOptions.length > 0 && (
+                    <div className="quick-offer-presets" aria-label="Quick cost presets">
+                      {quickOfferOptions.map((option) => (
+                        <button key={`${option.label}-${option.valuePence}`} type="button" onClick={() => applyQuickCost(option.valuePence)}>
+                          {option.label} {gbp(option.valuePence)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <button
                     className="primary-action"
                     type="button"
@@ -5657,13 +5730,15 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && headline && !needsManualComp && (
+      {view === "acquire" && headline && (
         <section className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`} aria-label="Current buy action">
           <div>
             <span>{confidenceLabel?.label ?? "Comp"}</span>
-            <strong>{gbp(headline.medianPence)}</strong>
+            <strong>{needsManualComp ? "Check solds" : gbp(headline.medianPence)}</strong>
             <small>
-              {quickStockReady
+              {needsManualComp
+                ? "open UK solds, then enter checked price"
+                : quickStockReady
                 ? `${quickStockQuantity} @ ${gbp(quickStockCostPence)} · ${
                     requiresCheckedCompBeforeStock ? "check solds" : deal?.label ?? "ready"
                   }`
@@ -5673,18 +5748,20 @@ export default function Home() {
           <button
             className="mobile-skip-button"
             type="button"
-            onClick={skipCurrentComp}
+            onClick={needsManualComp || requiresCheckedCompBeforeStock ? jumpToCheckedComp : skipCurrentComp}
             disabled={busy === "acquire"}
           >
-            Skip
+            {needsManualComp || requiresCheckedCompBeforeStock ? "Check" : "Skip"}
           </button>
           <button
             className="primary-action"
             type="button"
-            onClick={() => void acquire()}
-            disabled={busy === "acquire" || !quickStockCanSubmit}
+            onClick={needsManualComp ? () => openManualCompLink("EBAY_UK_SOLD") : () => void acquire()}
+            disabled={busy === "acquire" || (!needsManualComp && !quickStockCanSubmit)}
           >
-            {busy === "acquire"
+            {needsManualComp
+              ? "Open UK"
+              : busy === "acquire"
               ? "Stocking..."
               : !quickStockReady
                 ? "Add cost"

@@ -2257,6 +2257,34 @@ label {
   border-color: rgba(251, 113, 133, 0.38);
 }
 
+.quick-offer-presets,
+.checked-comp-price-presets {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quick-offer-presets button,
+.checked-comp-price-presets button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-color: rgba(255, 203, 5, 0.34);
+  background: rgba(255, 203, 5, 0.12);
+  color: #fff4b0;
+  padding: 7px 9px;
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.checked-comp-price-presets button {
+  border-color: rgba(52, 211, 153, 0.32);
+  background: rgba(52, 211, 153, 0.1);
+  color: #c7f7df;
+}
+
 .manual-rescue-card {
   display: grid;
   gap: 10px;
@@ -3974,9 +4002,12 @@ label {
 }
 
 .mobile-buy-action strong {
+  overflow: hidden;
   color: var(--ink);
   font-size: 24px;
   line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mobile-buy-action.good strong {
