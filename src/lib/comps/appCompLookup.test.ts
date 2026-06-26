@@ -188,6 +188,29 @@ test("resolveCatalogCard can fall back to known promo metadata", async () => {
   assert.equal(resolved?.imageUrl, "https://images.pokemontcg.io/svp/85_hires.png");
 });
 
+test("resolveCatalogCard can fall back to modern promo metadata before live catalog catches up", async () => {
+  const source = {
+    async resolve() {
+      return null;
+    },
+    async search() {
+      return [];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const resolved = await resolveCatalogCard(
+    { name: "Snivy", setName: "Mega Evolution Promos", number: "MEP049" },
+    source,
+  );
+
+  assert.equal(resolved?.name, "Snivy");
+  assert.equal(resolved?.setName, "Mega Evolution Promos");
+  assert.equal(resolved?.setCode, "mep");
+  assert.equal(resolved?.number, "MEP049");
+  assert.equal(resolved?.tcgApiId, "mep-49");
+  assert.equal(resolved?.imageUrl, undefined);
+});
+
 test("findCatalogAlternatives returns safe wrong-set recovery candidates", async () => {
   const wrongSetCard: CatalogCard = {
     game: "POKEMON",

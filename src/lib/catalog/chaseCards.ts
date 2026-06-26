@@ -156,6 +156,16 @@ const CHASE_CARDS: CatalogCard[] = [
     imageUrl: "https://images.pokemontcg.io/svp/85_hires.png",
     tcgApiId: "svp-85",
   },
+  {
+    game: "POKEMON",
+    language: "EN",
+    name: "Snivy",
+    setName: "Mega Evolution Promos",
+    setCode: "mep",
+    number: "MEP049",
+    rarity: "Promo",
+    tcgApiId: "mep-49",
+  },
 ];
 
 export function getChaseCards(): CatalogCard[] {

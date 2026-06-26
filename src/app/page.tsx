@@ -4465,7 +4465,7 @@ export default function Home() {
                   <div>
                     <span>Worth a quick check</span>
                     <strong>
-                      {!catalogCard
+                      {!catalogCard && !dealerVerdict
                         ? "Catalog image missing"
                         : comp?.sourcesDisagree
                           ? "Sources disagree"
