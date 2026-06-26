@@ -181,6 +181,7 @@ type OwnedSaleCompRow = {
   id: string;
   itemId: string;
   salePricePence: number;
+  itemSubtotalPence?: number;
   feesPence: number;
   postagePence: number;
   costBasisPence: number;
@@ -4976,7 +4977,7 @@ export default function Home() {
                   <div className="owned-sale-list">
                     {(ownedSalesComp.raw?.sales ?? []).slice(0, 3).map((sale) => (
                       <span key={sale.id}>
-                        {gbp(sale.salePricePence)} · {shortDate(sale.soldAt)}
+                        {gbp(sale.itemSubtotalPence ?? sale.salePricePence)} item · {shortDate(sale.soldAt)}
                       </span>
                     ))}
                   </div>

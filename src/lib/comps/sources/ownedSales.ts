@@ -2,6 +2,7 @@ import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.j
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { mean, median } from "../cleaning.js";
+import { saleItemSubtotalPence, type SaleChannel } from "../../dealer/saleFees.js";
 
 type OwnedSaleCard = {
   id: string;
@@ -16,6 +17,7 @@ type OwnedSaleCard = {
 
 export type OwnedSaleRow = {
   id: string;
+  channel: SaleChannel;
   salePrice: number;
   fees: number;
   postage: number;
@@ -84,7 +86,7 @@ export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext
     return emptyOwnedSalesComp(ctx, "no matching owned sales");
   }
 
-  const prices = matching.map((row) => row.salePrice);
+  const prices = matching.map(ownedSaleCompPricePence);
   const card = rowToCardRef(matching[matching.length - 1]!, ctx.card);
 
   return {
@@ -108,6 +110,7 @@ export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext
         id: row.id,
         itemId: row.item.id,
         salePricePence: row.salePrice,
+        itemSubtotalPence: ownedSaleCompPricePence(row),
         feesPence: row.fees,
         postagePence: row.postage,
         costBasisPence: row.item.costBasis,
@@ -115,6 +118,10 @@ export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext
       })),
     },
   };
+}
+
+function ownedSaleCompPricePence(row: OwnedSaleRow): number {
+  return saleItemSubtotalPence(row.channel, row.salePrice, { grade: row.item.grade });
 }
 
 export function buildOwnedSalesWhere(card: CardRef, grade: Grade, windowDays: number): unknown {
@@ -175,8 +182,8 @@ function rowToCardRef(row: OwnedSaleRow, fallback: CardRef): CardRef {
 function computeOwnedSalesTrend(rows: OwnedSaleRow[]): number | null {
   if (rows.length < 4) return null;
   const mid = Math.floor(rows.length / 2);
-  const older = rows.slice(0, mid).map((row) => row.salePrice);
-  const recent = rows.slice(mid).map((row) => row.salePrice);
+  const older = rows.slice(0, mid).map(ownedSaleCompPricePence);
+  const recent = rows.slice(mid).map(ownedSaleCompPricePence);
   const olderMedian = median(older);
   const recentMedian = median(recent);
   if (olderMedian <= 0) return null;

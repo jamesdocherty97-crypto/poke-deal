@@ -51,6 +51,39 @@ test("mapOwnedSalesToComp ignores rows for the wrong grade", () => {
   assert.equal(comp.highPence, 250000);
 });
 
+test("mapOwnedSalesToComp removes buyer-paid postage from posted marketplace sales", () => {
+  const comp = mapOwnedSalesToComp(
+    [
+      ownedSale("sale_1", 5175, "2026-06-01T12:00:00.000Z", "RAW", "EBAY"),
+      ownedSale("sale_2", 6175, "2026-06-02T12:00:00.000Z", "RAW", "CARDMARKET"),
+      ownedSale("sale_3", 7000, "2026-06-03T12:00:00.000Z", "RAW", "IN_PERSON"),
+    ],
+    { source: "owned-sales", card, grade: "RAW", windowDays: 90 },
+  );
+
+  assert.equal(comp.sampleSize, 3);
+  assert.equal(comp.lowPence, 5000);
+  assert.equal(comp.medianPence, 6000);
+  assert.equal(comp.highPence, 7000);
+  const rawSales = (comp.raw as { sales: Array<{ salePricePence: number; itemSubtotalPence: number }> }).sales;
+  assert.equal(rawSales[0]?.salePricePence, 5175);
+  assert.equal(rawSales[0]?.itemSubtotalPence, 5000);
+});
+
+test("mapOwnedSalesToComp removes slab postage before calculating owned comps", () => {
+  const comp = mapOwnedSalesToComp(
+    [
+      ownedSale("sale_1", 10499, "2026-06-01T12:00:00.000Z", "PSA_10", "EBAY"),
+      ownedSale("sale_2", 12499, "2026-06-02T12:00:00.000Z", "PSA_10", "CARDMARKET"),
+    ],
+    { source: "owned-sales", card, grade: "PSA_10", windowDays: 90 },
+  );
+
+  assert.equal(comp.lowPence, 10000);
+  assert.equal(comp.highPence, 12000);
+  assert.equal(comp.medianPence, 11000);
+});
+
 test("OwnedSalesSource degrades to empty comp when the db lookup fails", async () => {
   const source = new OwnedSalesSource({
     sale: {
@@ -79,9 +112,11 @@ function ownedSale(
   salePrice: number,
   soldAt: string,
   grade: "RAW" | "PSA_10" = "RAW",
+  channel: OwnedSaleRow["channel"] = "IN_PERSON",
 ): OwnedSaleRow {
   return {
     id,
+    channel,
     salePrice,
     fees: 0,
     postage: 0,
