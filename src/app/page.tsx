@@ -617,6 +617,9 @@ export default function Home() {
   const quickIntakeRef = useRef<HTMLInputElement | null>(null);
   const stockImportRef = useRef<HTMLFormElement | null>(null);
   const stockImportTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const expensePanelRef = useRef<HTMLElement | null>(null);
+  const expenseDescriptionRef = useRef<HTMLInputElement | null>(null);
+  const pnlWatchPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     void refreshAll();
@@ -1454,7 +1457,7 @@ export default function Home() {
       return;
     }
     if (target === "watches") {
-      setView("pnl");
+      openBuyWatchesPanel();
       return;
     }
     if (target === "reprice") {
@@ -1463,6 +1466,21 @@ export default function Home() {
       return;
     }
     setView("pnl");
+  }
+
+  function openCostsPanel() {
+    setView("pnl");
+    window.setTimeout(() => {
+      expensePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      expenseDescriptionRef.current?.focus();
+    }, 90);
+  }
+
+  function openBuyWatchesPanel() {
+    setView("pnl");
+    window.setTimeout(() => {
+      pnlWatchPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 90);
   }
 
   function openLaunchReadiness(target: LaunchReadinessTarget | undefined) {
@@ -3918,14 +3936,14 @@ export default function Home() {
                 title="Sourcing targets"
                 detail={`${activeWatchCount} active`}
                 action="Targets"
-                onClick={() => setView("pnl")}
+                onClick={openBuyWatchesPanel}
               />
               <SetupStep
                 done={(dashboard?.metrics.operatingExpensePence ?? 0) > 0}
                 title="Cost tracker"
                 detail={gbp(dashboard?.metrics.operatingExpensePence ?? 0)}
                 action="Costs"
-                onClick={() => setView("pnl")}
+                onClick={openCostsPanel}
               />
             </div>
           </section>
@@ -3943,14 +3961,17 @@ export default function Home() {
               <button type="button" onClick={takePortfolioSnapshot} disabled={busy === "snapshot"}>
                 {busy === "snapshot" ? "Snapshot..." : "Snapshot"}
               </button>
-              <button type="button" onClick={checkWatches} disabled={busy === "watch-check"}>
+              <button type="button" onClick={() => {
+                openBuyWatchesPanel();
+                void checkWatches();
+              }} disabled={busy === "watch-check"}>
                 {busy === "watch-check" ? "Checking..." : "Targets"}
               </button>
               <button type="button" onClick={checkReprices} disabled={busy === "reprice"}>
                 {busy === "reprice" ? "Checking..." : "Reprice"}
               </button>
               <button type="button" onClick={() => setView("pnl")}>Profit</button>
-              <button type="button" onClick={() => setView("pnl")}>Add cost</button>
+              <button type="button" onClick={openCostsPanel}>Add cost</button>
               <a className="export-link" href="/api/export/books" download>Books CSV</a>
               <a className="export-link" href="/api/export/listings?state=DRAFT" download>Draft CSV</a>
               <a className="export-link" href="/api/export/listing-pack" download>Listing pack</a>
@@ -5753,7 +5774,7 @@ export default function Home() {
               Costs CSV
             </a>
           </div>
-          <section className="panel expense-panel">
+          <section className="panel expense-panel" ref={expensePanelRef}>
             <div className="panel-heading">
               <div>
                 <h2>Costs</h2>
@@ -5776,6 +5797,7 @@ export default function Home() {
               <label>
                 Description
                 <input
+                  ref={expenseDescriptionRef}
                   value={expenseDescription}
                   onChange={(event) => setExpenseDescription(event.target.value)}
                   placeholder="Toploaders, table fee, grading..."
@@ -5873,7 +5895,7 @@ export default function Home() {
             </button>
             {portfolio?.checkedAt && <p className="hint">Last valued {ageLabel(portfolio.checkedAt)}.</p>}
           </section>
-          <section className="panel watch-panel">
+          <section className="panel watch-panel" ref={pnlWatchPanelRef}>
             <div className="panel-heading">
               <h2>Buy watches</h2>
               <span className="muted">{watches.filter((watch) => watch.active).length} active</span>
