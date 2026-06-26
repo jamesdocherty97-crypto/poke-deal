@@ -2424,6 +2424,26 @@ export default function Home() {
     setPostageTouched(false);
   }
 
+  async function pasteSaleTotalPrice() {
+    let clipboardText = "";
+    try {
+      clipboardText = await navigator.clipboard.readText();
+    } catch {
+      setError("Clipboard read failed. Copy the sale price, then tap Paste gross.");
+      return;
+    }
+
+    const pricePence = parseCheckedCompPriceText(clipboardText);
+    if (!pricePence) {
+      setError("Clipboard does not contain a clear sale price.");
+      return;
+    }
+
+    applySaleTotalPrice(pricePence);
+    setNotice("Sale price pasted. Fees and postage have been estimated.");
+    setError(null);
+  }
+
   function applySaleItemSubtotal(itemSubtotalPence: number) {
     applySaleTotalPrice(defaultGrossSalePence(saleChannel, itemSubtotalPence, { grade: sellingItem?.grade }));
   }
@@ -5714,6 +5734,9 @@ export default function Home() {
           <div className="sale-shortcuts" aria-label="Sale shortcuts">
             <button type="button" onClick={useListingSalePrice} disabled={!sellingItem}>
               List + post
+            </button>
+            <button type="button" onClick={() => void pasteSaleTotalPrice()}>
+              Paste gross
             </button>
             <button type="button" onClick={() => applySalePriceMultiplier(0.95)} disabled={!sellingItem}>
               95%
