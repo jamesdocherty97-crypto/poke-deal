@@ -1658,7 +1658,8 @@ export default function Home() {
   function rememberRecentComp(payload: Reconciled, input: LookupInput) {
     const result = payload.headline;
     if (!result) return;
-    const confidence = compConfidence(result, payload.sourcesDisagree);
+    const verdict = buildDealerCompVerdict(payload);
+    const confidence = { label: verdict.label, tone: verdict.tone };
     const catalog = payload.catalog;
     const entry: RecentCompEntry = {
       name: catalog?.name ?? input.name,
@@ -4600,6 +4601,32 @@ export default function Home() {
               )}
               {shouldOfferManualComp && renderManualCompLinks(needsManualComp ? "priority" : "compact")}
               {needsManualComp && renderCheckedCompCard("priority")}
+              {dealerVerdict && (
+                <div className={`dealer-verdict ${dealerVerdict.tone}`}>
+                  <div className="dealer-verdict-main">
+                    <span>{dealerVerdict.label}</span>
+                    <strong>{dealerVerdict.title}</strong>
+                    <small>{dealerVerdict.detail}</small>
+                    {dealerVerdict.tone !== "good" && !checkedComp && (
+                      <div className="dealer-verdict-actions">
+                        <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
+                          Open UK
+                        </button>
+                        <button type="button" onClick={jumpToCheckedComp}>
+                          Enter price
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="dealer-verdict-signal">
+                    <span>Signals</span>
+                    <strong>
+                      {dealerVerdict.pricedSignalCount}/{dealerVerdict.totalSignalCount}
+                    </strong>
+                    <small>{dealerVerdict.spreadPct == null ? "single price" : `${dealerVerdict.spreadPct}% spread`}</small>
+                  </div>
+                </div>
+              )}
               {!needsManualComp && deal && (
                 <div className={`deal-banner ${deal.tone}`}>
                   <div>
@@ -4707,32 +4734,6 @@ export default function Home() {
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
               </div>
-              {dealerVerdict && (
-                <div className={`dealer-verdict ${dealerVerdict.tone}`}>
-                  <div className="dealer-verdict-main">
-                    <span>{dealerVerdict.label}</span>
-                    <strong>{dealerVerdict.title}</strong>
-                    <small>{dealerVerdict.detail}</small>
-                    {dealerVerdict.tone !== "good" && !checkedComp && (
-                      <div className="dealer-verdict-actions">
-                        <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
-                          Open UK
-                        </button>
-                        <button type="button" onClick={jumpToCheckedComp}>
-                          Enter price
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="dealer-verdict-signal">
-                    <span>Signals</span>
-                    <strong>
-                      {dealerVerdict.pricedSignalCount}/{dealerVerdict.totalSignalCount}
-                    </strong>
-                    <small>{dealerVerdict.spreadPct == null ? "single price" : `${dealerVerdict.spreadPct}% spread`}</small>
-                  </div>
-                </div>
-              )}
               {compReceipt.length > 0 && (
                 <div className="comp-receipt">
                   <div className="receipt-heading">
