@@ -2551,7 +2551,7 @@ export default function Home() {
     if (existingListing?.state === "ACTIVE" || existingListing?.state === "DRAFT") {
       setAcquireListingState(existingListing.state);
     }
-    setGraderCert("");
+    setGraderCert(item.graderCert ?? "");
     setPsaResult(null);
     setQuickIntake("");
     setCardArtUrl(item.card.imageUrl);
@@ -5377,6 +5377,7 @@ export default function Home() {
               busy={busy}
               onEdit={openInventoryEditor}
               onSell={openSell}
+              onComp={(item) => loadRecentBuy(item, { lookupAfter: true })}
               onList={listInventoryItem}
               onPack={openRecentListingWork}
               onStatus={updateStatus}
@@ -5518,6 +5519,7 @@ export default function Home() {
                   busy={busy}
                   onEdit={openInventoryEditor}
                   onSell={openSell}
+                  onComp={(item) => loadRecentBuy(item, { lookupAfter: true })}
                   onList={listInventoryItem}
                   onPack={openRecentListingWork}
                   onStatus={updateStatus}
@@ -7029,6 +7031,7 @@ function InventoryRow({
   busy,
   onEdit,
   onSell,
+  onComp,
   onList,
   onPack,
   onStatus,
@@ -7038,6 +7041,7 @@ function InventoryRow({
   busy: string | null;
   onEdit: (item: InventoryItem) => void;
   onSell: (item: InventoryItem) => void;
+  onComp: (item: InventoryItem) => void;
   onList: (item: InventoryItem) => void;
   onPack: (item: InventoryItem) => void;
   onStatus: (item: InventoryItem, status: ItemStatus) => void;
@@ -7161,6 +7165,11 @@ function InventoryRow({
             </div>
           )}
           <div className="row-actions">
+            {item.status !== "SOLD" && (
+              <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
+                Comp
+              </button>
+            )}
             {item.status !== "SOLD" && (
               <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
                 Edit
