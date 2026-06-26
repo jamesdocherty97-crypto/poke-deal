@@ -1092,6 +1092,7 @@ export default function Home() {
   const quickStockListPence = listPriceOverride.trim()
     ? poundsToPence(listPriceOverride)
     : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
+  const manualStockReady = Boolean(name.trim() && quickStockQuantity > 0 && quickStockCostPence > 0);
   const totalCostSplit = useMemo(
     () =>
       quickStockQuantity > 1 && quickStockCostPence > 0
@@ -1101,6 +1102,8 @@ export default function Home() {
   );
   const quickStockReady = Boolean(headline && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
   const quickStockCanSubmit = quickStockReady && !requiresCheckedCompBeforeStock;
+  const mobileNeedsCheckedComp = needsManualComp || requiresCheckedCompBeforeStock;
+  const mobileCanStockLater = mobileNeedsCheckedComp && manualStockReady;
   const acquireButtonLabel = busy === "acquire"
     ? "Stocking..."
     : !headline
@@ -6276,7 +6279,11 @@ export default function Home() {
             <strong>{needsManualComp ? "Check solds" : gbp(headline.medianPence)}</strong>
             <small>
               {needsManualComp
-                ? "open UK solds, then enter checked price"
+                ? mobileCanStockLater
+                  ? "open UK solds or stock now, price later"
+                  : "open UK solds, then enter checked price"
+                : requiresCheckedCompBeforeStock && mobileCanStockLater
+                  ? "enter checked price or stock now, price later"
                 : quickStockReady
                 ? `${quickStockQuantity} @ ${gbp(quickStockCostPence)} · ${
                     requiresCheckedCompBeforeStock ? "check solds" : deal?.label ?? "ready"
@@ -6287,16 +6294,16 @@ export default function Home() {
           <button
             className="mobile-skip-button"
             type="button"
-            onClick={needsManualComp || requiresCheckedCompBeforeStock ? jumpToCheckedComp : skipCurrentComp}
-            disabled={busy === "acquire"}
+            onClick={mobileCanStockLater ? () => void stockWithoutComp() : mobileNeedsCheckedComp ? jumpToCheckedComp : skipCurrentComp}
+            disabled={busy === "acquire" || busy === "manual-stock"}
           >
-            {needsManualComp || requiresCheckedCompBeforeStock ? "Check" : "Skip"}
+            {mobileCanStockLater ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : mobileNeedsCheckedComp ? "Enter price" : "Skip"}
           </button>
           <button
             className="primary-action"
             type="button"
             onClick={needsManualComp ? () => openManualCompLink("EBAY_UK_SOLD") : () => void acquire()}
-            disabled={busy === "acquire" || (!needsManualComp && !quickStockCanSubmit)}
+            disabled={busy === "acquire" || busy === "manual-stock" || (!needsManualComp && !quickStockCanSubmit)}
           >
             {needsManualComp
               ? "Open UK"
