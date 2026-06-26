@@ -105,8 +105,23 @@ test("postage is tracked/signed for graded slabs, large letter for raw", () => {
   assert.match(suggestPostage(moonbreon).service, /Large Letter/);
 });
 
+test("manual marketplace packs use channel-specific copy and postage assumptions", () => {
+  const vintedPack = buildListingPack({ ...moonbreon, channel: "VINTED" });
+  const cardmarketPack = buildListingPack({ ...moonbreon, channel: "CARDMARKET" });
+
+  assert.match(vintedPack.copyReady, /CHANNEL: Vinted/);
+  assert.match(vintedPack.copyReady, /Buyer pays Vinted postage/);
+  assert.doesNotMatch(vintedPack.copyReady, /£1\.75/);
+  assert.match(vintedPack.description, /Happy to bundle/);
+
+  assert.match(cardmarketPack.copyReady, /CHANNEL: Cardmarket/);
+  assert.match(cardmarketPack.copyReady, /Buyer pays Cardmarket postage/);
+  assert.match(cardmarketPack.description, /Packed securely from the UK/);
+});
+
 test("listing pack produces a copy-ready block", () => {
   const pack = buildListingPack(slab);
+  assert.match(pack.copyReady, /CHANNEL: eBay/);
   assert.match(pack.copyReady, /TITLE:/);
   assert.match(pack.copyReady, /PRICE: £1063\.00/); // 1062.20 rounded up to a tidy whole pound
   assert.match(pack.copyReady, /ITEM SPECIFICS:/);

@@ -1,4 +1,4 @@
-// eBay-ready listing pack generator.
+// Marketplace-ready listing pack generator.
 //
 // Pure & dependency-free (like the comp engine). Turns a card + grade + comp +
 // cost into a copy-ready eBay listing: keyword-rich title (<=80 chars), item
@@ -18,6 +18,8 @@ export interface ListingPackCard {
 
 export interface ListingPackInput {
   card: ListingPackCard;
+  /** Marketplace/channel the copy is being prepared for. Defaults to eBay. */
+  channel?: ListingPackChannel;
   /** Canonical grade, e.g. "RAW", "PSA_10". */
   grade: string;
   /** Saved listing price in pence. Used exactly when present. */
@@ -52,6 +54,8 @@ export interface ListingPackCopyField {
   label: string;
   value: string;
 }
+
+export type ListingPackChannel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 
 const EBAY_TITLE_MAX = 80;
 
@@ -92,6 +96,13 @@ export function buildEbaySubtitle(input: ListingPackInput): string {
     return `${gradeDisplay(input.grade)}${input.certNumber ? ` · Cert ${input.certNumber}` : ""} · Fast tracked UK postage`;
   }
   return `${input.condition || "Near Mint"} · Carded & sleeved · Fast UK postage`;
+}
+
+export function listingPackChannelLabel(channel: ListingPackChannel | undefined): string {
+  if (channel === "CARDMARKET") return "Cardmarket";
+  if (channel === "VINTED") return "Vinted";
+  if (channel === "IN_PERSON") return "In-person";
+  return "eBay";
 }
 
 export function ebayCondition(input: ListingPackInput): { condition: string; conditionNote: string } {
@@ -135,6 +146,15 @@ export function buildItemSpecifics(input: ListingPackInput): Record<string, stri
 
 /** UK-relevant Royal Mail postage suggestion: tracked/signed for graded slabs. */
 export function suggestPostage(input: ListingPackInput): { service: string; pricePence: number } {
+  if (input.channel === "VINTED") {
+    return { service: "Buyer pays Vinted postage", pricePence: 0 };
+  }
+  if (input.channel === "CARDMARKET") {
+    return { service: "Buyer pays Cardmarket postage", pricePence: 0 };
+  }
+  if (input.channel === "IN_PERSON") {
+    return { service: "Collection / handover", pricePence: 0 };
+  }
   if (isGradedGrade(input.grade)) {
     return { service: "Royal Mail Special Delivery / Tracked 48 (signed)", pricePence: 499 };
   }
@@ -171,6 +191,10 @@ function roundToTidyPence(pence: number): number {
 }
 
 export function buildDescription(input: ListingPackInput): string {
+  if (input.channel === "VINTED") return buildVintedDescription(input);
+  if (input.channel === "CARDMARKET") return buildCardmarketDescription(input);
+  if (input.channel === "IN_PERSON") return buildInPersonDescription(input);
+
   const { card, grade } = input;
   const { conditionNote } = ebayCondition(input);
   const idLine = [card.setName, card.number ? `#${card.number}` : null].filter(Boolean).join(" ");
@@ -186,6 +210,47 @@ export function buildDescription(input: ListingPackInput): string {
   ].join("\n\n");
 }
 
+function buildVintedDescription(input: ListingPackInput): string {
+  const { card, grade } = input;
+  const idLine = [card.setName, card.number ? `#${card.number}` : null].filter(Boolean).join(" ");
+  const condition = isGradedGrade(grade)
+    ? `${gradeDisplay(grade)}${input.certNumber ? `, cert ${input.certNumber}` : ""}`
+    : input.condition || "Near Mint";
+
+  return [
+    `${card.name}${idLine ? ` - ${idLine}` : ""}`,
+    `Condition: ${condition}`,
+    "Genuine Pokemon TCG single from a UK seller.",
+    "Sleeved/top-loaded for posting. Happy to bundle with other cards.",
+  ].join("\n\n");
+}
+
+function buildCardmarketDescription(input: ListingPackInput): string {
+  const { card, grade } = input;
+  const condition = isGradedGrade(grade)
+    ? `${gradeDisplay(grade)}${input.certNumber ? `, cert ${input.certNumber}` : ""}`
+    : input.condition || "Near Mint";
+
+  return [
+    `${card.name}${card.number ? ` ${card.number}` : ""}${card.setName ? ` - ${card.setName}` : ""}`,
+    `Condition/grade: ${condition}`,
+    "English Pokemon TCG single. Packed securely from the UK.",
+  ].join("\n\n");
+}
+
+function buildInPersonDescription(input: ListingPackInput): string {
+  const { card, grade } = input;
+  const condition = isGradedGrade(grade)
+    ? `${gradeDisplay(grade)}${input.certNumber ? `, cert ${input.certNumber}` : ""}`
+    : input.condition || "Near Mint";
+
+  return [
+    `${card.name}${card.number ? ` ${card.number}` : ""}${card.setName ? ` - ${card.setName}` : ""}`,
+    condition,
+    "In-person sale note. Buyer can inspect before payment.",
+  ].join("\n");
+}
+
 export function buildListingPack(input: ListingPackInput): ListingPack {
   const title = buildEbayTitle(input);
   const subtitle = buildEbaySubtitle(input);
@@ -196,9 +261,10 @@ export function buildListingPack(input: ListingPackInput): ListingPack {
   const description = buildDescription(input);
 
   const copyReady = [
+    `CHANNEL: ${listingPackChannelLabel(input.channel)}`,
     `TITLE: ${title}`,
     `PRICE: ${formatGbp(suggestedPricePence)}`,
-    `POSTAGE: ${postage.service} (${formatGbp(postage.pricePence)})`,
+    `POSTAGE: ${postage.service}${postage.pricePence > 0 ? ` (${formatGbp(postage.pricePence)})` : ""}`,
     `CONDITION: ${condition} — ${conditionNote}`,
     "",
     "ITEM SPECIFICS:",

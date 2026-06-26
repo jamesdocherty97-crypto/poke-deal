@@ -808,6 +808,7 @@ export default function Home() {
     const { item } = listingPackTarget;
     const savedListPrice = listingPackTarget.listPrice ?? listingPackTarget.suggestedPrice ?? undefined;
     return buildListingPack({
+      channel: listingPackTarget.channel,
       card: {
         name: item.card.name,
         setName: item.card.setName,
