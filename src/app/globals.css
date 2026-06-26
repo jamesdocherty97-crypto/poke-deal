@@ -4272,13 +4272,93 @@ label {
   color: var(--yellow);
 }
 
+.sale-prompt-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(104px, auto);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.38);
+  border-radius: 8px;
+  background:
+    linear-gradient(120deg, rgba(52, 211, 153, 0.15), transparent 58%),
+    rgba(3, 8, 20, 0.36);
+  padding: 10px;
+}
+
+.sale-prompt-card.warn {
+  border-color: rgba(255, 203, 5, 0.4);
+  background:
+    linear-gradient(120deg, rgba(255, 203, 5, 0.15), transparent 58%),
+    rgba(3, 8, 20, 0.36);
+}
+
+.sale-prompt-card.info {
+  border-color: rgba(42, 117, 187, 0.42);
+  background:
+    linear-gradient(120deg, rgba(42, 117, 187, 0.18), transparent 58%),
+    rgba(3, 8, 20, 0.36);
+}
+
+.sale-prompt-card div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.sale-prompt-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.sale-prompt-card strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.08;
+}
+
+.sale-prompt-card small {
+  color: #cfe6ff;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.sale-prompt-card button {
+  min-height: 42px;
+  border-color: rgba(52, 211, 153, 0.48);
+  background: rgba(52, 211, 153, 0.14);
+  color: #dfffe7;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
 .sale-shortcuts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  gap: 8px;
+}
+
+.sale-shortcut-group {
+  display: grid;
+  gap: 5px;
+}
+
+.sale-shortcut-group > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.sale-shortcut-group > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 6px;
 }
 
-.sale-shortcuts button {
+.sale-shortcut-group button {
   min-height: 36px;
   padding: 6px 5px;
   border-color: rgba(42, 117, 187, 0.32);

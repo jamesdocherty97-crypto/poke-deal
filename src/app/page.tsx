@@ -82,6 +82,7 @@ import {
 } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
 import { buildSalePreview } from "@/lib/dealer/unitSale";
+import { buildSalePrompt, type SalePrompt } from "@/lib/dealer/salePrompt";
 import { checkEbayReadiness } from "@/lib/ebay/readiness";
 import {
   acceptedOfferItemSubtotalPence,
@@ -859,6 +860,17 @@ export default function Home() {
       soldQuantity,
     });
   }, [fees, postage, salePrice, saleQuantity, sellingItem]);
+  const salePrompt = useMemo(
+    () =>
+      buildSalePrompt({
+        salePricePence: poundsToPence(salePrice),
+        netPence: salePreview?.netPence ?? null,
+        profitPence: salePreview?.profitPence ?? null,
+        soldQuantity: salePreview?.soldQuantity ?? parseIntakeQuantity(saleQuantity) ?? 1,
+        nextSaleAvailable: Boolean(nextSaleAfterCurrentTarget),
+      }),
+    [nextSaleAfterCurrentTarget, salePreview?.netPence, salePreview?.profitPence, salePreview?.soldQuantity, salePrice, saleQuantity],
+  );
   const saleBreakdown = useMemo(() => {
     if (!sellingItem) return null;
     const soldQuantity = parseIntakeQuantity(saleQuantity) ?? 0;
@@ -6236,63 +6248,88 @@ export default function Home() {
               </button>
             ))}
           </div>
+          <SalePromptCard
+            prompt={salePrompt}
+            busy={busy === `sell-${sellingId}`}
+            onPasteGross={() => void pasteSaleTotalPrice()}
+          />
           <div className="sale-shortcuts" aria-label="Sale shortcuts">
-            <button type="button" onClick={useListingSalePrice} disabled={!sellingItem}>
-              List + post
-            </button>
-            <button type="button" onClick={() => void pasteSaleTotalPrice()}>
-              Paste gross
-            </button>
-            <button type="button" onClick={() => void pasteSaleNetPrice()}>
-              Paste net
-            </button>
-            <button type="button" onClick={() => applySalePriceDiscount(100)} disabled={!sellingItem}>
-              -£1
-            </button>
-            <button type="button" onClick={() => applySalePriceDiscount(500)} disabled={!sellingItem}>
-              -£5
-            </button>
-            <button type="button" onClick={() => applySalePriceMultiplier(0.95)} disabled={!sellingItem}>
-              Offer 95%
-            </button>
-            <button type="button" onClick={() => applySalePriceMultiplier(0.9)} disabled={!sellingItem}>
-              Offer 90%
-            </button>
-            <button type="button" onClick={() => applySalePriceMultiplier(0.85)} disabled={!sellingItem}>
-              Offer 85%
-            </button>
-            <button type="button" onClick={() => applySalePriceMultiplier(0.8)} disabled={!sellingItem}>
-              Offer 80%
-            </button>
-            <button type="button" onClick={useBreakEvenSalePrice} disabled={!sellingItem}>
-              Break even
-            </button>
-            <button type="button" onClick={() => applySaleTargetProfit(500)} disabled={!sellingItem}>
-              £5 profit
-            </button>
-            <button type="button" onClick={() => applySaleTargetProfit(1000)} disabled={!sellingItem}>
-              £10 profit
-            </button>
-            <button type="button" onClick={() => applySaleTargetRoi(0.3)} disabled={!sellingItem}>
-              30% ROI
-            </button>
-            <button type="button" onClick={() => applySaleTargetRoi(0.5)} disabled={!sellingItem}>
-              50% ROI
-            </button>
-            {sellingItem && sellingItem.quantity > 1 && (
-              <button type="button" onClick={sellAllQuantity}>
-                All qty
-              </button>
-            )}
-            <button type="button" onClick={applyCashSale}>
-              Cash
-            </button>
-            <button type="button" onClick={resetSaleCosts}>
-              Default costs
-            </button>
-            <button type="button" onClick={clearSalePostage}>
-              Post £0
-            </button>
+            <div className="sale-shortcut-group">
+              <span>Price</span>
+              <div>
+                <button type="button" onClick={useListingSalePrice} disabled={!sellingItem}>
+                  List + post
+                </button>
+                <button type="button" onClick={() => void pasteSaleTotalPrice()}>
+                  Paste gross
+                </button>
+                <button type="button" onClick={() => void pasteSaleNetPrice()}>
+                  Paste net
+                </button>
+                {sellingItem && sellingItem.quantity > 1 && (
+                  <button type="button" onClick={sellAllQuantity}>
+                    All qty
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="sale-shortcut-group">
+              <span>Offers</span>
+              <div>
+                <button type="button" onClick={() => applySalePriceDiscount(100)} disabled={!sellingItem}>
+                  -£1
+                </button>
+                <button type="button" onClick={() => applySalePriceDiscount(500)} disabled={!sellingItem}>
+                  -£5
+                </button>
+                <button type="button" onClick={() => applySalePriceMultiplier(0.95)} disabled={!sellingItem}>
+                  95%
+                </button>
+                <button type="button" onClick={() => applySalePriceMultiplier(0.9)} disabled={!sellingItem}>
+                  90%
+                </button>
+                <button type="button" onClick={() => applySalePriceMultiplier(0.85)} disabled={!sellingItem}>
+                  85%
+                </button>
+                <button type="button" onClick={() => applySalePriceMultiplier(0.8)} disabled={!sellingItem}>
+                  80%
+                </button>
+              </div>
+            </div>
+            <div className="sale-shortcut-group">
+              <span>Targets</span>
+              <div>
+                <button type="button" onClick={useBreakEvenSalePrice} disabled={!sellingItem}>
+                  Break even
+                </button>
+                <button type="button" onClick={() => applySaleTargetProfit(500)} disabled={!sellingItem}>
+                  £5 profit
+                </button>
+                <button type="button" onClick={() => applySaleTargetProfit(1000)} disabled={!sellingItem}>
+                  £10 profit
+                </button>
+                <button type="button" onClick={() => applySaleTargetRoi(0.3)} disabled={!sellingItem}>
+                  30% ROI
+                </button>
+                <button type="button" onClick={() => applySaleTargetRoi(0.5)} disabled={!sellingItem}>
+                  50% ROI
+                </button>
+              </div>
+            </div>
+            <div className="sale-shortcut-group">
+              <span>Costs</span>
+              <div>
+                <button type="button" onClick={applyCashSale}>
+                  Cash
+                </button>
+                <button type="button" onClick={resetSaleCosts}>
+                  Default costs
+                </button>
+                <button type="button" onClick={clearSalePostage}>
+                  Post £0
+                </button>
+              </div>
+            </div>
           </div>
           <div className="form-grid">
             <label>
@@ -6905,6 +6942,35 @@ function ListingNextActionCard({
       </div>
       <button type="button" onClick={onRun} disabled={busy || done}>
         {busy ? "Working..." : action.cta}
+      </button>
+    </div>
+  );
+}
+
+function SalePromptCard({
+  prompt,
+  busy,
+  onPasteGross,
+}: {
+  prompt: SalePrompt;
+  busy: boolean;
+  onPasteGross: () => void;
+}) {
+  const needsPrice = prompt.cta === "Paste gross";
+  return (
+    <div className={`sale-prompt-card ${prompt.tone}`}>
+      <div>
+        <span>Sale step</span>
+        <strong>{prompt.title}</strong>
+        <small>{prompt.detail}</small>
+      </div>
+      <button
+        type={needsPrice ? "button" : "submit"}
+        value={needsPrice ? undefined : "done"}
+        disabled={busy}
+        onClick={needsPrice ? onPasteGross : undefined}
+      >
+        {busy ? "Saving..." : prompt.cta}
       </button>
     </div>
   );
