@@ -4239,6 +4239,20 @@ export default function Home() {
                 )}
               </div>
             )}
+            <IntakeSessionCard
+              source={source}
+              location={location}
+              condition={condition}
+              channel={channel}
+              listingState={acquireListingState}
+              keepBuying={keepBuying}
+              onSourceChange={setSource}
+              onLocationChange={setLocation}
+              onConditionChange={setCondition}
+              onChannelChange={setChannel}
+              onListingStateChange={setAcquireListingState}
+              onKeepBuyingChange={setKeepBuying}
+            />
             <label className="set-field">
               Card
               <input
@@ -7226,6 +7240,92 @@ function SourceHealthRow({ source }: { source: SystemSource }) {
         {source.setupHint && <small>{source.setupHint}</small>}
       </div>
       <span>{sourceStatusLabel(source.status)}</span>
+    </div>
+  );
+}
+
+function IntakeSessionCard({
+  source,
+  location,
+  condition,
+  channel,
+  listingState,
+  keepBuying,
+  onSourceChange,
+  onLocationChange,
+  onConditionChange,
+  onChannelChange,
+  onListingStateChange,
+  onKeepBuyingChange,
+}: {
+  source: string;
+  location: string;
+  condition: string;
+  channel: Channel;
+  listingState: AcquireListingState;
+  keepBuying: boolean;
+  onSourceChange: (value: string) => void;
+  onLocationChange: (value: string) => void;
+  onConditionChange: (value: string) => void;
+  onChannelChange: (value: Channel) => void;
+  onListingStateChange: (value: AcquireListingState) => void;
+  onKeepBuyingChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="intake-session-card" aria-label="Buy session defaults">
+      <div className="intake-session-heading">
+        <div>
+          <span>Buy session</span>
+          <strong>
+            {source || "Source"} · {location || "Place"} · {condition || "Condition"}
+          </strong>
+        </div>
+        <div className="intake-session-mode" role="group" aria-label="After stock">
+          <button type="button" className={keepBuying ? "selected" : ""} onClick={() => onKeepBuyingChange(true)}>
+            Next
+          </button>
+          <button type="button" className={!keepBuying ? "selected" : ""} onClick={() => onKeepBuyingChange(false)}>
+            Done
+          </button>
+        </div>
+      </div>
+      <div className="intake-session-mode wide" role="group" aria-label="Listing defaults">
+        {channels.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={channel === option ? "selected" : ""}
+            onClick={() => onChannelChange(option)}
+          >
+            {channelLabel(option)}
+          </button>
+        ))}
+        <button type="button" className={listingState === "DRAFT" ? "selected" : ""} onClick={() => onListingStateChange("DRAFT")}>
+          Draft
+        </button>
+        <button type="button" className={listingState === "ACTIVE" ? "selected" : ""} onClick={() => onListingStateChange("ACTIVE")}>
+          Active
+        </button>
+      </div>
+      <div className="intake-session-presets" aria-label="Source presets">
+        {sourcePresets.map((preset) => (
+          <button key={preset} type="button" className={source === preset ? "selected" : ""} onClick={() => onSourceChange(preset)}>
+            {preset}
+          </button>
+        ))}
+      </div>
+      <div className="intake-session-presets compact" aria-label="Location and condition presets">
+        {locationPresets.map((preset) => (
+          <button key={preset} type="button" className={location === preset ? "selected" : ""} onClick={() => onLocationChange(preset)}>
+            {preset}
+          </button>
+        ))}
+        {conditionPresets.map((preset) => (
+          <button key={preset} type="button" className={condition === preset ? "selected" : ""} onClick={() => onConditionChange(preset)}>
+            {preset}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
