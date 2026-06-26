@@ -20,7 +20,7 @@ export async function resolveCatalogCard(
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
   options: { timeoutMs?: number } = {},
 ): Promise<CatalogCard | null> {
-  return withOptionalTimeout(resolveCatalogCardUnbounded(card, catalogSource), options.timeoutMs, null);
+  return withOptionalTimeout(resolveCatalogCardUnbounded(card, catalogSource), options.timeoutMs, findChaseCatalogMatch(card));
 }
 
 async function resolveCatalogCardUnbounded(

@@ -146,6 +146,48 @@ test("resolveCatalogCard can time out slow catalog misses", async () => {
   assert.ok(Date.now() - started < 500, "slow catalog resolution should not block the comp flow");
 });
 
+test("resolveCatalogCard uses known chase metadata when live catalog times out", async () => {
+  const source = {
+    async resolve() {
+      return new Promise<CatalogCard | null>(() => undefined);
+    },
+    async search() {
+      return new Promise<CatalogCard[]>(() => undefined);
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const started = Date.now();
+  const resolved = await resolveCatalogCard(
+    { name: "Charizard ex", setName: "151", number: "199/165" },
+    source,
+    { timeoutMs: 10 },
+  );
+
+  assert.ok(Date.now() - started < 500, "slow catalog resolution should not block the comp flow");
+  assert.equal(resolved?.tcgApiId, "sv3pt5-199");
+  assert.equal(resolved?.imageUrl, "https://images.pokemontcg.io/sv3pt5/199_hires.png");
+});
+
+test("resolveCatalogCard can fall back to known promo metadata", async () => {
+  const source = {
+    async resolve() {
+      return null;
+    },
+    async search() {
+      return [];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const resolved = await resolveCatalogCard(
+    { name: "Pikachu with Grey Felt Hat", setName: "SV Promos", number: "SVP085" },
+    source,
+  );
+
+  assert.equal(resolved?.tcgApiId, "svp-85");
+  assert.equal(resolved?.number, "SVP085");
+  assert.equal(resolved?.imageUrl, "https://images.pokemontcg.io/svp/85_hires.png");
+});
+
 test("findCatalogAlternatives returns safe wrong-set recovery candidates", async () => {
   const wrongSetCard: CatalogCard = {
     game: "POKEMON",

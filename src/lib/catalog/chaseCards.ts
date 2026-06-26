@@ -145,6 +145,17 @@ const CHASE_CARDS: CatalogCard[] = [
     imageUrl: "https://images.pokemontcg.io/swsh11tg/TG06_hires.png",
     tcgApiId: "swsh11tg-TG06",
   },
+  {
+    game: "POKEMON",
+    language: "EN",
+    name: "Pikachu with Grey Felt Hat",
+    setName: "Scarlet & Violet Black Star Promos",
+    setCode: "svp",
+    number: "SVP085",
+    rarity: "Promo",
+    imageUrl: "https://images.pokemontcg.io/svp/85_hires.png",
+    tcgApiId: "svp-85",
+  },
 ];
 
 export function getChaseCards(): CatalogCard[] {
