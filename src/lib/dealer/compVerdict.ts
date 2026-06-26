@@ -24,6 +24,7 @@ export type DealerCompVerdict = {
   pricedSignalCount: number;
   totalSignalCount: number;
   spreadPct: number | null;
+  buyCeilingPence: number | null;
 };
 
 export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict {
@@ -34,6 +35,7 @@ export function buildDealerCompVerdict(comp: DealerCompInput): DealerCompVerdict
     pricedSignalCount: priced.length,
     totalSignalCount,
     spreadPct,
+    buyCeilingPence: conservativeBuyCeilingPence(priced),
   };
 
   if (comp.headline.medianPence <= 0 || comp.headline.sampleSize <= 0) {
@@ -151,6 +153,12 @@ function signalSpreadPct(signals: DealerCompSignal[]): number | null {
   const min = Math.min(...medians);
   const max = Math.max(...medians);
   return Math.round(((max - min) / min) * 100);
+}
+
+function conservativeBuyCeilingPence(signals: DealerCompSignal[]): number | null {
+  const medians = signals.map((signal) => signal.medianPence).filter((median) => median > 0);
+  if (medians.length === 0) return null;
+  return Math.min(...medians);
 }
 
 function isMarketBaseline(signal: DealerCompSignal): boolean {

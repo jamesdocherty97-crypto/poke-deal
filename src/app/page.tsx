@@ -33,7 +33,7 @@ import {
   serializeRecentComps,
   type RecentCompEntry,
 } from "@/lib/dealer/recentComps";
-import { buildDealerCompVerdict } from "@/lib/dealer/compVerdict";
+import { buildDealerCompVerdict, type DealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { judgeDeal } from "@/lib/dealer/dealJudge";
 import {
   buildManualCompLinks,
@@ -4623,7 +4623,7 @@ export default function Home() {
                     <strong>
                       {dealerVerdict.pricedSignalCount}/{dealerVerdict.totalSignalCount}
                     </strong>
-                    <small>{dealerVerdict.spreadPct == null ? "single price" : `${dealerVerdict.spreadPct}% spread`}</small>
+                    <small>{dealerVerdictSignalMeta(dealerVerdict)}</small>
                   </div>
                 </div>
               )}
@@ -7738,6 +7738,12 @@ function compConfidence(comp: CompResult, sourcesDisagree: boolean): { label: st
   if (sourcesDisagree) return { label: "Cross-check", tone: "warn" };
   if (comp.sampleSize < 3) return { label: "Thin", tone: "warn" };
   return { label: "Usable", tone: "good" };
+}
+
+function dealerVerdictSignalMeta(verdict: DealerCompVerdict): string {
+  const spread = verdict.spreadPct == null ? "single price" : `${verdict.spreadPct}% spread`;
+  if (verdict.tone === "good" || verdict.buyCeilingPence == null) return spread;
+  return `${spread} · ceiling ${gbp(verdict.buyCeilingPence)}`;
 }
 
 function recentCompMeta(entry: RecentCompEntry): string {

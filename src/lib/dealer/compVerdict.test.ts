@@ -24,6 +24,7 @@ test("buildDealerCompVerdict marks missing data as manual stock", () => {
   assert.equal(verdict.title, "Stock manually");
   assert.equal(verdict.stockActionLabel, "Add checked comp");
   assert.equal(verdict.requiresCheckedComp, true);
+  assert.equal(verdict.buyCeilingPence, null);
 });
 
 test("buildDealerCompVerdict forces manual checks when raw baselines are far apart", () => {
@@ -47,6 +48,7 @@ test("buildDealerCompVerdict forces manual checks when raw baselines are far apa
   assert.equal(verdict.spreadPct, 61);
   assert.equal(verdict.stockActionLabel, "Add checked comp");
   assert.equal(verdict.requiresCheckedComp, true);
+  assert.equal(verdict.buyCeilingPence, 4100);
 });
 
 test("buildDealerCompVerdict labels a lone catalog market fallback", () => {
@@ -86,6 +88,7 @@ test("buildDealerCompVerdict distinguishes thin and aligned usable comps", () =>
   assert.equal(usable.tone, "good");
   assert.equal(usable.label, "Usable");
   assert.equal(usable.stockActionLabel, "Stock this");
+  assert.equal(usable.buyCeilingPence, 2500);
 });
 
 test("buildDealerCompVerdict warns on single-source graded comps", () => {
