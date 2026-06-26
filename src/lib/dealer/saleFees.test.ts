@@ -8,6 +8,7 @@ import {
   estimateSaleCosts,
   grossSalePriceForNetPence,
   postedSalePostagePence,
+  rescaleGrossSaleForQuantity,
   saleItemSubtotalPence,
   saleNetPence,
 } from "./saleFees.js";
@@ -44,6 +45,12 @@ test("saleItemSubtotalPence removes buyer-paid postage from posted marketplace g
   assert.equal(saleItemSubtotalPence("CARDMARKET", 5499, { grade: "PSA_10" }), 5000);
   assert.equal(saleItemSubtotalPence("IN_PERSON", 5000, { grade: "PSA_10" }), 5000);
   assert.equal(saleItemSubtotalPence("EBAY", 100, { grade: "RAW" }), 0);
+});
+
+test("rescaleGrossSaleForQuantity preserves per-card item price and channel postage", () => {
+  assert.equal(rescaleGrossSaleForQuantity("EBAY", 5175, 1, 3, { grade: "RAW" }), 15175);
+  assert.equal(rescaleGrossSaleForQuantity("CARDMARKET", 5499, 1, 2, { grade: "PSA_10" }), 10499);
+  assert.equal(rescaleGrossSaleForQuantity("IN_PERSON", 5000, 1, 3, { grade: "RAW" }), 15000);
 });
 
 test("discountedItemSubtotalPence handles accepted-offer shortcuts", () => {

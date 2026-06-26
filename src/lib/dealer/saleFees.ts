@@ -66,6 +66,20 @@ export function saleItemSubtotalPence(
   return Math.max(0, gross - buyerPaidPostagePence(channel, options.grade));
 }
 
+export function rescaleGrossSaleForQuantity(
+  channel: SaleChannel,
+  grossSalePence: number,
+  fromQuantity: number,
+  toQuantity: number,
+  options: SaleCostOptions = {},
+): number {
+  const from = Math.max(1, Math.floor(fromQuantity));
+  const to = Math.max(1, Math.floor(toQuantity));
+  const itemSubtotal = saleItemSubtotalPence(channel, grossSalePence, options);
+  const unitSubtotal = Math.round(itemSubtotal / from);
+  return defaultGrossSalePence(channel, unitSubtotal * to, options);
+}
+
 export function discountedItemSubtotalPence(
   unitItemPricePence: number,
   discountPerUnitPence: number,

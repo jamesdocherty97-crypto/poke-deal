@@ -87,6 +87,7 @@ import {
   discountedItemSubtotalPence,
   estimateSaleCosts,
   grossSalePriceForNetPence,
+  rescaleGrossSaleForQuantity,
   saleItemSubtotalPence,
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
@@ -2609,6 +2610,21 @@ export default function Home() {
     const unitPrice = saleUnitReferencePence();
     setSaleQuantity(String(sellingItem.quantity));
     applySaleItemSubtotal(unitPrice * sellingItem.quantity);
+  }
+
+  function changeSaleQuantity(value: string) {
+    const nextQuantity = parseIntakeQuantity(value);
+    const currentQuantity = saleQuantityForShortcuts();
+    setSaleQuantity(value);
+    if (!sellingItem || !nextQuantity || nextQuantity > sellingItem.quantity) return;
+    const nextGross = rescaleGrossSaleForQuantity(
+      saleChannel,
+      poundsToPence(salePrice),
+      currentQuantity,
+      nextQuantity,
+      { grade: sellingItem.grade },
+    );
+    applySaleTotalPrice(nextGross);
   }
 
   function applyCashSale() {
@@ -6046,7 +6062,7 @@ export default function Home() {
                 max={sellingItem?.quantity ?? 1}
                 step="1"
                 value={saleQuantity}
-                onChange={(event) => setSaleQuantity(event.target.value)}
+                onChange={(event) => changeSaleQuantity(event.target.value)}
               />
             </label>
           </div>
