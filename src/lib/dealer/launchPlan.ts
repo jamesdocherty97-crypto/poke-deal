@@ -23,6 +23,13 @@ export interface LaunchPlanItem {
   priority: number;
 }
 
+export interface LaunchProgress {
+  doneCount: number;
+  totalCount: number;
+  label: string;
+  nextLabel: string;
+}
+
 export function buildLaunchPlan(input: LaunchPlanInput, limit = 5): LaunchPlanItem[] {
   const items: LaunchPlanItem[] = [];
 
@@ -125,6 +132,27 @@ export function buildLaunchPlan(input: LaunchPlanInput, limit = 5): LaunchPlanIt
   return items
     .sort((left, right) => planRank(right.state) - planRank(left.state) || right.priority - left.priority)
     .slice(0, Math.max(1, limit));
+}
+
+export function buildLaunchProgress(input: LaunchPlanInput): LaunchProgress {
+  const setupKnown = input.setupKnown ?? true;
+  const milestones = [
+    { done: input.stockCount > 0, label: "stock ledger" },
+    { done: input.draftListings + input.activeListings > 0, label: "listing pipeline" },
+    { done: input.soldCount > 0, label: "first sale" },
+    { done: input.operatingExpensePence > 0, label: "costs" },
+    { done: input.activeWatches > 0, label: "buy target" },
+    { done: !setupKnown || input.secondaryCrossCheck, label: "comp cross-check" },
+  ];
+  const doneCount = milestones.filter((milestone) => milestone.done).length;
+  const next = milestones.find((milestone) => !milestone.done);
+
+  return {
+    doneCount,
+    totalCount: milestones.length,
+    label: `${doneCount}/${milestones.length} ready`,
+    nextLabel: next ? `Next: ${next.label}` : "Ready for weekly rhythm",
+  };
 }
 
 function planRank(state: LaunchPlanState): number {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildLaunchPlan } from "./launchPlan.js";
+import { buildLaunchPlan, buildLaunchProgress } from "./launchPlan.js";
 
 test("buildLaunchPlan starts a new business with stock, costs and source work", () => {
   const plan = buildLaunchPlan({
@@ -92,4 +92,40 @@ test("buildLaunchPlan caps lower priority work", () => {
   );
 
   assert.deepEqual(plan.map((item) => item.id), ["first-listings", "setup-costs", "source-target"]);
+});
+
+test("buildLaunchProgress summarizes setup completion and next milestone", () => {
+  const progress = buildLaunchProgress({
+    stockCount: 3,
+    draftListings: 1,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 1250,
+    setupKnown: true,
+    secondaryCrossCheck: true,
+    alertDelivery: false,
+  });
+
+  assert.equal(progress.doneCount, 4);
+  assert.equal(progress.totalCount, 6);
+  assert.equal(progress.label, "4/6 ready");
+  assert.equal(progress.nextLabel, "Next: first sale");
+});
+
+test("buildLaunchProgress does not punish unknown setup before source status loads", () => {
+  const progress = buildLaunchProgress({
+    stockCount: 0,
+    draftListings: 0,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 0,
+    setupKnown: false,
+    secondaryCrossCheck: false,
+    alertDelivery: false,
+  });
+
+  assert.equal(progress.doneCount, 1);
+  assert.equal(progress.nextLabel, "Next: stock ledger");
 });

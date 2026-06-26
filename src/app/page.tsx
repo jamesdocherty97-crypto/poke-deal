@@ -44,7 +44,7 @@ import {
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { normalizeListingUrl } from "@/lib/dealer/listingUrl";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
-import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
+import { buildLaunchPlan, buildLaunchProgress, type LaunchPlanItem, type LaunchPlanTarget, type LaunchProgress } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
 import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
 import {
@@ -1413,6 +1413,33 @@ export default function Home() {
       systemStatus?.summary.secondaryCrossCheck,
     ],
   );
+  const launchProgress = useMemo(
+    () =>
+      buildLaunchProgress({
+        stockCount: dashboard?.metrics.stockCount ?? activeInventory.length,
+        draftListings: draftListingCount,
+        activeListings: activeListingCount,
+        soldCount: dashboard?.metrics.soldCount ?? soldInventory.length,
+        activeWatches: activeWatchCount,
+        operatingExpensePence: dashboard?.metrics.operatingExpensePence ?? 0,
+        setupKnown: Boolean(systemStatus),
+        secondaryCrossCheck: Boolean(systemStatus?.summary.secondaryCrossCheck),
+        alertDelivery: Boolean(systemStatus?.summary.alertDelivery),
+      }),
+    [
+      activeInventory.length,
+      activeListingCount,
+      activeWatchCount,
+      dashboard?.metrics.operatingExpensePence,
+      dashboard?.metrics.soldCount,
+      dashboard?.metrics.stockCount,
+      draftListingCount,
+      soldInventory.length,
+      systemStatus?.summary.alertDelivery,
+      systemStatus?.summary.secondaryCrossCheck,
+    ],
+  );
+  const primaryTodayAction = todayActions[0] ?? null;
 
   async function refreshAll(options: RefreshOptions = {}) {
     setRefreshing(true);
@@ -3912,12 +3939,15 @@ export default function Home() {
             <div className="panel-heading">
               <div>
                 <h2>Today</h2>
-                <span className="muted">{todayActions.length} action{todayActions.length === 1 ? "" : "s"}</span>
+                <span className="muted">{launchProgress.label} · {launchProgress.nextLabel}</span>
               </div>
               <button className="ghost-button" type="button" onClick={() => setView("acquire")}>
                 New buy
               </button>
             </div>
+            {primaryTodayAction && (
+              <NextMoveCard action={primaryTodayAction} progress={launchProgress} onOpen={openTodayAction} />
+            )}
             <div className="today-action-list">
               {todayActions.map((action) => (
                 <TodayActionButton key={action.id} action={action} onOpen={openTodayAction} />
@@ -3989,7 +4019,7 @@ export default function Home() {
             <div className="panel-heading">
               <div>
                 <h2>First week</h2>
-                <span className="muted">{launchPlan.length} step{launchPlan.length === 1 ? "" : "s"}</span>
+                <span className="muted">{launchProgress.label}</span>
               </div>
               <button className="ghost-button" type="button" onClick={() => setView("pnl")}>
                 Books
@@ -7247,6 +7277,27 @@ function deleteTargetBusy(target: DeleteTarget, busy: string | null): boolean {
 function deleteTargetButtonLabel(target: DeleteTarget, busy: string | null): string {
   if (target.kind === "sale") return busy === `sale-${target.sale.id}` ? "Undoing..." : "Undo sale";
   return busy?.startsWith("delete-") || busy?.startsWith("watch-") ? "Deleting..." : "Delete";
+}
+
+function NextMoveCard({
+  action,
+  progress,
+  onOpen,
+}: {
+  action: TodayAction;
+  progress: LaunchProgress;
+  onOpen: (target: TodayActionTarget) => void;
+}) {
+  return (
+    <button className={`next-move-card ${action.tone}`} type="button" onClick={() => onOpen(action.target)}>
+      <span className="next-move-kicker">Next move · {progress.label}</span>
+      <span className="next-move-main">
+        <strong>{action.title}</strong>
+        <b aria-hidden="true">›</b>
+      </span>
+      <small>{action.detail}</small>
+    </button>
+  );
 }
 
 function TodayActionButton({
