@@ -1676,6 +1676,8 @@ export default function Home() {
     setQuickIntake("");
     clearCheckedComp();
     setGraderCert("");
+    setPsaResult(null);
+    window.requestAnimationFrame(() => quickIntakeRef.current?.focus());
   }
 
   function applyQuickIntake(options: { lookupAfter?: boolean } = {}) {
@@ -1820,10 +1822,10 @@ export default function Home() {
         return;
       }
       // Auto-fill the buy form from the verified slab so a comp can follow.
+      clearCompEvidence();
       if (result.subject) setName(toTitleCase(result.subject));
-      if (result.cardNumber) setNumber(result.cardNumber);
+      if (result.subject) setNumber(result.cardNumber ?? "");
       if (result.grade) setGrade(result.grade);
-      clearCheckedComp();
       setNotice(
         `Verified PSA ${result.gradeLabel ?? ""} ${toTitleCase(result.subject ?? "card")}${
           result.live ? "" : " (demo cert — add PSA_API_TOKEN for live)"
@@ -2259,15 +2261,12 @@ export default function Home() {
       number: card.number,
       grade,
     };
+    clearCompEvidence();
     setName(card.name);
     setSetNameValue(card.setName);
     setNumber(card.number);
-    setComp(null);
-    setSuggestion(null);
     setCardArtUrl(card.imageUrl ?? null);
-    setGradeComp(null);
     setManualCompQuery("");
-    clearCheckedComp();
     setNotice(null);
     setError(null);
     if (options.lookupAfter) {
@@ -2286,21 +2285,18 @@ export default function Home() {
     };
 
     setView("acquire");
+    clearCompEvidence();
     setName(entry.name);
     setSetNameValue(entry.setName);
     setNumber(entry.number ?? "");
     setGrade(nextGrade);
-    setComp(null);
-    setSuggestion(null);
     setCardArtUrl(entry.imageUrl ?? null);
-    setGradeComp(null);
     setManualCompQuery(
       cardSearchQuery(
         { name: entry.name, setName: entry.setName, number: entry.number },
         { condition },
       ),
     );
-    clearCheckedComp();
     setError(null);
 
     if (options.lookupAfter) {
@@ -2340,16 +2336,13 @@ export default function Home() {
       grade,
     };
 
+    clearCompEvidence();
     setName(lookupName);
     setSetNameValue(card.setName);
     pinRecentSetName(card.setName);
     setNumber(card.number ?? "");
-    setComp(null);
-    setSuggestion(null);
     setCardArtUrl(card.imageUrl ?? null);
-    setGradeComp(null);
     setManualCompQuery(manualSearch);
-    clearCheckedComp();
     setError(null);
     setNotice(`Rechecking ${lookupName}...`);
     void lookupComp(nextLookup);
@@ -2397,22 +2390,21 @@ export default function Home() {
   }
 
   function chooseSet(set: CatalogSet) {
+    editCompIdentity();
     setSetNameValue(set.name);
     setSetSuggestionsOpen(false);
     pinRecentSet(set.id);
-    setManualCompQuery("");
-    clearCheckedComp();
   }
 
   function chooseCard(card: CatalogCard) {
+    clearCompEvidence();
     setName(card.name);
     setSetNameValue(card.setName);
     pinRecentSetName(card.setName);
-    if (card.number) setNumber(card.number);
+    setNumber(card.number ?? "");
     if (card.imageUrl) setCardArtUrl(card.imageUrl);
     setCardSuggestionsOpen(false);
     setManualCompQuery("");
-    clearCheckedComp();
     setError(null);
   }
 
@@ -2429,6 +2421,7 @@ export default function Home() {
     };
 
     setView("acquire");
+    clearCompEvidence();
     setName(item.card.name);
     setSetNameValue(item.card.setName);
     setNumber(item.card.number ?? "");
@@ -2445,10 +2438,7 @@ export default function Home() {
     setGraderCert("");
     setPsaResult(null);
     setQuickIntake("");
-    setComp(null);
-    setSuggestion(null);
     setCardArtUrl(item.card.imageUrl);
-    setGradeComp(null);
     setListPriceOverride(options.repeatBuy && repeatListPrice ? penceToPounds(repeatListPrice) : "");
     setManualCompQuery(
       cardSearchQuery(
@@ -2460,7 +2450,6 @@ export default function Home() {
         { condition: nextCondition },
       ),
     );
-    clearCheckedComp();
     setError(null);
 
     if (options.lookupAfter) {
