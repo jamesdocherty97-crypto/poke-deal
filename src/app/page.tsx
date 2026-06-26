@@ -83,6 +83,7 @@ import {
   buyerPaidPostagePence,
   breakEvenSalePricePence,
   defaultGrossSalePence,
+  discountedItemSubtotalPence,
   estimateSaleCosts,
   saleItemSubtotalPence,
 } from "@/lib/dealer/saleFees";
@@ -2546,6 +2547,13 @@ export default function Home() {
   function applySalePriceMultiplier(multiplier: number) {
     if (!sellingItem) return;
     applySaleItemSubtotal(Math.round(saleUnitReferencePence() * multiplier) * saleQuantityForShortcuts());
+  }
+
+  function applySalePriceDiscount(discountPence: number) {
+    if (!sellingItem) return;
+    applySaleItemSubtotal(
+      discountedItemSubtotalPence(saleUnitReferencePence(), discountPence, saleQuantityForShortcuts()),
+    );
   }
 
   function useBreakEvenSalePrice() {
@@ -5855,6 +5863,12 @@ export default function Home() {
             </button>
             <button type="button" onClick={() => void pasteSaleTotalPrice()}>
               Paste gross
+            </button>
+            <button type="button" onClick={() => applySalePriceDiscount(100)} disabled={!sellingItem}>
+              -£1
+            </button>
+            <button type="button" onClick={() => applySalePriceDiscount(500)} disabled={!sellingItem}>
+              -£5
             </button>
             <button type="button" onClick={() => applySalePriceMultiplier(0.95)} disabled={!sellingItem}>
               95%

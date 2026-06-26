@@ -4,6 +4,7 @@ import {
   breakEvenSalePricePence,
   buyerPaidPostagePence,
   defaultGrossSalePence,
+  discountedItemSubtotalPence,
   estimateSaleCosts,
   postedSalePostagePence,
   saleItemSubtotalPence,
@@ -42,6 +43,12 @@ test("saleItemSubtotalPence removes buyer-paid postage from posted marketplace g
   assert.equal(saleItemSubtotalPence("CARDMARKET", 5499, { grade: "PSA_10" }), 5000);
   assert.equal(saleItemSubtotalPence("IN_PERSON", 5000, { grade: "PSA_10" }), 5000);
   assert.equal(saleItemSubtotalPence("EBAY", 100, { grade: "RAW" }), 0);
+});
+
+test("discountedItemSubtotalPence handles accepted-offer shortcuts", () => {
+  assert.equal(discountedItemSubtotalPence(5000, 100), 4900);
+  assert.equal(discountedItemSubtotalPence(5000, 500, 2), 9000);
+  assert.equal(discountedItemSubtotalPence(300, 500), 0);
 });
 
 test("saleNetPence nets fees and postage from the booked sale price", () => {
