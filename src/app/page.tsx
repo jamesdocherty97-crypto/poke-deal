@@ -1451,9 +1451,7 @@ export default function Home() {
       return;
     }
     if (target === "sales") {
-      setListingStateFilter("ACTIVE");
-      setListingSort("newest");
-      setView("listings");
+      openSalesDesk();
       return;
     }
     if (target === "watches") {
@@ -1481,6 +1479,15 @@ export default function Home() {
     window.setTimeout(() => {
       pnlWatchPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 90);
+  }
+
+  function openSalesDesk() {
+    setListingStateFilter("ACTIVE");
+    setListingSort("newest");
+    setView("listings");
+    if (firstSaleListingTarget) {
+      openSellFromListing(firstSaleListingTarget);
+    }
   }
 
   function openLaunchReadiness(target: LaunchReadinessTarget | undefined) {
@@ -3947,8 +3954,8 @@ export default function Home() {
                 done={(dashboard?.metrics.soldCount ?? 0) > 0}
                 title="Booked sales"
                 detail={`${dashboard?.metrics.soldCount ?? 0} sold`}
-                action="Stock"
-                onClick={() => setView("inventory")}
+                action={activeListingCount > 0 ? "Sell" : "Stock"}
+                onClick={activeListingCount > 0 ? openSalesDesk : () => setView("inventory")}
               />
               <SetupStep
                 done={activeWatchCount > 0}
@@ -3975,7 +3982,7 @@ export default function Home() {
             <div className="command-grid">
               <button type="button" onClick={() => setView("acquire")}>Comp buy</button>
               <button type="button" onClick={() => openOpeningStockImport()}>Import stock</button>
-              <button type="button" onClick={() => setView("inventory")}>Sell stock</button>
+              <button type="button" onClick={activeListingCount > 0 ? openSalesDesk : () => setView("inventory")}>Sell stock</button>
               <button type="button" onClick={() => setView("listings")}>List drafts</button>
               <button type="button" onClick={takePortfolioSnapshot} disabled={busy === "snapshot"}>
                 {busy === "snapshot" ? "Snapshot..." : "Snapshot"}
