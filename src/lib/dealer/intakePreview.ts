@@ -1,9 +1,10 @@
 import type { ParsedQuickIntake } from "./intakeParser.js";
 
 export type IntakePreviewTone = "good" | "warn" | "info";
+type IntakePreviewField = Exclude<keyof ParsedQuickIntake, "costMode">;
 
 export interface IntakePreviewChip {
-  key: keyof ParsedQuickIntake;
+  key: IntakePreviewField;
   label: string;
   value: string;
   source: "typed" | "current";
@@ -33,7 +34,7 @@ export interface IntakePreview {
   summary: string;
 }
 
-const fieldLabels: Record<keyof ParsedQuickIntake, string> = {
+const fieldLabels: Record<IntakePreviewField, string> = {
   name: "Card",
   setName: "Set",
   number: "No.",
@@ -78,7 +79,7 @@ export function buildQuickIntakePreview(
   ].filter((value): value is string => Boolean(value));
   const warnings = [
     effectiveSet || effectiveNumber ? null : "add set or number for a cleaner match",
-    effectiveCost && Number.isInteger(quantityValue) && quantityValue > 1
+    effectiveCost && parsed.costMode !== "TOTAL_SPLIT" && Number.isInteger(quantityValue) && quantityValue > 1
       ? "cost is per copy; use Split total if this was a bundle price"
       : null,
   ].filter((value): value is string => Boolean(value));
@@ -99,7 +100,7 @@ export function buildQuickIntakePreview(
 
 function addChip(
   chips: IntakePreviewChip[],
-  key: keyof ParsedQuickIntake,
+  key: IntakePreviewField,
   typedValue?: string,
   currentValue?: string,
 ) {
@@ -131,7 +132,7 @@ function firstText(...values: Array<string | null | undefined>): string | undefi
   return values.map((value) => value?.trim()).find((value): value is string => Boolean(value));
 }
 
-function displayChipValue(key: keyof ParsedQuickIntake, value: string): string {
+function displayChipValue(key: IntakePreviewField, value: string): string {
   if (key === "channel") {
     if (value === "EBAY") return "eBay";
     if (value === "CARDMARKET") return "Cardmarket";

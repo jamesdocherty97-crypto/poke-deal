@@ -68,6 +68,19 @@ test("buildQuickIntakePreview warns when quantity and cost could be a bundle tot
   assert.equal(preview.summary, "Ready, but tighten the match.");
 });
 
+test("buildQuickIntakePreview stays green after an explicit total is split", () => {
+  const preview = buildQuickIntakePreview(parseQuickIntake("2x Charizard 151 199/165 £18 total raw"));
+
+  assert.equal(preview.readyForComp, true);
+  assert.equal(preview.readyForStock, true);
+  assert.equal(preview.tone, "good");
+  assert.deepEqual(preview.warnings, []);
+  assert.equal(
+    preview.chips.find((chip) => chip.key === "cost")?.value,
+    "9.00",
+  );
+});
+
 test("buildQuickIntakePreview shows typed listing channel and state", () => {
   const preview = buildQuickIntakePreview(parseQuickIntake("Snivy MEP 049 £2 sell on vinted active"), {
     currentChannel: "EBAY",

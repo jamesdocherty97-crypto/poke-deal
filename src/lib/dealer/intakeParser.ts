@@ -1,6 +1,7 @@
 import { getSetById, searchSets, resolveExactSetId, resolveSetIdForCard } from "../catalog/setCatalog.js";
 import { normalizeSearchText, tokenizeSearchText, tokenMatches } from "../catalog/fuzzy.js";
 import type { Grade } from "../domain/types.js";
+import { splitTotalCostToUnitPence } from "./bundleCost.js";
 import type { SaleChannel } from "./saleFees.js";
 
 export type ParsedQuickIntakeGrade = Grade;
@@ -13,6 +14,7 @@ export interface ParsedQuickIntake {
   number?: string;
   grade?: ParsedQuickIntakeGrade;
   cost?: string;
+  costMode?: "TOTAL_SPLIT";
   quantity?: string;
   source?: string;
   location?: string;
@@ -25,6 +27,12 @@ interface SetMatch {
   setName: string;
   phrase: string;
   score: number;
+}
+
+interface CostMatch {
+  value: string;
+  match: string;
+  isTotal: boolean;
 }
 
 const NUMBER_PATTERNS = [
@@ -93,16 +101,17 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
   let working = normalizeSpacing(input);
   const parsed: ParsedQuickIntake = {};
 
-  const cost = extractCost(working);
-  if (cost) {
-    parsed.cost = cost.value;
-    working = removeMatch(working, cost.match);
-  }
-
   const quantity = extractQuantity(working);
   if (quantity) {
     parsed.quantity = String(quantity.value);
     working = removeMatch(working, quantity.match);
+  }
+
+  const cost = extractCost(working);
+  if (cost) {
+    parsed.cost = cost.isTotal && quantity ? splitTotalCost(cost.value, quantity.value) : cost.value;
+    if (cost.isTotal && quantity) parsed.costMode = "TOTAL_SPLIT";
+    working = removeMatch(working, cost.match);
   }
 
   const listingChannel = extractListingChannel(working);
@@ -164,12 +173,18 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
   return parsed;
 }
 
-function extractCost(input: string): { value: string; match: string } | null {
+function extractCost(input: string): CostMatch | null {
+  const totalMatch =
+    input.match(/\b(?:paid|cost|buy|bought)?\s*(?:total|bundle|job\s*lot|lot)\s*(?:price|cost|paid|for)?\s*(?:£\s*)?(\d+(?:[.,]\d{1,2})?)\b/i) ??
+    input.match(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:total|all\s*in|for\s*(?:both|all|the\s+lot)|bundle|job\s*lot|lot)\b/i) ??
+    input.match(/(?:£\s*)(\d+(?:[.,]\d{1,2})?)\s*(?:total|all\s*in|for\s*(?:both|all|the\s+lot)|bundle|job\s*lot|lot)\b/i);
+  if (totalMatch?.[1]) return { value: formatMoney(totalMatch[1]), match: totalMatch[0], isTotal: true };
+
   const match =
     input.match(/(?:£\s*)(\d+(?:[.,]\d{1,2})?)/i) ??
     input.match(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?(\d+(?:[.,]\d{1,2})?)\b/i);
   if (!match?.[1]) return null;
-  return { value: formatMoney(match[1]), match: match[0] };
+  return { value: formatMoney(match[1]), match: match[0], isTotal: false };
 }
 
 function extractQuantity(input: string): { value: number; match: string } | null {
@@ -346,6 +361,17 @@ function formatMoney(value: string): string {
   const amount = Number(value.replace(",", "."));
   if (!Number.isFinite(amount) || amount <= 0) return "";
   return amount.toFixed(2);
+}
+
+function splitTotalCost(value: string, quantity: number): string {
+  const amount = Number(value.replace(",", "."));
+  if (!Number.isFinite(amount) || amount <= 0) return value;
+  const split = splitTotalCostToUnitPence(Math.round(amount * 100), quantity);
+  return split ? formatPence(split.unitCostPence) : value;
+}
+
+function formatPence(pence: number): string {
+  return (pence / 100).toFixed(2);
 }
 
 function removeMatch(input: string, match: string): string {

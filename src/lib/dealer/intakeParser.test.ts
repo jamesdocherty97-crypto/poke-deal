@@ -130,6 +130,30 @@ test("parseQuickIntake captures fair-flow source, location and condition", () =>
   });
 });
 
+test("parseQuickIntake splits explicit bundle totals into per-card cost", () => {
+  assert.deepEqual(parseQuickIntake("2x Charizard 151 199/165 £18 total from card fair box a nm"), {
+    name: "Charizard",
+    setName: "151",
+    number: "199/165",
+    cost: "9.00",
+    costMode: "TOTAL_SPLIT",
+    quantity: "2",
+    source: "Card fair",
+    location: "Box A",
+    condition: "NM",
+  });
+
+  assert.deepEqual(parseQuickIntake("3x Gengar lor tg TG06 bundle £10 raw"), {
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    number: "TG06",
+    grade: "RAW",
+    cost: "3.33",
+    costMode: "TOTAL_SPLIT",
+    quantity: "3",
+  });
+});
+
 test("parseQuickIntake captures explicit listing channel and state", () => {
   assert.deepEqual(parseQuickIntake("Gengar lor tg TG06 raw £10 from vinted binder list on ebay draft"), {
     name: "Gengar",
