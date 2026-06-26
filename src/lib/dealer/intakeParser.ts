@@ -184,7 +184,8 @@ function extractCost(input: string): CostMatch | null {
   const totalMatch =
     input.match(/\b(?:paid|cost|buy|bought)?\s*(?:total|bundle|job\s*lot|lot)\s*(?:price|cost|paid|for)?\s*(?:£\s*)?(\d+(?:[.,]\d{1,2})?)\b/i) ??
     input.match(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:total|all\s*in|for\s*(?:both|all|the\s+lot)|bundle|job\s*lot|lot)\b/i) ??
-    input.match(/(?:£\s*)(\d+(?:[.,]\d{1,2})?)\s*(?:total|all\s*in|for\s*(?:both|all|the\s+lot)|bundle|job\s*lot|lot)\b/i);
+    input.match(/(?:£\s*)(\d+(?:[.,]\d{1,2})?)\s*(?:total|all\s*in|for\s*(?:both|all|the\s+lot)|bundle|job\s*lot|lot)\b/i) ??
+    input.match(/\bfor\s*(?:£\s*)?(\d+(?:[.,]\d{1,2})?)\b/i);
   if (totalMatch?.[1]) return { value: formatMoney(totalMatch[1]), match: totalMatch[0], isTotal: true };
 
   const match =
@@ -196,6 +197,7 @@ function extractCost(input: string): CostMatch | null {
 
 function extractQuantity(input: string): { value: number; match: string } | null {
   const match =
+    input.match(/(?:^|\s)(\d{1,3})(?=\s+for\s+(?:£\s*)?\d)/i) ??
     input.match(/(?:^|\s)(?:qty|quantity)\s*(\d{1,3})(?=\s|$)/i) ??
     input.match(/(?:^|\s)x\s*(\d{1,3})(?=\s|$)/i) ??
     input.match(/(?:^|\s)(\d{1,3})\s*x(?=\s|$)/i);
@@ -396,11 +398,13 @@ function removePhrase(input: string, phrase: string): string {
 }
 
 function cleanupName(input: string): string {
-  return normalizeSpacing(
+  const cleaned = normalizeSpacing(
     input
       .replace(/[()|,;]+/g, " ")
-      .replace(/\b(?:card|pokemon|pokémon)\b/gi, " "),
+      .replace(/\b(?:bought|buy|paid|for|each|per|copy|copies|card|pokemon|pokémon)\b/gi, " ")
+      .replace(/\b1st\s+ed(?:ition)?\b/gi, "1st Edition"),
   );
+  return cleaned.replace(/^1st Edition\s+(.+)$/i, "$1 1st Edition");
 }
 
 function normalizeSpacing(input: string): string {

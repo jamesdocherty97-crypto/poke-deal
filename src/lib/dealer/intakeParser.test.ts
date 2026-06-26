@@ -46,6 +46,14 @@ test("parseQuickIntake resolves vintage dealer shorthand", () => {
     setName: "Neo Genesis",
     condition: "LP",
   });
+
+  assert.deepEqual(parseQuickIntake("Neo Genesis 1st ed Hitmontop LP £35 raw"), {
+    name: "Hitmontop 1st Edition",
+    setName: "Neo Genesis",
+    condition: "LP",
+    grade: "RAW",
+    cost: "35.00",
+  });
 });
 
 test("parseQuickIntake resolves Mega Evolution promo shorthand", () => {
@@ -138,6 +146,25 @@ test("parseQuickIntake captures fair-flow source, location and condition", () =>
     location: "Box A",
     condition: "NM",
   });
+
+  assert.deepEqual(parseQuickIntake("Gengar lor tg TG06 raw £10 each LP vinted binder"), {
+    name: "Gengar",
+    setName: "Lost Origin Trainer Gallery",
+    number: "TG06",
+    grade: "RAW",
+    cost: "10.00",
+    source: "Vinted",
+    location: "Binder",
+    condition: "LP",
+  });
+
+  assert.deepEqual(parseQuickIntake("Bought Snivy MEP 049 raw for £4"), {
+    name: "Snivy",
+    setName: "Mega Evolution Promos",
+    number: "MEP049",
+    grade: "RAW",
+    cost: "4.00",
+  });
 });
 
 test("parseQuickIntake splits explicit bundle totals into per-card cost", () => {
@@ -161,6 +188,18 @@ test("parseQuickIntake splits explicit bundle totals into per-card cost", () => 
     cost: "3.33",
     costMode: "TOTAL_SPLIT",
     quantity: "3",
+  });
+
+  assert.deepEqual(parseQuickIntake("3 for £25 Pikachu 151 173/165 raw nm card fair"), {
+    name: "Pikachu",
+    setName: "151",
+    number: "173/165",
+    grade: "RAW",
+    cost: "8.33",
+    costMode: "TOTAL_SPLIT",
+    quantity: "3",
+    source: "Card fair",
+    condition: "NM",
   });
 });
 
