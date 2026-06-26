@@ -3122,8 +3122,7 @@ export default function Home() {
     setEbayPreflight(null);
   }
 
-  async function pasteListingUrlAndActivate() {
-    if (!listingPackTarget) return;
+  async function pasteListingUrlForListing(listing: Listing) {
     let clipboardText = "";
     try {
       clipboardText = await navigator.clipboard.readText();
@@ -3139,7 +3138,7 @@ export default function Home() {
     }
 
     const ok = await patchListing(
-      listingPackTarget,
+      listing,
       { state: "ACTIVE", externalUrl },
       "Live URL saved. Listing marked active.",
     );
@@ -3147,6 +3146,11 @@ export default function Home() {
     setListingPackCopied(false);
     setListingPackCopiedField(null);
     setEbayPreflight(null);
+  }
+
+  async function pasteListingUrlAndActivate() {
+    if (!listingPackTarget) return;
+    await pasteListingUrlForListing(listingPackTarget);
   }
 
   async function runEbayPreflight(listingId: string) {
@@ -5391,6 +5395,7 @@ export default function Home() {
               onEdit={openListingEditor}
               onPack={openListingPack}
               onSell={openSellFromListing}
+              onPasteUrl={() => void pasteListingUrlForListing(listing)}
               onState={(state) =>
                 patchListing(
                   listing,
@@ -6665,6 +6670,7 @@ function ListingRow({
   onEdit,
   onPack,
   onSell,
+  onPasteUrl,
   onState,
   onEbayPublish,
 }: {
@@ -6674,6 +6680,7 @@ function ListingRow({
   onEdit: (listing: Listing) => void;
   onPack: (listing: Listing) => void;
   onSell: (listing: Listing) => void;
+  onPasteUrl: () => void;
   onState: (state: Exclude<ListingState, "SOLD">) => void;
   onEbayPublish: () => void;
 }) {
@@ -6699,6 +6706,7 @@ function ListingRow({
   const isEbay = listing.channel === "EBAY";
   const hasOffer = listing.externalRef?.startsWith("offer:");
   const isPublished = listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl;
+  const canPasteUrl = listing.state !== "SOLD" && !listing.externalUrl;
   const ebayStatusLabel = hasOffer
     ? " · offer pending"
     : isPublished
@@ -6778,6 +6786,11 @@ function ListingRow({
           {listing.state !== "ACTIVE" && listing.state !== "SOLD" && (
             <button type="button" onClick={() => onState("ACTIVE")} disabled={isBusy}>
               Activate
+            </button>
+          )}
+          {canPasteUrl && (
+            <button type="button" onClick={onPasteUrl} disabled={isBusy}>
+              Paste URL
             </button>
           )}
           {listing.state === "ACTIVE" && (
