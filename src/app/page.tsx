@@ -69,6 +69,7 @@ import {
 } from "@/lib/dealer/listingWorkflow";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
 import { buildQuickIntakePreview } from "@/lib/dealer/intakePreview";
+import { buildOperatingSnapshot, type OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import {
   DEFAULT_INTAKE_PREFERENCES,
@@ -1321,6 +1322,29 @@ export default function Home() {
       draftListingCount,
       soldInventory.length,
       unlistedStockCount,
+    ],
+  );
+  const operatingSnapshot = useMemo<OperatingSnapshotRow[]>(
+    () =>
+      buildOperatingSnapshot({
+        activeCostPence: dashboard?.metrics.activeCostPence ?? 0,
+        cashInPence: dashboard?.metrics.cashInPence ?? 0,
+        cashOutPence: dashboard?.metrics.cashOutPence ?? 0,
+        cashNetPence: dashboard?.metrics.cashNetPence ?? 0,
+        cashRecoveryPct: dashboard?.metrics.cashRecoveryPct ?? 0,
+        sellThroughPct: dashboard?.metrics.sellThroughPct ?? 0,
+        draftListings: draftListingCount,
+        activeListings: activeListingCount,
+      }),
+    [
+      activeListingCount,
+      dashboard?.metrics.activeCostPence,
+      dashboard?.metrics.cashInPence,
+      dashboard?.metrics.cashNetPence,
+      dashboard?.metrics.cashOutPence,
+      dashboard?.metrics.cashRecoveryPct,
+      dashboard?.metrics.sellThroughPct,
+      draftListingCount,
     ],
   );
   const launchReadiness = useMemo(
@@ -3873,6 +3897,23 @@ export default function Home() {
             <div className="today-action-list">
               {todayActions.map((action) => (
                 <TodayActionButton key={action.id} action={action} onOpen={openTodayAction} />
+              ))}
+            </div>
+          </section>
+
+          <section className="panel operating-snapshot-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Operating snapshot</h2>
+                <span className="muted">cash, stock and listing flow</span>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setView("pnl")}>
+                Profit
+              </button>
+            </div>
+            <div className="operating-snapshot-grid">
+              {operatingSnapshot.map((row) => (
+                <OperatingSnapshotCard key={row.id} row={row} />
               ))}
             </div>
           </section>
@@ -7185,6 +7226,16 @@ function SourceHealthRow({ source }: { source: SystemSource }) {
         {source.setupHint && <small>{source.setupHint}</small>}
       </div>
       <span>{sourceStatusLabel(source.status)}</span>
+    </div>
+  );
+}
+
+function OperatingSnapshotCard({ row }: { row: OperatingSnapshotRow }) {
+  return (
+    <div className={`operating-snapshot-card ${row.tone}`}>
+      <span>{row.label}</span>
+      <strong>{row.value}</strong>
+      <small>{row.detail}</small>
     </div>
   );
 }

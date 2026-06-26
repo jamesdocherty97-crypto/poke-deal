@@ -1402,6 +1402,67 @@ label {
   background: rgba(42, 117, 187, 0.14);
 }
 
+.operating-snapshot-panel {
+  background:
+    linear-gradient(120deg, rgba(255, 203, 5, 0.1), transparent 48%),
+    var(--panel);
+}
+
+.operating-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.operating-snapshot-card {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 9px;
+}
+
+.operating-snapshot-card span,
+.operating-snapshot-card small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.operating-snapshot-card strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.05;
+}
+
+.operating-snapshot-card.good {
+  border-color: rgba(52, 211, 153, 0.28);
+}
+
+.operating-snapshot-card.good strong {
+  color: var(--green);
+}
+
+.operating-snapshot-card.warn {
+  border-color: rgba(255, 203, 5, 0.3);
+}
+
+.operating-snapshot-card.warn strong {
+  color: var(--yellow);
+}
+
+.operating-snapshot-card.info {
+  border-color: rgba(42, 117, 187, 0.28);
+}
+
+.operating-snapshot-card.info strong {
+  color: #cfe6ff;
+}
+
 .launch-plan-panel {
   background:
     linear-gradient(120deg, rgba(42, 117, 187, 0.16), transparent 48%),
