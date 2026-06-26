@@ -10,7 +10,9 @@ Pikachu ex,Surging Sparks,238/191,PSA 10,200,1,eBay,Slabs,,12345678,eBay,240,dra
 
   assert.equal(parsed.errors.length, 0);
   assert.equal(parsed.totalCostPence, 22000);
+  assert.equal(parsed.totalQuantity, 3);
   assert.equal(parsed.listingCount, 2);
+  assert.equal(parsed.explicitListPriceCount, 2);
   assert.deepEqual(parsed.rows[0], {
     card: { name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" },
     grade: "RAW",
@@ -33,6 +35,23 @@ test("parseStockImportText accepts ACE slabs", () => {
 
   assert.equal(parsed.errors.length, 0);
   assert.equal(parsed.rows[0]?.grade, "ACE_10");
+});
+
+test("parseStockImportText keeps slab certs from freeform opening stock", () => {
+  const parsed = parseStockImportText("Charizard ex 151 199/165 PSA 10 £700 cert 84213567 slabs list on ebay draft");
+
+  assert.equal(parsed.errors.length, 0);
+  assert.deepEqual(parsed.rows[0], {
+    card: { name: "Charizard ex", setName: "151", number: "199/165" },
+    grade: "PSA_10",
+    costBasisPence: 70000,
+    quantity: 1,
+    location: "Slabs",
+    graderCert: "84213567",
+    channel: "EBAY",
+    listingState: "DRAFT",
+  });
+  assert.equal(parsed.listingCount, 1);
 });
 
 test("parseStockImportText keeps old ordered listing rows backward compatible", () => {
@@ -71,6 +90,9 @@ test("parseStockImportText parses freeform quick-intake rows", () => {
     costBasisPence: 1000,
     quantity: 1,
   });
+  assert.equal(parsed.totalQuantity, 1);
+  assert.equal(parsed.listingCount, 1);
+  assert.equal(parsed.explicitListPriceCount, 0);
 });
 
 test("parseStockImportText keeps freeform dealer context for opening stock", () => {

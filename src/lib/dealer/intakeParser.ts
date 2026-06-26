@@ -19,6 +19,7 @@ export interface ParsedQuickIntake {
   source?: string;
   location?: string;
   condition?: string;
+  graderCert?: string;
   channel?: ParsedQuickIntakeChannel;
   listingState?: ParsedQuickIntakeListingState;
 }
@@ -150,6 +151,12 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
     working = removeMatch(working, grade.match);
   }
 
+  const cert = extractCert(working);
+  if (cert) {
+    parsed.graderCert = cert.value;
+    working = removeMatch(working, cert.match);
+  }
+
   const number = extractNumber(working);
   if (number) {
     parsed.number = normalizeCollectorNumber(number.value);
@@ -264,6 +271,12 @@ function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: st
   if (raw?.[0]) return { value: "RAW", match: raw[0] };
 
   return null;
+}
+
+function extractCert(input: string): { value: string; match: string } | null {
+  const match = input.match(/\b(?:(?:psa|bgs|cgc|ace)\s+)?cert(?:ificate)?(?:\s*(?:no|number|#))?\s*#?\s*([A-Z0-9-]{4,})\b/i);
+  if (!match?.[0] || !match[1]) return null;
+  return { value: match[1].toUpperCase(), match: match[0] };
 }
 
 function firstPresetMatch<T extends string>(

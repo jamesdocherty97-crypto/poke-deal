@@ -20,6 +20,7 @@ export interface IntakePreviewOptions {
   currentSource?: string;
   currentLocation?: string;
   currentCondition?: string;
+  currentGraderCert?: string;
   currentChannel?: string;
   currentListingState?: string;
 }
@@ -44,6 +45,7 @@ const fieldLabels: Record<IntakePreviewField, string> = {
   source: "Source",
   location: "Place",
   condition: "Cond.",
+  graderCert: "Cert",
   channel: "Channel",
   listingState: "Listing",
 };
@@ -62,6 +64,7 @@ export function buildQuickIntakePreview(
   addChip(chips, "source", parsed.source, options.currentSource);
   addChip(chips, "location", parsed.location, options.currentLocation);
   addChip(chips, "condition", parsed.condition, options.currentCondition);
+  addChip(chips, "graderCert", parsed.graderCert, options.currentGraderCert);
   addChip(chips, "channel", parsed.channel, options.currentChannel);
   addChip(chips, "listingState", parsed.listingState, options.currentListingState);
 

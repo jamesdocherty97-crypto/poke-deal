@@ -2065,7 +2065,7 @@ label {
 
 .stock-import-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
   gap: 6px;
 }
 
@@ -2099,6 +2099,33 @@ label {
 
 .stock-import-preview.warn {
   border-color: rgba(255, 203, 5, 0.38);
+}
+
+.stock-import-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.stock-import-summary span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  border-radius: 8px;
+  background: rgba(52, 211, 153, 0.08);
+  padding: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.stock-import-summary strong {
+  overflow-wrap: anywhere;
+  color: var(--green);
+  font-size: 16px;
+  line-height: 1.05;
 }
 
 .stock-import-rows span,

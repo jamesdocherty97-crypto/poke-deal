@@ -31,7 +31,9 @@ export interface StockImportParseResult {
   rows: StockImportRow[];
   errors: StockImportError[];
   totalCostPence: number;
+  totalQuantity: number;
   listingCount: number;
+  explicitListPriceCount: number;
 }
 
 const ORDERED_COLUMNS = [
@@ -143,7 +145,9 @@ export function parseStockImportText(input: string): StockImportParseResult {
     rows,
     errors,
     totalCostPence: rows.reduce((sum, row) => sum + row.costBasisPence * row.quantity, 0),
-    listingCount: rows.filter((row) => row.listPricePence != null).length,
+    totalQuantity: rows.reduce((sum, row) => sum + row.quantity, 0),
+    listingCount: rows.length,
+    explicitListPriceCount: rows.filter((row) => row.listPricePence != null).length,
   };
 }
 
@@ -190,6 +194,7 @@ function parseFreeformStockLine(line: string): { row: StockImportRow } | { error
     acquiredFrom: parsed.source,
     location: parsed.location,
     condition: parsed.condition,
+    graderCert: parsed.graderCert,
     channel: parsed.channel,
     listingState: parsed.listingState,
   });

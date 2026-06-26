@@ -491,6 +491,20 @@ const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
 const STOCK_IMPORT_EXAMPLE =
   "card,set,number,grade,cost,qty,source,location,condition,cert,channel,list price,state\n" +
   "Gengar,Lost Origin Trainer Gallery,TG06/TG30,RAW,10.00,1,Card fair,Binder,NM,,Vinted,25.00,draft";
+const stockImportTemplates = [
+  {
+    label: "CSV",
+    text: STOCK_IMPORT_EXAMPLE,
+  },
+  {
+    label: "Binder",
+    text: "2x Gengar lor tg TG06 raw £10 LP vinted binder list on ebay draft",
+  },
+  {
+    label: "Slab",
+    text: "Charizard ex 151 199/165 PSA 10 £700 cert 84213567 slabs list on ebay draft",
+  },
+] as const;
 const VISIBLE_POPULAR_SET_LIMIT = 30;
 const VISIBLE_QUICK_HUNT_LIMIT = 8;
 const expensePresets: Array<{ category: ExpenseCategory; description: string; amount?: string; channel?: Channel }> = [
@@ -2219,9 +2233,9 @@ export default function Home() {
     setError(parsed.errors.length > 0 ? `${parsed.errors.length} import row${parsed.errors.length === 1 ? "" : "s"} need fixing.` : null);
   }
 
-  function fillStockImportExample() {
-    setStockImportText(STOCK_IMPORT_EXAMPLE);
-    setNotice("Example stock row loaded.");
+  function fillStockImportTemplate(template: (typeof stockImportTemplates)[number]) {
+    setStockImportText(template.text);
+    setNotice(`${template.label} stock template loaded.`);
     setError(null);
   }
 
@@ -5208,9 +5222,11 @@ export default function Home() {
               <button type="button" onClick={() => void pasteStockImportRows()}>
                 Paste clipboard
               </button>
-              <button type="button" onClick={fillStockImportExample}>
-                Example
-              </button>
+              {stockImportTemplates.map((template) => (
+                <button key={template.label} type="button" onClick={() => fillStockImportTemplate(template)}>
+                  {template.label}
+                </button>
+              ))}
             </div>
             {stockImportHasText && (
               <div className={`stock-import-preview ${stockImportPreview.errors.length > 0 ? "warn" : "good"}`}>
@@ -5224,17 +5240,33 @@ export default function Home() {
                     {stockImportPreview.errors.length > 4 && <span>+{stockImportPreview.errors.length - 4} more</span>}
                   </div>
                 ) : (
-                  <div className="stock-import-rows">
-                    {stockImportPreview.rows.slice(0, 3).map((row, index) => (
-                      <span key={`${row.card.name}-${row.card.number ?? ""}-${index}`}>
-                        {row.quantity}x {row.card.name} · {row.card.setName ?? "No set"} · {gbp(row.costBasisPence)}
-                        {row.condition ? ` · ${row.condition}` : ""}
-                        {row.graderCert ? ` · cert ${row.graderCert}` : ""}
-                        {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : " · draft auto"}
+                  <>
+                    <div className="stock-import-summary" aria-label="Opening stock import summary">
+                      <span>
+                        <strong>{stockImportPreview.totalQuantity}</strong>
+                        cards
                       </span>
-                    ))}
-                    {stockImportPreview.rows.length > 3 && <span>+{stockImportPreview.rows.length - 3} more</span>}
-                  </div>
+                      <span>
+                        <strong>{stockImportPreview.listingCount}</strong>
+                        drafts
+                      </span>
+                      <span>
+                        <strong>{stockImportPreview.explicitListPriceCount}</strong>
+                        priced
+                      </span>
+                    </div>
+                    <div className="stock-import-rows">
+                      {stockImportPreview.rows.slice(0, 3).map((row, index) => (
+                        <span key={`${row.card.name}-${row.card.number ?? ""}-${index}`}>
+                          {row.quantity}x {row.card.name} · {row.card.setName ?? "No set"} · {gbp(row.costBasisPence)}
+                          {row.condition ? ` · ${row.condition}` : ""}
+                          {row.graderCert ? ` · cert ${row.graderCert}` : ""}
+                          {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : " · draft auto"}
+                        </span>
+                      ))}
+                      {stockImportPreview.rows.length > 3 && <span>+{stockImportPreview.rows.length - 3} more</span>}
+                    </div>
+                  </>
                 )}
               </div>
             )}

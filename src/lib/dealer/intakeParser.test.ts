@@ -104,6 +104,16 @@ test("parseQuickIntake accepts broader slab grades", () => {
     grade: "ACE_10",
     cost: "120.00",
   });
+
+  assert.deepEqual(parseQuickIntake("Charizard ex 151 199/165 PSA 10 £700 cert 84213567 slabs"), {
+    name: "Charizard ex",
+    setName: "151",
+    number: "199/165",
+    grade: "PSA_10",
+    cost: "700.00",
+    location: "Slabs",
+    graderCert: "84213567",
+  });
 });
 
 test("parseQuickIntake captures fair-flow source, location and condition", () => {
