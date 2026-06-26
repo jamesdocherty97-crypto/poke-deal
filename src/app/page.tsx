@@ -2060,7 +2060,12 @@ export default function Home() {
         if (!stockRes.ok) throw new Error(stockPayload.error ?? "stock import failed");
         stocked += 1;
 
-        if (row.listPricePence != null && stockPayload.item?.id) {
+        if (stockPayload.item?.id) {
+          const draftDefaults = buildListingDraftDefaults({
+            card: { name: row.card.name, number: row.card.number },
+            grade: row.grade,
+            costBasis: row.costBasisPence,
+          });
           const listingRes = await fetch("/api/listings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2068,7 +2073,7 @@ export default function Home() {
               itemId: stockPayload.item.id,
               channel: row.channel ?? channel,
               state: row.listingState ?? "DRAFT",
-              listPricePence: row.listPricePence,
+              listPricePence: row.listPricePence ?? draftDefaults.listPricePence,
             }),
           });
           const listingPayload = await readJson(listingRes);
@@ -5031,7 +5036,7 @@ export default function Home() {
                         {row.quantity}x {row.card.name} · {row.card.setName ?? "No set"} · {gbp(row.costBasisPence)}
                         {row.condition ? ` · ${row.condition}` : ""}
                         {row.graderCert ? ` · cert ${row.graderCert}` : ""}
-                        {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : ""}
+                        {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : " · draft auto"}
                       </span>
                     ))}
                     {stockImportPreview.rows.length > 3 && <span>+{stockImportPreview.rows.length - 3} more</span>}

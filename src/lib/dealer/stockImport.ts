@@ -187,6 +187,11 @@ function parseFreeformStockLine(line: string): { row: StockImportRow } | { error
     grade: parsed.grade,
     cost: parsed.cost,
     quantity: parsed.quantity,
+    acquiredFrom: parsed.source,
+    location: parsed.location,
+    condition: parsed.condition,
+    channel: parsed.channel,
+    listingState: parsed.listingState,
   });
 }
 

@@ -73,6 +73,23 @@ test("parseStockImportText parses freeform quick-intake rows", () => {
   });
 });
 
+test("parseStockImportText keeps freeform dealer context for opening stock", () => {
+  const parsed = parseStockImportText("2x Gengar lor tg TG06 raw £10 LP vinted binder list on ebay active");
+
+  assert.equal(parsed.errors.length, 0);
+  assert.deepEqual(parsed.rows[0], {
+    card: { name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06" },
+    grade: "RAW",
+    costBasisPence: 1000,
+    quantity: 2,
+    acquiredFrom: "Vinted",
+    location: "Binder",
+    condition: "LP",
+    channel: "EBAY",
+    listingState: "ACTIVE",
+  });
+});
+
 test("parseStockImportText reports line-level errors", () => {
   const parsed = parseStockImportText(`card,set,number,grade,cost
 Gengar,Lost Origin Trainer Gallery,TG06,RAW,
