@@ -85,6 +85,7 @@ import {
   defaultGrossSalePence,
   discountedItemSubtotalPence,
   estimateSaleCosts,
+  grossSalePriceForNetPence,
   saleItemSubtotalPence,
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
@@ -2540,6 +2541,26 @@ export default function Home() {
 
     applySaleTotalPrice(pricePence);
     setNotice("Sale price pasted. Fees and postage have been estimated.");
+    setError(null);
+  }
+
+  async function pasteSaleNetPrice() {
+    let clipboardText = "";
+    try {
+      clipboardText = await navigator.clipboard.readText();
+    } catch {
+      setError("Clipboard read failed. Copy the payout, then tap Paste net.");
+      return;
+    }
+
+    const netPence = parseCheckedCompPriceText(clipboardText);
+    if (!netPence) {
+      setError("Clipboard does not contain a clear payout.");
+      return;
+    }
+
+    applySaleTotalPrice(grossSalePriceForNetPence(saleChannel, netPence, { grade: sellingItem?.grade }));
+    setNotice("Net payout pasted. Gross, fees and postage have been estimated.");
     setError(null);
   }
 
@@ -5875,6 +5896,9 @@ export default function Home() {
             </button>
             <button type="button" onClick={() => void pasteSaleTotalPrice()}>
               Paste gross
+            </button>
+            <button type="button" onClick={() => void pasteSaleNetPrice()}>
+              Paste net
             </button>
             <button type="button" onClick={() => applySalePriceDiscount(100)} disabled={!sellingItem}>
               -£1

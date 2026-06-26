@@ -89,6 +89,28 @@ export function saleNetPence({
   return salePricePence - feesPence - postagePence;
 }
 
+export function grossSalePriceForNetPence(
+  channel: SaleChannel,
+  netPence: number,
+  options: SaleCostOptions = {},
+): number {
+  const target = Math.max(0, Math.round(netPence));
+  if (target <= 0) return 0;
+  if (channel === "IN_PERSON" || channel === "VINTED") return target;
+
+  let price = target;
+  const maxPrice = target * 3 + 5000;
+  while (price <= maxPrice) {
+    const costs = estimateSaleCosts(channel, price, options);
+    if (saleNetPence({ salePricePence: price, feesPence: costs.feesPence, postagePence: costs.postagePence }) >= target) {
+      return price;
+    }
+    price += 1;
+  }
+
+  return maxPrice;
+}
+
 export function breakEvenSalePricePence(
   channel: SaleChannel,
   costPence: number,

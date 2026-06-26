@@ -6,6 +6,7 @@ import {
   defaultGrossSalePence,
   discountedItemSubtotalPence,
   estimateSaleCosts,
+  grossSalePriceForNetPence,
   postedSalePostagePence,
   saleItemSubtotalPence,
   saleNetPence,
@@ -53,6 +54,30 @@ test("discountedItemSubtotalPence handles accepted-offer shortcuts", () => {
 
 test("saleNetPence nets fees and postage from the booked sale price", () => {
   assert.equal(saleNetPence({ salePricePence: 5000, feesPence: 670, postagePence: 175 }), 4155);
+});
+
+test("grossSalePriceForNetPence finds the gross total needed for a target payout", () => {
+  const gross = grossSalePriceForNetPence("EBAY", 4000, { grade: "RAW" });
+  const costs = estimateSaleCosts("EBAY", gross, { grade: "RAW" });
+  const previousCosts = estimateSaleCosts("EBAY", gross - 1, { grade: "RAW" });
+
+  assert.equal(
+    saleNetPence({ salePricePence: gross, feesPence: costs.feesPence, postagePence: costs.postagePence }) >= 4000,
+    true,
+  );
+  assert.equal(
+    saleNetPence({
+      salePricePence: gross - 1,
+      feesPence: previousCosts.feesPence,
+      postagePence: previousCosts.postagePence,
+    }) < 4000,
+    true,
+  );
+});
+
+test("grossSalePriceForNetPence keeps no-fee channels as the pasted net", () => {
+  assert.equal(grossSalePriceForNetPence("IN_PERSON", 4200), 4200);
+  assert.equal(grossSalePriceForNetPence("VINTED", 4200), 4200);
 });
 
 test("breakEvenSalePricePence returns the lowest total that clears selling costs", () => {
