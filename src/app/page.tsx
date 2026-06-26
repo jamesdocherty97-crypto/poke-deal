@@ -1906,7 +1906,7 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "manual stock failed");
 
-      let listingCreated = false;
+      let createdListing: Listing | null = null;
       if (payload.item?.id) {
         const listPricePence = overrideListPricePence ?? draftDefaults.listPricePence;
         const listingRes = await fetch("/api/listings", {
@@ -1923,12 +1923,27 @@ export default function Home() {
         if (!listingRes.ok) {
           console.warn("[manual stock] draft listing skipped:", listingPayload.error ?? "listing create failed");
         } else {
-          listingCreated = true;
+          createdListing = listingPayload.listing as Listing;
         }
       }
 
+      const stockedItem = payload.item as InventoryItem | undefined;
+      setLastStocked({
+        itemId: stockedItem?.id ?? payload.item?.id,
+        listingId: createdListing?.id ?? null,
+        name: stockedItem?.card?.name ?? name,
+        setName: stockedItem?.card?.setName ?? setNameValue,
+        number: stockedItem?.card?.number ?? number,
+        grade,
+        quantity: intakeQuantity,
+        costPence: costBasisPence,
+        listPricePence: createdListing?.listPrice ?? createdListing?.suggestedPrice ?? overrideListPricePence ?? draftDefaults.listPricePence,
+        channel,
+        listingState: createdListing?.state ?? acquireListingState,
+        imageUrl: stockedItem?.card?.imageUrl ?? cardArtUrl,
+      });
       setNotice(
-        listingCreated
+        createdListing
           ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${acquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(overrideListPricePence ?? draftDefaults.listPricePence)}.`
           : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.`,
       );
