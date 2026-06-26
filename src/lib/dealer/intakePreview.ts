@@ -69,6 +69,8 @@ export function buildQuickIntakePreview(
   const effectiveNumber = firstText(parsed.number, options.currentNumber);
   const effectiveGrade = firstText(parsed.grade, options.currentGrade);
   const effectiveCost = firstText(parsed.cost, options.currentCost);
+  const effectiveQuantity = firstText(parsed.quantity, options.currentQuantity);
+  const quantityValue = effectiveQuantity ? Number(effectiveQuantity) : 1;
   const missing = [
     effectiveName ? null : "card",
     effectiveGrade ? null : "grade",
@@ -76,10 +78,13 @@ export function buildQuickIntakePreview(
   ].filter((value): value is string => Boolean(value));
   const warnings = [
     effectiveSet || effectiveNumber ? null : "add set or number for a cleaner match",
+    effectiveCost && Number.isInteger(quantityValue) && quantityValue > 1
+      ? "cost is per copy; use Split total if this was a bundle price"
+      : null,
   ].filter((value): value is string => Boolean(value));
   const readyForComp = Boolean(effectiveName && effectiveGrade);
   const readyForStock = readyForComp && Boolean(effectiveCost);
-  const tone: IntakePreviewTone = readyForStock ? "good" : readyForComp ? "warn" : "info";
+  const tone: IntakePreviewTone = readyForStock && warnings.length === 0 ? "good" : readyForComp ? "warn" : "info";
 
   return {
     chips,
