@@ -1,4 +1,4 @@
-export type TodayActionTarget = "buy" | "stock" | "drafts" | "sales" | "profit" | "watches" | "reprice";
+export type TodayActionTarget = "buy" | "opening-stock" | "stock" | "drafts" | "sales" | "profit" | "watches" | "reprice";
 
 export type TodayActionTone = "good" | "warn" | "info";
 
@@ -27,9 +27,18 @@ export function buildTodayActions(input: TodayActionInput, limit = 5): TodayActi
 
   if (input.stockCount === 0) {
     actions.push({
+      id: "opening-stock",
+      title: "Load opening stock",
+      detail: "Paste existing cards in one go",
+      target: "opening-stock",
+      tone: "good",
+      priority: 104,
+    });
+
+    actions.push({
       id: "first-buy",
       title: "Add first buy",
-      detail: "Start the stock ledger",
+      detail: "Comp and stock one card",
       target: "buy",
       tone: "good",
       priority: 100,

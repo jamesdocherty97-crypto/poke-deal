@@ -1,5 +1,5 @@
 export type LaunchReadinessState = "done" | "next" | "warn";
-export type LaunchReadinessTarget = "buy" | "stock" | "listings" | "profit" | "watches" | "external";
+export type LaunchReadinessTarget = "buy" | "opening-stock" | "stock" | "listings" | "profit" | "watches" | "external";
 
 export interface LaunchReadinessInput {
   livePrimaryComps: boolean;

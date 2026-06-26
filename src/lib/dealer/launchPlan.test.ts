@@ -21,7 +21,8 @@ test("buildLaunchPlan starts a new business with stock, costs and source work", 
     "source-target",
     "second-source",
   ]);
-  assert.equal(plan[0]?.target, "buy");
+  assert.equal(plan[0]?.target, "opening-stock");
+  assert.equal(plan[0]?.action, "Import");
   assert.equal(plan.find((item) => item.id === "second-source")?.state, "warn");
 });
 

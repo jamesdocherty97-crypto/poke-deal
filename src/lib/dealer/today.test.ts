@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { buildTodayActions } from "./today.js";
 
-test("buildTodayActions starts a new seller with first buy and buy target actions", () => {
+test("buildTodayActions starts a new seller with opening stock, first buy and buy target actions", () => {
   const actions = buildTodayActions({
     stockCount: 0,
     activeStockCount: 0,
@@ -15,8 +15,9 @@ test("buildTodayActions starts a new seller with first buy and buy target action
     unlistedStockCount: 0,
   });
 
-  assert.deepEqual(actions.map((action) => action.id), ["first-buy", "buy-target"]);
-  assert.equal(actions[0]?.target, "buy");
+  assert.deepEqual(actions.map((action) => action.id), ["opening-stock", "first-buy", "buy-target"]);
+  assert.equal(actions[0]?.target, "opening-stock");
+  assert.equal(actions[1]?.target, "buy");
 });
 
 test("buildTodayActions prioritizes drafts and unlisted stock for an operating seller", () => {

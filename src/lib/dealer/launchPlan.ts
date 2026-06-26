@@ -1,5 +1,5 @@
 export type LaunchPlanState = "next" | "warn" | "done";
-export type LaunchPlanTarget = "buy" | "stock" | "listings" | "profit" | "watches" | "external";
+export type LaunchPlanTarget = "buy" | "opening-stock" | "stock" | "listings" | "profit" | "watches" | "external";
 
 export interface LaunchPlanInput {
   stockCount: number;
@@ -29,11 +29,11 @@ export function buildLaunchPlan(input: LaunchPlanInput, limit = 5): LaunchPlanIt
   if (input.stockCount === 0) {
     items.push({
       id: "first-stock",
-      title: "Stock first buys",
-      detail: "Use checked comps for the first three cards.",
+      title: "Load first stock",
+      detail: "Paste opening stock, or comp a fresh buy if you are starting from zero.",
       state: "next",
-      action: "Buy",
-      target: "buy",
+      action: "Import",
+      target: "opening-stock",
       priority: 100,
     });
   }

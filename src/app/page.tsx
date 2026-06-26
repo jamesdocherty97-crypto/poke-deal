@@ -590,6 +590,7 @@ export default function Home() {
   const [showAllPopularSets, setShowAllPopularSets] = useState(false);
   const [showAllQuickHunts, setShowAllQuickHunts] = useState(false);
   const [scrollToComp, setScrollToComp] = useState(false);
+  const [scrollToStockImport, setScrollToStockImport] = useState(false);
   const [setSuggestions, setSetSuggestions] = useState<CatalogSet[]>([]);
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
   const [cardSuggestions, setCardSuggestions] = useState<CatalogCard[]>([]);
@@ -608,6 +609,8 @@ export default function Home() {
   const compPanelRef = useRef<HTMLElement | null>(null);
   const checkedCompRef = useRef<HTMLDivElement | null>(null);
   const quickIntakeRef = useRef<HTMLInputElement | null>(null);
+  const stockImportRef = useRef<HTMLFormElement | null>(null);
+  const stockImportTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     void refreshAll();
@@ -1164,6 +1167,16 @@ export default function Home() {
     return () => window.clearTimeout(handle);
   }, [headline, scrollToComp]);
 
+  useEffect(() => {
+    if (!scrollToStockImport || view !== "acquire" || !stockImportRef.current) return;
+    const handle = window.setTimeout(() => {
+      stockImportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      stockImportTextareaRef.current?.focus();
+      setScrollToStockImport(false);
+    }, 90);
+    return () => window.clearTimeout(handle);
+  }, [scrollToStockImport, view]);
+
   const dashboardLoading = dashboard === null;
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
@@ -1375,6 +1388,10 @@ export default function Home() {
       setView("acquire");
       return;
     }
+    if (target === "opening-stock") {
+      openOpeningStockImport();
+      return;
+    }
     if (target === "stock") {
       setInventoryQuery("");
       setInventorySort("newest");
@@ -1407,6 +1424,10 @@ export default function Home() {
 
   function openLaunchReadiness(target: LaunchReadinessTarget | undefined) {
     if (!target || target === "external") return;
+    if (target === "opening-stock") {
+      openOpeningStockImport();
+      return;
+    }
     if (target === "buy") {
       setView("acquire");
       return;
@@ -1428,6 +1449,10 @@ export default function Home() {
 
   function openLaunchPlan(target: LaunchPlanTarget) {
     if (target === "external") return;
+    if (target === "opening-stock") {
+      openOpeningStockImport({ example: true });
+      return;
+    }
     if (target === "buy") {
       setView("acquire");
       return;
@@ -1512,6 +1537,15 @@ export default function Home() {
 
   function skipCurrentComp() {
     clearCurrentComp("Skipped. Ready for next comp.");
+  }
+
+  function openOpeningStockImport(options: { example?: boolean } = {}) {
+    setView("acquire");
+    if (options.example && !stockImportText.trim()) {
+      setStockImportText(STOCK_IMPORT_EXAMPLE);
+      setNotice("Example stock row loaded. Replace it with your own rows.");
+    }
+    setScrollToStockImport(true);
   }
 
   function rememberRecentComp(payload: Reconciled, input: LookupInput) {
@@ -3737,8 +3771,14 @@ export default function Home() {
                 done={(dashboard?.metrics.stockCount ?? 0) > 0}
                 title="Stock ledger"
                 detail={`${dashboard?.metrics.stockCount ?? 0} stocked`}
-                action="Buy"
-                onClick={() => setView("acquire")}
+                action={(dashboard?.metrics.stockCount ?? 0) > 0 ? "Buy" : "Import"}
+                onClick={() => {
+                  if ((dashboard?.metrics.stockCount ?? 0) > 0) {
+                    setView("acquire");
+                    return;
+                  }
+                  openOpeningStockImport({ example: true });
+                }}
               />
               <SetupStep
                 done={listings.length > 0}
@@ -3778,6 +3818,7 @@ export default function Home() {
             </div>
             <div className="command-grid">
               <button type="button" onClick={() => setView("acquire")}>Comp buy</button>
+              <button type="button" onClick={() => openOpeningStockImport()}>Import stock</button>
               <button type="button" onClick={() => setView("inventory")}>Sell stock</button>
               <button type="button" onClick={() => setView("listings")}>List drafts</button>
               <button type="button" onClick={takePortfolioSnapshot} disabled={busy === "snapshot"}>
@@ -4751,7 +4792,7 @@ export default function Home() {
               </p>
             )}
           </form>
-          <form className="panel stock-import-panel" onSubmit={importStockRows}>
+          <form className="panel stock-import-panel" onSubmit={importStockRows} ref={stockImportRef}>
             <div className="panel-heading">
               <div>
                 <h2>Opening stock</h2>
@@ -4770,6 +4811,7 @@ export default function Home() {
             <label>
               Paste rows
               <textarea
+                ref={stockImportTextareaRef}
                 value={stockImportText}
                 onChange={(event) => setStockImportText(event.target.value)}
                 placeholder={STOCK_IMPORT_EXAMPLE}
