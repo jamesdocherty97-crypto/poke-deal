@@ -49,6 +49,8 @@ test("resolveSetId handles dealer shorthand for current chase sets and subsets",
   assert.equal(resolveSetId("hidden fates sv"), "sma");
   assert.equal(resolveSetId("brs tg"), "swsh9tg");
   assert.equal(resolveSetId("sv promos"), "svp");
+  assert.equal(resolveSetId("sv promo"), "svp");
+  assert.equal(resolveSetId("swsh promo"), "swshp");
   assert.equal(resolveSetId("mep"), "mep");
   assert.equal(resolveSetId("mega evolution promos"), "mep");
 });
