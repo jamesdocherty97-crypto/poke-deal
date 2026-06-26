@@ -1575,6 +1575,20 @@ export default function Home() {
     setCheckedCompNote("");
   }
 
+  function clearCompEvidence() {
+    setComp(null);
+    setSuggestion(null);
+    setCardArtUrl(null);
+    setGradeComp(null);
+    setListPriceOverride("");
+    clearCheckedComp();
+  }
+
+  function editCompIdentity() {
+    clearCompEvidence();
+    setManualCompQuery("");
+  }
+
   function clearCurrentComp(message = "Ready for next comp.") {
     setName("");
     setSetNameValue("");
@@ -1583,14 +1597,9 @@ export default function Home() {
     setManualCompQuery("");
     setCost("");
     setQuantity("1");
-    setComp(null);
-    setSuggestion(null);
-    setCardArtUrl(null);
-    setGradeComp(null);
-    setListPriceOverride("");
+    clearCompEvidence();
     setGraderCert("");
     setPsaResult(null);
-    clearCheckedComp();
     setError(null);
     setNotice(message);
     window.requestAnimationFrame(() => quickIntakeRef.current?.focus());
@@ -4086,7 +4095,10 @@ export default function Home() {
                   id="quick-intake"
                   ref={quickIntakeRef}
                   value={quickIntake}
-                  onChange={(event) => setQuickIntake(event.target.value)}
+                  onChange={(event) => {
+                    setQuickIntake(event.target.value);
+                    if (comp || checkedCompPrice.trim()) clearCompEvidence();
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && quickIntake.trim()) {
                       event.preventDefault();
@@ -4135,9 +4147,8 @@ export default function Home() {
               <input
                 value={name}
                 onChange={(event) => {
+                  editCompIdentity();
                   setName(event.target.value);
-                  setManualCompQuery("");
-                  clearCheckedComp();
                 }}
                 onFocus={() => setCardSuggestionsOpen(true)}
                 onBlur={() => setTimeout(() => setCardSuggestionsOpen(false), 150)}
@@ -4172,9 +4183,8 @@ export default function Home() {
                 <input
                   value={setNameValue}
                   onChange={(event) => {
+                    editCompIdentity();
                     setSetNameValue(event.target.value);
-                    setManualCompQuery("");
-                    clearCheckedComp();
                   }}
                   onFocus={() => setSetSuggestionsOpen(true)}
                   onBlur={() => setTimeout(() => setSetSuggestionsOpen(false), 150)}
@@ -4198,9 +4208,8 @@ export default function Home() {
                 <input
                   value={number}
                   onChange={(event) => {
+                    editCompIdentity();
                     setNumber(event.target.value);
-                    setManualCompQuery("");
-                    clearCheckedComp();
                   }}
                   placeholder="199/165"
                 />
@@ -4253,8 +4262,8 @@ export default function Home() {
                     className={grade === g ? "selected" : ""}
                     type="button"
                     onClick={() => {
+                      clearCompEvidence();
                       setGrade(g);
-                      clearCheckedComp();
                     }}
                   >
                     {g.replace(/_/g, " ")}
@@ -4266,8 +4275,8 @@ export default function Home() {
                 <select
                   value={grade}
                   onChange={(event) => {
+                    clearCompEvidence();
                     setGrade(event.target.value as Grade);
-                    clearCheckedComp();
                   }}
                 >
                   {gradeOptions.map((option) => (
