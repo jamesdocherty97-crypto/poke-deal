@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PsaCertLookup, mapPsaCertResponse } from "./psaCert.js";
+import { buildPsaLookupFields, inferPsaSetName } from "./lookupFields.js";
 import { psaGradeLabelToGrade } from "./types.js";
 
 const fixture = JSON.parse(
@@ -31,6 +32,29 @@ test("mapPsaCertResponse parses a successful PSACert envelope", () => {
   assert.equal(r.totalPopulation, 12863);
   assert.equal(r.populationHigher, 0);
   assert.equal(r.live, true);
+});
+
+test("buildPsaLookupFields turns a PSA cert into comp-ready lookup fields", () => {
+  const r = mapPsaCertResponse(fixture, "79721014", true);
+
+  assert.deepEqual(buildPsaLookupFields(r), {
+    name: "Umbreon VMAX",
+    setName: "Evolving Skies",
+    number: "215",
+    grade: "PSA_10",
+  });
+});
+
+test("inferPsaSetName prefers the actual set over the series name", () => {
+  assert.equal(inferPsaSetName("POKEMON SWORD & SHIELD EVOLVING SKIES"), "Evolving Skies");
+  assert.equal(inferPsaSetName("POKEMON SCARLET & VIOLET 151"), "151");
+  assert.equal(inferPsaSetName("POKEMON BASE SET"), "Base");
+});
+
+test("inferPsaSetName handles common black star promo brands", () => {
+  assert.equal(inferPsaSetName("POKEMON SCARLET & VIOLET PROMO"), "Scarlet & Violet Black Star Promos");
+  assert.equal(inferPsaSetName("POKEMON SWORD & SHIELD PROMOS"), "SWSH Black Star Promos");
+  assert.equal(inferPsaSetName("POKEMON SUN & MOON PROMO"), "SM Black Star Promos");
 });
 
 test("mapPsaCertResponse handles invalid and empty responses", () => {

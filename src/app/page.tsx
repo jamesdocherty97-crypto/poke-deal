@@ -85,6 +85,7 @@ import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } fr
 import { buildSalePreview } from "@/lib/dealer/unitSale";
 import { buildSalePrompt, type SalePrompt } from "@/lib/dealer/salePrompt";
 import { checkEbayReadiness } from "@/lib/ebay/readiness";
+import { buildPsaLookupFields } from "@/lib/psa/lookupFields";
 import {
   acceptedOfferItemSubtotalPence,
   buyerPaidPostagePence,
@@ -1960,9 +1961,14 @@ export default function Home() {
       }
       // Auto-fill the buy form from the verified slab so a comp can follow.
       clearCompEvidence();
-      if (result.subject) setName(toTitleCase(result.subject));
-      if (result.subject) setNumber(result.cardNumber ?? "");
-      if (result.grade) setGrade(result.grade);
+      const lookupFields = buildPsaLookupFields(result);
+      if (lookupFields.name) setName(lookupFields.name);
+      if (lookupFields.setName) {
+        setSetNameValue(lookupFields.setName);
+        pinRecentSetName(lookupFields.setName);
+      }
+      if (lookupFields.number) setNumber(lookupFields.number);
+      if (lookupFields.grade) setGrade(lookupFields.grade);
       setNotice(
         `Verified PSA ${result.gradeLabel ?? ""} ${toTitleCase(result.subject ?? "card")}${
           result.live ? "" : " (demo cert — add PSA_API_TOKEN for live)"
