@@ -210,6 +210,20 @@ function buildSaleReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
     };
   }
 
+  if (input.activeListings > 0 || input.draftListings > 0) {
+    return {
+      id: "sale-loop",
+      title: "Profit loop",
+      detail: input.activeListings > 0
+        ? "Book the first sale from an active listing to prove true margin."
+        : "Activate a draft listing, then book the first sale when it sells.",
+      state: "next",
+      action: input.activeListings > 0 ? "Sell" : "List",
+      target: "listings",
+      priority: 76,
+    };
+  }
+
   return {
     id: "sale-loop",
     title: "Profit loop",

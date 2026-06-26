@@ -44,7 +44,8 @@ test("buildLaunchReadiness nudges draft listings and first sale for a new operat
   assert.equal(listing?.state, "next");
   assert.equal(listing?.target, "listings");
   assert.match(listing?.detail ?? "", /2 draft/);
-  assert.equal(sale?.target, "stock");
+  assert.equal(sale?.target, "listings");
+  assert.equal(sale?.action, "List");
   assert.equal(items.some((item) => item.id === "first-buy"), false);
 });
 

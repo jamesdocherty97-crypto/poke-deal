@@ -2038,6 +2038,8 @@ export default function Home() {
     setNotice(null);
     let stocked = 0;
     let listingsCreated = 0;
+    let firstCreatedListingId: string | null = null;
+    let firstCreatedListingState: ListingStateFilter = "DRAFT";
 
     try {
       for (const row of parsed.rows) {
@@ -2081,6 +2083,10 @@ export default function Home() {
             console.warn("[stock import] listing skipped:", listingPayload.error ?? "listing create failed");
           } else {
             listingsCreated += 1;
+            if (!firstCreatedListingId) {
+              firstCreatedListingId = listingPayload.listing?.id ?? null;
+              firstCreatedListingState = listingPayload.listing?.state === "ACTIVE" ? "ACTIVE" : "DRAFT";
+            }
           }
         }
       }
@@ -2090,7 +2096,17 @@ export default function Home() {
         `Imported ${stocked} stock row${stocked === 1 ? "" : "s"}${listingsCreated > 0 ? ` and ${listingsCreated} listing${listingsCreated === 1 ? "" : "s"}` : ""}.`,
       );
       await refreshAll();
-      setView("inventory");
+      if (firstCreatedListingId) {
+        setListingStateFilter(firstCreatedListingState);
+        setListingSort("newest");
+        setListingPackId(firstCreatedListingId);
+        setListingPackCopied(false);
+        setListingPackCopiedField(null);
+        setEbayPreflight(null);
+        setView("listings");
+      } else {
+        setView("inventory");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "stock import failed");
     } finally {
