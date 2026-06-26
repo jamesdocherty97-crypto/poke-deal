@@ -88,7 +88,9 @@ test("buildLaunchReadiness marks operating systems done when they are ready", ()
   });
 
   assert.equal(items.find((item) => item.id === "live-comps")?.state, "done");
-  assert.equal(items.find((item) => item.id === "cross-check")?.state, "done");
+  const crossCheck = items.find((item) => item.id === "cross-check");
+  assert.equal(crossCheck?.state, "done");
+  assert.match(crossCheck?.detail ?? "", /RAW comps/);
   assert.equal(items.find((item) => item.id === "ebay-automation")?.state, "done");
   assert.equal(items.find((item) => item.id === "alerts")?.state, "done");
   assert.equal(items.find((item) => item.id === "listing-pipeline")?.state, "done");

@@ -46,11 +46,11 @@ export async function GET() {
     {
       id: "poketrace",
       label: "PokeTrace",
-      role: "EU-first secondary cross-check",
+      role: "EU-first RAW cross-check",
       status: pokeTrace.live ? "ready" : "missing",
       required: false,
       setupHint: pokeTrace.live
-        ? "EU/Cardmarket and US PokeTrace signals are available for raw-noise checks."
+        ? "PokeTrace is configured for RAW cross-checks. Graded coverage depends on account tier and source data."
         : "Add POKETRACE_API_KEY in Vercel for EU/Cardmarket and US cross-checks.",
     },
     {

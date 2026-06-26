@@ -144,7 +144,7 @@ function buildCrossCheckReadiness(input: LaunchReadinessInput): LaunchReadinessI
     return {
       id: "cross-check",
       title: "Second source",
-      detail: "Raw/graded comps have a live cross-check.",
+      detail: "RAW comps have a live cross-check; slabs still use Price Tracker, PSA context, owned sales or manual checks.",
       state: "done",
       priority: 90,
     };
