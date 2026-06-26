@@ -1,4 +1,5 @@
 import type { CardRef, Grade } from "../domain/types.js";
+import { textMentionsFirstEdition } from "../comps/variants.js";
 
 export type ManualCompLinkKind = "EBAY_UK_SOLD" | "EBAY_ALL_SOLD" | "CARDMARKET" | "TCGPLAYER";
 
@@ -13,12 +14,15 @@ export interface ManualCompLink {
 export interface ManualCompLinkOptions {
   searchText?: string;
   condition?: string;
+  typedText?: string;
 }
 
 const RAW_EBAY_EXCLUSIONS = ["-PSA", "-BGS", "-CGC", "-ACE", "-SGC", "-graded"];
 
 export function buildManualCompLinks(card: CardRef, grade: Grade, options: ManualCompLinkOptions = {}): ManualCompLink[] {
-  const rawQuery = normalizeManualCompSearchText(options.searchText) || cardSearchQuery(card, { condition: options.condition });
+  const rawQuery =
+    normalizeManualCompSearchText(options.searchText) ||
+    buildManualCompFallbackQuery(card, { condition: options.condition, typedText: options.typedText });
   const ebayQuery = ebaySoldSearchQuery(rawQuery, grade);
 
   return [
@@ -57,6 +61,26 @@ export function cardSearchQuery(card: CardRef, options: { condition?: string } =
     .filter((part): part is string => Boolean(part));
   return [...coreParts, ...(coreParts.length > 0 && condition ? [condition] : [])]
     .join(" ");
+}
+
+export function buildManualCompFallbackQuery(
+  card: CardRef,
+  options: { condition?: string; typedText?: string } = {},
+): string {
+  const base = cardSearchQuery(card, { condition: options.condition });
+  const typed = normalizeManualCompSearchText(options.typedText);
+  const additions: string[] = [];
+
+  if (textMentionsFirstEdition(typed) && !textMentionsFirstEdition(base)) {
+    additions.push("1st Edition");
+  }
+
+  const typedCondition = rawConditionFromSearchText(typed);
+  if (typedCondition && !queryMentionsCondition(base, typedCondition)) {
+    additions.push(typedCondition);
+  }
+
+  return normalizeManualCompSearchText([base, ...additions].filter(Boolean).join(" "));
 }
 
 export function normalizeManualCompSearchText(input: string | undefined): string {
@@ -137,6 +161,26 @@ function appendMissingTerms(query: string, terms: string[]): string {
   const upper = query.toUpperCase();
   const missing = terms.filter((term) => !upper.includes(term.toUpperCase()));
   return [query, ...missing].join(" ").trim();
+}
+
+function rawConditionFromSearchText(text: string): string | null {
+  const normalized = text.toUpperCase().replace(/\s+/g, " ");
+  if (/\b(?:LIGHTLY\s+PLAYED|LIGHT\s+PLAY|LP)\b/.test(normalized)) return "LP";
+  if (/\b(?:MODERATELY\s+PLAYED|MP)\b/.test(normalized)) return "MP";
+  if (/\b(?:HEAVILY\s+PLAYED|HP)\b/.test(normalized)) return "HP";
+  if (/\b(?:DAMAGED|DMG)\b/.test(normalized)) return "DMG";
+  if (/\b(?:NEAR\s+MINT|NM)\b/.test(normalized)) return "NM";
+  return null;
+}
+
+function queryMentionsCondition(query: string, condition: string): boolean {
+  const normalized = query.toUpperCase().replace(/\s+/g, " ");
+  if (condition === "LP") return /\b(?:LIGHTLY\s+PLAYED|LIGHT\s+PLAY|LP)\b/.test(normalized);
+  if (condition === "MP") return /\b(?:MODERATELY\s+PLAYED|MP)\b/.test(normalized);
+  if (condition === "HP") return /\b(?:HEAVILY\s+PLAYED|HP)\b/.test(normalized);
+  if (condition === "DMG") return /\b(?:DAMAGED|DMG)\b/.test(normalized);
+  if (condition === "NM") return /\b(?:NEAR\s+MINT|NM)\b/.test(normalized);
+  return false;
 }
 
 function normalizeConditionForSearch(condition: string | undefined): string | undefined {

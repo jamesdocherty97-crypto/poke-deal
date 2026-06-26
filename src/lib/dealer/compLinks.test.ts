@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildManualCompLinks, cardSearchQuery, ebaySoldSearchQuery, normalizeManualCompSearchText } from "./compLinks.js";
+import {
+  buildManualCompFallbackQuery,
+  buildManualCompLinks,
+  cardSearchQuery,
+  ebaySoldSearchQuery,
+  normalizeManualCompSearchText,
+} from "./compLinks.js";
 
 const card = {
   name: "Gengar",
@@ -61,6 +67,29 @@ test("cardSearchQuery includes non-NM condition for manual fallbacks", () => {
   assert.equal(cardSearchQuery({ name: "Hitmontop", setName: "Neo Genesis" }, { condition: "LP" }), "Hitmontop Neo Genesis LP");
   assert.equal(cardSearchQuery({ name: "Hitmontop", setName: "Neo Genesis" }, { condition: "NM" }), "Hitmontop Neo Genesis");
   assert.equal(cardSearchQuery({ name: "", setName: "", number: "" }, { condition: "LP" }), "");
+});
+
+test("buildManualCompFallbackQuery preserves typed vintage qualifiers after catalog canonicalization", () => {
+  assert.equal(
+    buildManualCompFallbackQuery(
+      { name: "Hitmontop", setName: "Neo Genesis", number: "3/111" },
+      { typedText: "Neo Genesis 1st Ed Hitmontop LP raw £35" },
+    ),
+    "Hitmontop 3/111 Neo Genesis 1st Edition LP",
+  );
+});
+
+test("buildManualCompLinks uses typed fallback qualifiers when no manual search override is set", () => {
+  const links = buildManualCompLinks(
+    { name: "Hitmontop", setName: "Neo Genesis", number: "3/111" },
+    "RAW",
+    { typedText: "Neo Genesis 1st Ed Hitmontop LP raw £35" },
+  );
+
+  assert.equal(
+    new URL(links[0]!.url).searchParams.get("_nkw"),
+    "Hitmontop 3/111 Neo Genesis 1st Edition LP -PSA -BGS -CGC -ACE -SGC -graded",
+  );
 });
 
 test("normalizeManualCompSearchText strips buy-flow noise but keeps comp qualifiers", () => {

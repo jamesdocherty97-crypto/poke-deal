@@ -37,6 +37,7 @@ import { buildDealerCompVerdict, type DealerCompVerdict } from "@/lib/dealer/com
 import { judgeDeal } from "@/lib/dealer/dealJudge";
 import {
   buildManualCompLinks,
+  buildManualCompFallbackQuery,
   cardSearchQuery,
   normalizeManualCompSearchText,
   type ManualCompLinkKind,
@@ -1054,15 +1055,19 @@ export default function Home() {
     }),
     [catalogCard?.name, catalogCard?.number, catalogCard?.setName, name, number, setNameValue],
   );
-  const manualCompFallbackQuery = useMemo(
-    () => cardSearchQuery(manualCompCard, { condition }),
-    [condition, manualCompCard],
-  );
   const quickIntakeManualQuery = useMemo(() => normalizeManualCompSearchText(quickIntake), [quickIntake]);
+  const typedManualCompContext = useMemo(
+    () => [quickIntakeManualQuery, name, setNameValue, number].filter(Boolean).join(" "),
+    [name, number, quickIntakeManualQuery, setNameValue],
+  );
+  const manualCompFallbackQuery = useMemo(
+    () => buildManualCompFallbackQuery(manualCompCard, { condition, typedText: typedManualCompContext }),
+    [condition, manualCompCard, typedManualCompContext],
+  );
   const manualCompSearchText = manualCompQuery || quickIntakeManualQuery;
   const manualCompLinks = useMemo(
-    () => buildManualCompLinks(manualCompCard, grade, { searchText: manualCompSearchText, condition }),
-    [condition, grade, manualCompCard, manualCompSearchText],
+    () => buildManualCompLinks(manualCompCard, grade, { searchText: manualCompSearchText, condition, typedText: typedManualCompContext }),
+    [condition, grade, manualCompCard, manualCompSearchText, typedManualCompContext],
   );
   const compSpreadPct = useMemo(() => (compForReceipt ? medianSpreadPct(compForReceipt.all) : null), [compForReceipt]);
   const dealerVerdict = useMemo(
