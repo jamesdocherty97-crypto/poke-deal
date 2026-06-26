@@ -9,6 +9,14 @@ export interface SaleCostOptions {
   grade?: string | null;
 }
 
+export interface SalePriceBreakdown {
+  grossPence: number;
+  itemSubtotalPence: number;
+  postagePaidPence: number;
+  unitItemPence: number;
+  quantity: number;
+}
+
 const RAW_POSTAGE_PENCE = 175;
 const GRADED_POSTAGE_PENCE = 499;
 
@@ -64,6 +72,25 @@ export function saleItemSubtotalPence(
 ): number {
   const gross = Math.max(0, Math.round(grossSalePence));
   return Math.max(0, gross - buyerPaidPostagePence(channel, options.grade));
+}
+
+export function salePriceBreakdown(
+  channel: SaleChannel,
+  grossSalePence: number,
+  quantity: number,
+  options: SaleCostOptions = {},
+): SalePriceBreakdown {
+  const count = Math.max(1, Math.floor(quantity));
+  const grossPence = Math.max(0, Math.round(grossSalePence));
+  const postagePaidPence = Math.min(grossPence, buyerPaidPostagePence(channel, options.grade));
+  const itemSubtotalPence = saleItemSubtotalPence(channel, grossPence, options);
+  return {
+    grossPence,
+    itemSubtotalPence,
+    postagePaidPence,
+    unitItemPence: Math.round(itemSubtotalPence / count),
+    quantity: count,
+  };
 }
 
 export function rescaleGrossSaleForQuantity(

@@ -3916,6 +3916,43 @@ label {
   padding: 10px;
 }
 
+.sale-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  border: 1px solid rgba(42, 117, 187, 0.24);
+  border-radius: 8px;
+  background: rgba(42, 117, 187, 0.1);
+  padding: 8px;
+}
+
+.sale-breakdown div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.sale-breakdown span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.sale-breakdown strong {
+  overflow-wrap: anywhere;
+  color: #eaf4ff;
+  font-size: 16px;
+  line-height: 1.08;
+}
+
+.sale-breakdown small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
 .sale-preview div {
   display: grid;
   min-width: 0;

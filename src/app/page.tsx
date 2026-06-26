@@ -88,6 +88,7 @@ import {
   estimateSaleCosts,
   grossSalePriceForNetPence,
   rescaleGrossSaleForQuantity,
+  salePriceBreakdown,
   saleItemSubtotalPence,
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
@@ -844,6 +845,12 @@ export default function Home() {
       soldQuantity,
     });
   }, [fees, postage, salePrice, saleQuantity, sellingItem]);
+  const saleBreakdown = useMemo(() => {
+    if (!sellingItem) return null;
+    const soldQuantity = parseIntakeQuantity(saleQuantity) ?? 0;
+    if (soldQuantity <= 0) return null;
+    return salePriceBreakdown(saleChannel, poundsToPence(salePrice), soldQuantity, { grade: sellingItem.grade });
+  }, [saleChannel, salePrice, saleQuantity, sellingItem]);
   const apiHeadline = comp?.headline ?? null;
   const catalogCard = comp?.catalog ?? null;
   const checkedComp = useMemo<CompResult | null>(
@@ -6051,7 +6058,7 @@ export default function Home() {
           </div>
           <div className="form-grid">
             <label>
-              Gross received
+              Buyer paid total
               <MoneyInput value={salePrice} onChange={setSalePrice} />
             </label>
             <label>
@@ -6066,6 +6073,27 @@ export default function Home() {
               />
             </label>
           </div>
+          {saleBreakdown && (
+            <div className="sale-breakdown" aria-label="Sale price breakdown">
+              <div>
+                <span>Items</span>
+                <strong>{gbp(saleBreakdown.itemSubtotalPence)}</strong>
+                <small>
+                  {saleBreakdown.quantity} x {gbp(saleBreakdown.unitItemPence)}
+                </small>
+              </div>
+              <div>
+                <span>Buyer post</span>
+                <strong>{gbp(saleBreakdown.postagePaidPence)}</strong>
+                <small>{saleBreakdown.postagePaidPence > 0 ? "included above" : "none in total"}</small>
+              </div>
+              <div>
+                <span>Total</span>
+                <strong>{gbp(saleBreakdown.grossPence)}</strong>
+                <small>what buyer paid</small>
+              </div>
+            </div>
+          )}
           <div className="form-grid">
             <label>
               Sold
