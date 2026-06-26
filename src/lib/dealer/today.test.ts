@@ -13,11 +13,13 @@ test("buildTodayActions starts a new seller with opening stock, first buy and bu
     activeWatches: 0,
     agedStockCount: 0,
     unlistedStockCount: 0,
+    operatingExpensePence: 0,
   });
 
-  assert.deepEqual(actions.map((action) => action.id), ["opening-stock", "first-buy", "buy-target"]);
+  assert.deepEqual(actions.map((action) => action.id), ["opening-stock", "first-buy", "log-first-cost", "buy-target"]);
   assert.equal(actions[0]?.target, "opening-stock");
   assert.equal(actions[1]?.target, "buy");
+  assert.equal(actions[2]?.target, "profit");
 });
 
 test("buildTodayActions prioritizes drafts and unlisted stock for an operating seller", () => {
@@ -30,6 +32,7 @@ test("buildTodayActions prioritizes drafts and unlisted stock for an operating s
     activeWatches: 1,
     agedStockCount: 2,
     unlistedStockCount: 1,
+    operatingExpensePence: 1000,
   });
 
   assert.deepEqual(actions.map((action) => action.id), [
@@ -54,6 +57,7 @@ test("buildTodayActions caps noisy queues without dropping the highest priority 
       activeWatches: 0,
       agedStockCount: 1,
       unlistedStockCount: 1,
+      operatingExpensePence: 0,
     },
     3,
   );
@@ -71,6 +75,7 @@ test("buildTodayActions does not offer repricing until a listing is active", () 
     activeWatches: 1,
     agedStockCount: 0,
     unlistedStockCount: 0,
+    operatingExpensePence: 500,
   });
 
   assert.equal(actions.some((action) => action.id === "reprice"), false);
@@ -87,6 +92,7 @@ test("buildTodayActions sends first-sale work to active listings when possible",
     activeWatches: 1,
     agedStockCount: 0,
     unlistedStockCount: 0,
+    operatingExpensePence: 500,
   });
 
   const firstSale = actions.find((action) => action.id === "first-sale");
@@ -104,6 +110,7 @@ test("buildTodayActions keeps booking active sales visible after first sale", ()
     activeWatches: 1,
     agedStockCount: 0,
     unlistedStockCount: 0,
+    operatingExpensePence: 500,
   });
 
   const activeSales = actions.find((action) => action.id === "active-sales");
@@ -122,9 +129,28 @@ test("buildTodayActions keeps fast comping available after setup", () => {
     activeWatches: 1,
     agedStockCount: 0,
     unlistedStockCount: 0,
+    operatingExpensePence: 500,
   });
 
   const nextBuy = actions.find((action) => action.id === "comp-next-buy");
   assert.equal(nextBuy?.target, "buy");
   assert.match(nextBuy?.detail ?? "", /Fast lookup/);
+});
+
+test("buildTodayActions keeps setup costs visible until the first cost is logged", () => {
+  const actions = buildTodayActions({
+    stockCount: 3,
+    activeStockCount: 3,
+    soldCount: 0,
+    draftListings: 0,
+    activeListings: 0,
+    activeWatches: 1,
+    agedStockCount: 0,
+    unlistedStockCount: 0,
+    operatingExpensePence: 0,
+  });
+
+  const costAction = actions.find((action) => action.id === "log-first-cost");
+  assert.equal(costAction?.target, "profit");
+  assert.equal(costAction?.title, "Log first cost");
 });

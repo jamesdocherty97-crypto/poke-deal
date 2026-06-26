@@ -11,6 +11,7 @@ export interface TodayActionInput {
   activeWatches: number;
   agedStockCount: number;
   unlistedStockCount: number;
+  operatingExpensePence: number;
 }
 
 export interface TodayAction {
@@ -119,6 +120,17 @@ export function buildTodayActions(input: TodayActionInput, limit = 5): TodayActi
       target: "buy",
       tone: "info",
       priority: 62,
+    });
+  }
+
+  if (input.operatingExpensePence === 0) {
+    actions.push({
+      id: "log-first-cost",
+      title: "Log first cost",
+      detail: "Sleeves, postage or table fee",
+      target: "profit",
+      tone: "info",
+      priority: input.stockCount === 0 ? 56 : 58,
     });
   }
 
