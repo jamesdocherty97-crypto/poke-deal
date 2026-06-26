@@ -33,10 +33,14 @@ test("grade label normalization", () => {
   assert.equal(normalizeGradeLabel(""), "RAW");
   assert.equal(normalizeGradeLabel("Ungraded"), "RAW");
   assert.equal(normalizeGradeLabel("PSA 10"), "PSA_10");
+  assert.equal(normalizeGradeLabel("PSA_10"), "PSA_10");
+  assert.equal(normalizeGradeLabel("psa-10"), "PSA_10");
   assert.equal(normalizeGradeLabel("psa10"), "PSA_10");
   assert.equal(normalizeGradeLabel("BGS 9.5"), "BGS_9_5");
+  assert.equal(normalizeGradeLabel("BGS_9_5"), "BGS_9_5");
   assert.equal(normalizeGradeLabel("CGC 10"), "CGC_10");
   assert.equal(normalizeGradeLabel("ACE 10"), "ACE_10");
+  assert.equal(normalizeGradeLabel("ACE_10"), "ACE_10");
   assert.equal(normalizeGradeLabel("ace9"), "ACE_9");
   assert.equal(normalizeGradeLabel("totally unknown"), null);
 });

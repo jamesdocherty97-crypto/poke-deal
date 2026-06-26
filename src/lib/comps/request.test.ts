@@ -68,6 +68,15 @@ test("readCompLookupRequest normalizes typed slab grades", () => {
   assert.equal("grade" in parsed ? parsed.grade : null, "ACE_10");
 });
 
+test("readCompLookupRequest preserves canonical URL grade values", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    name: "Umbreon VMAX",
+    grade: "PSA_10",
+  }));
+
+  assert.equal("grade" in parsed ? parsed.grade : null, "PSA_10");
+});
+
 test("readCompLookupRequest requires a card name", () => {
   assert.deepEqual(readCompLookupRequest(new URLSearchParams()), { error: "name is required" });
 });

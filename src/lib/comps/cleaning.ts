@@ -40,14 +40,15 @@ export function mean(values: number[]): number {
 /** Normalize a free-text grade label to a canonical Grade, or null if unrecognised. */
 export function normalizeGradeLabel(label: string | undefined): Grade | null {
   if (label == null) return "RAW";
-  const t = label.trim().toLowerCase();
+  const t = label.trim().toLowerCase().replace(/[_-]+/g, " ");
   if (t === "") return "RAW";
   if (/\b(raw|ungraded|not graded|nm|near mint|loose)\b/.test(t)) return "RAW";
 
-  const m = t.match(/\b(psa|bgs|cgc|ace)\s*\.?\s*(10|9\.5|9|8|7|6|5|4|3|2|1)\b/);
+  const m = t.match(/\b(psa|bgs|cgc|ace)\s*\.?\s*(10|9\s*\.?\s*5|9|8|7|6|5|4|3|2|1)\b/);
   if (m) {
     const company = m[1]!.toUpperCase();
-    const num = m[2]!.replace(".", "_");
+    const compactNum = m[2]!.replace(/\s+/g, "");
+    const num = compactNum === "95" ? "9_5" : compactNum.replace(".", "_");
     return `${company}_${num}` as Grade;
   }
   return null; // unrecognised — caller decides (we drop it)
