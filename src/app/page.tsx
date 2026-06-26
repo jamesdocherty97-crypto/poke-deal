@@ -611,6 +611,12 @@ export default function Home() {
   const [ebayStatus, setEbayStatus] = useState<EbayStatus | null>(null);
   const [ebayPreflight, setEbayPreflight] = useState<EbayPreflight | null>(null);
   const [ebayPublishTarget, setEbayPublishTarget] = useState<string | null>(null);
+  const [ebayLocationName, setEbayLocationName] = useState("Pokemon Dealer OS");
+  const [ebayLocationAddress1, setEbayLocationAddress1] = useState("");
+  const [ebayLocationAddress2, setEbayLocationAddress2] = useState("");
+  const [ebayLocationCity, setEbayLocationCity] = useState("");
+  const [ebayLocationPostcode, setEbayLocationPostcode] = useState("");
+  const [ebayLocationCountry, setEbayLocationCountry] = useState("GB");
   const [cardArtUrl, setCardArtUrl] = useState<string | null>(null);
   const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
   const [gradeOdds, setGradeOdds] = useState("45");
@@ -1326,8 +1332,12 @@ export default function Home() {
   );
   const ebayHasMerchantLocation = Boolean(ebayStatus?.hasMerchantLocation || ebayPolicies?.merchantLocationKey);
   const ebayNeedsMerchantLocation = Boolean(ebayStatus?.connected && ebayHasPolicies && !ebayHasMerchantLocation);
-  const ebayCanCreateMerchantLocation = Boolean(ebayNeedsMerchantLocation && ebayStatus?.locationSetup?.configured);
-  const ebayLocationMissingFields = ebayStatus?.locationSetup?.missingFields?.join(", ") ?? "";
+  const ebayLocationFormReady = Boolean(
+    ebayLocationAddress1.trim() &&
+      ebayLocationCity.trim() &&
+      ebayLocationPostcode.trim() &&
+      ebayLocationCountry.trim().length === 2,
+  );
   const ebayNeedsReconnect = Boolean(
     ebayStatus?.configured &&
       !ebayStatus.connected &&
@@ -3495,12 +3505,24 @@ export default function Home() {
     }
   }
 
-  async function createEbaySellerLocation() {
+  async function createEbaySellerLocation(event?: FormEvent) {
+    event?.preventDefault();
     setBusy("ebay-location");
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch("/api/ebay/location", { method: "POST" });
+      const res = await fetch("/api/ebay/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: ebayLocationName,
+          addressLine1: ebayLocationAddress1,
+          addressLine2: ebayLocationAddress2,
+          city: ebayLocationCity,
+          postalCode: ebayLocationPostcode,
+          country: ebayLocationCountry,
+        }),
+      });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "eBay seller location setup failed");
       setNotice(payload.message ?? "eBay seller location is ready.");
@@ -5873,15 +5895,50 @@ export default function Home() {
           {ebayNeedsMerchantLocation && listings.some((l) => l.channel === "EBAY") && (
             <div className="ebay-setup-banner">
               <span>
-                eBay is connected and policies are ready. Seller location is still missing, so offer creation may fail until this is fixed.
+                eBay is connected and policies are ready. Add your dispatch location once, then offer creation can run from listing packs.
               </span>
-              {ebayCanCreateMerchantLocation ? (
-                <button type="button" onClick={() => void createEbaySellerLocation()} disabled={busy === "ebay-location"}>
+              <form className="ebay-location-form" onSubmit={(event) => void createEbaySellerLocation(event)}>
+                <input
+                  value={ebayLocationName}
+                  onChange={(event) => setEbayLocationName(event.target.value)}
+                  placeholder="Location name"
+                  autoComplete="organization"
+                />
+                <input
+                  value={ebayLocationAddress1}
+                  onChange={(event) => setEbayLocationAddress1(event.target.value)}
+                  placeholder="Address line 1"
+                  autoComplete="address-line1"
+                />
+                <input
+                  value={ebayLocationAddress2}
+                  onChange={(event) => setEbayLocationAddress2(event.target.value)}
+                  placeholder="Address line 2"
+                  autoComplete="address-line2"
+                />
+                <input
+                  value={ebayLocationCity}
+                  onChange={(event) => setEbayLocationCity(event.target.value)}
+                  placeholder="City"
+                  autoComplete="address-level2"
+                />
+                <input
+                  value={ebayLocationPostcode}
+                  onChange={(event) => setEbayLocationPostcode(event.target.value)}
+                  placeholder="Postcode"
+                  autoComplete="postal-code"
+                />
+                <input
+                  value={ebayLocationCountry}
+                  onChange={(event) => setEbayLocationCountry(event.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="GB"
+                  autoComplete="country"
+                  inputMode="text"
+                />
+                <button type="submit" disabled={busy === "ebay-location" || !ebayLocationFormReady}>
                   {busy === "ebay-location" ? "Creating location..." : "Create seller location"}
                 </button>
-              ) : ebayLocationMissingFields ? (
-                <span className="ebay-setup-detail">Add env vars: {ebayLocationMissingFields}</span>
-              ) : null}
+              </form>
               <a href="https://www.ebay.co.uk/sh/landing" target="_blank" rel="noreferrer">
                 Open Seller Hub
               </a>

@@ -16,6 +16,7 @@ import {
   createInventoryLocation,
   missingEbayLocationSetupFields,
   readEbayLocationSetup,
+  readEbayLocationSetupInput,
 } from "./location.js";
 
 const TEST_CONFIG: EbayConfig = {
@@ -386,6 +387,61 @@ test("missingEbayLocationSetupFields reports required setup env vars", () => {
       EBAY_LOCATION_POSTAL_CODE: "M1 1AA",
     }),
     [],
+  );
+});
+
+test("readEbayLocationSetupInput normalizes app-submitted seller location details", () => {
+  const parsed = readEbayLocationSetupInput({
+    name: "  James cards  ",
+    merchantLocationKey: " Main stock room! ",
+    addressLine1: "  10 Test Street ",
+    addressLine2: " Flat 2 ",
+    city: " Manchester ",
+    postalCode: " m1 1aa ",
+    country: "",
+  });
+
+  assert.deepEqual(parsed, {
+    missingFields: [],
+    setup: {
+      merchantLocationKey: "main-stock-room",
+      name: "James cards",
+      address: {
+        addressLine1: "10 Test Street",
+        addressLine2: "Flat 2",
+        city: "Manchester",
+        postalCode: "M1 1AA",
+        country: "GB",
+      },
+    },
+  });
+});
+
+test("readEbayLocationSetupInput defaults merchant key and reports missing fields", () => {
+  assert.deepEqual(readEbayLocationSetupInput({ addressLine1: "", city: "", postalCode: "" }), {
+    setup: null,
+    missingFields: ["addressLine1", "city", "postalCode"],
+  });
+
+  const parsed = readEbayLocationSetupInput({
+    addressLine1: "10 Test Street",
+    city: "Manchester",
+    postalCode: "M1 1AA",
+    country: "GBR",
+  });
+
+  assert.deepEqual(parsed, {
+    setup: null,
+    missingFields: ["country"],
+  });
+
+  assert.equal(
+    readEbayLocationSetupInput({
+      addressLine1: "10 Test Street",
+      city: "Manchester",
+      postalCode: "M1 1AA",
+    }).setup?.merchantLocationKey,
+    "pdos-main",
   );
 });
 

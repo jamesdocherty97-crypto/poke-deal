@@ -29,6 +29,22 @@ export interface EbayLocationPayload {
   };
 }
 
+export interface EbayLocationSetupInput {
+  merchantLocationKey?: unknown;
+  name?: unknown;
+  addressLine1?: unknown;
+  addressLine2?: unknown;
+  city?: unknown;
+  stateOrProvince?: unknown;
+  postalCode?: unknown;
+  country?: unknown;
+}
+
+export interface EbayLocationSetupParseResult {
+  setup: EbayLocationSetup | null;
+  missingFields: string[];
+}
+
 const requiredLocationEnv = [
   "EBAY_MERCHANT_LOCATION_KEY",
   "EBAY_LOCATION_ADDRESS_LINE1",
@@ -59,6 +75,41 @@ export function readEbayLocationSetup(env: LocationEnv = process.env): EbayLocat
         : {}),
       postalCode: env.EBAY_LOCATION_POSTAL_CODE!.trim(),
       country: env.EBAY_LOCATION_COUNTRY?.trim() || "GB",
+    },
+  };
+}
+
+export function readEbayLocationSetupInput(input: EbayLocationSetupInput): EbayLocationSetupParseResult {
+  const addressLine1 = cleanLocationText(input.addressLine1);
+  const city = cleanLocationText(input.city);
+  const postalCode = cleanLocationText(input.postalCode).toUpperCase();
+  const country = cleanLocationText(input.country).toUpperCase() || "GB";
+  const missingFields: string[] = [];
+  if (!addressLine1) missingFields.push("addressLine1");
+  if (!city) missingFields.push("city");
+  if (!postalCode) missingFields.push("postalCode");
+
+  if (country.length !== 2) missingFields.push("country");
+  if (missingFields.length > 0) return { setup: null, missingFields };
+
+  const merchantLocationKey = normalizeMerchantLocationKey(input.merchantLocationKey) || "pdos-main";
+  const name = cleanLocationText(input.name) || "Pokemon Dealer OS";
+  const addressLine2 = cleanLocationText(input.addressLine2);
+  const stateOrProvince = cleanLocationText(input.stateOrProvince);
+
+  return {
+    missingFields: [],
+    setup: {
+      merchantLocationKey,
+      name,
+      address: {
+        addressLine1,
+        ...(addressLine2 ? { addressLine2 } : {}),
+        city,
+        ...(stateOrProvince ? { stateOrProvince } : {}),
+        postalCode,
+        country,
+      },
     },
   };
 }
@@ -105,4 +156,17 @@ export async function createInventoryLocation(
   }
 
   return { merchantLocationKey: setup.merchantLocationKey };
+}
+
+function cleanLocationText(value: unknown): string {
+  return typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+}
+
+function normalizeMerchantLocationKey(value: unknown): string {
+  const cleaned = cleanLocationText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 36);
+  return cleaned;
 }

@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { getEbayConfig, hasEbayRefreshToken, isEbayConfigured } from "@/lib/ebay/config";
-import { createInventoryLocation, missingEbayLocationSetupFields, readEbayLocationSetup } from "@/lib/ebay/location";
+import {
+  createInventoryLocation,
+  missingEbayLocationSetupFields,
+  readEbayLocationSetup,
+  readEbayLocationSetupInput,
+} from "@/lib/ebay/location";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { getAccessToken } from "@/lib/ebay/tokens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
   if (!isEbayConfigured()) {
     return NextResponse.json({ error: "eBay is not configured." }, { status: 503 });
   }
@@ -15,12 +20,17 @@ export async function POST() {
     return NextResponse.json({ error: "eBay account is not connected." }, { status: 409 });
   }
 
-  const missingFields = missingEbayLocationSetupFields();
-  const setup = readEbayLocationSetup();
+  const requestText = await request.text();
+  const requestBody = parseJsonBody(requestText);
+  const parsed = requestBody ? readEbayLocationSetupInput(requestBody) : null;
+  const missingFields = parsed?.missingFields.length ? parsed.missingFields : missingEbayLocationSetupFields();
+  const setup = parsed?.setup ?? readEbayLocationSetup();
   if (!setup) {
     return NextResponse.json(
       {
-        error: `Seller location env vars are missing: ${missingFields.join(", ")}.`,
+        error: requestBody
+          ? `Seller location details are missing: ${missingFields.join(", ")}.`
+          : `Seller location env vars are missing: ${missingFields.join(", ")}.`,
         missingFields,
       },
       { status: 400 },
@@ -45,5 +55,15 @@ export async function POST() {
       { error: err instanceof Error ? err.message : "eBay seller location setup failed" },
       { status: 500 },
     );
+  }
+}
+
+function parseJsonBody(value: string): Record<string, unknown> | null {
+  if (!value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
   }
 }
