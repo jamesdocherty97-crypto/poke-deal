@@ -1633,6 +1633,10 @@ export default function Home() {
 
   function openLaunchReadiness(target: LaunchReadinessTarget | undefined) {
     if (!target || target === "external") return;
+    if (target === "ebay-connect") {
+      window.location.href = "/api/ebay/connect";
+      return;
+    }
     if (target === "opening-stock") {
       openOpeningStockImport();
       return;

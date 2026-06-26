@@ -147,3 +147,29 @@ test("buildLaunchReadiness flags eBay policy setup after account connection", ()
   assert.equal(ebay?.state, "warn");
   assert.match(ebay?.detail ?? "", /payment, postage and return policies/);
 });
+
+test("buildLaunchReadiness makes disconnected eBay credentials actionable", () => {
+  const items = buildLaunchReadiness({
+    livePrimaryComps: true,
+    liveCatalogKey: true,
+    secondaryCrossCheck: true,
+    ebayConfigured: true,
+    ebayConnected: false,
+    ebayHasPolicies: false,
+    ebayHasMerchantLocation: false,
+    alertDelivery: false,
+    stockCount: 1,
+    draftListings: 0,
+    activeListings: 0,
+    soldCount: 0,
+    activeWatches: 0,
+    operatingExpensePence: 0,
+  });
+
+  const ebay = items.find((item) => item.id === "ebay-automation");
+
+  assert.equal(ebay?.state, "warn");
+  assert.equal(ebay?.action, "Connect");
+  assert.equal(ebay?.target, "ebay-connect");
+  assert.match(ebay?.detail ?? "", /Reconnect/);
+});

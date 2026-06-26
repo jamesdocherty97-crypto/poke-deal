@@ -1,5 +1,13 @@
 export type LaunchReadinessState = "done" | "next" | "warn";
-export type LaunchReadinessTarget = "buy" | "opening-stock" | "stock" | "listings" | "profit" | "watches" | "external";
+export type LaunchReadinessTarget =
+  | "buy"
+  | "opening-stock"
+  | "stock"
+  | "listings"
+  | "profit"
+  | "watches"
+  | "ebay-connect"
+  | "external";
 
 export interface LaunchReadinessInput {
   livePrimaryComps: boolean;
@@ -96,10 +104,10 @@ function buildEbayReadiness(input: LaunchReadinessInput): LaunchReadinessItem {
     return {
       id: "ebay-automation",
       title: "eBay automation",
-      detail: "Connect the seller account before pushing listing offers from the app.",
+      detail: "Reconnect the seller account before pushing listing offers from the app.",
       state: "warn",
-      action: "Setup",
-      target: "external",
+      action: "Connect",
+      target: "ebay-connect",
       priority: 86,
     };
   }
