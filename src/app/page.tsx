@@ -45,7 +45,12 @@ import { normalizeListingUrl } from "@/lib/dealer/listingUrl";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
-import { buildCheckedComp, checkedCompSourceLabel, type CheckedCompSource } from "@/lib/dealer/checkedComp";
+import {
+  buildCheckedComp,
+  checkedCompSourceLabel,
+  parseCheckedCompPriceText,
+  type CheckedCompSource,
+} from "@/lib/dealer/checkedComp";
 import {
   buildListingPack,
   listingPackCopyFields,
@@ -3298,6 +3303,24 @@ export default function Home() {
     setError(null);
   }
 
+  async function pasteCheckedCompPrice() {
+    let clipboardText = "";
+    try {
+      clipboardText = await navigator.clipboard.readText();
+    } catch {
+      setError("Clipboard read failed. Copy the sold price, then tap Paste price.");
+      return;
+    }
+
+    const pricePence = parseCheckedCompPriceText(clipboardText);
+    if (!pricePence) {
+      setError("Clipboard does not contain a clear sold price.");
+      return;
+    }
+
+    applyCheckedCompPrice(pricePence);
+  }
+
   function jumpToCheckedComp() {
     checkedCompRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -3353,6 +3376,8 @@ export default function Home() {
   }
 
   function renderCheckedCompCard(variant: "full" | "priority" = "full") {
+    const canOpenUkSolds = manualCompLinks.some((link) => link.kind === "EBAY_UK_SOLD" && link.query.trim());
+
     return (
       <div
         className={`checked-comp-card ${checkedComp ? "active" : ""} ${variant}`}
@@ -3387,6 +3412,14 @@ export default function Home() {
               ))}
             </select>
           </label>
+        </div>
+        <div className="checked-comp-quick-actions">
+          <button type="button" onClick={() => void pasteCheckedCompPrice()}>
+            Paste price
+          </button>
+          <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")} disabled={!canOpenUkSolds}>
+            Open UK solds
+          </button>
         </div>
         {checkedCompPriceOptions.length > 0 && (
           <div className="checked-comp-price-presets" aria-label="Checked comp price shortcuts">

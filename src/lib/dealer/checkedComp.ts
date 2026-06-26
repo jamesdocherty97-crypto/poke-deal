@@ -52,7 +52,33 @@ export function checkedCompSourceLabel(source: CheckedCompSource | string | unde
   return "Checked comp";
 }
 
+export function parseCheckedCompPriceText(text: string | undefined): number | null {
+  const normalized = text?.trim().replace(/\s+/g, " ");
+  if (!normalized) return null;
+
+  const currencyMatch =
+    normalized.match(/(?:£|GBP\s*)\s*([0-9][0-9,]*(?:[.][0-9]{1,2})?|[0-9]+(?:,[0-9]{1,2}))/i) ??
+    normalized.match(/([0-9][0-9,]*(?:[.][0-9]{1,2})?|[0-9]+(?:,[0-9]{1,2}))\s*(?:GBP|pounds?)/i);
+  if (currencyMatch?.[1]) return moneyTextToPence(currencyMatch[1]);
+
+  const plainMatch = normalized.match(/^([0-9][0-9,]*(?:[.][0-9]{1,2})?|[0-9]+(?:,[0-9]{1,2}))$/);
+  return plainMatch?.[1] ? moneyTextToPence(plainMatch[1]) : null;
+}
+
 function positiveInt(value: number | undefined, fallback: number): number {
   const rounded = Math.round(Number(value));
   return Number.isFinite(rounded) && rounded > 0 ? rounded : fallback;
+}
+
+function moneyTextToPence(text: string): number | null {
+  const compact = text.trim();
+  const decimal =
+    compact.includes(".")
+      ? compact.replace(/,/g, "")
+      : compact.includes(",") && /,\d{1,2}$/.test(compact)
+        ? compact.replace(",", ".")
+        : compact.replace(/,/g, "");
+  const amount = Number(decimal);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return Math.round(amount * 100);
 }

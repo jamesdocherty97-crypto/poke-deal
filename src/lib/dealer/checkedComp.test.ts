@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildCheckedComp, checkedCompSourceLabel } from "./checkedComp.js";
+import { buildCheckedComp, checkedCompSourceLabel, parseCheckedCompPriceText } from "./checkedComp.js";
 
 const card = {
   name: "Gengar",
@@ -67,4 +67,19 @@ test("checkedCompSourceLabel uses dealer-facing source names", () => {
   assert.equal(checkedCompSourceLabel("EBAY_SOLD"), "eBay sold");
   assert.equal(checkedCompSourceLabel("TCGPLAYER"), "TCGPlayer");
   assert.equal(checkedCompSourceLabel("OTHER"), "Checked comp");
+});
+
+test("parseCheckedCompPriceText reads copied marketplace prices", () => {
+  assert.equal(parseCheckedCompPriceText("£24.00"), 2400);
+  assert.equal(parseCheckedCompPriceText("Sold for GBP 18.50"), 1850);
+  assert.equal(parseCheckedCompPriceText("21.99 pounds"), 2199);
+  assert.equal(parseCheckedCompPriceText("12,50 GBP"), 1250);
+});
+
+test("parseCheckedCompPriceText only accepts plain numbers when the clipboard is just a price", () => {
+  assert.equal(parseCheckedCompPriceText("27"), 2700);
+  assert.equal(parseCheckedCompPriceText("27.50"), 2750);
+  assert.equal(parseCheckedCompPriceText("Gengar TG06 27.50"), null);
+  assert.equal(parseCheckedCompPriceText("199/165"), null);
+  assert.equal(parseCheckedCompPriceText(""), null);
 });
