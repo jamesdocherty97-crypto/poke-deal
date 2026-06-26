@@ -168,6 +168,59 @@ test("PokeTrace rejects wrong-set cards for unavailable promo sets", () => {
   assert.match((comp.raw as { reason?: string }).reason ?? "", /card match/);
 });
 
+test("PokeTrace rejects generic cards for first-edition requests", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Charizard",
+          cardNumber: "4/102",
+          set: { name: "Base" },
+          market: "EU",
+          currency: "EUR",
+          prices: { cardmarket: { NEAR_MINT: { avg: 500, saleCount: 20 } } },
+        },
+      ],
+    },
+    {
+      source: "poketrace",
+      card: { name: "Charizard 1st Edition", setName: "Base", number: "4/102" },
+      grade: "RAW",
+      windowDays: 90,
+    },
+  );
+
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.medianPence, 0);
+  assert.match((comp.raw as { reason?: string }).reason ?? "", /card match/);
+});
+
+test("PokeTrace allows explicitly labelled first-edition provider matches", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Charizard 1st Edition",
+          cardNumber: "4/102",
+          set: { name: "Base" },
+          market: "EU",
+          currency: "EUR",
+          prices: { cardmarket: { NEAR_MINT: { avg: 500, saleCount: 20 } } },
+        },
+      ],
+    },
+    {
+      source: "poketrace",
+      card: { name: "Charizard 1st Edition", setName: "Base", number: "4/102" },
+      grade: "RAW",
+      windowDays: 90,
+    },
+  );
+
+  assert.equal(comp.sampleSize, 20);
+  assert.equal(comp.medianPence, eurToPence(500));
+});
+
 test("PokeTraceSource tries EU first, then falls back to US", async () => {
   const requestedMarkets: string[] = [];
   const fetchImpl = (async (url: string | URL | Request) => {

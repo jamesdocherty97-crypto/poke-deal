@@ -4,6 +4,7 @@ import { tokenizeSearchText, tokenMatches } from "../../catalog/fuzzy.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
+import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
 
 const BASE_URL = "https://api.poketrace.com/v1";
 const DEFAULT_FETCH_TIMEOUT_MS = 2200;
@@ -286,6 +287,8 @@ function pokeTraceCardMatchesRequest(card: PokeTraceCard, request: CardRef): boo
   const providerName = readString(card.name) ?? "";
   if (!tokensMatch(request.name, providerName)) return false;
 
+  if (requestsFirstEdition(request) && !pokeTraceProviderMentionsFirstEdition(card)) return false;
+
   const requestedNumber = request.number?.trim();
   const providerNumber = readString(card.cardNumber) ?? undefined;
   if (requestedNumber && providerNumber && !collectorNumberMatches(providerNumber, requestedNumber)) return false;
@@ -294,6 +297,10 @@ function pokeTraceCardMatchesRequest(card: PokeTraceCard, request: CardRef): boo
   if (request.setName && !setMatchesRequest(providerSet, request.setName)) return false;
 
   return true;
+}
+
+function pokeTraceProviderMentionsFirstEdition(card: PokeTraceCard): boolean {
+  return [card.name, card.set?.name].some((value) => textMentionsFirstEdition(readString(value)));
 }
 
 function setMatchesRequest(providerSet: string, requestedSet: string): boolean {
