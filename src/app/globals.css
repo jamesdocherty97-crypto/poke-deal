@@ -1469,8 +1469,9 @@ label {
 
 .launch-plan-row button,
 .readiness-row button {
-  min-height: 34px;
-  padding: 6px 9px;
+  min-width: 48px;
+  min-height: 40px;
+  padding: 8px 10px;
   color: #cfe6ff;
   font-size: 11px;
   font-weight: 900;
@@ -1537,8 +1538,9 @@ label {
 }
 
 .setup-step button {
-  min-height: 34px;
-  padding: 6px 9px;
+  min-width: 48px;
+  min-height: 40px;
+  padding: 8px 10px;
   color: #cfe6ff;
   font-size: 11px;
   font-weight: 900;
