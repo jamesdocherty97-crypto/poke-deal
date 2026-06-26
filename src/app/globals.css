@@ -4004,6 +4004,16 @@ label {
   font-weight: 950;
 }
 
+.sale-submit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.sale-submit-row:has(.secondary-action) {
+  grid-template-columns: minmax(0, 1.1fr) minmax(112px, 0.9fr);
+}
+
 .price-preview {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 68px;

@@ -804,6 +804,11 @@ export default function Home() {
     const nextId = nextSaleListingId(listings, null);
     return nextId ? listings.find((listing) => listing.id === nextId) ?? null : null;
   }, [listings]);
+  const nextSaleAfterCurrentTarget = useMemo(() => {
+    if (!sellingListingId) return null;
+    const nextId = nextSaleListingId(listings, sellingListingId);
+    return nextId ? listings.find((listing) => listing.id === nextId) ?? null : null;
+  }, [listings, sellingListingId]);
   const nextListingPackTarget = useMemo(() => {
     const nextId = nextDraftListingId(visibleListings, listingPackId);
     return nextId ? visibleListings.find((listing) => listing.id === nextId) ?? null : null;
@@ -2763,6 +2768,8 @@ export default function Home() {
   async function markSold(event: FormEvent) {
     event.preventDefault();
     if (!sellingId) return;
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const continueSelling = submitter?.value === "next";
     const item = sellingItem;
     const soldQuantity = parseIntakeQuantity(saleQuantity);
     if (!item || !soldQuantity) {
@@ -2776,6 +2783,7 @@ export default function Home() {
     setBusy(`sell-${sellingId}`);
     setError(null);
     setNotice(null);
+    const nextSaleListing = continueSelling ? nextSaleAfterCurrentTarget : null;
     try {
       const res = await fetch(`/api/inventory/${sellingId}/sell`, {
         method: "POST",
@@ -2792,11 +2800,20 @@ export default function Home() {
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "mark sold failed");
-      setNotice(`${soldQuantity > 1 ? `${soldQuantity} copies sold` : "Sold"}. Profit ${gbp(payload.profitPence)}.`);
+      const saleNotice = `${soldQuantity > 1 ? `${soldQuantity} copies sold` : "Sold"}. Profit ${gbp(payload.profitPence)}.`;
       setSellingId(null);
       setSellingListingId(null);
       await refreshAll();
-      setView("pnl");
+      if (nextSaleListing?.item) {
+        setNotice(`${saleNotice} Next sale loaded.`);
+        setListingStateFilter("ACTIVE");
+        setListingSort("newest");
+        setView("listings");
+        openSell(nextSaleListing.item, nextSaleListing);
+      } else {
+        setNotice(saleNotice);
+        setView("pnl");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "mark sold failed");
     } finally {
@@ -6209,9 +6226,16 @@ export default function Home() {
               </div>
             </div>
           )}
-          <button className="primary-action" type="submit" disabled={busy === `sell-${sellingId}`}>
-            {busy === `sell-${sellingId}` ? "Saving..." : "Create sale"}
-          </button>
+          <div className="sale-submit-row">
+            <button className="primary-action" type="submit" value="done" disabled={busy === `sell-${sellingId}`}>
+              {busy === `sell-${sellingId}` ? "Saving..." : "Create sale"}
+            </button>
+            {nextSaleAfterCurrentTarget && (
+              <button className="secondary-action" type="submit" value="next" disabled={busy === `sell-${sellingId}`}>
+                Save + next
+              </button>
+            )}
+          </div>
         </form>
       )}
 
