@@ -60,10 +60,10 @@ export function serializeRecentComps(entries: readonly RecentCompEntry[]): strin
 
 export function recentCompKey(entry: Pick<RecentCompEntry, "name" | "setName" | "number" | "grade">): string {
   return [
-    entry.name.trim().toLowerCase(),
-    entry.setName.trim().toLowerCase(),
-    (entry.number ?? "").trim().toLowerCase(),
-    entry.grade.trim().toLowerCase(),
+    normalizeRecentCompKeyText(entry.name),
+    normalizeRecentCompKeyText(entry.setName),
+    normalizeRecentCompKeyText(entry.number ?? ""),
+    normalizeRecentCompKeyText(entry.grade),
   ].join("|");
 }
 
@@ -126,6 +126,15 @@ function normalizeRecentComp(value: unknown): RecentCompEntry | null {
 
 function cleanText(value: unknown): string {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+}
+
+function normalizeRecentCompKeyText(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\b1st\s*ed\.?\b/g, "1st edition")
+    .replace(/\bfirst\s*edition\b/g, "1st edition")
+    .replace(/\s+/g, " ");
 }
 
 function cleanPence(value: unknown): number {

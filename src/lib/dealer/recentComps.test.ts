@@ -57,6 +57,29 @@ test("pinRecentComp promotes duplicate cards and keeps previous artwork", () => 
   assert.equal(second[0]?.setMarkUrl, baseComp.setMarkUrl);
 });
 
+test("pinRecentComp treats first-edition shorthand as the same recent card", () => {
+  const firstEditionComp: RecentCompEntry = {
+    ...baseComp,
+    name: "1st Edition Hitmontop",
+    setName: "Neo Genesis",
+    number: "",
+    pricePence: 0,
+    lowPence: 0,
+    highPence: 0,
+    sampleSize: 0,
+  };
+
+  const first = pinRecentComp([], firstEditionComp);
+  const second = pinRecentComp(first, {
+    ...firstEditionComp,
+    name: "1st Ed Hitmontop",
+    lookedUpAt: "2026-06-24T11:00:00.000Z",
+  });
+
+  assert.equal(second.length, 1);
+  assert.equal(second[0]?.name, "1st Ed Hitmontop");
+});
+
 test("pinRecentComp caps the recent list", () => {
   const entries = Array.from({ length: MAX_RECENT_COMPS + 2 }, (_, index) => ({
     ...baseComp,
@@ -81,6 +104,18 @@ test("parseRecentComps normalizes, dedupes and ignores malformed rows", () => {
   assert.equal(parsed.length, 1);
   assert.equal(parsed[0]?.pricePence, baseComp.pricePence);
   assert.deepEqual(parseRecentComps("nope"), []);
+});
+
+test("parseRecentComps dedupes stored first-edition spelling variants", () => {
+  const parsed = parseRecentComps(
+    JSON.stringify([
+      { ...baseComp, name: "1st Ed Hitmontop", setName: "Neo Genesis", number: "" },
+      { ...baseComp, name: "First Edition Hitmontop", setName: "Neo Genesis", number: "", pricePence: 999 },
+    ]),
+  );
+
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0]?.name, "1st Ed Hitmontop");
 });
 
 test("removeRecentComp removes by card and grade identity", () => {
