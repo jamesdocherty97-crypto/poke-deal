@@ -4015,6 +4015,47 @@ label {
   font-weight: 900;
 }
 
+.split-cost-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 98px;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(42, 117, 187, 0.28);
+  border-radius: 8px;
+  background: rgba(42, 117, 187, 0.1);
+  padding: 9px;
+}
+
+.split-cost-card div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.split-cost-card span,
+.split-cost-card small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.split-cost-card strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.split-cost-card button {
+  min-height: 36px;
+  padding: 6px 8px;
+  border-color: rgba(42, 117, 187, 0.4);
+  background: rgba(42, 117, 187, 0.18);
+  color: #d9ecff;
+  font-size: 12px;
+  font-weight: 950;
+}
+
 .buy-plan {
   display: grid;
   grid-template-columns: 1.35fr 1fr 1fr;
@@ -4297,6 +4338,7 @@ label {
   .form-grid,
   .deal-banner,
   .quick-stock-grid,
+  .split-cost-card,
   .buy-plan,
   .sale-preview,
   .listing-economics,

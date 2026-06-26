@@ -46,6 +46,7 @@ import { normalizeListingUrl } from "@/lib/dealer/listingUrl";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, type LaunchPlanItem, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
+import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
 import {
   buildCheckedComp,
   checkedCompSourceLabel,
@@ -1074,6 +1075,13 @@ export default function Home() {
   const quickStockListPence = listPriceOverride.trim()
     ? poundsToPence(listPriceOverride)
     : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
+  const totalCostSplit = useMemo(
+    () =>
+      quickStockQuantity > 1 && quickStockCostPence > 0
+        ? splitTotalCostToUnitPence(quickStockCostPence, quickStockQuantity)
+        : null,
+    [quickStockCostPence, quickStockQuantity],
+  );
   const quickStockReady = Boolean(headline && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
   const quickStockCanSubmit = quickStockReady && !requiresCheckedCompBeforeStock;
   const acquireButtonLabel = busy === "acquire"
@@ -3447,6 +3455,19 @@ export default function Home() {
     setError(null);
   }
 
+  function applyTotalCostSplit() {
+    if (!totalCostSplit) return;
+    setCost(penceToPounds(totalCostSplit.unitCostPence));
+    setNotice(
+      `Split total into ${gbp(totalCostSplit.unitCostPence)} each${
+        totalCostSplit.roundingDeltaPence
+          ? ` (${totalCostSplit.roundingDeltaPence > 0 ? "+" : ""}${gbp(totalCostSplit.roundingDeltaPence)} rounding)`
+          : ""
+      }.`,
+    );
+    setError(null);
+  }
+
   function applyCheckedCompPrice(valuePence: number) {
     setCheckedCompPrice(penceToPounds(valuePence));
     setCheckedCompSample((current) => (Number(current) > 0 ? current : "1"));
@@ -4429,6 +4450,25 @@ export default function Home() {
                       tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
                     />
                   </div>
+                  {totalCostSplit && (
+                    <div className="split-cost-card">
+                      <div>
+                        <span>Total paid</span>
+                        <strong>
+                          {gbp(quickStockCostPence)} / {quickStockQuantity}
+                        </strong>
+                        <small>
+                          Ledger cost {gbp(totalCostSplit.unitCostPence)} each
+                          {totalCostSplit.roundingDeltaPence
+                            ? ` · ${totalCostSplit.roundingDeltaPence > 0 ? "+" : ""}${gbp(totalCostSplit.roundingDeltaPence)} rounding`
+                            : ""}
+                        </small>
+                      </div>
+                      <button type="button" onClick={applyTotalCostSplit}>
+                        Split total
+                      </button>
+                    </div>
+                  )}
                   {quickOfferOptions.length > 0 && (
                     <div className="quick-offer-presets" aria-label="Quick cost presets">
                       {quickOfferOptions.map((option) => (
@@ -4714,6 +4754,25 @@ export default function Home() {
                 />
               </label>
             </div>
+            {totalCostSplit && (
+              <div className="split-cost-card">
+                <div>
+                  <span>Total paid</span>
+                  <strong>
+                    {gbp(quickStockCostPence)} / {quickStockQuantity}
+                  </strong>
+                  <small>
+                    Ledger cost {gbp(totalCostSplit.unitCostPence)} each
+                    {totalCostSplit.roundingDeltaPence
+                      ? ` · ${totalCostSplit.roundingDeltaPence > 0 ? "+" : ""}${gbp(totalCostSplit.roundingDeltaPence)} rounding`
+                      : ""}
+                  </small>
+                </div>
+                <button type="button" onClick={applyTotalCostSplit}>
+                  Split total
+                </button>
+              </div>
+            )}
             <div className="form-grid">
               <label>
                 Strategy
