@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  acceptedOfferItemSubtotalPence,
   breakEvenSalePricePence,
   buyerPaidPostagePence,
   defaultGrossSalePence,
@@ -75,6 +76,13 @@ test("discountedItemSubtotalPence handles accepted-offer shortcuts", () => {
   assert.equal(discountedItemSubtotalPence(5000, 100), 4900);
   assert.equal(discountedItemSubtotalPence(5000, 500, 2), 9000);
   assert.equal(discountedItemSubtotalPence(300, 500), 0);
+});
+
+test("acceptedOfferItemSubtotalPence handles percentage offers", () => {
+  assert.equal(acceptedOfferItemSubtotalPence(5000, 0.9), 4500);
+  assert.equal(acceptedOfferItemSubtotalPence(999, 0.85, 2), 1698);
+  assert.equal(acceptedOfferItemSubtotalPence(5000, 1.2), 5000);
+  assert.equal(acceptedOfferItemSubtotalPence(5000, -1), 0);
 });
 
 test("saleNetPence nets fees and postage from the booked sale price", () => {

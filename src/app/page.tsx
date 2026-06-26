@@ -81,6 +81,7 @@ import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } fr
 import { buildSalePreview } from "@/lib/dealer/unitSale";
 import { checkEbayReadiness } from "@/lib/ebay/readiness";
 import {
+  acceptedOfferItemSubtotalPence,
   buyerPaidPostagePence,
   breakEvenSalePricePence,
   defaultGrossSalePence,
@@ -2649,7 +2650,9 @@ export default function Home() {
 
   function applySalePriceMultiplier(multiplier: number) {
     if (!sellingItem) return;
-    applySaleItemSubtotal(Math.round(saleUnitReferencePence() * multiplier) * saleQuantityForShortcuts());
+    applySaleItemSubtotal(
+      acceptedOfferItemSubtotalPence(saleUnitReferencePence(), multiplier, saleQuantityForShortcuts()),
+    );
   }
 
   function applySalePriceDiscount(discountPence: number) {
@@ -6137,10 +6140,16 @@ export default function Home() {
               -£5
             </button>
             <button type="button" onClick={() => applySalePriceMultiplier(0.95)} disabled={!sellingItem}>
-              95%
+              Offer 95%
             </button>
             <button type="button" onClick={() => applySalePriceMultiplier(0.9)} disabled={!sellingItem}>
-              90%
+              Offer 90%
+            </button>
+            <button type="button" onClick={() => applySalePriceMultiplier(0.85)} disabled={!sellingItem}>
+              Offer 85%
+            </button>
+            <button type="button" onClick={() => applySalePriceMultiplier(0.8)} disabled={!sellingItem}>
+              Offer 80%
             </button>
             <button type="button" onClick={useBreakEvenSalePrice} disabled={!sellingItem}>
               Break even

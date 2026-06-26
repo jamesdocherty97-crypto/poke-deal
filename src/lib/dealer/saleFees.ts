@@ -118,6 +118,17 @@ export function discountedItemSubtotalPence(
   return Math.max(0, unitPrice - discount) * count;
 }
 
+export function acceptedOfferItemSubtotalPence(
+  unitItemPricePence: number,
+  offerPct: number,
+  quantity = 1,
+): number {
+  const unitPrice = Math.max(0, Math.round(unitItemPricePence));
+  const pct = Math.max(0, Math.min(1, offerPct));
+  const count = Math.max(1, Math.floor(quantity));
+  return Math.round(unitPrice * pct) * count;
+}
+
 export function saleNetPence({
   salePricePence,
   feesPence,
