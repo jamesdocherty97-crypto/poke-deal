@@ -164,7 +164,7 @@ function rawBaselineConsensus(baselines: CompResult[]): { headline: CompResult; 
   if (spreadPct > 35) return null;
 
   return {
-    headline: strongestSignal(priced) ?? priced[0]!,
+    headline: ukRelevantBaseline(priced) ?? strongestSignal(priced) ?? priced[0]!,
     highPence: high,
     spreadPct,
   };
@@ -174,9 +174,29 @@ function smartIsHighOutlier(smart: CompResult, consensus: { highPence: number })
   return smart.medianPence > consensus.highPence * 1.25;
 }
 
+function ukRelevantBaseline(results: CompResult[]): CompResult | null {
+  return (
+    results.find(
+      (result) =>
+        readRawString(result, "kind") === "catalog-market-baseline" &&
+        readRawNestedString(result, ["chosenSignal", "source"]) === "cardmarket",
+    ) ?? null
+  );
+}
+
 function readRawString(result: CompResult, key: string): string | null {
   if (!result.raw || typeof result.raw !== "object") return null;
   const value = (result.raw as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+function readRawNestedString(result: CompResult, path: string[]): string | null {
+  if (!result.raw || typeof result.raw !== "object") return null;
+  let value: unknown = result.raw;
+  for (const key of path) {
+    if (!value || typeof value !== "object") return null;
+    value = (value as Record<string, unknown>)[key];
+  }
   return typeof value === "string" ? value : null;
 }
 
