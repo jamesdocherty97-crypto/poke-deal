@@ -10,9 +10,12 @@ test("buildSalePrompt asks for a total before booking", () => {
     nextSaleAvailable: false,
   });
 
-  assert.equal(prompt.title, "Enter sale total");
-  assert.equal(prompt.cta, "Paste gross");
+  assert.equal(prompt.title, "Enter buyer total");
+  assert.equal(prompt.cta, "Paste total");
+  assert.equal(prompt.action, "paste-total");
   assert.equal(prompt.tone, "info");
+  assert.match(prompt.detail, /buyer-paid total/);
+  assert.match(prompt.detail, /including postage/);
 });
 
 test("buildSalePrompt summarizes a profitable sale", () => {
@@ -26,6 +29,7 @@ test("buildSalePrompt summarizes a profitable sale", () => {
 
   assert.equal(prompt.title, "Ready to book");
   assert.equal(prompt.cta, "Create sale");
+  assert.equal(prompt.action, "create-sale");
   assert.equal(prompt.tone, "good");
   assert.match(prompt.detail, /£13\.20 profit/);
   assert.match(prompt.detail, /Save \+ next/);
@@ -41,6 +45,7 @@ test("buildSalePrompt warns before booking a loss", () => {
   });
 
   assert.equal(prompt.title, "Review loss");
+  assert.equal(prompt.action, "create-sale");
   assert.equal(prompt.tone, "warn");
   assert.match(prompt.detail, /2 cards/);
   assert.match(prompt.detail, /-£5\.00 loss/);

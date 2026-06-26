@@ -1,4 +1,5 @@
 export type SalePromptTone = "good" | "warn" | "info";
+export type SalePromptAction = "paste-total" | "create-sale";
 
 export interface SalePromptInput {
   salePricePence: number;
@@ -13,6 +14,7 @@ export interface SalePrompt {
   detail: string;
   cta: string;
   tone: SalePromptTone;
+  action: SalePromptAction;
 }
 
 export function buildSalePrompt(input: SalePromptInput): SalePrompt {
@@ -21,10 +23,11 @@ export function buildSalePrompt(input: SalePromptInput): SalePrompt {
 
   if (salePricePence <= 0) {
     return {
-      title: "Enter sale total",
-      detail: "Paste the buyer total, payout, or pick a shortcut before booking.",
-      cta: "Paste gross",
+      title: "Enter buyer total",
+      detail: "Paste or enter the buyer-paid total, including postage when the marketplace charges it.",
+      cta: "Paste total",
       tone: "info",
+      action: "paste-total",
     };
   }
 
@@ -39,6 +42,7 @@ export function buildSalePrompt(input: SalePromptInput): SalePrompt {
       detail: `${quantityLabel} will book a ${formatSignedGbp(profit)} loss${net != null ? ` after ${formatSignedGbp(net)} net` : ""}.${next}`,
       cta: "Create sale",
       tone: "warn",
+      action: "create-sale",
     };
   }
 
@@ -47,6 +51,7 @@ export function buildSalePrompt(input: SalePromptInput): SalePrompt {
     detail: `${quantityLabel}${profit != null ? ` · ${formatSignedGbp(profit)} profit` : ""}${net != null ? ` · ${formatSignedGbp(net)} net` : ""}.${next}`,
     cta: "Create sale",
     tone: "good",
+    action: "create-sale",
   };
 }
 

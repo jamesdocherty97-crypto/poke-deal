@@ -2728,13 +2728,13 @@ export default function Home() {
     try {
       clipboardText = await navigator.clipboard.readText();
     } catch {
-      setError("Clipboard read failed. Copy the sale price, then tap Paste gross.");
+      setError("Clipboard read failed. Copy the buyer total, then tap Paste total.");
       return;
     }
 
     const pricePence = parseCheckedCompPriceText(clipboardText);
     if (!pricePence) {
-      setError("Clipboard does not contain a clear sale price.");
+      setError("Clipboard does not contain a clear buyer total.");
       return;
     }
 
@@ -6391,10 +6391,10 @@ export default function Home() {
               <span>Price</span>
               <div>
                 <button type="button" onClick={useListingSalePrice} disabled={!sellingItem}>
-                  List + post
+                  Listing total
                 </button>
                 <button type="button" onClick={() => void pasteSaleTotalPrice()}>
-                  Paste gross
+                  Paste total
                 </button>
                 <button type="button" onClick={() => void pasteSaleNetPrice()}>
                   Paste net
@@ -6459,14 +6459,14 @@ export default function Home() {
                   Default costs
                 </button>
                 <button type="button" onClick={clearSalePostage}>
-                  Post £0
+                  My post £0
                 </button>
               </div>
             </div>
           </div>
           <div className="form-grid">
             <label>
-              Buyer paid total
+              Buyer total
               <MoneyInput value={salePrice} onChange={setSalePrice} />
             </label>
             <label>
@@ -6493,7 +6493,7 @@ export default function Home() {
               <div>
                 <span>Buyer post</span>
                 <strong>{gbp(saleBreakdown.postagePaidPence)}</strong>
-                <small>{saleBreakdown.postagePaidPence > 0 ? "included above" : "none in total"}</small>
+                <small>{saleBreakdown.postagePaidPence > 0 ? "charged to buyer" : "none charged"}</small>
               </div>
               <div>
                 <span>Total</span>
@@ -6519,7 +6519,7 @@ export default function Home() {
             </label>
           </div>
           <label>
-            Postage
+            My postage cost
             <MoneyInput
               value={postage}
               onChange={(value) => {
@@ -6530,7 +6530,7 @@ export default function Home() {
           </label>
           {sellingItem && buyerPaidPostagePence(saleChannel, sellingItem.grade) > 0 && (
             <p className="hint sale-assumption">
-              Default gross includes {gbp(buyerPaidPostagePence(saleChannel, sellingItem.grade))} buyer-paid postage.
+              Default buyer total includes {gbp(buyerPaidPostagePence(saleChannel, sellingItem.grade))} postage, then deducts your postage cost below.
             </p>
           )}
           {salePreview && (
@@ -6538,7 +6538,7 @@ export default function Home() {
               <div>
                 <span>Net</span>
                 <strong>{gbp(salePreview.netPence)}</strong>
-                <small>After fees + post</small>
+                <small>After fees + my post</small>
               </div>
               <div>
                 <span>Cost</span>
@@ -7089,7 +7089,7 @@ function SalePromptCard({
   busy: boolean;
   onPasteGross: () => void;
 }) {
-  const needsPrice = prompt.cta === "Paste gross";
+  const needsPrice = prompt.action === "paste-total";
   return (
     <div className={`sale-prompt-card ${prompt.tone}`}>
       <div>
