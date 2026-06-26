@@ -2138,6 +2138,7 @@ label {
   justify-content: flex-end;
 }
 
+.comp-check-button,
 .comp-skip-button {
   min-height: 28px;
   padding: 4px 10px;

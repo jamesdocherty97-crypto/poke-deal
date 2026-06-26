@@ -4423,6 +4423,13 @@ export default function Home() {
                 </div>
                 <div className="comp-hero-actions">
                   <span className={`pill ${confidenceLabel?.tone ?? ""}`}>{confidenceLabel?.label}</span>
+                  <button
+                    className="ghost-button comp-check-button"
+                    type="button"
+                    onClick={() => openManualCompLink("EBAY_UK_SOLD")}
+                  >
+                    UK solds
+                  </button>
                   <button className="ghost-button comp-skip-button" type="button" onClick={skipCurrentComp}>
                     Skip
                   </button>
