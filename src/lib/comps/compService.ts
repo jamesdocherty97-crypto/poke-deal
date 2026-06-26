@@ -164,7 +164,7 @@ function rawBaselineConsensus(baselines: CompResult[]): { headline: CompResult; 
   if (spreadPct > 35) return null;
 
   return {
-    headline: ukRelevantBaseline(priced) ?? strongestSignal(priced) ?? priced[0]!,
+    headline: preferredRawBaseline(priced) ?? strongestSignal(priced) ?? priced[0]!,
     highPence: high,
     spreadPct,
   };
@@ -174,8 +174,20 @@ function smartIsHighOutlier(smart: CompResult, consensus: { highPence: number })
   return smart.medianPence > consensus.highPence * 1.25;
 }
 
-function ukRelevantBaseline(results: CompResult[]): CompResult | null {
+function preferredRawBaseline(results: CompResult[]): CompResult | null {
   return (
+    results.find(
+      (result) =>
+        result.source === "poketrace" &&
+        readRawString(result, "kind") === "market-baseline" &&
+        readRawString(result, "priceSource") === "cardmarket",
+    ) ??
+    results.find(
+      (result) =>
+        result.source === "poketrace" &&
+        readRawString(result, "kind") === "market-baseline" &&
+        result.sampleSize >= 10,
+    ) ??
     results.find(
       (result) =>
         readRawString(result, "kind") === "catalog-market-baseline" &&

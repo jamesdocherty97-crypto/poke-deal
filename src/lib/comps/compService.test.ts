@@ -81,7 +81,7 @@ test("pickHeadline keeps smart RAW as the headline when market baselines disagre
   assert.equal(pickHeadline([smartRaw, catalogBaseline]), smartRaw);
 });
 
-test("pickHeadline uses UK-relevant RAW baseline when smart eBay is a high outlier", () => {
+test("pickHeadline uses strong PokeTrace RAW baseline when smart eBay is a high outlier", () => {
   const smartRaw = comp({
     source: "pokemon-price-tracker",
     medianPence: 6575,
@@ -103,7 +103,31 @@ test("pickHeadline uses UK-relevant RAW baseline when smart eBay is a high outli
   });
 
   assert.equal(detectDisagreement([smartRaw, pokeTraceBaseline, catalogBaseline]), true);
-  assert.equal(pickHeadline([smartRaw, pokeTraceBaseline, catalogBaseline]), catalogBaseline);
+  assert.equal(pickHeadline([smartRaw, pokeTraceBaseline, catalogBaseline]), pokeTraceBaseline);
+});
+
+test("pickHeadline prefers PokeTrace Cardmarket RAW baseline over catalog market baseline", () => {
+  const smartRaw = comp({
+    source: "pokemon-price-tracker",
+    medianPence: 6575,
+    sampleSize: 76,
+    raw: { chosenPriceSource: "smartMarketPrice" },
+  });
+  const pokeTraceCardmarket = comp({
+    source: "poketrace",
+    medianPence: 4550,
+    sampleSize: 12,
+    raw: { kind: "market-baseline", priceSource: "cardmarket", tier: "NEAR_MINT" },
+  });
+  const catalogBaseline = comp({
+    source: "pokemon-tcg-market",
+    medianPence: 4000,
+    sampleSize: 1,
+    windowDays: 30,
+    raw: { kind: "catalog-market-baseline", chosenSignal: { source: "cardmarket" } },
+  });
+
+  assert.equal(pickHeadline([smartRaw, pokeTraceCardmarket, catalogBaseline]), pokeTraceCardmarket);
 });
 
 test("pickHeadline keeps smart RAW when it agrees with the market baseline", () => {
