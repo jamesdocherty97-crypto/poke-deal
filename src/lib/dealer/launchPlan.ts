@@ -109,7 +109,7 @@ export function buildLaunchPlan(input: LaunchPlanInput, limit = 5): LaunchPlanIt
     items.push({
       id: "second-source",
       title: "Add second comp source",
-      detail: "PokeTrace is still missing, so bigger raw buys need manual checking.",
+      detail: "Finish a live cross-check source before trusting bigger raw buys without a manual sold check.",
       state: "warn",
       action: "Setup",
       target: "external",

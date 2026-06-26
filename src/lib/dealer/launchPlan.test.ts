@@ -24,6 +24,8 @@ test("buildLaunchPlan starts a new business with stock, costs and source work", 
   assert.equal(plan[0]?.target, "opening-stock");
   assert.equal(plan[0]?.action, "Import");
   assert.equal(plan.find((item) => item.id === "second-source")?.state, "warn");
+  assert.match(plan.find((item) => item.id === "second-source")?.detail ?? "", /live cross-check source/);
+  assert.doesNotMatch(plan.find((item) => item.id === "second-source")?.detail ?? "", /PokeTrace is still missing/);
 });
 
 test("buildLaunchPlan prioritizes draft activation and first sale", () => {
