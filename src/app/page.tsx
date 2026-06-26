@@ -1445,9 +1445,7 @@ export default function Home() {
       return;
     }
     if (target === "drafts") {
-      setListingStateFilter("DRAFT");
-      setListingSort("newest");
-      setView("listings");
+      openListingDesk();
       return;
     }
     if (target === "sales") {
@@ -1507,9 +1505,7 @@ export default function Home() {
       return;
     }
     if (target === "listings") {
-      setListingStateFilter("ALL");
-      setListingSort("newest");
-      setView("listings");
+      openListingDesk();
       return;
     }
     setView("pnl");
@@ -1532,9 +1528,7 @@ export default function Home() {
       return;
     }
     if (target === "listings") {
-      setListingStateFilter("ALL");
-      setListingSort("newest");
-      setView("listings");
+      openListingDesk();
       return;
     }
     setView("pnl");
@@ -3196,6 +3190,16 @@ export default function Home() {
     setNotice(null);
   }
 
+  function openListingDesk() {
+    if (firstDraftListingTarget || unlistedStock.length > 0) {
+      startListingDesk();
+      return;
+    }
+    setListingStateFilter("ALL");
+    setListingSort("newest");
+    setView("listings");
+  }
+
   function startListingDesk() {
     if (firstDraftListingTarget) {
       setView("listings");
@@ -3948,7 +3952,7 @@ export default function Home() {
                 title="Listing pipeline"
                 detail={`${draftListingCount} draft / ${activeListingCount} active`}
                 action="Listings"
-                onClick={() => setView("listings")}
+                onClick={openListingDesk}
               />
               <SetupStep
                 done={(dashboard?.metrics.soldCount ?? 0) > 0}
@@ -3983,7 +3987,7 @@ export default function Home() {
               <button type="button" onClick={() => setView("acquire")}>Comp buy</button>
               <button type="button" onClick={() => openOpeningStockImport()}>Import stock</button>
               <button type="button" onClick={activeListingCount > 0 ? openSalesDesk : () => setView("inventory")}>Sell stock</button>
-              <button type="button" onClick={() => setView("listings")}>List drafts</button>
+              <button type="button" onClick={openListingDesk}>List drafts</button>
               <button type="button" onClick={takePortfolioSnapshot} disabled={busy === "snapshot"}>
                 {busy === "snapshot" ? "Snapshot..." : "Snapshot"}
               </button>
