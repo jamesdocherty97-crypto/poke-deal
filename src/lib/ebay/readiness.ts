@@ -19,7 +19,10 @@ export interface EbayReadinessInput {
 }
 
 export interface EbayReadinessResult {
+  /** True when read-only eBay checks/preflight are safe to run. */
   ready: boolean;
+  /** True when the app should write inventory/offer data to eBay. */
+  offerReady: boolean;
   checks: EbayReadinessCheck[];
 }
 
@@ -90,5 +93,10 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
   });
 
   const blockingFails = checks.filter((c) => c.status === "fail");
-  return { ready: blockingFails.length === 0, checks };
+  const ready = blockingFails.length === 0;
+  return {
+    ready,
+    offerReady: ready && input.hasMerchantLocation !== false,
+    checks,
+  };
 }

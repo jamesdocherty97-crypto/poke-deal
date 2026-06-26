@@ -6799,12 +6799,13 @@ function ListingPackSheet({
         hasImage: Boolean(listing.item?.card.imageUrl),
       })
     : null;
+  const ebayOfferReady = ebayReadiness?.offerReady ?? false;
   const sellingSteps = buildListingSellFlow({
     channel: listing.channel,
     state: listing.state,
     externalRef: listing.externalRef,
     externalUrl: listing.externalUrl,
-    ebayReady: ebayReadiness?.ready ?? false,
+    ebayReady: ebayOfferReady,
     sellable: canSell,
   });
   const nextAction = buildListingNextAction({
@@ -6812,7 +6813,7 @@ function ListingPackSheet({
     state: listing.state,
     externalRef: listing.externalRef,
     externalUrl: listing.externalUrl,
-    ebayReady: ebayReadiness?.ready ?? false,
+    ebayReady: ebayOfferReady,
     sellable: canSell,
     hasVenueAction: Boolean(venueAction),
     packCopied: copied,
@@ -6995,7 +6996,7 @@ function ListingPackSheet({
             >
               {busy ? "Working..." : "Publish to eBay"}
             </button>
-          ) : ebayReadiness.ready ? (
+          ) : ebayOfferReady ? (
             <button
               className="ghost-button"
               type="button"
@@ -7009,7 +7010,7 @@ function ListingPackSheet({
               className="ghost-button"
               type="button"
               onClick={onCreateOffer}
-              disabled={busy || !ebayReadiness.ready}
+              disabled={busy || !ebayOfferReady}
             >
               {busy ? "Creating offer..." : "Create eBay offer"}
             </button>
