@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildListingSellFlow, listingVenueAction, nextDraftListingId, nextSaleListingId } from "./listingWorkflow.js";
+import {
+  buildListingNextAction,
+  buildListingSellFlow,
+  listingVenueAction,
+  nextDraftListingId,
+  nextSaleListingId,
+} from "./listingWorkflow.js";
 
 test("nextDraftListingId advances through stocked draft listings", () => {
   const listings = [
@@ -128,4 +134,108 @@ test("buildListingSellFlow keeps manual channels simple", () => {
   });
   assert.equal(active.find((step) => step.id === "activate")?.state, "done");
   assert.equal(active.find((step) => step.id === "sale")?.state, "current");
+});
+
+test("buildListingNextAction falls back to manual eBay listing when automation is not ready", () => {
+  const action = buildListingNextAction({
+    channel: "EBAY",
+    state: "DRAFT",
+    externalRef: null,
+    ebayReady: false,
+    sellable: true,
+    hasVenueAction: true,
+  });
+
+  assert.equal(action.id, "copy-open");
+  assert.equal(action.cta, "Copy + open");
+  assert.match(action.detail, /automation is unavailable/);
+});
+
+test("buildListingNextAction prompts for a live URL after a manual copy", () => {
+  const action = buildListingNextAction({
+    channel: "EBAY",
+    state: "DRAFT",
+    externalRef: null,
+    ebayReady: false,
+    sellable: true,
+    hasVenueAction: true,
+    packCopied: true,
+  });
+
+  assert.equal(action.id, "paste-url");
+  assert.equal(action.cta, "Paste URL");
+});
+
+test("buildListingNextAction walks eBay automation from offer to sale", () => {
+  assert.equal(
+    buildListingNextAction({
+      channel: "EBAY",
+      state: "DRAFT",
+      externalRef: null,
+      ebayReady: true,
+      sellable: true,
+    }).id,
+    "create-offer",
+  );
+  assert.equal(
+    buildListingNextAction({
+      channel: "EBAY",
+      state: "DRAFT",
+      externalRef: "offer:abc",
+      ebayReady: true,
+      sellable: true,
+    }).id,
+    "publish",
+  );
+  assert.equal(
+    buildListingNextAction({
+      channel: "EBAY",
+      state: "ACTIVE",
+      externalRef: "1234567890",
+      ebayReady: true,
+      sellable: true,
+    }).id,
+    "record-sale",
+  );
+});
+
+test("buildListingNextAction guides manual marketplace listings", () => {
+  assert.equal(
+    buildListingNextAction({
+      channel: "VINTED",
+      state: "DRAFT",
+      sellable: true,
+      hasVenueAction: true,
+    }).id,
+    "copy-open",
+  );
+  assert.equal(
+    buildListingNextAction({
+      channel: "CARDMARKET",
+      state: "DRAFT",
+      externalUrl: "https://example.com/listing",
+      sellable: true,
+      hasVenueAction: true,
+    }).id,
+    "activate",
+  );
+  assert.equal(
+    buildListingNextAction({
+      channel: "VINTED",
+      state: "DRAFT",
+      sellable: true,
+      hasVenueAction: true,
+      packCopied: true,
+    }).id,
+    "paste-url",
+  );
+  assert.equal(
+    buildListingNextAction({
+      channel: "IN_PERSON",
+      state: "DRAFT",
+      sellable: true,
+      hasVenueAction: false,
+    }).id,
+    "copy-only",
+  );
 });

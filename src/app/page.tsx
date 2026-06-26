@@ -62,9 +62,11 @@ import {
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
 import {
   buildListingSellFlow,
+  buildListingNextAction,
   listingVenueAction,
   nextDraftListingId,
   nextSaleListingId,
+  type ListingNextAction,
   type ListingFlowStep,
 } from "@/lib/dealer/listingWorkflow";
 import { parseQuickIntake } from "@/lib/dealer/intakeParser";
@@ -6596,9 +6598,50 @@ function ListingPackSheet({
     channel: listing.channel,
     state: listing.state,
     externalRef: listing.externalRef,
+    externalUrl: listing.externalUrl,
     ebayReady: ebayReadiness?.ready ?? false,
     sellable: canSell,
   });
+  const nextAction = buildListingNextAction({
+    channel: listing.channel,
+    state: listing.state,
+    externalRef: listing.externalRef,
+    externalUrl: listing.externalUrl,
+    ebayReady: ebayReadiness?.ready ?? false,
+    sellable: canSell,
+    hasVenueAction: Boolean(venueAction),
+    packCopied: copied,
+  });
+
+  function runNextAction() {
+    if (nextAction.id === "copy-open") {
+      onCopyAndOpen();
+      return;
+    }
+    if (nextAction.id === "copy-only") {
+      onCopy();
+      return;
+    }
+    if (nextAction.id === "paste-url") {
+      onPasteLiveUrl();
+      return;
+    }
+    if (nextAction.id === "activate") {
+      onActivate();
+      return;
+    }
+    if (nextAction.id === "create-offer") {
+      onCreateOffer();
+      return;
+    }
+    if (nextAction.id === "publish") {
+      onRequestPublish();
+      return;
+    }
+    if (nextAction.id === "record-sale") {
+      onSell(listing);
+    }
+  }
 
   return (
     <form className="sell-sheet listing-pack-sheet" onSubmit={(event) => event.preventDefault()}>
@@ -6651,6 +6694,7 @@ function ListingPackSheet({
           </div>
         </div>
       )}
+      <ListingNextActionCard action={nextAction} busy={busy} onRun={runNextAction} />
       <ListingFlowSteps steps={sellingSteps} />
       <div className="listing-field-actions" aria-label="Copy listing fields">
         {copyFields.map((field) => (
@@ -6838,6 +6882,30 @@ function EbayPreflightCard({ preflight }: { preflight: EbayPreflight }) {
           ? " If eBay rejects create, add or refresh the seller location in eBay business settings."
           : ""}
       </p>
+    </div>
+  );
+}
+
+function ListingNextActionCard({
+  action,
+  busy,
+  onRun,
+}: {
+  action: ListingNextAction;
+  busy: boolean;
+  onRun: () => void;
+}) {
+  const done = action.id === "done";
+  return (
+    <div className={`listing-next-action ${done ? "done" : ""}`}>
+      <div>
+        <span>Next listing step</span>
+        <strong>{action.title}</strong>
+        <small>{action.detail}</small>
+      </div>
+      <button type="button" onClick={onRun} disabled={busy || done}>
+        {busy ? "Working..." : action.cta}
+      </button>
     </div>
   );
 }

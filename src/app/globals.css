@@ -3993,6 +3993,60 @@ label {
   color: var(--yellow);
 }
 
+.listing-next-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(104px, auto);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.38);
+  border-radius: 8px;
+  background:
+    linear-gradient(120deg, rgba(52, 211, 153, 0.15), transparent 58%),
+    rgba(3, 8, 20, 0.36);
+  padding: 10px;
+}
+
+.listing-next-action div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.listing-next-action span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.listing-next-action strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.08;
+}
+
+.listing-next-action small {
+  color: #cfe6ff;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.listing-next-action button {
+  min-height: 42px;
+  border-color: rgba(52, 211, 153, 0.48);
+  background: rgba(52, 211, 153, 0.14);
+  color: #dfffe7;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.listing-next-action.done {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(3, 8, 20, 0.3);
+}
+
 .listing-flow-steps {
   display: grid;
   gap: 7px;

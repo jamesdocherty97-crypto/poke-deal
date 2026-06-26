@@ -21,12 +21,32 @@ export interface ListingFlowStep {
   state: ListingFlowStepState;
 }
 
+export type ListingNextActionId =
+  | "copy-open"
+  | "copy-only"
+  | "paste-url"
+  | "activate"
+  | "create-offer"
+  | "publish"
+  | "record-sale"
+  | "done";
+
+export interface ListingNextAction {
+  id: ListingNextActionId;
+  title: string;
+  detail: string;
+  cta: string;
+}
+
 export interface ListingSellFlowInput {
   channel: ListingWorkflowChannel;
   state: string;
   externalRef?: string | null;
+  externalUrl?: string | null;
   ebayReady?: boolean;
   sellable?: boolean;
+  hasVenueAction?: boolean;
+  packCopied?: boolean;
 }
 
 export function nextDraftListingId(
@@ -100,6 +120,21 @@ export function buildListingSellFlow(input: ListingSellFlowInput): ListingFlowSt
   return buildManualSellFlow(input);
 }
 
+export function buildListingNextAction(input: ListingSellFlowInput): ListingNextAction {
+  const sold = input.state === "SOLD" || input.sellable === false;
+  if (sold) {
+    return {
+      id: "done",
+      title: "Sale booked",
+      detail: "This listing is closed in the stock ledger.",
+      cta: "Done",
+    };
+  }
+
+  if (input.channel === "EBAY") return buildEbayNextAction(input);
+  return buildManualNextAction(input);
+}
+
 function buildEbaySellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
   const sold = input.state === "SOLD" || input.sellable === false;
   const hasOffer = Boolean(input.externalRef?.startsWith("offer:"));
@@ -133,6 +168,63 @@ function buildEbaySellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
   ];
 }
 
+function buildEbayNextAction(input: ListingSellFlowInput): ListingNextAction {
+  const hasOffer = Boolean(input.externalRef?.startsWith("offer:"));
+  const published = Boolean(input.externalRef && !input.externalRef.startsWith("offer:"));
+
+  if (published || input.state === "ACTIVE") {
+    return {
+      id: "record-sale",
+      title: "Wait for sale",
+      detail: "When it sells, book price, fees and buyer-paid postage here.",
+      cta: "Record sale",
+    };
+  }
+
+  if (hasOffer) {
+    return {
+      id: "publish",
+      title: "Publish eBay offer",
+      detail: "The offer exists. Final confirmation puts it live.",
+      cta: "Publish",
+    };
+  }
+
+  if (input.ebayReady) {
+    return {
+      id: "create-offer",
+      title: "Create eBay offer",
+      detail: "Send inventory and offer details to eBay without publishing yet.",
+      cta: "Create offer",
+    };
+  }
+
+  if (input.externalUrl) {
+    return {
+      id: "activate",
+      title: "Mark active",
+      detail: "A listing URL is saved. Mark it active so it enters the sales queue.",
+      cta: "Mark active",
+    };
+  }
+
+  if (input.packCopied && !input.externalUrl) {
+    return {
+      id: "paste-url",
+      title: "Save live link",
+      detail: "Paste the marketplace URL and mark the listing active.",
+      cta: "Paste URL",
+    };
+  }
+
+  return {
+    id: input.hasVenueAction ? "copy-open" : "copy-only",
+    title: "List manually",
+    detail: "Copy the pack and create the listing while API automation is unavailable.",
+    cta: input.hasVenueAction ? "Copy + open" : "Copy pack",
+  };
+}
+
 function buildManualSellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
   const sold = input.state === "SOLD" || input.sellable === false;
   const active = input.state === "ACTIVE";
@@ -157,6 +249,51 @@ function buildManualSellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
       state: sold ? "done" : active ? "current" : "next",
     },
   ];
+}
+
+function buildManualNextAction(input: ListingSellFlowInput): ListingNextAction {
+  if (input.state === "ACTIVE") {
+    return {
+      id: "record-sale",
+      title: "Wait for sale",
+      detail: "When it sells, book price, fees and postage here.",
+      cta: "Record sale",
+    };
+  }
+
+  if (input.externalUrl) {
+    return {
+      id: "activate",
+      title: "Mark active",
+      detail: "A listing URL is saved. Mark it active so it enters the sales queue.",
+      cta: "Mark active",
+    };
+  }
+
+  if (input.packCopied) {
+    return {
+      id: "paste-url",
+      title: "Save live link",
+      detail: "Paste the marketplace URL and mark the listing active.",
+      cta: "Paste URL",
+    };
+  }
+
+  if (input.hasVenueAction) {
+    return {
+      id: "copy-open",
+      title: "Create listing",
+      detail: "Copy the pack, open the marketplace and paste the fields.",
+      cta: "Copy + open",
+    };
+  }
+
+  return {
+    id: "copy-only",
+    title: "Prepare sale note",
+    detail: "Copy the pack for a manual or in-person sale record.",
+    cta: "Copy pack",
+  };
 }
 
 function hasSellableItem(item: ListingWorkflowItem["item"]): boolean {
