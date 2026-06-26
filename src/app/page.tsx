@@ -4190,6 +4190,7 @@ export default function Home() {
               {busy === "lookup" ? "Looking up..." : "Look up comp"}
             </button>
             {!headline && renderManualCompLinks("compact")}
+            {!headline && renderCheckedCompCard("priority")}
             {!headline && (
               <>
                 <div className="quick-hunt-toolbar" aria-label="Quick hunt controls">
