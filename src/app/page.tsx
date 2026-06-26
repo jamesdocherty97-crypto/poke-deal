@@ -2,6 +2,7 @@
 
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
+  conditionAdjustedPricePence,
   rawConditionPriceFactor,
   suggestListPrice,
   type PricingStrategy,
@@ -1036,6 +1037,8 @@ export default function Home() {
     [condition, headline, strategy, cost],
   );
   const conditionAdjustmentActive = grade === "RAW" && rawConditionPriceFactor(grade, condition) < 1;
+  const conditionAdjustedHeadlinePence =
+    headline && conditionAdjustmentActive ? conditionAdjustedPricePence(headline.medianPence, grade, condition) : null;
   const buyPlan = useMemo(() => {
     const intakeQuantity = parseIntakeQuantity(quantity) ?? 1;
     const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
@@ -4394,6 +4397,9 @@ export default function Home() {
               )}
               <div className="detail-grid">
                 <Metric label="Range" value={`${gbp(headline.lowPence)}-${gbp(headline.highPence)}`} />
+                {conditionAdjustedHeadlinePence != null && (
+                  <Metric label="Raw value" value={gbp(conditionAdjustedHeadlinePence)} tone="warn" />
+                )}
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
               </div>
