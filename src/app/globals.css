@@ -2867,6 +2867,11 @@ label {
     rgba(3, 8, 20, 0.42);
 }
 
+.checked-comp-card.awaiting {
+  border-color: rgba(255, 203, 5, 0.58);
+  box-shadow: 0 0 0 1px rgba(255, 203, 5, 0.12) inset;
+}
+
 .checked-comp-heading {
   display: flex;
   align-items: center;
@@ -2927,6 +2932,28 @@ label {
   border-color: rgba(52, 211, 153, 0.36);
   background: rgba(52, 211, 153, 0.12);
   color: #c7f7df;
+}
+
+.checked-comp-return {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(255, 203, 5, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 203, 5, 0.08);
+  padding: 8px 9px;
+}
+
+.checked-comp-return strong {
+  color: var(--yellow);
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.checked-comp-return span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
 }
 
 .checked-comp-presets button {

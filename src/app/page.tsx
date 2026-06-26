@@ -523,6 +523,7 @@ export default function Home() {
   const [checkedCompSample, setCheckedCompSample] = useState("1");
   const [checkedCompSource, setCheckedCompSource] = useState<CheckedCompSource>("EBAY_SOLD");
   const [checkedCompNote, setCheckedCompNote] = useState("");
+  const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
   const [keepBuying, setKeepBuying] = useState(DEFAULT_INTAKE_PREFERENCES.keepBuying);
   const [comp, setComp] = useState<Reconciled | null>(null);
@@ -1582,6 +1583,7 @@ export default function Home() {
     setCheckedCompSample("1");
     setCheckedCompSource("EBAY_SOLD");
     setCheckedCompNote("");
+    setManualCompReturnArmed(false);
   }
 
   function clearCompEvidence() {
@@ -3547,8 +3549,10 @@ export default function Home() {
     const link = manualCompLinks.find((candidate) => candidate.kind === kind);
     if (!link?.url) return;
     setManualCompQuery(link.query);
+    setManualCompReturnArmed(true);
+    if (kind === "EBAY_UK_SOLD") setCheckedCompSource("EBAY_SOLD");
     window.open(link.url, "_blank", "noopener,noreferrer");
-    setNotice(kind === "EBAY_UK_SOLD" ? "Opened eBay UK solds." : "Opened manual comp source.");
+    setNotice(kind === "EBAY_UK_SOLD" ? "Opened eBay UK solds. Paste or enter the sold price when you are back." : "Opened manual comp source.");
     setError(null);
   }
 
@@ -3573,6 +3577,7 @@ export default function Home() {
   function applyCheckedCompPrice(valuePence: number) {
     setCheckedCompPrice(penceToPounds(valuePence));
     setCheckedCompSample((current) => (Number(current) > 0 ? current : "1"));
+    setManualCompReturnArmed(false);
     setNotice("Checked comp price filled. Adjust it if the sold listing differs.");
     setError(null);
   }
@@ -3651,16 +3656,17 @@ export default function Home() {
 
   function renderCheckedCompCard(variant: "full" | "priority" = "full") {
     const canOpenUkSolds = manualCompLinks.some((link) => link.kind === "EBAY_UK_SOLD" && link.query.trim());
+    const awaitingManualPrice = manualCompReturnArmed && !checkedComp;
 
     return (
       <div
-        className={`checked-comp-card ${checkedComp ? "active" : ""} ${variant}`}
+        className={`checked-comp-card ${checkedComp ? "active" : ""} ${awaitingManualPrice ? "awaiting" : ""} ${variant}`}
         ref={variant === "priority" ? checkedCompRef : undefined}
       >
         <div className="checked-comp-heading">
           <div>
             <span>Checked comp</span>
-            <strong>{checkedComp ? `${gbp(checkedComp.medianPence)} in use` : "Optional override"}</strong>
+            <strong>{checkedComp ? `${gbp(checkedComp.medianPence)} in use` : awaitingManualPrice ? "Paste or enter sold price" : "Optional override"}</strong>
           </div>
           {checkedComp && (
             <button className="ghost-button" type="button" onClick={clearCheckedComp}>
@@ -3695,6 +3701,12 @@ export default function Home() {
             Open UK solds
           </button>
         </div>
+        {awaitingManualPrice && (
+          <div className="checked-comp-return">
+            <strong>Back from solds?</strong>
+            <span>Copy a sold price then tap Paste price, or type it above.</span>
+          </div>
+        )}
         {checkedCompPriceOptions.length > 0 && (
           <div className="checked-comp-price-presets" aria-label="Checked comp price shortcuts">
             {checkedCompPriceOptions.map((option) => (
