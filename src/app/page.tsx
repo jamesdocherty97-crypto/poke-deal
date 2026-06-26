@@ -5315,6 +5315,47 @@ export default function Home() {
               )}
             </section>
           )}
+          {firstSaleListingTarget?.item && (
+            <section className="panel listing-desk-panel sales-desk-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Sales desk</h2>
+                  <span className="muted">
+                    {activeListingCount} active listing{activeListingCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => {
+                    setListingStateFilter("ACTIVE");
+                    setListingSort("newest");
+                  }}
+                >
+                  Active
+                </button>
+              </div>
+              <div className="listing-desk-card">
+                <CardImage
+                  src={firstSaleListingTarget.item.card.imageUrl}
+                  className="mini-card-art"
+                  fallbackClassName="mini-card-art blank"
+                  alt=""
+                />
+                <div>
+                  <span>Ready to book</span>
+                  <strong>{listingQueueLabel(firstSaleListingTarget)}</strong>
+                  <small>
+                    {channelLabel(firstSaleListingTarget.channel)} ·{" "}
+                    {gbp(firstSaleListingTarget.listPrice ?? firstSaleListingTarget.suggestedPrice ?? 0)}
+                  </small>
+                </div>
+                <button type="button" onClick={() => openSellFromListing(firstSaleListingTarget)}>
+                  Record sale
+                </button>
+              </div>
+            </section>
+          )}
           <div className="export-actions" aria-label="Listing exports">
             <a className="export-link" href="/api/export/listings?state=DRAFT" download>
               Draft CSV
