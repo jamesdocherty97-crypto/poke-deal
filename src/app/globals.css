@@ -2490,6 +2490,47 @@ label {
     rgba(3, 8, 20, 0.42);
 }
 
+.stock-reprice-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(52, 211, 153, 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(125deg, rgba(52, 211, 153, 0.14), transparent 52%),
+    rgba(3, 8, 20, 0.36);
+  padding: 10px;
+}
+
+.stock-reprice-card div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.stock-reprice-card span,
+.stock-reprice-card small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.stock-reprice-card span {
+  text-transform: uppercase;
+}
+
+.stock-reprice-card strong {
+  overflow-wrap: anywhere;
+  color: var(--green);
+  font-size: 16px;
+}
+
+.stock-reprice-card button {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
 .quick-stock-card {
   display: grid;
   gap: 10px;

@@ -547,6 +547,7 @@ export default function Home() {
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
   const [keepBuying, setKeepBuying] = useState(DEFAULT_INTAKE_PREFERENCES.keepBuying);
   const [comp, setComp] = useState<Reconciled | null>(null);
+  const [stockCompItemId, setStockCompItemId] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
@@ -809,6 +810,16 @@ export default function Home() {
     () => buildInventoryView(soldInventory, { query: inventoryQuery, sort: inventorySort }),
     [soldInventory, inventoryQuery, inventorySort],
   );
+  const stockCompItem = useMemo(
+    () => inventory.find((item) => item.id === stockCompItemId && item.status !== "SOLD") ?? null,
+    [inventory, stockCompItemId],
+  );
+  const stockCompListing = useMemo(() => {
+    if (!stockCompItem) return null;
+    const listing = listingForInventoryItem(stockCompItem);
+    if (!listing || (listing.state !== "DRAFT" && listing.state !== "ACTIVE")) return null;
+    return listing;
+  }, [stockCompItem, listings]);
   const visibleListings = useMemo(
     () => buildListingView(listings, { query: listingQuery, state: listingStateFilter, sort: listingSort }),
     [listings, listingQuery, listingStateFilter, listingSort],
@@ -1087,6 +1098,18 @@ export default function Home() {
           })
         : null,
     [condition, headline, strategy, cost],
+  );
+  const stockCompSuggestion = useMemo(
+    () =>
+      headline && stockCompItem
+        ? suggestListPrice({
+            comp: headline,
+            strategy,
+            costBasisPence: stockCompItem.costBasis,
+            condition: stockCompItem.condition,
+          })
+        : null,
+    [headline, stockCompItem, strategy],
   );
   const conditionAdjustmentActive = grade === "RAW" && rawConditionPriceFactor(grade, condition) < 1;
   const conditionAdjustedHeadlinePence =
@@ -1671,6 +1694,7 @@ export default function Home() {
 
   function clearCompEvidence() {
     setComp(null);
+    setStockCompItemId(null);
     setSuggestion(null);
     setCardArtUrl(null);
     setGradeComp(null);
@@ -2575,6 +2599,11 @@ export default function Home() {
     }
 
     setNotice(options.repeatBuy ? `${item.card.name} loaded with the last buy details.` : `${item.card.name} loaded for another buy.`);
+  }
+
+  function compInventoryItem(item: InventoryItem) {
+    loadRecentBuy(item, { lookupAfter: true });
+    setStockCompItemId(item.id);
   }
 
   function pinRecentSetName(value: string | null | undefined) {
@@ -3559,6 +3588,20 @@ export default function Home() {
       `Repriced ${recommendation.cardName} to ${gbp(recommendation.suggestedPricePence)}.`,
     );
     setRepriceRecommendations((rows) => rows.filter((row) => row.itemId !== recommendation.itemId));
+  }
+
+  async function applyStockCompReprice() {
+    if (!stockCompItem || !stockCompSuggestion) return;
+    if (!stockCompListing) {
+      setError("Draft a listing first, then reprice it from the comp.");
+      return;
+    }
+    const ok = await patchListing(
+      stockCompListing,
+      { listPricePence: stockCompSuggestion.pricePence },
+      `Repriced ${stockCompItem.card.name} to ${gbp(stockCompSuggestion.pricePence)}.`,
+    );
+    if (ok) setStockCompItemId(null);
   }
 
   async function takePortfolioSnapshot() {
@@ -4703,7 +4746,33 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {!needsManualComp && (
+              {!needsManualComp && stockCompItem && stockCompSuggestion && (
+                <div className="stock-reprice-card">
+                  <div>
+                    <span>Stock reprice</span>
+                    <strong>{stockCompItem.card.name}</strong>
+                    <small>
+                      {stockCompListing
+                        ? `Current ${gbp(stockCompListing.listPrice ?? stockCompListing.suggestedPrice ?? 0)} · suggested ${gbp(stockCompSuggestion.pricePence)}`
+                        : `Suggested ${gbp(stockCompSuggestion.pricePence)} · no draft listing yet`}
+                    </small>
+                  </div>
+                  {stockCompListing ? (
+                    <button
+                      type="button"
+                      onClick={() => void applyStockCompReprice()}
+                      disabled={busy === `listing-${stockCompListing.id}`}
+                    >
+                      {busy === `listing-${stockCompListing.id}` ? "Updating..." : "Update listing"}
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => void listInventoryItem(stockCompItem)} disabled={busy?.startsWith("create-listing-")}>
+                      Draft listing
+                    </button>
+                  )}
+                </div>
+              )}
+              {!needsManualComp && !stockCompItem && (
                 <div className={`quick-stock-card ${buyPlan?.tone ?? "warn"}`}>
                   <div className="quick-stock-heading">
                     <div>
@@ -5377,7 +5446,7 @@ export default function Home() {
               busy={busy}
               onEdit={openInventoryEditor}
               onSell={openSell}
-              onComp={(item) => loadRecentBuy(item, { lookupAfter: true })}
+              onComp={compInventoryItem}
               onList={listInventoryItem}
               onPack={openRecentListingWork}
               onStatus={updateStatus}
@@ -5519,7 +5588,7 @@ export default function Home() {
                   busy={busy}
                   onEdit={openInventoryEditor}
                   onSell={openSell}
-                  onComp={(item) => loadRecentBuy(item, { lookupAfter: true })}
+                  onComp={compInventoryItem}
                   onList={listInventoryItem}
                   onPack={openRecentListingWork}
                   onStatus={updateStatus}
