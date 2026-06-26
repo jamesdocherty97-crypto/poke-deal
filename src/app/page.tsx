@@ -3950,9 +3950,10 @@ export default function Home() {
                             {entry.number ? ` #${entry.number}` : ""} · {entry.grade.replace(/_/g, " ")}
                           </small>
                           <em>
-                            {entry.pricePence > 0 ? gbp(entry.pricePence) : "No price"} · {entry.confidenceLabel}
+                            {entry.pricePence > 0 ? `Last ${gbp(entry.pricePence)}` : "No price"} · {entry.confidenceLabel}
                           </em>
                           <small className="recent-comp-meta">{recentCompMeta(entry)}</small>
+                          <small className="recent-comp-recheck">Tap to recheck live</small>
                         </span>
                       </button>
                       <button

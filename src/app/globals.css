@@ -779,6 +779,13 @@ label {
   color: rgba(220, 226, 240, 0.68);
 }
 
+.recent-comp-recheck {
+  color: rgba(220, 226, 240, 0.76);
+  font-size: 9px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .recent-comp-remove {
   display: grid;
   min-width: 34px;
