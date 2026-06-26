@@ -877,6 +877,10 @@ export default function Home() {
   );
   const headline = checkedComp ?? apiHeadline;
   const sourceMatchedCard = !catalogCard && apiHeadline?.card ? apiHeadline.card : null;
+  const sourceMatchTypedMeta = [name.trim(), setNameValue.trim(), number.trim() ? `#${number.trim()}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  const sourceMatchSourceLabel = apiHeadline ? sourceLabel(apiHeadline.source, false) : "Source";
   const compForReceipt = useMemo<Reconciled | null>(() => {
     if (!comp) return null;
     if (!checkedComp) return comp;
@@ -4503,19 +4507,29 @@ export default function Home() {
                     alt=""
                   />
                   <div>
-                    <span>{apiHeadline?.source ? `Source match · ${apiHeadline.source}` : "Source match"}</span>
+                    <span>{sourceMatchSourceLabel} matched this card</span>
                     <strong>{sourceMatchedCard.name}</strong>
                     <small>
                       {sourceMatchedCard.setName ?? "No set"}
                       {sourceMatchedCard.number ? ` #${sourceMatchedCard.number}` : ""}
                     </small>
+                    {sourceMatchTypedMeta && <small className="source-match-typed">Typed: {sourceMatchTypedMeta}</small>}
+                    {!catalogCard && headline.medianPence > 0 && !checkedComp && (
+                      <div className="source-match-actions" aria-label="Source match actions">
+                        <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
+                          Open UK
+                        </button>
+                        <button type="button" onClick={jumpToCheckedComp}>
+                          Enter price
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
               {!catalogCard && headline.medianPence > 0 && (
                 <p className="hint">
-                  Card art/catalog was not found, so the price is coming from source matching. Use manual checks for promos,
-                  very new sets or unusual variants before relying on the image or set identity.
+                  Source found a price, but catalog/art did not confirm the card. Verify bigger buys with a UK sold check.
                 </p>
               )}
               {headline.raw?.chosenPriceSource === "smartMarketPrice" && (

@@ -3007,6 +3007,7 @@ label {
 
 .catalog-strip.source-match-strip {
   grid-template-columns: 42px minmax(0, 1fr);
+  align-items: start;
 }
 
 .catalog-strip div {
@@ -3019,6 +3020,28 @@ label {
   overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 12px;
+}
+
+.source-match-typed {
+  color: #d8e9ff;
+}
+
+.source-match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.source-match-actions button {
+  min-height: 30px;
+  border: 1px solid rgba(255, 203, 5, 0.34);
+  border-radius: 7px;
+  background: rgba(255, 203, 5, 0.1);
+  color: var(--yellow);
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 950;
 }
 
 .catalog-art {
