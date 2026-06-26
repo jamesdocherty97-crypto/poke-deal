@@ -23,6 +23,26 @@ test("readCompLookupRequest accepts setName alias used by smoke tools", () => {
   });
 });
 
+test("readCompLookupRequest accepts cardName alias used by smoke tools", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    cardName: "Snivy",
+    setName: "Mega Evolution Promo",
+    number: "MEP049",
+    grade: "RAW",
+  }));
+
+  assert.deepEqual(parsed, {
+    card: {
+      name: "Snivy",
+      setName: "Mega Evolution Promo",
+      number: "MEP049",
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "RAW",
+  });
+});
+
 test("readCompLookupRequest parses one-box dealer shorthand", () => {
   const parsed = readCompLookupRequest(new URLSearchParams({
     q: "Snivy MEP 049 raw £2",

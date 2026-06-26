@@ -15,7 +15,7 @@ export interface CompLookupRequest {
 export function readCompLookupRequest(searchParams: URLSearchParams): CompLookupRequest | { error: string } {
   const freeText = readFirst(searchParams, "q", "query", "search");
   const parsed = freeText ? normalizeCatalogCardSearchInput(freeText) : null;
-  const rawName = readFirst(searchParams, "name") ?? parsed?.name;
+  const rawName = readFirst(searchParams, "name", "cardName", "card") ?? parsed?.name;
   const name = preserveVariantText(rawName, freeText);
 
   if (!name?.trim()) return { error: "name is required" };
