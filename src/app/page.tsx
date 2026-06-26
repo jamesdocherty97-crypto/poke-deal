@@ -88,6 +88,7 @@ import {
   defaultGrossSalePence,
   discountedItemSubtotalPence,
   estimateSaleCosts,
+  grossSalePriceForProfitPence,
   grossSalePriceForNetPence,
   rescaleGrossSaleForQuantity,
   salePriceBreakdown,
@@ -2690,6 +2691,28 @@ export default function Home() {
     if (!sellingItem) return;
     applySaleTotalPrice(
       breakEvenSalePricePence(saleChannel, sellingItem.costBasis * saleQuantityForShortcuts(), {
+        grade: sellingItem.grade,
+      }),
+    );
+  }
+
+  function applySaleTargetProfit(targetProfitPence: number) {
+    if (!sellingItem) return;
+    applySaleTotalPrice(
+      grossSalePriceForProfitPence(
+        saleChannel,
+        sellingItem.costBasis * saleQuantityForShortcuts(),
+        targetProfitPence,
+        { grade: sellingItem.grade },
+      ),
+    );
+  }
+
+  function applySaleTargetRoi(roiPct: number) {
+    if (!sellingItem) return;
+    const costPence = sellingItem.costBasis * saleQuantityForShortcuts();
+    applySaleTotalPrice(
+      grossSalePriceForProfitPence(saleChannel, costPence, Math.round(costPence * roiPct), {
         grade: sellingItem.grade,
       }),
     );
@@ -6208,6 +6231,18 @@ export default function Home() {
             </button>
             <button type="button" onClick={useBreakEvenSalePrice} disabled={!sellingItem}>
               Break even
+            </button>
+            <button type="button" onClick={() => applySaleTargetProfit(500)} disabled={!sellingItem}>
+              £5 profit
+            </button>
+            <button type="button" onClick={() => applySaleTargetProfit(1000)} disabled={!sellingItem}>
+              £10 profit
+            </button>
+            <button type="button" onClick={() => applySaleTargetRoi(0.3)} disabled={!sellingItem}>
+              30% ROI
+            </button>
+            <button type="button" onClick={() => applySaleTargetRoi(0.5)} disabled={!sellingItem}>
+              50% ROI
             </button>
             {sellingItem && sellingItem.quantity > 1 && (
               <button type="button" onClick={sellAllQuantity}>

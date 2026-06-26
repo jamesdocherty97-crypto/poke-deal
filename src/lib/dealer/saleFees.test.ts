@@ -7,6 +7,7 @@ import {
   defaultGrossSalePence,
   discountedItemSubtotalPence,
   estimateSaleCosts,
+  grossSalePriceForProfitPence,
   grossSalePriceForNetPence,
   postedSalePostagePence,
   rescaleGrossSaleForQuantity,
@@ -111,6 +112,30 @@ test("grossSalePriceForNetPence finds the gross total needed for a target payout
 test("grossSalePriceForNetPence keeps no-fee channels as the pasted net", () => {
   assert.equal(grossSalePriceForNetPence("IN_PERSON", 4200), 4200);
   assert.equal(grossSalePriceForNetPence("VINTED", 4200), 4200);
+});
+
+test("grossSalePriceForProfitPence targets profit after selling costs", () => {
+  const gross = grossSalePriceForProfitPence("EBAY", 1800, 500, { grade: "RAW" });
+  const costs = estimateSaleCosts("EBAY", gross, { grade: "RAW" });
+  const previousCosts = estimateSaleCosts("EBAY", gross - 1, { grade: "RAW" });
+
+  assert.equal(
+    saleNetPence({ salePricePence: gross, feesPence: costs.feesPence, postagePence: costs.postagePence }) >= 2300,
+    true,
+  );
+  assert.equal(
+    saleNetPence({
+      salePricePence: gross - 1,
+      feesPence: previousCosts.feesPence,
+      postagePence: previousCosts.postagePence,
+    }) < 2300,
+    true,
+  );
+});
+
+test("grossSalePriceForProfitPence keeps no-fee profit targets simple", () => {
+  assert.equal(grossSalePriceForProfitPence("IN_PERSON", 1800, 500), 2300);
+  assert.equal(grossSalePriceForProfitPence("VINTED", 1800, 500), 2300);
 });
 
 test("breakEvenSalePricePence returns the lowest total that clears selling costs", () => {

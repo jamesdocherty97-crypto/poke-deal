@@ -163,6 +163,17 @@ export function grossSalePriceForNetPence(
   return maxPrice;
 }
 
+export function grossSalePriceForProfitPence(
+  channel: SaleChannel,
+  costPence: number,
+  targetProfitPence: number,
+  options: SaleCostOptions = {},
+): number {
+  const cost = Math.max(0, Math.round(costPence));
+  const targetProfit = Math.max(0, Math.round(targetProfitPence));
+  return grossSalePriceForNetPence(channel, cost + targetProfit, options);
+}
+
 export function breakEvenSalePricePence(
   channel: SaleChannel,
   costPence: number,
