@@ -15,6 +15,21 @@ test("normalizeListingUrl adds https for pasted bare marketplace URLs", () => {
     normalizeListingUrl("www.ebay.co.uk/itm/1234567890"),
     "https://www.ebay.co.uk/itm/1234567890",
   );
+  assert.equal(
+    normalizeListingUrl("ebay.co.uk/itm/1234567890"),
+    "https://ebay.co.uk/itm/1234567890",
+  );
+});
+
+test("normalizeListingUrl extracts listing links from share text", () => {
+  assert.equal(
+    normalizeListingUrl("Listed now: https://www.ebay.co.uk/itm/1234567890?mkcid=16"),
+    "https://www.ebay.co.uk/itm/1234567890?mkcid=16",
+  );
+  assert.equal(
+    normalizeListingUrl("Vinted listing - www.vinted.co.uk/items/987654321-card."),
+    "https://www.vinted.co.uk/items/987654321-card",
+  );
 });
 
 test("normalizeListingUrl rejects non-web or malformed values", () => {
