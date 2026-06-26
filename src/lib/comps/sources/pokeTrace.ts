@@ -177,6 +177,7 @@ export function mapPokeTraceCardsToComp(
       priceSource: choice.priceSource,
       market: readString(card.market),
       currency,
+      providerCard: providerCardRef(card),
       approxSaleCount: Boolean(choice.tier.approxSaleCount),
       ...choice.tier,
     },
@@ -235,6 +236,15 @@ function emptyComp(ctx: MapContext, reason = "no PokeTrace data"): CompResult {
 }
 
 function canonicalCardRef(input: CardRef, card: PokeTraceCard): CardRef {
+  const providerNumber = readString(card.cardNumber) ?? undefined;
+  if (shouldKeepRequestedPromoIdentity(input, providerNumber)) {
+    return {
+      ...input,
+      game: "POKEMON",
+      language: input.language ?? "EN",
+    };
+  }
+
   return {
     ...input,
     name: readString(card.name) ?? input.name,
@@ -243,6 +253,22 @@ function canonicalCardRef(input: CardRef, card: PokeTraceCard): CardRef {
     game: "POKEMON",
     language: input.language ?? "EN",
   };
+}
+
+function providerCardRef(card: PokeTraceCard): CardRef {
+  return {
+    name: readString(card.name) ?? "Unknown card",
+    setName: readString(card.set?.name) ?? undefined,
+    number: readString(card.cardNumber) ?? undefined,
+    game: "POKEMON",
+    language: "EN",
+  };
+}
+
+function shouldKeepRequestedPromoIdentity(input: CardRef, providerNumber: string | undefined): boolean {
+  const requestedNumber = input.number?.trim();
+  if (!requestedNumber || !providerNumber) return false;
+  return Boolean(stripPromoCollectorPrefix(requestedNumber)) && collectorNumberMatches(providerNumber, requestedNumber);
 }
 
 function findMatchingPokeTraceCard(json: unknown, request: CardRef): PokeTraceCard | null {

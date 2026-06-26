@@ -130,7 +130,16 @@ test("PokeTrace chooses the matching promo card from multiple results", () => {
 
   assert.equal(comp.sampleSize, 274);
   assert.equal(comp.medianPence, usdToPence(19.38));
-  assert.equal(comp.card.setName, "ME: Mega Evolution Promo");
+  assert.equal(comp.card.name, "Snivy");
+  assert.equal(comp.card.setName, "Mega Evolution Promos");
+  assert.equal(comp.card.number, "MEP049");
+  assert.deepEqual((comp.raw as { providerCard?: unknown }).providerCard, {
+    name: "Snivy - 049",
+    setName: "ME: Mega Evolution Promo",
+    number: "049",
+    game: "POKEMON",
+    language: "EN",
+  });
 });
 
 test("PokeTrace rejects wrong-set cards for unavailable promo sets", () => {
