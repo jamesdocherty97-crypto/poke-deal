@@ -2883,11 +2883,13 @@ export default function Home() {
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "listing create failed");
-      setNotice(`${item.card.name} listing ${listingState === "ACTIVE" ? "activated" : "drafted"}.`);
+      const listing = payload.listing as Listing;
       setCreatingListingItemId(null);
-      await refreshAll();
       setView("listings");
       setListingStateFilter(listingState === "ACTIVE" ? "ACTIVE" : "DRAFT");
+      openListingPack(listing);
+      setNotice(`${item.card.name} listing ${listingState === "ACTIVE" ? "activated" : "drafted"}. Listing pack is ready.`);
+      await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "listing create failed");
     } finally {
