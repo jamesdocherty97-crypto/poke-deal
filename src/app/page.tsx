@@ -1234,6 +1234,12 @@ export default function Home() {
   const ebayNeedsMerchantLocation = Boolean(ebayStatus?.connected && ebayHasPolicies && !ebayHasMerchantLocation);
   const ebayCanCreateMerchantLocation = Boolean(ebayNeedsMerchantLocation && ebayStatus?.locationSetup?.configured);
   const ebayLocationMissingFields = ebayStatus?.locationSetup?.missingFields?.join(", ") ?? "";
+  const ebayNeedsReconnect = Boolean(
+    ebayStatus?.configured &&
+      !ebayStatus.connected &&
+      ebayStatus.error &&
+      /(?:invalid access token|authorization|refresh token|token exchange|token refresh)/i.test(ebayStatus.error),
+  );
   const ebayHealthSource = useMemo<SystemSource>(
     () => ({
       id: "ebay-sell-api",
@@ -1254,11 +1260,13 @@ export default function Home() {
             ? "Required eBay policies are ready; no merchant location key was returned, so first offer creation may need seller-location setup."
           : ebayStatus?.connected
             ? "Seller account is connected; finish business policies before offer creation."
+            : ebayNeedsReconnect
+              ? "The saved eBay connection has expired. Reconnect the seller account to create offers."
             : ebayStatus?.configured
               ? "Seller credentials are present; connect the eBay account to create offers."
               : "Add production eBay credentials when you are ready to automate listing offers.",
     }),
-    [ebayHasMerchantLocation, ebayHasPolicies, ebayStatus?.configured, ebayStatus?.connected],
+    [ebayHasMerchantLocation, ebayHasPolicies, ebayNeedsReconnect, ebayStatus?.configured, ebayStatus?.connected],
   );
   const setupSources = useMemo(
     () => (systemStatus ? [...systemStatus.sources.filter((source) => source.id !== "push-alerts"), ebayHealthSource] : []),
@@ -5463,6 +5471,11 @@ export default function Home() {
             <div className="ebay-setup-banner">
               {!ebayStatus.configured ? (
                 <span>eBay credentials not configured — set env vars to enable API automation.</span>
+              ) : ebayNeedsReconnect ? (
+                <>
+                  <span>eBay connection expired — reconnect your seller account to create offers.</span>
+                  <a href="/api/ebay/connect">Reconnect eBay</a>
+                </>
               ) : (
                 <>
                   <span>eBay not connected — authorise your seller account to enable offer creation.</span>
