@@ -2744,7 +2744,7 @@ export default function Home() {
     }
 
     applySaleTotalPrice(pricePence);
-    setNotice("Sale price pasted. Fees and postage have been estimated.");
+    setNotice("Buyer total pasted. Fees and your postage cost have been estimated.");
     setError(null);
   }
 
@@ -2764,7 +2764,7 @@ export default function Home() {
     }
 
     applySaleTotalPrice(grossSalePriceForNetPence(saleChannel, netPence, { grade: sellingItem?.grade }));
-    setNotice("Net payout pasted. Gross, fees and postage have been estimated.");
+    setNotice("Net payout pasted. Buyer total, fees and your postage cost have been estimated.");
     setError(null);
   }
 
@@ -5199,7 +5199,7 @@ export default function Home() {
                   <span>Net/unit</span>
                   <strong>{gbp(buyPlan.unitNetPence)}</strong>
                   <small>
-                    gross {gbp(buyPlan.unitGrossSalePence)} · fees {gbp(buyPlan.unitFeesPence)} · post{" "}
+                    buyer total {gbp(buyPlan.unitGrossSalePence)} · fees {gbp(buyPlan.unitFeesPence)} · my post{" "}
                     {gbp(buyPlan.unitPostagePence)}
                   </small>
                 </div>
@@ -6850,7 +6850,7 @@ function ListingPackSheet({
             <span>Net after sale</span>
             <strong>{gbp(economics.netPence)}</strong>
             <small>
-              Gross {gbp(economics.grossPence)} · fees {gbp(economics.feesPence)} · post {gbp(economics.postagePence)}
+              Buyer total {gbp(economics.grossPence)} · fees {gbp(economics.feesPence)} · my post {gbp(economics.postagePence)}
             </small>
           </div>
           <div>
