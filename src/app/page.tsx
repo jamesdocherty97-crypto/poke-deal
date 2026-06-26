@@ -1028,6 +1028,15 @@ export default function Home() {
       card.number.trim().toLowerCase() === number.trim().toLowerCase(),
   );
   const hasActiveCardIdentity = Boolean(name.trim() || setNameValue.trim() || number.trim() || comp);
+  const canClearCurrentComp = Boolean(
+    hasActiveCardIdentity ||
+      quickIntake.trim() ||
+      cost.trim() ||
+      manualCompQuery.trim() ||
+      checkedCompPrice.trim() ||
+      graderCert.trim() ||
+      psaResult,
+  );
   const selectedCardImage = cardArtUrl ?? catalogCard?.imageUrl ?? matchingQuickHunt?.imageUrl ?? null;
   const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
   const spotlightImage =
@@ -4279,8 +4288,8 @@ export default function Home() {
                   className="clear-comp-button"
                   type="button"
                   onClick={() => clearCurrentComp()}
-                  aria-label="Clear current comp"
-                  title="Clear current comp"
+                  aria-label="Clear and comp another card"
+                  title="Clear and comp another card"
                   disabled={busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
                 >
                   X
@@ -4338,7 +4347,7 @@ export default function Home() {
             )}
             <div className="quick-intake-field">
               <label htmlFor="quick-intake">Quick fill</label>
-              <div className="quick-intake-row quick-intake-actions">
+              <div className={`quick-intake-row quick-intake-actions ${canClearCurrentComp ? "has-next" : ""}`}>
                 <input
                   id="quick-intake"
                   ref={quickIntakeRef}
@@ -4367,6 +4376,17 @@ export default function Home() {
                 >
                   Comp
                 </button>
+                {canClearCurrentComp && (
+                  <button
+                    className="quick-next-button"
+                    type="button"
+                    onClick={() => clearCurrentComp()}
+                    disabled={busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
+                    aria-label="Clear and comp another card"
+                  >
+                    Next
+                  </button>
+                )}
               </div>
             </div>
             {quickIntakePreview && (
@@ -4655,7 +4675,7 @@ export default function Home() {
                     UK solds
                   </button>
                   <button className="ghost-button comp-skip-button" type="button" onClick={skipCurrentComp}>
-                    Skip
+                    Next comp
                   </button>
                 </div>
               </div>
@@ -6624,7 +6644,7 @@ export default function Home() {
             onClick={mobileCanStockLater ? () => void stockWithoutComp() : mobileNeedsCheckedComp ? jumpToCheckedComp : skipCurrentComp}
             disabled={busy === "acquire" || busy === "manual-stock"}
           >
-            {mobileCanStockLater ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : mobileNeedsCheckedComp ? "Enter price" : "Skip"}
+            {mobileCanStockLater ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : mobileNeedsCheckedComp ? "Enter price" : "Next"}
           </button>
           <button
             className="primary-action"
