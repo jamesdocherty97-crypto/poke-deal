@@ -1075,6 +1075,15 @@ export default function Home() {
     : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
   const quickStockReady = Boolean(headline && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
   const quickStockCanSubmit = quickStockReady && !requiresCheckedCompBeforeStock;
+  const acquireButtonLabel = busy === "acquire"
+    ? "Stocking..."
+    : !headline
+      ? "Look up comp first"
+      : !quickStockReady
+        ? "Add cost"
+        : requiresCheckedCompBeforeStock
+          ? "Add checked comp first"
+          : "Acquire + price";
   const quickOfferOptions = useMemo(() => {
     const targetPence = deal?.targetBuyPence ?? 0;
     const options: Array<{ label: string; valuePence: number }> = [];
@@ -4820,13 +4829,9 @@ export default function Home() {
             <button
               className="primary-action"
               type="submit"
-              disabled={busy === "acquire" || needsManualComp || requiresCheckedCompBeforeStock}
+              disabled={busy === "acquire" || !quickStockCanSubmit}
             >
-              {busy === "acquire"
-                ? "Stocking..."
-                : needsManualComp || requiresCheckedCompBeforeStock
-                  ? "Add checked comp first"
-                  : "Acquire + price"}
+              {acquireButtonLabel}
             </button>
             <button className="secondary-action" type="button" onClick={stockWithoutComp} disabled={busy === "manual-stock"}>
               {busy === "manual-stock" ? "Stocking..." : "Stock now, price later"}
