@@ -1852,6 +1852,22 @@ label {
     var(--panel);
 }
 
+.stock-import-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.stock-import-actions button {
+  min-height: 38px;
+  padding: 7px 8px;
+  border-color: rgba(139, 92, 246, 0.34);
+  background: rgba(139, 92, 246, 0.12);
+  color: #eadcff;
+  font-size: 12px;
+  font-weight: 950;
+}
+
 .stock-import-preview,
 .stock-import-rows,
 .stock-import-errors {

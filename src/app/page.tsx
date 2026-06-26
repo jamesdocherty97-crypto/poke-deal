@@ -476,6 +476,9 @@ const INTAKE_PREFERENCES_STORAGE_KEY = "pokemon-dealer-os.intake-preferences.v1"
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
+const STOCK_IMPORT_EXAMPLE =
+  "card,set,number,grade,cost,qty,source,location,condition,cert,channel,list price,state\n" +
+  "Gengar,Lost Origin Trainer Gallery,TG06/TG30,RAW,10.00,1,Card fair,Binder,NM,,Vinted,25.00,draft";
 const VISIBLE_POPULAR_SET_LIMIT = 30;
 const VISIBLE_QUICK_HUNT_LIMIT = 8;
 const expensePresets: Array<{ category: ExpenseCategory; description: string; amount?: string; channel?: Channel }> = [
@@ -1967,6 +1970,36 @@ export default function Home() {
     } finally {
       setBusy(null);
     }
+  }
+
+  async function pasteStockImportRows() {
+    let clipboardText = "";
+    try {
+      clipboardText = await navigator.clipboard.readText();
+    } catch {
+      setError("Clipboard read failed. Paste rows into the box manually.");
+      return;
+    }
+
+    if (!clipboardText.trim()) {
+      setError("Clipboard is empty.");
+      return;
+    }
+
+    const parsed = parseStockImportText(clipboardText);
+    setStockImportText(clipboardText);
+    setNotice(
+      parsed.rows.length > 0
+        ? `${parsed.rows.length} stock row${parsed.rows.length === 1 ? "" : "s"} ready to review.`
+        : "Rows pasted. Fix the highlighted import issues before saving.",
+    );
+    setError(parsed.errors.length > 0 ? `${parsed.errors.length} import row${parsed.errors.length === 1 ? "" : "s"} need fixing.` : null);
+  }
+
+  function fillStockImportExample() {
+    setStockImportText(STOCK_IMPORT_EXAMPLE);
+    setNotice("Example stock row loaded.");
+    setError(null);
   }
 
   async function createWatch() {
@@ -4739,10 +4772,18 @@ export default function Home() {
               <textarea
                 value={stockImportText}
                 onChange={(event) => setStockImportText(event.target.value)}
-                placeholder={`card,set,number,grade,cost,qty,source,location,condition,cert,channel,list price,state\nGengar,Lost Origin Trainer Gallery,TG06/TG30,RAW,10.00,1,Card fair,Binder,NM,,Vinted,25.00,draft`}
+                placeholder={STOCK_IMPORT_EXAMPLE}
                 rows={4}
               />
             </label>
+            <div className="stock-import-actions" aria-label="Opening stock shortcuts">
+              <button type="button" onClick={() => void pasteStockImportRows()}>
+                Paste clipboard
+              </button>
+              <button type="button" onClick={fillStockImportExample}>
+                Example
+              </button>
+            </div>
             {stockImportHasText && (
               <div className={`stock-import-preview ${stockImportPreview.errors.length > 0 ? "warn" : "good"}`}>
                 {stockImportPreview.errors.length > 0 ? (
