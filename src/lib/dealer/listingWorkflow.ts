@@ -9,6 +9,7 @@ export interface ListingWorkflowItem {
 export interface ListingVenueAction {
   label: string;
   url: string;
+  openedLabel: string;
 }
 
 export type ListingFlowStepState = "done" | "current" | "next" | "blocked";
@@ -60,12 +61,38 @@ export function nextSaleListingId(
   return activeIds[(currentIndex + 1) % activeIds.length] ?? null;
 }
 
-export function listingVenueAction(channel: ListingWorkflowChannel): ListingVenueAction | null {
-  if (channel !== "EBAY") return null;
-  return {
-    label: "Open eBay Sell",
-    url: "https://www.ebay.co.uk/sl/sell",
-  };
+export function listingVenueAction(
+  channel: ListingWorkflowChannel,
+  options: { query?: string } = {},
+): ListingVenueAction | null {
+  if (channel === "EBAY") {
+    return {
+      label: "Open eBay Sell",
+      url: "https://www.ebay.co.uk/sl/sell",
+      openedLabel: "eBay Sell",
+    };
+  }
+
+  if (channel === "CARDMARKET") {
+    const params = new URLSearchParams();
+    const query = options.query?.trim();
+    if (query) params.set("searchString", query);
+    return {
+      label: "Open Cardmarket",
+      url: `https://www.cardmarket.com/en/Pokemon/Products/Search${params.size ? `?${params.toString()}` : ""}`,
+      openedLabel: "Cardmarket",
+    };
+  }
+
+  if (channel === "VINTED") {
+    return {
+      label: "Open Vinted",
+      url: "https://www.vinted.co.uk/items/new",
+      openedLabel: "Vinted upload",
+    };
+  }
+
+  return null;
 }
 
 export function buildListingSellFlow(input: ListingSellFlowInput): ListingFlowStep[] {

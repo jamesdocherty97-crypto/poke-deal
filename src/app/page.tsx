@@ -2920,7 +2920,7 @@ export default function Home() {
 
   async function copyListingPackAndOpenVenue() {
     if (!listingPack || !listingPackTarget) return;
-    const venueAction = listingVenueAction(listingPackTarget.channel);
+    const venueAction = listingVenueAction(listingPackTarget.channel, { query: listingPackSearchQuery(listingPackTarget, listingPack) });
     if (venueAction) window.open(venueAction.url, "_blank", "noopener,noreferrer");
     try {
       await navigator.clipboard.writeText(listingPack.copyReady);
@@ -2928,7 +2928,7 @@ export default function Home() {
       setListingPackCopiedField(null);
       setNotice(
         venueAction
-          ? "Listing pack copied. eBay Sell opened."
+          ? `Listing pack copied. ${venueAction.openedLabel} opened.`
           : "Listing pack copied.",
       );
       setError(null);
@@ -5946,7 +5946,7 @@ function ListingPackSheet({
   const item = listing.item;
   const specifics = Object.entries(pack.itemSpecifics);
   const copyFields = listingPackCopyFields(pack);
-  const venueAction = listingVenueAction(listing.channel);
+  const venueAction = listingVenueAction(listing.channel, { query: listingPackSearchQuery(listing, pack) });
   const canActivate = listing.state === "DRAFT";
   const canSell = Boolean(item && item.status !== "SOLD" && listing.state !== "SOLD");
   const economics = item
@@ -6164,6 +6164,11 @@ function ListingPackSheet({
       )}
     </form>
   );
+}
+
+function listingPackSearchQuery(listing: Listing, pack: ListingPack): string {
+  const card = listing.item?.card;
+  return [card?.name, card?.number, card?.setName].filter(Boolean).join(" ").trim() || pack.title;
 }
 
 function EbayPreflightCard({ preflight }: { preflight: EbayPreflight }) {

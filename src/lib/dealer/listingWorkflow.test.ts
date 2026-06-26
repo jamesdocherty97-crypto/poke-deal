@@ -33,13 +33,25 @@ test("nextSaleListingId advances through active sellable listings", () => {
   assert.equal(nextSaleListingId([{ id: "only", state: "ACTIVE", item: {} }], "only"), null);
 });
 
-test("listingVenueAction gives an official UK eBay listing entrypoint only for eBay", () => {
+test("listingVenueAction gives marketplace handoff entrypoints", () => {
   assert.deepEqual(listingVenueAction("EBAY"), {
     label: "Open eBay Sell",
     url: "https://www.ebay.co.uk/sl/sell",
+    openedLabel: "eBay Sell",
   });
-  assert.equal(listingVenueAction("VINTED"), null);
-  assert.equal(listingVenueAction("CARDMARKET"), null);
+
+  assert.deepEqual(listingVenueAction("VINTED"), {
+    label: "Open Vinted",
+    url: "https://www.vinted.co.uk/items/new",
+    openedLabel: "Vinted upload",
+  });
+
+  assert.deepEqual(listingVenueAction("CARDMARKET", { query: "Gengar TG06 Lost Origin Trainer Gallery" }), {
+    label: "Open Cardmarket",
+    url: "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=Gengar+TG06+Lost+Origin+Trainer+Gallery",
+    openedLabel: "Cardmarket",
+  });
+
   assert.equal(listingVenueAction("IN_PERSON"), null);
 });
 
