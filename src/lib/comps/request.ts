@@ -15,13 +15,17 @@ export interface CompLookupRequest {
 export function readCompLookupRequest(searchParams: URLSearchParams): CompLookupRequest | { error: string } {
   const freeText = readFirst(searchParams, "q", "query", "search");
   const parsed = freeText ? normalizeCatalogCardSearchInput(freeText) : null;
-  const rawName = readFirst(searchParams, "name", "cardName", "card") ?? parsed?.name;
-  const name = preserveVariantText(rawName, freeText);
+  const rawNameParam = readFirst(searchParams, "name", "cardName", "card");
+  const explicitSetName = readFirst(searchParams, "set", "setName");
+  const explicitNumber = readFirst(searchParams, "number", "collectorNumber", "cardNumber");
+  const parsedNameParam = rawNameParam ? normalizeCatalogCardSearchInput(rawNameParam, explicitSetName) : null;
+  const rawName = cleanCompRequestName(parsedNameParam?.name ?? parsed?.name);
+  const name = cleanCompRequestName(preserveVariantText(rawName, [freeText, rawNameParam].filter(Boolean).join(" ")));
 
   if (!name?.trim()) return { error: "name is required" };
 
-  const setName = readFirst(searchParams, "set", "setName") ?? parsed?.setName;
-  const number = readFirst(searchParams, "number", "collectorNumber", "cardNumber") ?? parsed?.number;
+  const setName = explicitSetName ?? parsed?.setName ?? parsedNameParam?.setName;
+  const number = explicitNumber ?? parsed?.number ?? parsedNameParam?.number;
   const grade = normalizeGradeLabel(readFirst(searchParams, "grade")) ?? "RAW";
 
   return {
@@ -48,4 +52,11 @@ function preserveVariantText(name: string | undefined, freeText: string | undefi
   if (!name?.trim()) return name;
   if (!textMentionsFirstEdition(freeText) || textMentionsFirstEdition(name)) return name;
   return `${name.trim()} 1st Edition`;
+}
+
+function cleanCompRequestName(name: string | undefined): string | undefined {
+  return name
+    ?.replace(/\s+-+\s+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

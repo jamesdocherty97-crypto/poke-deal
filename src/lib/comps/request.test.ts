@@ -77,6 +77,44 @@ test("readCompLookupRequest preserves 1st Edition variant text for pricing", () 
   });
 });
 
+test("readCompLookupRequest cleans direct cardName condition noise but keeps first edition", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    cardName: "Hitmontop - 1st Edition - LP",
+    setName: "Neo Genesis",
+    number: "3/111",
+    grade: "RAW",
+  }));
+
+  assert.deepEqual(parsed, {
+    card: {
+      name: "Hitmontop 1st Edition",
+      setName: "Neo Genesis",
+      number: "3/111",
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "RAW",
+  });
+});
+
+test("readCompLookupRequest can recover set and number from direct cardName shorthand", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    cardName: "Snivy MEP049 raw",
+    grade: "RAW",
+  }));
+
+  assert.deepEqual(parsed, {
+    card: {
+      name: "Snivy",
+      setName: "Mega Evolution Promos",
+      number: "MEP049",
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "RAW",
+  });
+});
+
 test("readCompLookupRequest normalizes typed slab grades", () => {
   const parsed = readCompLookupRequest(new URLSearchParams({
     name: "Gengar",
