@@ -68,6 +68,17 @@ export function buildTodayActions(input: TodayActionInput, limit = 5): TodayActi
   }
 
   if (input.activeListings > 0) {
+    if (input.soldCount > 0) {
+      actions.push({
+        id: "active-sales",
+        title: "Book active sale",
+        detail: `${input.activeListings} active listing${input.activeListings === 1 ? "" : "s"} to check`,
+        target: "sales",
+        tone: "good",
+        priority: 74,
+      });
+    }
+
     actions.push({
       id: "reprice",
       title: "Check repricing",
