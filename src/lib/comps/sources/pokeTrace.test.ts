@@ -2,7 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { buildPokeTraceSearchVariants, gradeToPokeTraceTier, mapPokeTraceCardsToComp, PokeTraceSource } from "./pokeTrace.js";
+import {
+  buildPokeTraceSearchVariants,
+  gradeToPokeTraceTier,
+  mapPokeTraceCardsToComp,
+  PokeTraceSource,
+  resetPokeTraceSharedThrottleForTests,
+} from "./pokeTrace.js";
 import type { CardRef } from "../../domain/types.js";
 
 const fixture = JSON.parse(
@@ -235,6 +241,23 @@ test("free tier: spaces the fallback US request to clear the 1-req/2s burst wind
   assert.equal(callTimes.length, 2);
   assert.ok(callTimes[1]! - callTimes[0]! >= 35, "US fallback should be spaced after EU");
   assert.equal(comp.medianPence > 0, true);
+});
+
+test("shared throttle spaces separate source instances for rapid app lookups", async () => {
+  resetPokeTraceSharedThrottleForTests();
+  const callTimes: number[] = [];
+  const fetchImpl = (async () => {
+    callTimes.push(Date.now());
+    return Response.json(fixture);
+  }) as typeof fetch;
+  const first = new PokeTraceSource("secret", fetchImpl, 5, 35, true);
+  const second = new PokeTraceSource("secret", fetchImpl, 5, 35, true);
+
+  await Promise.all([first.lookup(card, { grade: "RAW" }), second.lookup(card, { grade: "RAW" })]);
+
+  assert.equal(callTimes.length, 2);
+  assert.ok(callTimes[1]! - callTimes[0]! >= 30, "separate app lookups should share the PokeTrace burst guard");
+  resetPokeTraceSharedThrottleForTests();
 });
 
 test("free tier (US only): RAW resolves to the US TCGPlayer baseline", () => {

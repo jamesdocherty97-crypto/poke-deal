@@ -13,6 +13,8 @@ const DEFAULT_FETCH_TIMEOUT_MS = 2200;
 // window. Pro tier usually returns on the first (EU) call, so this delay rarely fires.
 const DEFAULT_INTER_MARKET_DELAY_MS = 2100;
 const MARKET_FALLBACKS: PokeTraceMarket[] = ["EU", "US"];
+let sharedPokeTraceRequestAt = 0;
+let sharedPokeTraceQueue = Promise.resolve();
 
 type PokeTraceMarket = "US" | "EU";
 
@@ -66,6 +68,7 @@ export class PokeTraceSource implements CompSource {
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
     private readonly interMarketDelayMs = DEFAULT_INTER_MARKET_DELAY_MS,
+    private readonly useSharedThrottle = fetchImpl === fetch,
   ) {
     this.live = Boolean(apiKey && apiKey.trim().length > 0);
   }
@@ -102,6 +105,7 @@ export class PokeTraceSource implements CompSource {
       });
 
       try {
+        if (this.useSharedThrottle) await waitForSharedPokeTraceSlot(this.interMarketDelayMs);
         const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
           headers: { "X-API-Key": this.apiKey ?? "", Accept: "application/json" },
           signal: timeoutSignal(this.fetchTimeoutMs),
@@ -120,6 +124,11 @@ export class PokeTraceSource implements CompSource {
 
     return null;
   }
+}
+
+export function resetPokeTraceSharedThrottleForTests(): void {
+  sharedPokeTraceRequestAt = 0;
+  sharedPokeTraceQueue = Promise.resolve();
 }
 
 export function gradeToPokeTraceTier(grade: Grade): string {
@@ -355,4 +364,16 @@ function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function waitForSharedPokeTraceSlot(intervalMs: number): Promise<void> {
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) return Promise.resolve();
+  const wait = sharedPokeTraceQueue.then(async () => {
+    const elapsed = Date.now() - sharedPokeTraceRequestAt;
+    const remaining = intervalMs - elapsed;
+    if (remaining > 0) await sleep(remaining);
+    sharedPokeTraceRequestAt = Date.now();
+  });
+  sharedPokeTraceQueue = wait.catch(() => undefined);
+  return wait;
 }
