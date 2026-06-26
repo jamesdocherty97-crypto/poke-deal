@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildBuyPlan, buildBuyTargetSuggestion } from "./buyPlan.js";
+import { buildBuyPlan, buildBuyTargetOptions, buildBuyTargetSuggestion } from "./buyPlan.js";
 
 test("buildBuyPlan accounts for eBay fees and postage per unit", () => {
   const plan = buildBuyPlan({
@@ -93,6 +93,40 @@ test("buildBuyTargetSuggestion prefers fee-aware target buy", () => {
     note: "Keeps a 30% safety cushion after expected selling costs.",
     alreadyUsing: false,
   });
+});
+
+test("buildBuyTargetOptions gives fair-flow watch presets", () => {
+  const options = buildBuyTargetOptions({
+    targetBuyPence: 2436,
+    compMedianPence: 5000,
+    compLowPence: 3000,
+    currentTargetPence: 2192,
+  });
+
+  assert.deepEqual(
+    options.map((option) => ({
+      label: option.label,
+      targetPence: option.targetPence,
+      alreadyUsing: option.alreadyUsing,
+    })),
+    [
+      { label: "Target buy", targetPence: 2436, alreadyUsing: false },
+      { label: "Safe target", targetPence: 2192, alreadyUsing: true },
+      { label: "70% comp", targetPence: 3500, alreadyUsing: false },
+      { label: "Low comp", targetPence: 3000, alreadyUsing: false },
+    ],
+  );
+});
+
+test("buildBuyTargetOptions removes duplicate prices", () => {
+  const options = buildBuyTargetOptions({
+    targetBuyPence: 3500,
+    compMedianPence: 5000,
+    compLowPence: 3500,
+    currentTargetPence: 3500,
+  });
+
+  assert.deepEqual(options.map((option) => option.label), ["Target buy", "Safe target"]);
 });
 
 test("buildBuyTargetSuggestion falls back to 70 percent of comp", () => {

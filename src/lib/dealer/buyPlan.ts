@@ -30,11 +30,12 @@ export interface BuyPlan {
 export interface BuyTargetSuggestionInput {
   targetBuyPence?: number | null;
   compMedianPence: number;
+  compLowPence?: number | null;
   currentTargetPence?: number | null;
 }
 
 export interface BuyTargetSuggestion {
-  label: "Target buy" | "70% comp";
+  label: "Target buy" | "Safe target" | "70% comp" | "Low comp";
   targetPence: number;
   note: string;
   alreadyUsing: boolean;
@@ -120,30 +121,56 @@ export function buildBuyPlan(input: BuyPlanInput): BuyPlan {
 }
 
 export function buildBuyTargetSuggestion(input: BuyTargetSuggestionInput): BuyTargetSuggestion | null {
+  return buildBuyTargetOptions(input)[0] ?? null;
+}
+
+export function buildBuyTargetOptions(input: BuyTargetSuggestionInput): BuyTargetSuggestion[] {
   const currentTargetPence = sanitisePence(input.currentTargetPence ?? 0);
   const targetBuyPence = sanitisePence(input.targetBuyPence ?? 0);
   const compMedianPence = sanitisePence(input.compMedianPence);
+  const compLowPence = sanitisePence(input.compLowPence ?? 0);
+  const options: BuyTargetSuggestion[] = [];
 
   if (targetBuyPence > 0) {
-    return {
+    options.push({
       label: "Target buy",
       targetPence: targetBuyPence,
       note: "Keeps a 30% safety cushion after expected selling costs.",
       alreadyUsing: isSamePence(currentTargetPence, targetBuyPence),
-    };
+    });
+    options.push({
+      label: "Safe target",
+      targetPence: Math.max(1, Math.round(targetBuyPence * 0.9)),
+      note: "A little under target for quicker sourcing decisions.",
+      alreadyUsing: isSamePence(currentTargetPence, Math.max(1, Math.round(targetBuyPence * 0.9))),
+    });
   }
 
   if (compMedianPence > 0) {
     const targetPence = Math.round(compMedianPence * 0.7);
-    return {
+    options.push({
       label: "70% comp",
       targetPence,
       note: "Fallback target when fee-aware deal maths is not available.",
       alreadyUsing: isSamePence(currentTargetPence, targetPence),
-    };
+    });
   }
 
-  return null;
+  if (compLowPence > 0) {
+    options.push({
+      label: "Low comp",
+      targetPence: compLowPence,
+      note: "Anchors to the low end of recent sold evidence.",
+      alreadyUsing: isSamePence(currentTargetPence, compLowPence),
+    });
+  }
+
+  const seen = new Set<number>();
+  return options.filter((option) => {
+    if (seen.has(option.targetPence)) return false;
+    seen.add(option.targetPence);
+    return option.targetPence > 0;
+  });
 }
 
 function roundPct(fraction: number): number {

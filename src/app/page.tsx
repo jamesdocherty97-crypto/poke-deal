@@ -45,7 +45,7 @@ import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { normalizeListingUrl } from "@/lib/dealer/listingUrl";
 import { buildLaunchReadiness, type LaunchReadinessItem, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, buildLaunchProgress, type LaunchPlanItem, type LaunchPlanTarget, type LaunchProgress } from "@/lib/dealer/launchPlan";
-import { buildBuyPlan, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
+import { buildBuyPlan, buildBuyTargetOptions, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
 import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
 import {
   buildCheckedComp,
@@ -1209,9 +1209,22 @@ export default function Home() {
         ? buildBuyTargetSuggestion({
             targetBuyPence: deal?.targetBuyPence ?? null,
             compMedianPence: headline.medianPence,
+            compLowPence: headline.lowPence,
             currentTargetPence: poundsToPence(watchTarget),
           })
         : null,
+    [deal?.targetBuyPence, headline, watchTarget],
+  );
+  const buyTargetOptions = useMemo(
+    () =>
+      headline
+        ? buildBuyTargetOptions({
+            targetBuyPence: deal?.targetBuyPence ?? null,
+            compMedianPence: headline.medianPence,
+            compLowPence: headline.lowPence,
+            currentTargetPence: poundsToPence(watchTarget),
+          })
+        : [],
     [deal?.targetBuyPence, headline, watchTarget],
   );
   const buyFlowSteps = useMemo<BuyFlowStep[]>(() => {
@@ -5059,6 +5072,23 @@ export default function Home() {
                   >
                     {buyTargetSuggestion.alreadyUsing ? "Using" : "Use"}
                   </button>
+                </div>
+              )}
+              {buyTargetOptions.length > 1 && (
+                <div className="buy-target-presets" aria-label="Buy target presets">
+                  {buyTargetOptions.map((option) => (
+                    <button
+                      key={`${option.label}-${option.targetPence}`}
+                      type="button"
+                      className={option.alreadyUsing ? "selected" : ""}
+                      onClick={() => setWatchTarget(penceToPounds(option.targetPence))}
+                      disabled={option.alreadyUsing}
+                      title={option.note}
+                    >
+                      <span>{option.label}</span>
+                      <strong>{gbp(option.targetPence)}</strong>
+                    </button>
+                  ))}
                 </div>
               )}
               <button className="secondary-action" type="button" onClick={createWatch} disabled={busy === "watch-create"}>

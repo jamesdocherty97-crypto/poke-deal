@@ -2057,6 +2057,51 @@ label {
   opacity: 1;
 }
 
+.buy-target-presets {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.buy-target-presets button {
+  display: grid;
+  flex: 0 0 auto;
+  min-width: 86px;
+  min-height: 44px;
+  gap: 2px;
+  border-color: rgba(255, 203, 5, 0.24);
+  background: rgba(255, 203, 5, 0.08);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.buy-target-presets button.selected,
+.buy-target-presets button:disabled {
+  border-color: rgba(52, 211, 153, 0.32);
+  background: rgba(52, 211, 153, 0.1);
+  opacity: 1;
+}
+
+.buy-target-presets span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.buy-target-presets strong {
+  color: var(--yellow);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.buy-target-presets button.selected strong,
+.buy-target-presets button:disabled strong {
+  color: var(--green);
+}
+
 .stock-import-panel {
   background:
     linear-gradient(125deg, rgba(139, 92, 246, 0.16), transparent 48%),
