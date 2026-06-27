@@ -5001,6 +5001,27 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+              <div className="comp-identity-strip" aria-label="Comp card identity">
+                <CardImage
+                  src={selectedCardImage}
+                  className="comp-identity-art"
+                  fallbackClassName="comp-identity-art blank"
+                  alt={`${selectedCardTitle} card art`}
+                />
+                <div>
+                  <span>{grade.replace(/_/g, " ")}</span>
+                  <strong>{selectedCardTitle}</strong>
+                  <small>{selectedCardMeta}</small>
+                </div>
+                {selectedCardMarkUrl && (
+                  <img
+                    className="comp-identity-set-mark"
+                    src={selectedCardMarkUrl}
+                    alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+                    onError={hideBrokenImage}
+                  />
+                )}
+              </div>
               {!needsManualComp && !stockCompItem && renderQuickStockCard()}
               {needsManualComp && (
                 <div className="manual-rescue-card">

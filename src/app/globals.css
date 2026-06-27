@@ -2684,6 +2684,59 @@ label {
   text-shadow: 0 3px 0 rgba(42, 117, 187, 0.55);
 }
 
+.comp-identity-strip {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 203, 5, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(112deg, rgba(255, 203, 5, 0.1), rgba(42, 117, 187, 0.1)),
+    rgba(3, 8, 20, 0.4);
+  padding: 9px;
+}
+
+.comp-identity-strip div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.comp-identity-strip span,
+.comp-identity-strip small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.comp-identity-strip strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.08;
+}
+
+.comp-identity-art {
+  width: 54px;
+  height: 74px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  background: var(--panel-2);
+  object-fit: cover;
+}
+
+.comp-identity-set-mark {
+  width: auto;
+  height: auto;
+  max-width: 84px;
+  max-height: 34px;
+  object-fit: contain;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
