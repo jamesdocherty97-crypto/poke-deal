@@ -5671,7 +5671,7 @@ label {
   overflow-wrap: anywhere;
 }
 
-.ebay-publish-confirm > div {
+.ebay-publish-confirm > div:last-child {
   display: flex;
   gap: 8px;
 }
@@ -5689,6 +5689,47 @@ label {
   .listings-workspace,
   .pnl-workspace {
     gap: 10px;
+  }
+
+  .ebay-setup-banner {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .ebay-location-form {
+    grid-template-columns: 1fr;
+  }
+
+  .ebay-location-form input,
+  .ebay-location-form input:nth-of-type(3),
+  .ebay-location-form button {
+    grid-column: 1 / -1;
+    min-height: 42px;
+  }
+
+  .ebay-setup-banner a,
+  .ebay-setup-banner button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .ebay-publish-overlay {
+    top: max(8px, env(safe-area-inset-top));
+  }
+
+  .ebay-publish-confirm > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .ebay-publish-confirm button,
+  .listing-pack-ebay-actions a,
+  .listing-pack-ebay-actions button {
+    width: 100%;
+  }
+
+  .ebay-preflight-card dl {
+    grid-template-columns: 1fr;
   }
 
   .inventory-workspace .section-heading,
