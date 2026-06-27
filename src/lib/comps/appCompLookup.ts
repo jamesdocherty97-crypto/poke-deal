@@ -29,6 +29,11 @@ async function resolveCatalogCardUnbounded(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource,
 ): Promise<CatalogCard | null> {
+  const cached = catalogSource.name === "pokemon-tcg-api"
+    ? await findCachedCatalogMatch(card).catch(() => null)
+    : null;
+  if (cached) return cached;
+
   const direct = await catalogSource.resolve(card).catch(() => null);
   if (direct && catalogCardMatchesLookupContext(direct, card)) return direct;
 
@@ -101,6 +106,7 @@ export function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardR
     setName: catalog.setName,
     number: catalog.number ?? fallback.number,
     tcgApiId: catalog.tcgApiId,
+    tcgDexId: catalog.tcgDexId,
     game: catalog.game,
     language: catalog.language,
   };
@@ -131,12 +137,57 @@ export function fixedCatalogSource(live: boolean, catalog: CatalogCard): Catalog
 function catalogIdentityKey(card: CatalogCard): string {
   return (
     card.tcgApiId ??
+    card.tcgDexId ??
     [
       card.name.trim().toLowerCase(),
       card.setName.trim().toLowerCase(),
       (card.number ?? "").trim().toLowerCase(),
     ].join("|")
   );
+}
+
+async function findCachedCatalogMatch(card: CardRef): Promise<CatalogCard | null> {
+  if (!process.env.DATABASE_URL) return null;
+  const normalized = normalizeCatalogCardSearchInput(card.name, card.setName);
+  const query = [normalized.name || card.name, normalized.number ?? card.number].filter(Boolean).join(" ");
+  if (!query.trim()) return null;
+
+  const rows = await getPrisma().card.findMany({
+    where: {
+      game: "POKEMON",
+      language: "EN",
+      OR: [
+        { name: { contains: normalized.name || card.name, mode: "insensitive" } },
+        ...(normalized.number ?? card.number
+          ? [{ number: { contains: normalized.number ?? card.number, mode: "insensitive" as const } }]
+          : []),
+        ...(normalized.setName ?? card.setName
+          ? [{ setName: { contains: normalized.setName ?? card.setName, mode: "insensitive" as const } }]
+          : []),
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 120,
+  });
+
+  const ranked = rankCatalogCards(
+    query,
+    rows.map((row) => ({
+      game: row.game,
+      language: row.language,
+      name: row.name,
+      setName: row.setName,
+      setCode: row.setCode ?? undefined,
+      number: row.number ?? undefined,
+      rarity: row.rarity ?? undefined,
+      imageUrl: row.imageUrl ?? undefined,
+      tcgApiId: row.tcgApiId ?? undefined,
+      tcgDexId: row.tcgDexId ?? undefined,
+    })),
+    { setName: normalized.setName ?? card.setName, limit: 8 },
+  );
+
+  return ranked.find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null;
 }
 
 function findChaseCatalogMatch(card: CardRef): CatalogCard | null {
