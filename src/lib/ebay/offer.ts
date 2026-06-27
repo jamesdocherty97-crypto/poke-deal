@@ -2,7 +2,7 @@
 // Creates, looks up by SKU, and publishes eBay offers for a FIXED_PRICE listing.
 
 import type { EbayConfig } from "./config.js";
-import { ebayJson } from "./client.js";
+import { ebayFetch, ebayJson } from "./client.js";
 import type { ListingPack } from "../dealer/listingPack.js";
 import type { EbayPolicies } from "./policies.js";
 import { EBAY_UK_CATEGORY_POKEMON } from "./config.js";
@@ -91,13 +91,28 @@ export async function updateEbayOffer(
   accessToken: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  await ebayJson<unknown>(
+  // eBay returns 204 No Content on a successful offer update — no body to
+  // parse, so this uses ebayFetch directly rather than ebayJson (which always
+  // calls response.json() and would throw "Unexpected end of JSON input").
+  const response = await ebayFetch(
     config,
     `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}`,
     accessToken,
     { method: "PUT", body: JSON.stringify(payload) },
     fetchImpl,
   );
+  if (!response.ok && response.status !== 204) {
+    let msg = `HTTP ${response.status}`;
+    try {
+      const body = (await response.json()) as {
+        errors?: Array<{ longMessage?: string; message?: string }>;
+      };
+      msg = body.errors?.[0]?.longMessage ?? body.errors?.[0]?.message ?? msg;
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(`eBay offer update failed: ${msg}`);
+  }
 }
 
 export async function getOfferBySku(
