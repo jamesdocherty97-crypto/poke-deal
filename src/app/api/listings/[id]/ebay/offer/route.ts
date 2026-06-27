@@ -4,7 +4,7 @@ import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { upsertInventoryItem } from "@/lib/ebay/inventoryItem";
-import { createEbayOffer, getOfferBySku } from "@/lib/ebay/offer";
+import { createEbayOffer, getOfferBySku, updateEbayOffer } from "@/lib/ebay/offer";
 import { buildEbayOfferPreflight } from "@/lib/ebay/preflight";
 
 export const runtime = "nodejs";
@@ -83,11 +83,16 @@ export async function POST(
     // Upsert the inventory item (idempotent — safe to call multiple times)
     await upsertInventoryItem(config, preflight.sku, preflight.inventoryItem, accessToken);
 
-    // Use existing offer if one already exists for this SKU
+    // Use existing offer if one already exists for this SKU, but always sync it
+    // with the latest preflight payload (price, policies, merchant location).
+    // Without this, an offer created before e.g. the merchant location was set
+    // up would stay stale forever and fail to publish with a vague eBay error.
     let offerId = await getOfferBySku(config, preflight.sku, accessToken);
     if (!offerId) {
       const created = await createEbayOffer(config, preflight.offer, accessToken);
       offerId = created.offerId;
+    } else {
+      await updateEbayOffer(config, offerId, preflight.offer, accessToken);
     }
 
     // Persist offer ID with prefix so we can distinguish it from a published listing ID

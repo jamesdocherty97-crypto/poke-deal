@@ -84,6 +84,22 @@ export async function createEbayOffer(
   );
 }
 
+export async function updateEbayOffer(
+  config: EbayConfig,
+  offerId: string,
+  payload: EbayOfferPayload,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  await ebayJson<unknown>(
+    config,
+    `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}`,
+    accessToken,
+    { method: "PUT", body: JSON.stringify(payload) },
+    fetchImpl,
+  );
+}
+
 export async function getOfferBySku(
   config: EbayConfig,
   sku: string,
