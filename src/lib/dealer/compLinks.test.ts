@@ -58,9 +58,9 @@ test("buildManualCompLinks adds ACE slab grades to eBay sold searches", () => {
 });
 
 test("buildManualCompLinks formats low CGC half grades for eBay sold searches", () => {
-  const links = buildManualCompLinks({ name: "Lugia", setName: "Neo Genesis" }, "CGC_1_5");
+  const links = buildManualCompLinks({ name: "Lugia", setName: "Neo Genesis", number: "9" }, "CGC_1_5");
 
-  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), 'Lugia Neo Genesis ("CGC 1.5" OR CGC1.5)');
+  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), 'Lugia 9 Neo Genesis ("CGC 1.5" OR CGC1.5)');
 });
 
 test("buildManualCompLinks formats BGS half grades for eBay sold searches", () => {
@@ -139,6 +139,7 @@ test("normalizeManualCompSearchText joins modern promo codes for manual eBay sea
 test("normalizeManualCompSearchText keeps ex card names separate from collector numbers", () => {
   assert.equal(normalizeManualCompSearchText("Charizard ex 199/165 151"), "Charizard ex 199/165 151");
   assert.equal(normalizeManualCompSearchText("Mew GX 242/236 Unified Minds"), "Mew GX 242/236 Unified Minds");
+  assert.equal(normalizeManualCompSearchText("Lugia 9 Neo Genesis CGC 1.5"), "Lugia 9 Neo Genesis CGC 1.5");
 });
 
 test("ebaySoldSearchQuery keeps explicit graded wording instead of adding raw exclusions", () => {

@@ -94,8 +94,8 @@ export function normalizeManualCompSearchText(input: string | undefined): string
     .replace(/\b(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s+0?(\d{1,4})\b/gi, (_, prefix: string, digits: string) =>
       `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
     )
-    .replace(/\b(?!(?:SET|PSA|BGS|CGC|ACE|SGC|EX|GX)\b)([A-Z]{2,5})\s+(\d{1,4})\b/gi, (_, prefix: string, digits: string) =>
-      `${prefix.toUpperCase()}${digits}`,
+    .replace(/\b(?!(?:SET|PSA|BGS|CGC|ACE|SGC|EX|GX)\b)([A-Z]{2,5})\s+(\d{1,4})\b/gi, (match: string, prefix: string, digits: string) =>
+      prefix === prefix.toUpperCase() ? `${prefix}${digits}` : match,
     )
     .replace(/(?:£\s*)\d+(?:[.,]\d{1,2})?/gi, " ")
     .replace(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?\d+(?:[.,]\d{1,2})?\b/gi, " ")
