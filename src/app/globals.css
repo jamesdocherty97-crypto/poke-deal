@@ -5192,11 +5192,19 @@ label {
     grid-auto-flow: dense;
   }
 
+  .buy-workspace {
+    grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.18fr);
+    grid-auto-flow: dense;
+  }
+
   .pnl-workspace {
     grid-template-columns: minmax(0, 1.26fr) minmax(300px, 0.95fr);
     grid-auto-flow: dense;
   }
 
+  .buy-workspace > .buy-flow-rail,
+  .buy-workspace > .last-stocked-panel,
+  .buy-workspace > .lookup-panel,
   .inventory-workspace > .section-heading,
   .inventory-workspace > .dex-controls,
   .listings-workspace > .detail-grid,
@@ -5210,6 +5218,12 @@ label {
     grid-column: 1;
   }
 
+  .buy-workspace > .comp-panel,
+  .buy-workspace > .fallback-stock-panel,
+  .buy-workspace > .grade-lab,
+  .buy-workspace > .watch-panel,
+  .buy-workspace > .stock-import-panel,
+  .buy-workspace > .recent-intake-panel,
   .listings-workspace > .export-actions,
   .listings-workspace > .listing-desk-panel,
   .listings-workspace > .listing-queue-panel,
@@ -5225,6 +5239,8 @@ label {
     grid-column: 2;
   }
 
+  .buy-workspace > .lookup-panel,
+  .buy-workspace > .last-stocked-panel,
   .inventory-workspace > .sell-sheet,
   .inventory-workspace > .stock-import-panel,
   .inventory-workspace > .recent-intake-panel,
@@ -5235,6 +5251,36 @@ label {
   .pnl-workspace > .watch-panel {
     position: sticky;
     top: 84px;
+  }
+
+  .buy-workspace > .last-stocked-panel {
+    top: 84px;
+    align-self: start;
+  }
+
+  .buy-workspace > .lookup-panel {
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .buy-workspace > .comp-panel {
+    align-self: start;
+  }
+
+  .buy-workspace .quick-stock-card {
+    border-color: rgba(255, 203, 5, 0.3);
+    background:
+      linear-gradient(125deg, rgba(255, 203, 5, 0.1), transparent 48%),
+      rgba(3, 8, 20, 0.38);
+  }
+
+  .buy-workspace .quick-stock-grid {
+    grid-template-columns: minmax(0, 1fr) 84px repeat(2, minmax(90px, 0.75fr));
+  }
+
+  .buy-workspace .buy-plan.compact {
+    grid-template-columns: minmax(0, 1.1fr) repeat(3, minmax(88px, 0.75fr));
   }
 
   .inventory-workspace > .sell-sheet,
