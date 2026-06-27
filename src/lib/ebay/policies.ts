@@ -87,3 +87,39 @@ export async function fetchEbayPolicies(
 
   return { paymentPolicyId, fulfillmentPolicyId, returnPolicyId, merchantLocationKey };
 }
+
+export interface EbaySellingPrivileges {
+  sellerRegistrationCompleted: boolean | null;
+  sellingLimit: { amount?: { value?: string; currency?: string }; quantity?: number } | null;
+}
+
+interface PrivilegeResponse {
+  sellerRegistrationCompleted?: boolean;
+  sellingLimit?: { amount?: { value?: string; currency?: string }; quantity?: number };
+}
+
+/**
+ * Calls eBay's Account API privilege endpoint to check whether the eBay
+ * account behind the connected OAuth token has finished seller
+ * registration. Distinct from business-policy/location setup — this
+ * reflects eBay's own account-level gate (identity verification + payout
+ * method) that blocks publish with "Incomplete account information"
+ * regardless of how correct the listing payload is.
+ */
+export async function fetchEbaySellingPrivileges(
+  config: EbayConfig,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EbaySellingPrivileges> {
+  const result = await ebayJson<PrivilegeResponse>(
+    config,
+    "/sell/account/v1/privilege",
+    accessToken,
+    {},
+    fetchImpl,
+  );
+  return {
+    sellerRegistrationCompleted: result.sellerRegistrationCompleted ?? null,
+    sellingLimit: result.sellingLimit ?? null,
+  };
+}
