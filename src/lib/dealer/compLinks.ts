@@ -86,6 +86,10 @@ export function buildManualCompFallbackQuery(
 export function normalizeManualCompSearchText(input: string | undefined): string {
   if (!input?.trim()) return "";
   return input
+    .replace(
+      /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
+      (_, digits: string, prefix: string) => `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
+    )
     .replace(/[–—-]+/g, " ")
     .replace(/\b(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s+0?(\d{1,4})\b/gi, (_, prefix: string, digits: string) =>
       `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
@@ -154,7 +158,7 @@ function gradeLabel(grade: Grade): string {
 function queryMentionsGrade(query: string, gradeLabelValue: string): boolean {
   const normalized = query.toUpperCase().replace(/\s+/g, " ");
   if (gradeLabelValue && normalized.includes(gradeLabelValue.toUpperCase())) return true;
-  return /\b(?:PSA|BGS|CGC|ACE|SGC)\s*(?:10|9(?:\.5)?|[1-8])\b/.test(normalized) || /\bGRADED\b/.test(normalized);
+  return /\b(?:PSA|BGS|CGC|ACE|SGC)\s*(?:10|9(?:\.5)?|[1-8](?:\.5)?)\b/.test(normalized) || /\bGRADED\b/.test(normalized);
 }
 
 function appendMissingTerms(query: string, terms: string[]): string {

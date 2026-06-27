@@ -88,6 +88,32 @@ test("parseQuickIntake resolves Mega Evolution promo shorthand", () => {
   });
 });
 
+test("parseQuickIntake resolves parenthesised modern promo shorthand", () => {
+  assert.deepEqual(parseQuickIntake("Victini 208 IR Promo (SVP) ACE 10 £40"), {
+    name: "Victini",
+    setName: "Scarlet & Violet Black Star Promos",
+    number: "SVP208",
+    grade: "ACE_10",
+    cost: "40.00",
+  });
+
+  assert.deepEqual(parseQuickIntake("Alakazam MEP0079 raw £5"), {
+    name: "Alakazam",
+    setName: "Mega Evolution Promos",
+    number: "MEP0079",
+    grade: "RAW",
+    cost: "5.00",
+  });
+});
+
+test("parseQuickIntake keeps unsupported slab grades out of the card name", () => {
+  assert.deepEqual(parseQuickIntake("Lugia Neo Genesis CGC 1.5 £80"), {
+    name: "Lugia",
+    setName: "Neo Genesis",
+    cost: "80.00",
+  });
+});
+
 test("parseQuickIntake accepts broader slab grades", () => {
   assert.deepEqual(parseQuickIntake("Charizard base set 4/102 psa8 £300"), {
     name: "Charizard",

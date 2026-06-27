@@ -1339,6 +1339,35 @@ label {
   accent-color: var(--yellow);
 }
 
+.buy-advanced-details {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0;
+}
+
+.buy-advanced-details summary {
+  min-height: 42px;
+  padding: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 950;
+  list-style-position: inside;
+  text-transform: uppercase;
+}
+
+.buy-advanced-details[open] {
+  padding: 0 10px 10px;
+}
+
+.buy-advanced-details[open] summary {
+  margin: 0 -10px;
+  color: var(--ink);
+}
+
 .set-chip-row button img {
   width: auto;
   height: 18px;

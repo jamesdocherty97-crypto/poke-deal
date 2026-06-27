@@ -105,7 +105,9 @@ test("normalizeManualCompSearchText strips buy-flow noise but keeps comp qualifi
 
 test("normalizeManualCompSearchText joins modern promo codes for manual eBay searches", () => {
   assert.equal(normalizeManualCompSearchText("Snivy MEP 049 raw £2"), "Snivy MEP049");
+  assert.equal(normalizeManualCompSearchText("Alakazam MEP0079 raw"), "Alakazam MEP0079");
   assert.equal(normalizeManualCompSearchText("Pikachu SVP 085 LP"), "Pikachu SVP085 LP");
+  assert.equal(normalizeManualCompSearchText("Victini 208 IR Promo (SVP) ACE 10"), "Victini SVP208 ACE 10");
   assert.equal(normalizeManualCompSearchText("Snivy XYZ 001 raw £2"), "Snivy XYZ001");
 });
 
@@ -116,5 +118,6 @@ test("normalizeManualCompSearchText keeps ex card names separate from collector 
 
 test("ebaySoldSearchQuery keeps explicit graded wording instead of adding raw exclusions", () => {
   assert.equal(ebaySoldSearchQuery("Umbreon VMAX PSA 10", "RAW"), "Umbreon VMAX PSA 10");
+  assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis CGC 1.5", "RAW"), "Lugia Neo Genesis CGC 1.5");
   assert.equal(ebaySoldSearchQuery("Umbreon VMAX", "PSA_10"), "Umbreon VMAX PSA 10");
 });

@@ -121,6 +121,20 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     number: "MEP049",
   });
 
+  assert.deepEqual(normalizeCatalogCardSearchInput("Alakazam MEP0079 raw"), {
+    query: "Alakazam MEP0079",
+    name: "Alakazam",
+    setName: "Mega Evolution Promos",
+    number: "MEP0079",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Victini 208 IR Promo (SVP) ACE 10"), {
+    query: "Victini SVP208",
+    name: "Victini",
+    setName: "Scarlet & Violet Black Star Promos",
+    number: "SVP208",
+  });
+
   assert.deepEqual(normalizeCatalogCardSearchInput("Snivy XYZ 001 raw £2"), {
     query: "Snivy XYZ001",
     name: "Snivy",

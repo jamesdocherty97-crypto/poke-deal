@@ -99,7 +99,7 @@ const STRONG_SET_ALIASES = new Set([
 ]);
 
 export function parseQuickIntake(input: string): ParsedQuickIntake {
-  let working = normalizeSpacing(input);
+  let working = normalizeSpacing(normalizeParentheticalPromoNumbers(input));
   const parsed: ParsedQuickIntake = {};
 
   const quantity = extractQuantity(working);
@@ -149,6 +149,11 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
   if (grade) {
     parsed.grade = grade.value;
     working = removeMatch(working, grade.match);
+  } else {
+    const unsupportedSlabGrade = extractUnsupportedSlabGrade(working);
+    if (unsupportedSlabGrade) {
+      working = removeMatch(working, unsupportedSlabGrade.match);
+    }
   }
 
   const cert = extractCert(working);
@@ -178,6 +183,13 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
   if (name) parsed.name = name;
 
   return parsed;
+}
+
+function normalizeParentheticalPromoNumbers(input: string): string {
+  return input.replace(
+    /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
+    (_, digits: string, prefix: string) => `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
+  );
 }
 
 function extractCost(input: string): CostMatch | null {
@@ -273,6 +285,11 @@ function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: st
   if (raw?.[0]) return { value: "RAW", match: raw[0] };
 
   return null;
+}
+
+function extractUnsupportedSlabGrade(input: string): { match: string } | null {
+  const slab = input.match(/\b(?:PSA|BGS|CGC|ACE)\s*(?:10|9(?:[.,]5)?|[1-8](?:[.,]5)?)\b/i);
+  return slab?.[0] ? { match: slab[0] } : null;
 }
 
 function extractCert(input: string): { value: string; match: string } | null {

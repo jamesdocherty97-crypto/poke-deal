@@ -5157,8 +5157,8 @@ export default function Home() {
 
           <form className="panel" onSubmit={acquire}>
             <div className="panel-heading">
-              <h2>Just bought it</h2>
-              <span className="muted">Stock + listing</span>
+              <h2>Stock this card</h2>
+              <span className="muted">{quickStockListPence > 0 ? `List ${gbp(quickStockListPence)}` : "price later"}</span>
             </div>
             <div className="form-grid">
               <label>
@@ -5198,22 +5198,6 @@ export default function Home() {
             )}
             <div className="form-grid">
               <label>
-                Strategy
-                <select value={strategy} onChange={(event) => setStrategy(event.target.value as PricingStrategy)}>
-                  <option value="quick">Quick</option>
-                  <option value="market">Market</option>
-                  <option value="patient">Patient</option>
-                </select>
-              </label>
-              <label>
-                Channel
-                <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)}>
-                  {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
-                </select>
-              </label>
-            </div>
-            <div className="form-grid">
-              <label>
                 List price
                 <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="auto" />
               </label>
@@ -5225,6 +5209,95 @@ export default function Home() {
                 </select>
               </label>
             </div>
+            <details className="buy-advanced-details">
+              <summary>More stock details</summary>
+              <div className="form-grid">
+                <label>
+                  Strategy
+                  <select value={strategy} onChange={(event) => setStrategy(event.target.value as PricingStrategy)}>
+                    <option value="quick">Quick</option>
+                    <option value="market">Market</option>
+                    <option value="patient">Patient</option>
+                  </select>
+                </label>
+                <label>
+                  Channel
+                  <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)}>
+                    {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Source
+                  <input value={source} onChange={(event) => setSource(event.target.value)} />
+                </label>
+                <label>
+                  Location
+                  <input value={location} onChange={(event) => setLocation(event.target.value)} />
+                </label>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Condition
+                  <input value={condition} onChange={(event) => setCondition(event.target.value)} placeholder="NM, LP, edgewear..." />
+                </label>
+                <label>
+                  Cert
+                  <input
+                    inputMode="numeric"
+                    value={graderCert}
+                    onChange={(event) => setGraderCert(event.target.value)}
+                    placeholder={grade === "RAW" ? "optional" : "PSA cert number"}
+                  />
+                </label>
+              </div>
+              <div className="preset-row" aria-label="Source presets">
+                {sourcePresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={source === preset ? "selected" : ""}
+                    onClick={() => setSource(preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <div className="preset-row" aria-label="Location presets">
+                {locationPresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={location === preset ? "selected" : ""}
+                    onClick={() => setLocation(preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <div className="preset-row" aria-label="Condition presets">
+                {conditionPresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={condition === preset ? "selected" : ""}
+                    onClick={() => setCondition(preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <label className="toggle-control">
+                <input
+                  id="keep-buying"
+                  type="checkbox"
+                  checked={keepBuying}
+                  onChange={(event) => setKeepBuying(event.target.checked)}
+                />
+                <span>Keep buying</span>
+              </label>
+            </details>
             {projectedListSuggestion && !needsManualComp && (
               <div className={`price-preview ${projectedListSuggestion.confidence}`}>
                 <div>
@@ -5263,76 +5336,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-            <div className="form-grid">
-              <label>
-                Source
-                <input value={source} onChange={(event) => setSource(event.target.value)} />
-              </label>
-              <label>
-                Location
-                <input value={location} onChange={(event) => setLocation(event.target.value)} />
-              </label>
-            </div>
-            <div className="form-grid">
-              <label>
-                Condition
-                <input value={condition} onChange={(event) => setCondition(event.target.value)} placeholder="NM, LP, edgewear..." />
-              </label>
-              <label>
-                Cert
-                <input
-                  inputMode="numeric"
-                  value={graderCert}
-                  onChange={(event) => setGraderCert(event.target.value)}
-                  placeholder={grade === "RAW" ? "optional" : "PSA cert number"}
-                />
-              </label>
-            </div>
-            <div className="preset-row" aria-label="Source presets">
-              {sourcePresets.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={source === preset ? "selected" : ""}
-                  onClick={() => setSource(preset)}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-            <div className="preset-row" aria-label="Location presets">
-              {locationPresets.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={location === preset ? "selected" : ""}
-                  onClick={() => setLocation(preset)}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-            <div className="preset-row" aria-label="Condition presets">
-              {conditionPresets.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={condition === preset ? "selected" : ""}
-                  onClick={() => setCondition(preset)}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-            <label className="toggle-control">
-              <input
-                id="keep-buying"
-                type="checkbox"
-                checked={keepBuying}
-                onChange={(event) => setKeepBuying(event.target.checked)}
-              />
-              <span>Keep buying</span>
-            </label>
             <button
               className="primary-action"
               type="submit"

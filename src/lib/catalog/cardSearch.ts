@@ -142,7 +142,7 @@ export function normalizeCatalogCardSearchInput(
   query: string,
   explicitSetName?: string,
 ): NormalizedCatalogCardSearchInput {
-  const cleaned = stripLookupNoise(query);
+  const cleaned = stripLookupNoise(normalizeParentheticalPromoNumbers(query));
   const parsed = parseCardSearchQuery(cleaned);
   let name = parsed.name || cleaned.trim();
   let number = parsed.number;
@@ -180,6 +180,13 @@ export function normalizeCatalogCardSearchInput(
   const normalizedNumber = number ?? trailingNumber?.number;
   const normalizedQuery = [name, normalizedNumber].filter(Boolean).join(" ").trim() || cleaned.trim();
   return { query: normalizedQuery, name, setName, number: normalizedNumber };
+}
+
+function normalizeParentheticalPromoNumbers(input: string): string {
+  return input.replace(
+    /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
+    (_, digits: string, prefix: string) => `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
+  );
 }
 
 function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
