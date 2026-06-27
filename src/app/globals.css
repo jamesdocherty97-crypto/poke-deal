@@ -2216,6 +2216,62 @@ label {
     var(--panel);
 }
 
+.stock-import-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.stock-import-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.stock-import-panel summary::after {
+  content: "+";
+  display: grid;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(139, 92, 246, 0.34);
+  border-radius: 999px;
+  color: #eadcff;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.stock-import-panel[open] summary::after {
+  content: "-";
+}
+
+.stock-import-panel summary span,
+.stock-import-panel summary small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.stock-import-panel summary span {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 1000;
+}
+
+.stock-import-panel summary small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.stock-import-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 10px;
+}
+
 .stock-import-actions {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
@@ -4978,6 +5034,12 @@ label {
     grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
   }
 
+  .inventory-workspace,
+  .listings-workspace,
+  .pnl-workspace {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workspace > .section-heading,
   .workspace > .dex-controls,
   .workspace > .pnl-summary,
@@ -5000,6 +5062,17 @@ label {
   .buy-workspace > .recent-intake-panel,
   .buy-workspace > .last-stocked-panel {
     grid-column: 1 / -1;
+  }
+
+  .inventory-workspace > .sell-sheet,
+  .listings-workspace > .sell-sheet,
+  .pnl-workspace > .sell-sheet {
+    grid-column: auto;
+  }
+
+  .inventory-workspace .item-row,
+  .listings-workspace .item-row {
+    min-height: 128px;
   }
 
   .sell-sheet {
@@ -5070,6 +5143,71 @@ label {
 
   .dex-controls .search-control {
     grid-column: 1 / -1;
+  }
+
+  .item-row,
+  .swipe-content,
+  .listing-desk-card,
+  .watch-row {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .card-thumb {
+    width: 52px;
+    height: 72px;
+  }
+
+  .item-title-line {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .item-badges {
+    max-width: 100%;
+  }
+
+  .next-action-strip,
+  .listing-next-action,
+  .target-suggestion,
+  .channel-row,
+  .expense-row,
+  .reprice-row,
+  .watch-hit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .next-action-strip .next-action-button,
+  .listing-next-action button,
+  .target-suggestion button,
+  .reprice-row button {
+    width: 100%;
+  }
+
+  .row-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .row-actions button {
+    min-width: 0;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .expense-row div:last-child,
+  .reprice-row div:last-child,
+  .watch-hit-row div:last-child,
+  .channel-row > div:nth-child(2),
+  .sale-mini-row .sale-result {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .sale-mini-row {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .profit-sparkline {
@@ -5306,6 +5444,25 @@ label {
     margin-bottom: 72px;
   }
 
+  .inventory-workspace,
+  .listings-workspace,
+  .pnl-workspace {
+    gap: 10px;
+  }
+
+  .inventory-workspace .section-heading,
+  .listings-workspace .section-heading,
+  .pnl-workspace .section-heading {
+    position: sticky;
+    top: max(8px, env(safe-area-inset-top));
+    z-index: 6;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(13, 20, 36, 0.94);
+    padding: 8px 10px;
+    backdrop-filter: blur(12px);
+  }
+
   .detail-grid,
   .form-grid,
   .deal-banner,
@@ -5330,6 +5487,14 @@ label {
 
   .quick-intake-actions.has-next .quick-next-button {
     grid-column: 1 / -1;
+  }
+
+  .stock-import-panel summary {
+    min-height: 38px;
+  }
+
+  .stock-import-panel summary small {
+    text-align: right;
   }
 
   .mobile-buy-spacer {

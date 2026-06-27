@@ -642,6 +642,7 @@ export default function Home() {
   const compPanelRef = useRef<HTMLElement | null>(null);
   const checkedCompRef = useRef<HTMLDivElement | null>(null);
   const quickIntakeRef = useRef<HTMLInputElement | null>(null);
+  const stockImportDetailsRef = useRef<HTMLDetailsElement | null>(null);
   const stockImportRef = useRef<HTMLFormElement | null>(null);
   const stockImportTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const expensePanelRef = useRef<HTMLElement | null>(null);
@@ -1304,6 +1305,7 @@ export default function Home() {
   useEffect(() => {
     if (!scrollToStockImport || view !== "acquire" || !stockImportRef.current) return;
     const handle = window.setTimeout(() => {
+      if (stockImportDetailsRef.current) stockImportDetailsRef.current.open = true;
       stockImportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       stockImportTextareaRef.current?.focus();
       setScrollToStockImport(false);
@@ -5532,101 +5534,107 @@ export default function Home() {
             )}
           </form>
           )}
-          <form className="panel stock-import-panel" onSubmit={importStockRows} ref={stockImportRef}>
-            <div className="panel-heading">
-              <div>
-                <h2>Opening stock</h2>
-                <span className="muted">
-                  {stockImportHasText
-                    ? `${stockImportPreview.rows.length} row${stockImportPreview.rows.length === 1 ? "" : "s"} · ${gbp(stockImportPreview.totalCostPence)}`
-                    : "Bulk stock"}
-                </span>
-              </div>
-              {stockImportHasText && (
-                <button className="ghost-button" type="button" onClick={() => setStockImportText("")}>
-                  Clear
-                </button>
-              )}
-            </div>
-            <label>
-              Paste rows
-              <textarea
-                ref={stockImportTextareaRef}
-                value={stockImportText}
-                onChange={(event) => setStockImportText(event.target.value)}
-                placeholder={STOCK_IMPORT_EXAMPLE}
-                rows={4}
-              />
-            </label>
-            <div className="stock-import-actions" aria-label="Opening stock shortcuts">
-              <button type="button" onClick={() => void pasteStockImportRows()}>
-                Paste clipboard
-              </button>
-              {stockImportTemplates.map((template) => (
-                <button key={template.label} type="button" onClick={() => fillStockImportTemplate(template)}>
-                  {template.label}
-                </button>
-              ))}
-            </div>
-            {stockImportHasText && (
-              <div className={`stock-import-preview ${stockImportPreview.errors.length > 0 ? "warn" : "good"}`}>
-                {stockImportPreview.errors.length > 0 ? (
-                  <div className="stock-import-errors">
-                    {stockImportPreview.errors.slice(0, 4).map((row) => (
-                      <span key={`${row.line}-${row.message}`}>
-                        Line {row.line}: {row.message}
-                      </span>
-                    ))}
-                    {stockImportPreview.errors.length > 4 && <span>+{stockImportPreview.errors.length - 4} more</span>}
-                  </div>
-                ) : (
-                  <>
-                    <div className="stock-import-summary" aria-label="Opening stock import summary">
-                      <span>
-                        <strong>{stockImportPreview.totalQuantity}</strong>
-                        cards
-                      </span>
-                      <span>
-                        <strong>{stockImportPreview.listingCount}</strong>
-                        drafts
-                      </span>
-                      <span>
-                        <strong>{stockImportPreview.explicitListPriceCount}</strong>
-                        priced
-                      </span>
-                    </div>
-                    <div className="stock-import-rows">
-                      {stockImportPreview.rows.slice(0, 3).map((row, index) => (
-                        <span key={`${row.card.name}-${row.card.number ?? ""}-${index}`}>
-                          {row.quantity}x {row.card.name} · {row.card.setName ?? "No set"} · {gbp(row.costBasisPence)}
-                          {row.condition ? ` · ${row.condition}` : ""}
-                          {row.graderCert ? ` · cert ${row.graderCert}` : ""}
-                          {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : " · draft auto"}
-                        </span>
-                      ))}
-                      {stockImportPreview.rows.length > 3 && <span>+{stockImportPreview.rows.length - 3} more</span>}
-                    </div>
-                  </>
+          <details className="panel stock-import-panel" ref={stockImportDetailsRef}>
+            <summary>
+              <span>Opening stock import</span>
+              <small>
+                {stockImportHasText
+                  ? `${stockImportPreview.rows.length} row${stockImportPreview.rows.length === 1 ? "" : "s"} · ${gbp(stockImportPreview.totalCostPence)}`
+                  : "setup / bulk paste"}
+              </small>
+            </summary>
+            <form className="stock-import-form" onSubmit={importStockRows} ref={stockImportRef}>
+              <div className="panel-heading">
+                <div>
+                  <h2>Opening stock</h2>
+                  <span className="muted">Paste existing stock rows when setting up.</span>
+                </div>
+                {stockImportHasText && (
+                  <button className="ghost-button" type="button" onClick={() => setStockImportText("")}>
+                    Clear
+                  </button>
                 )}
               </div>
-            )}
-            <button
-              className="secondary-action"
-              type="submit"
-              disabled={
-                busy === "stock-import" ||
-                !stockImportHasText ||
-                stockImportPreview.rows.length === 0 ||
-                stockImportPreview.errors.length > 0
-              }
-            >
-              {busy === "stock-import"
-                ? "Importing..."
-                : stockImportPreview.rows.length > 0
-                  ? `Import ${stockImportPreview.rows.length} row${stockImportPreview.rows.length === 1 ? "" : "s"}`
-                  : "Import rows"}
-            </button>
-          </form>
+              <label>
+                Paste rows
+                <textarea
+                  ref={stockImportTextareaRef}
+                  value={stockImportText}
+                  onChange={(event) => setStockImportText(event.target.value)}
+                  placeholder={STOCK_IMPORT_EXAMPLE}
+                  rows={4}
+                />
+              </label>
+              <div className="stock-import-actions" aria-label="Opening stock shortcuts">
+                <button type="button" onClick={() => void pasteStockImportRows()}>
+                  Paste clipboard
+                </button>
+                {stockImportTemplates.map((template) => (
+                  <button key={template.label} type="button" onClick={() => fillStockImportTemplate(template)}>
+                    {template.label}
+                  </button>
+                ))}
+              </div>
+              {stockImportHasText && (
+                <div className={`stock-import-preview ${stockImportPreview.errors.length > 0 ? "warn" : "good"}`}>
+                  {stockImportPreview.errors.length > 0 ? (
+                    <div className="stock-import-errors">
+                      {stockImportPreview.errors.slice(0, 4).map((row) => (
+                        <span key={`${row.line}-${row.message}`}>
+                          Line {row.line}: {row.message}
+                        </span>
+                      ))}
+                      {stockImportPreview.errors.length > 4 && <span>+{stockImportPreview.errors.length - 4} more</span>}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="stock-import-summary" aria-label="Opening stock import summary">
+                        <span>
+                          <strong>{stockImportPreview.totalQuantity}</strong>
+                          cards
+                        </span>
+                        <span>
+                          <strong>{stockImportPreview.listingCount}</strong>
+                          drafts
+                        </span>
+                        <span>
+                          <strong>{stockImportPreview.explicitListPriceCount}</strong>
+                          priced
+                        </span>
+                      </div>
+                      <div className="stock-import-rows">
+                        {stockImportPreview.rows.slice(0, 3).map((row, index) => (
+                          <span key={`${row.card.name}-${row.card.number ?? ""}-${index}`}>
+                            {row.quantity}x {row.card.name} · {row.card.setName ?? "No set"} · {gbp(row.costBasisPence)}
+                            {row.condition ? ` · ${row.condition}` : ""}
+                            {row.graderCert ? ` · cert ${row.graderCert}` : ""}
+                            {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : " · draft auto"}
+                          </span>
+                        ))}
+                        {stockImportPreview.rows.length > 3 && <span>+{stockImportPreview.rows.length - 3} more</span>}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              <button
+                className="secondary-action"
+                type="submit"
+                disabled={
+                  busy === "stock-import" ||
+                  !stockImportHasText ||
+                  stockImportPreview.rows.length === 0 ||
+                  stockImportPreview.errors.length > 0
+                }
+              >
+                {busy === "stock-import"
+                  ? "Importing..."
+                  : stockImportPreview.rows.length > 0
+                    ? `Import ${stockImportPreview.rows.length} row${stockImportPreview.rows.length === 1 ? "" : "s"}`
+                    : "Import rows"}
+              </button>
+            </form>
+          </details>
           {recentIntake.length > 0 && (
             <section className="panel recent-intake-panel">
               <div className="panel-heading">
@@ -5684,7 +5692,7 @@ export default function Home() {
       )}
 
       {view === "inventory" && (
-        <section className="workspace">
+        <section className="workspace inventory-workspace">
           <div className="section-heading">
             <h2>Active stock</h2>
             <span>{rowCountLabel(visibleActiveInventory.length, activeInventory.length)}</span>
@@ -5873,7 +5881,7 @@ export default function Home() {
       )}
 
       {view === "listings" && (
-        <section className="workspace">
+        <section className="workspace listings-workspace">
           <div className="detail-grid">
             <Metric label="Draft" value={String(dashboard?.listingsByState.DRAFT ?? 0)} />
             <Metric label="Active" value={String(dashboard?.listingsByState.ACTIVE ?? 0)} />
@@ -6268,7 +6276,7 @@ export default function Home() {
       )}
 
       {view === "pnl" && (
-        <section className="workspace">
+        <section className="workspace pnl-workspace">
           <section className={`pnl-summary ${noBookedSales ? "empty" : ""}`}>
             <div className="detail-grid">
               <Metric
