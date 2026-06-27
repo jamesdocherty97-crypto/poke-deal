@@ -628,6 +628,7 @@ export default function Home() {
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
   const [cardSuggestions, setCardSuggestions] = useState<CatalogCard[]>([]);
   const [cardSuggestionsOpen, setCardSuggestionsOpen] = useState(false);
+  const [cardSuggestionsLoading, setCardSuggestionsLoading] = useState(false);
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
   const [listingQuery, setListingQuery] = useState("");
@@ -771,19 +772,35 @@ export default function Home() {
     const smartText = quickIntake.trim() || [name.trim(), number.trim()].filter(Boolean).join(" ");
     const parsed = normalizeCatalogCardSearchInput(smartText, setNameValue);
     const query = parsed.query;
+    setCardSuggestions([]);
     if (!query) {
-      setCardSuggestions([]);
+      setCardSuggestionsLoading(false);
       return;
     }
+    setCardSuggestionsLoading(true);
+    let cancelled = false;
     const handle = setTimeout(() => {
       const qs = new URLSearchParams({ q: query, limit: "8" });
       if (parsed.setName ?? setNameValue.trim()) qs.set("set", parsed.setName ?? setNameValue.trim());
       fetch(`/api/catalog/cards?${qs}`)
         .then(readJson)
-        .then((payload) => setCardSuggestions(payload.cards ?? []))
-        .catch(() => {});
+        .then((payload) => {
+          if (!cancelled) {
+            setCardSuggestions(payload.cards ?? []);
+            setCardSuggestionsLoading(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setCardSuggestions([]);
+            setCardSuggestionsLoading(false);
+          }
+        });
     }, 180);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [name, number, quickIntake, setNameValue, cardSuggestionsOpen]);
 
   const sellingItem = useMemo(
@@ -1010,6 +1027,15 @@ export default function Home() {
         : null,
     [acquireListingState, channel, condition, cost, grade, location, name, number, parsedQuickIntake, quantity, setNameValue, source],
   );
+  const typedFallbackSuggestion = useMemo(() => {
+    if (!quickIntake.trim() || !parsedQuickIntake?.name || cardSuggestionsLoading || cardSuggestions.length > 0) return null;
+    return {
+      name: parsedQuickIntake.name,
+      setName: parsedQuickIntake.setName ?? setNameValue.trim(),
+      number: parsedQuickIntake.number,
+      grade: parsedQuickIntake.grade ?? grade,
+    };
+  }, [cardSuggestions.length, cardSuggestionsLoading, grade, parsedQuickIntake, quickIntake, setNameValue]);
   const recentSets = useMemo(() => {
     const byId = new Map([...allSets, ...popularSets, ...setSuggestions].map((set) => [set.id, set]));
     return recentSetIds
@@ -4473,6 +4499,8 @@ export default function Home() {
                   value={quickIntake}
                   onChange={(event) => {
                     setQuickIntake(event.target.value);
+                    setCardSuggestions([]);
+                    setCardSuggestionsLoading(Boolean(event.target.value.trim()));
                     if (comp || checkedCompPrice.trim()) clearCompEvidence();
                   }}
                   onFocus={() => setCardSuggestionsOpen(true)}
@@ -4506,7 +4534,7 @@ export default function Home() {
                   </button>
                 )}
               </div>
-              {cardSuggestionsOpen && quickIntake.trim() && cardSuggestions.length > 0 && (
+              {cardSuggestionsOpen && quickIntake.trim() && (cardSuggestions.length > 0 || typedFallbackSuggestion) && (
                 <div className="smart-card-suggestions" role="listbox" aria-label="Card suggestions">
                   {cardSuggestions.map((card) => (
                     <button
@@ -4523,6 +4551,24 @@ export default function Home() {
                       </small>
                     </button>
                   ))}
+                  {typedFallbackSuggestion && (
+                    <button
+                      type="button"
+                      className="suggestion-item card-option typed-fallback-option"
+                      onClick={() => {
+                        applyQuickIntake();
+                        setCardSuggestionsOpen(false);
+                      }}
+                    >
+                      <span className="suggestion-card-art blank" aria-hidden="true" />
+                      <span>{typedFallbackSuggestion.name}</span>
+                      <small>
+                        {typedFallbackSuggestion.setName || "Manual card"}
+                        {typedFallbackSuggestion.number ? ` #${typedFallbackSuggestion.number}` : ""} ·{" "}
+                        {typedFallbackSuggestion.grade.replace(/_/g, " ")}
+                      </small>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
