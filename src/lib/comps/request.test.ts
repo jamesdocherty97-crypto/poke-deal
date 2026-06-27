@@ -141,6 +141,13 @@ test("readCompLookupRequest preserves canonical URL grade values", () => {
   }));
 
   assert.equal("grade" in parsed ? parsed.grade : null, "PSA_10");
+
+  const lowCgc = readCompLookupRequest(new URLSearchParams({
+    name: "Lugia",
+    grade: "CGC_1_5",
+  }));
+
+  assert.equal("grade" in lowCgc ? lowCgc.grade : null, "CGC_1_5");
 });
 
 test("readCompLookupRequest requires a card name", () => {

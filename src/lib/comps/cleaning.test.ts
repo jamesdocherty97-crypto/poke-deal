@@ -39,6 +39,7 @@ test("grade label normalization", () => {
   assert.equal(normalizeGradeLabel("BGS 9.5"), "BGS_9_5");
   assert.equal(normalizeGradeLabel("BGS_9_5"), "BGS_9_5");
   assert.equal(normalizeGradeLabel("CGC 1.5"), "CGC_1_5");
+  assert.equal(normalizeGradeLabel("CGC_1_5"), "CGC_1_5");
   assert.equal(normalizeGradeLabel("cgc1.5"), "CGC_1_5");
   assert.equal(normalizeGradeLabel("CGC 10"), "CGC_10");
   assert.equal(normalizeGradeLabel("ACE 10"), "ACE_10");

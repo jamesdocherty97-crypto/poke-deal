@@ -48,7 +48,9 @@ export function normalizeGradeLabel(label: string | undefined): Grade | null {
   if (m) {
     const company = m[1]!.toUpperCase();
     const compactNum = m[2]!.replace(/\s+/g, "");
-    const num = compactNum === "95" ? "9_5" : compactNum.replace(".", "_");
+    const num = compactNum.length === 2 && compactNum.endsWith("5")
+      ? `${compactNum[0]}_5`
+      : compactNum.replace(".", "_");
     const grade = `${company}_${num}` as Grade;
     return GRADE_VALUES.includes(grade) ? grade : null;
   }

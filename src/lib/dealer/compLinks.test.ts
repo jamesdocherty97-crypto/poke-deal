@@ -51,6 +51,12 @@ test("buildManualCompLinks adds ACE slab grades to eBay sold searches", () => {
   assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /ACE/);
 });
 
+test("buildManualCompLinks formats low CGC half grades for eBay sold searches", () => {
+  const links = buildManualCompLinks({ name: "Lugia", setName: "Neo Genesis" }, "CGC_1_5");
+
+  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), "Lugia Neo Genesis CGC 1.5");
+});
+
 test("buildManualCompLinks preserves typed vintage qualifiers for eBay", () => {
   const links = buildManualCompLinks(
     { name: "Hitmontop", setName: "Neo Genesis" },

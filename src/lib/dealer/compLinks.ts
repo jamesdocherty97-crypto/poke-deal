@@ -152,7 +152,7 @@ function tcgPlayerUrl(query: string): string {
 }
 
 function gradeLabel(grade: Grade): string {
-  return grade.replace(/_(\d)$/g, " $1").replace(/_/g, " ").replace("9 5", "9.5");
+  return grade.replace(/_(\d)_5$/g, " $1.5").replace(/_(\d+)$/g, " $1").replace(/_/g, " ");
 }
 
 function queryMentionsGrade(query: string, gradeLabelValue: string): boolean {
