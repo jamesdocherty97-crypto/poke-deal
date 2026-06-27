@@ -6942,13 +6942,17 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && headline && (
+      {view === "acquire" && (headline || name.trim() || setNameValue.trim() || number.trim() || checkedComp) && (
         <section className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`} aria-label="Current buy action">
           <div>
-            <span>{confidenceLabel?.label ?? "Comp"}</span>
-            <strong>{needsManualComp ? "Check solds" : gbp(headline.medianPence)}</strong>
+            <span>{headline ? confidenceLabel?.label ?? "Comp" : "Manual card"}</span>
+            <strong>{headline ? (needsManualComp ? "Check solds" : gbp(headline.medianPence)) : "No auto comp"}</strong>
             <small>
-              {needsManualComp
+              {!headline
+                ? manualStockReady
+                  ? "stock manually now, price/list later if needed"
+                  : "open UK solds or add cost and quantity"
+                : needsManualComp
                 ? mobileCanStockLater
                   ? "open UK solds or stock now, price later"
                   : "open UK solds, then enter checked price"
@@ -6964,18 +6968,24 @@ export default function Home() {
           <button
             className="mobile-skip-button"
             type="button"
-            onClick={mobileCanStockLater ? () => void stockWithoutComp() : mobileNeedsCheckedComp ? jumpToCheckedComp : skipCurrentComp}
+            onClick={!headline ? () => clearCurrentComp() : mobileCanStockLater ? () => void stockWithoutComp() : mobileNeedsCheckedComp ? jumpToCheckedComp : skipCurrentComp}
             disabled={busy === "acquire" || busy === "manual-stock"}
           >
-            {mobileCanStockLater ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : mobileNeedsCheckedComp ? "Enter price" : "Next"}
+            {!headline ? "Next" : mobileCanStockLater ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : mobileNeedsCheckedComp ? "Enter price" : "Next"}
           </button>
           <button
             className="primary-action"
             type="button"
-            onClick={needsManualComp ? () => openManualCompLink("EBAY_UK_SOLD") : () => void acquire()}
-            disabled={busy === "acquire" || busy === "manual-stock" || (!needsManualComp && !quickStockCanSubmit)}
+            onClick={!headline ? (manualStockReady ? () => void stockWithoutComp() : () => openManualCompLink("EBAY_UK_SOLD")) : needsManualComp ? () => openManualCompLink("EBAY_UK_SOLD") : () => void acquire()}
+            disabled={busy === "acquire" || busy === "manual-stock" || (headline ? !needsManualComp && !quickStockCanSubmit : !manualStockReady && !manualCompFallbackQuery.trim())}
           >
-            {needsManualComp
+            {!headline
+              ? manualStockReady
+                ? busy === "manual-stock"
+                  ? "Stocking..."
+                  : "Stock now"
+                : "Open UK"
+              : needsManualComp
               ? "Open UK"
               : busy === "acquire"
               ? "Stocking..."
