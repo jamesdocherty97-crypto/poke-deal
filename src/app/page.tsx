@@ -4098,6 +4098,143 @@ export default function Home() {
     );
   }
 
+  function renderQuickStockCard() {
+    return (
+      <div className={`quick-stock-card ${buyPlan?.tone ?? "warn"}`}>
+        <div className="quick-stock-heading">
+          <div>
+            <span>Ready to stock</span>
+            <strong>
+              {requiresCheckedCompBeforeStock
+                ? "Add checked comp"
+                : quickStockReady
+                  ? `${quickStockQuantity} to ${acquireListingState === "ACTIVE" ? "list" : "draft"}`
+                  : "Add cost"}
+            </strong>
+          </div>
+          <span className={`pill ${quickStockCostPence > 0 ? buyPlan?.tone ?? "warn" : "warn"}`}>
+            {quickStockCostPence > 0 ? buyPlan?.label ?? "Check" : "Add cost"}
+          </span>
+        </div>
+        <div className="quick-stock-grid">
+          <label>
+            Cost
+            <MoneyInput value={cost} onChange={setCost} />
+          </label>
+          <label>
+            Qty
+            <input
+              inputMode="numeric"
+              min="1"
+              step="1"
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+            />
+          </label>
+          <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
+          <Metric
+            label="Profit"
+            value={quickStockCostPence > 0 && buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
+            tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
+          />
+        </div>
+        <div className="listing-choice" role="group" aria-label="After stock listing choice">
+          <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
+            List later
+          </button>
+          <button
+            type="button"
+            className={shouldCreateListing && acquireListingState === "DRAFT" ? "selected" : ""}
+            onClick={() => {
+              setShouldCreateListing(true);
+              setAcquireListingState("DRAFT");
+            }}
+          >
+            Draft
+          </button>
+          <button
+            type="button"
+            className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
+            onClick={() => {
+              setShouldCreateListing(true);
+              setAcquireListingState("ACTIVE");
+            }}
+          >
+            Active
+          </button>
+        </div>
+        {totalCostSplit && (
+          <div className="split-cost-card">
+            <div>
+              <span>Total paid</span>
+              <strong>
+                {gbp(quickStockCostPence)} / {quickStockQuantity}
+              </strong>
+              <small>
+                Ledger cost {gbp(totalCostSplit.unitCostPence)} each
+                {totalCostSplit.roundingDeltaPence
+                  ? ` · ${totalCostSplit.roundingDeltaPence > 0 ? "+" : ""}${gbp(totalCostSplit.roundingDeltaPence)} rounding`
+                  : ""}
+              </small>
+            </div>
+            <button type="button" onClick={applyTotalCostSplit}>
+              Split total
+            </button>
+          </div>
+        )}
+        {quickOfferOptions.length > 0 && (
+          <div className="quick-offer-presets" aria-label="Quick cost presets">
+            {quickOfferOptions.map((option) => (
+              <button key={`${option.label}-${option.valuePence}`} type="button" onClick={() => applyQuickCost(option.valuePence)}>
+                {option.label} {gbp(option.valuePence)}
+              </button>
+            ))}
+          </div>
+        )}
+        {buyPlan && quickStockCostPence > 0 && (
+          <div className={`buy-plan compact ${buyPlan.tone}`} aria-label="Buy decision">
+            <div className="buy-plan-heading">
+              <span>Verdict</span>
+              <strong>{buyPlan.label}</strong>
+              <small>{buyPlan.note}</small>
+            </div>
+            <div>
+              <span>Expected sale</span>
+              <strong>{gbp(buyPlan.unitGrossSalePence)}</strong>
+              <small>net {gbp(buyPlan.unitNetPence)}</small>
+            </div>
+            <div>
+              <span>Costs</span>
+              <strong>{gbp(buyPlan.unitFeesPence + buyPlan.unitPostagePence)}</strong>
+              <small>
+                fees {gbp(buyPlan.unitFeesPence)} · post {gbp(buyPlan.unitPostagePence)}
+              </small>
+            </div>
+            <div>
+              <span>Return</span>
+              <strong>{formatPct(buyPlan.roiPct)}</strong>
+              <small>{formatPct(buyPlan.marginPct)} margin</small>
+            </div>
+          </div>
+        )}
+        <button
+          className="primary-action"
+          type="button"
+          onClick={() => void acquire()}
+          disabled={busy === "acquire" || !quickStockCanSubmit}
+        >
+          {busy === "acquire"
+            ? "Stocking..."
+            : !quickStockReady
+              ? "Add cost"
+              : requiresCheckedCompBeforeStock
+                ? "Add checked comp first"
+                : stockButtonLabel}
+        </button>
+      </div>
+    );
+  }
+
   const pullReady = shouldTriggerPullRefresh(pullDistance);
   const pullVisible = userRefreshing || pullDistance > 0;
   const pullOffset = pullVisible ? Math.round(pullRefreshProgress(pullDistance) * 16) : -64;
@@ -4864,6 +5001,7 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+              {!needsManualComp && !stockCompItem && renderQuickStockCard()}
               {needsManualComp && (
                 <div className="manual-rescue-card">
                   <div>
@@ -4999,140 +5137,6 @@ export default function Home() {
                       Draft listing
                     </button>
                   )}
-                </div>
-              )}
-              {!needsManualComp && !stockCompItem && (
-                <div className={`quick-stock-card ${buyPlan?.tone ?? "warn"}`}>
-                  <div className="quick-stock-heading">
-                    <div>
-                      <span>Ready to stock</span>
-                      <strong>
-                        {requiresCheckedCompBeforeStock
-                          ? "Add checked comp"
-                          : quickStockReady
-                            ? `${quickStockQuantity} to ${acquireListingState === "ACTIVE" ? "list" : "draft"}`
-                            : "Add cost"}
-                      </strong>
-                    </div>
-                    <span className={`pill ${quickStockCostPence > 0 ? buyPlan?.tone ?? "warn" : "warn"}`}>
-                      {quickStockCostPence > 0 ? buyPlan?.label ?? "Check" : "Add cost"}
-                    </span>
-                  </div>
-                  <div className="quick-stock-grid">
-                    <label>
-                      Cost
-                      <MoneyInput value={cost} onChange={setCost} />
-                    </label>
-                    <label>
-                      Qty
-                      <input
-                        inputMode="numeric"
-                        min="1"
-                        step="1"
-                        value={quantity}
-                        onChange={(event) => setQuantity(event.target.value)}
-                      />
-                    </label>
-                    <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
-                    <Metric
-                      label="Profit"
-                      value={quickStockCostPence > 0 && buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
-                      tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
-                    />
-                  </div>
-                  <div className="listing-choice" role="group" aria-label="After stock listing choice">
-                    <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
-                      List later
-                    </button>
-                    <button
-                      type="button"
-                      className={shouldCreateListing && acquireListingState === "DRAFT" ? "selected" : ""}
-                      onClick={() => {
-                        setShouldCreateListing(true);
-                        setAcquireListingState("DRAFT");
-                      }}
-                    >
-                      Draft
-                    </button>
-                    <button
-                      type="button"
-                      className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
-                      onClick={() => {
-                        setShouldCreateListing(true);
-                        setAcquireListingState("ACTIVE");
-                      }}
-                    >
-                      Active
-                    </button>
-                  </div>
-                  {totalCostSplit && (
-                    <div className="split-cost-card">
-                      <div>
-                        <span>Total paid</span>
-                        <strong>
-                          {gbp(quickStockCostPence)} / {quickStockQuantity}
-                        </strong>
-                        <small>
-                          Ledger cost {gbp(totalCostSplit.unitCostPence)} each
-                          {totalCostSplit.roundingDeltaPence
-                            ? ` · ${totalCostSplit.roundingDeltaPence > 0 ? "+" : ""}${gbp(totalCostSplit.roundingDeltaPence)} rounding`
-                            : ""}
-                        </small>
-                      </div>
-                      <button type="button" onClick={applyTotalCostSplit}>
-                        Split total
-                      </button>
-                    </div>
-                  )}
-                  {quickOfferOptions.length > 0 && (
-                    <div className="quick-offer-presets" aria-label="Quick cost presets">
-                      {quickOfferOptions.map((option) => (
-                        <button key={`${option.label}-${option.valuePence}`} type="button" onClick={() => applyQuickCost(option.valuePence)}>
-                          {option.label} {gbp(option.valuePence)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {buyPlan && quickStockCostPence > 0 && (
-                    <div className={`buy-plan compact ${buyPlan.tone}`} aria-label="Buy decision">
-                      <div className="buy-plan-heading">
-                        <span>Verdict</span>
-                        <strong>{buyPlan.label}</strong>
-                        <small>{buyPlan.note}</small>
-                      </div>
-                      <div>
-                        <span>Expected sale</span>
-                        <strong>{gbp(buyPlan.unitGrossSalePence)}</strong>
-                        <small>net {gbp(buyPlan.unitNetPence)}</small>
-                      </div>
-                      <div>
-                        <span>Costs</span>
-                        <strong>{gbp(buyPlan.unitFeesPence + buyPlan.unitPostagePence)}</strong>
-                        <small>
-                          fees {gbp(buyPlan.unitFeesPence)} · post {gbp(buyPlan.unitPostagePence)}
-                        </small>
-                      </div>
-                      <div>
-                        <span>Return</span>
-                        <strong>{formatPct(buyPlan.roiPct)}</strong>
-                        <small>{formatPct(buyPlan.marginPct)} margin</small>
-                      </div>
-                    </div>
-                  )}
-                  <button
-                    className="primary-action"
-                    type="button"
-                    onClick={() => void acquire()}
-                    disabled={busy === "acquire" || !quickStockCanSubmit}
-                  >
-                    {busy === "acquire"
-                      ? "Stocking..."
-                      : !quickStockReady
-                        ? "Add cost"
-                        : requiresCheckedCompBeforeStock
-                          ? "Add checked comp first"
-                          : stockButtonLabel}
-                  </button>
                 </div>
               )}
               <div className="detail-grid">
