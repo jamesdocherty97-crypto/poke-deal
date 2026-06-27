@@ -118,8 +118,9 @@ export function ebaySoldSearchQuery(rawQuery: string, grade: Grade): string {
   if (!normalized) return "";
 
   if (grade !== "RAW") {
-    const label = gradeLabel(grade);
-    return queryMentionsGrade(normalized, label) ? normalized : `${normalized} ${label}`;
+    return queryMentionsGrade(normalized, grade)
+      ? normalized
+      : `${normalized} ${gradeBooleanSearchTerm(grade)}`;
   }
 
   if (queryMentionsGrade(normalized, "")) return normalized;
@@ -155,9 +156,25 @@ function gradeLabel(grade: Grade): string {
   return grade.replace(/_(\d)_5$/g, " $1.5").replace(/_(\d+)$/g, " $1").replace(/_/g, " ");
 }
 
-function queryMentionsGrade(query: string, gradeLabelValue: string): boolean {
+function compactGradeLabel(label: string): string {
+  return label.replace(/\s+/g, "");
+}
+
+function gradeBooleanSearchTerm(grade: Grade): string {
+  const label = gradeLabel(grade);
+  const compact = compactGradeLabel(label);
+  return compact === label ? label : `("${label}" OR ${compact})`;
+}
+
+function queryMentionsGrade(query: string, grade: Grade | ""): boolean {
   const normalized = query.toUpperCase().replace(/\s+/g, " ");
-  if (gradeLabelValue && normalized.includes(gradeLabelValue.toUpperCase())) return true;
+  if (grade) {
+    const label = gradeLabel(grade);
+    const compact = compactGradeLabel(label);
+    if (normalized.includes(label.toUpperCase()) || normalized.replace(/\s+/g, "").includes(compact.toUpperCase())) {
+      return true;
+    }
+  }
   return /\b(?:PSA|BGS|CGC|ACE|SGC)\s*(?:10|9(?:\.5)?|[1-8](?:\.5)?)\b/.test(normalized) || /\bGRADED\b/.test(normalized);
 }
 

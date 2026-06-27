@@ -6,6 +6,7 @@ import {
   type ParsedCardSearchQuery,
 } from "@/lib/catalog/cardSearch";
 import { searchChaseCards } from "@/lib/catalog/chaseCards";
+import { buildPromoCatalogFallback } from "@/lib/catalog/promoFallback";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { toCardData } from "@/lib/catalog/prismaCardCache";
 import type { CatalogCard } from "@/lib/catalog/types";
@@ -55,7 +56,18 @@ export async function GET(request: Request) {
   }
 
   const chaseCards = searchChaseCards(lookup.query, lookup.setName, limit);
-  const cards = rankCatalogCards(lookup.query, [...localRanked, ...liveCards, ...chaseCards], { setName: lookup.setName, limit });
+  const promoFallback = buildPromoCatalogFallback({
+    name: lookup.name || q,
+    setName: lookup.setName,
+    number: lookup.number ?? parsedQuery.number,
+    game: "POKEMON",
+    language: "EN",
+  });
+  const cards = rankCatalogCards(
+    lookup.query,
+    [...localRanked, ...liveCards, ...chaseCards, ...(promoFallback ? [promoFallback] : [])],
+    { setName: lookup.setName, limit },
+  );
   return NextResponse.json({ cards });
 }
 

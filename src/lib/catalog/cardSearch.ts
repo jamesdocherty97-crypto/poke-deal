@@ -125,6 +125,11 @@ export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
   const wholeNumber = readCollectorNumber(trimmed);
   if (wholeNumber) return { name: "", number: wholeNumber };
 
+  const trailingParenthesizedNumber = trimmed.match(/^(.+?)\s+\(([^()]{1,16})\)$/i);
+  const parenthesizedName = trailingParenthesizedNumber?.[1]?.trim();
+  const parenthesizedNumber = readCollectorNumber(trailingParenthesizedNumber?.[2]);
+  if (parenthesizedName && parenthesizedNumber) return { name: parenthesizedName, number: parenthesizedNumber };
+
   const trailingPlainSlashNumber = trimmed.match(/^(.+?)\s+#?(\d{1,4}\s*\/\s*[A-Za-z]{0,5}\s*\d{1,4})$/i);
   const plainSlashName = trailingPlainSlashNumber?.[1]?.trim();
   const plainSlashNumber = readCollectorNumber(trailingPlainSlashNumber?.[2]);
@@ -177,7 +182,7 @@ export function normalizeCatalogCardSearchInput(
   }
 
   name = normalizeNameForSearch(name);
-  const normalizedNumber = number ?? trailingNumber?.number;
+  const normalizedNumber = formatPromoDisplayNumber(number ?? trailingNumber?.number, setName);
   const normalizedQuery = [name, normalizedNumber].filter(Boolean).join(" ").trim() || cleaned.trim();
   return { query: normalizedQuery, name, setName, number: normalizedNumber };
 }
@@ -207,12 +212,20 @@ function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
   return Math.max(directScore, resolvedScore);
 }
 
+function formatPromoDisplayNumber(number: string | undefined, setName: string | undefined): string | undefined {
+  if (!number?.trim()) return undefined;
+  const resolvedSetId = resolveSetId(setName);
+  const trimmed = number.trim();
+  if (resolvedSetId === "svp" && /^\d{1,4}$/.test(trimmed)) return `SVP${trimmed.padStart(3, "0")}`;
+  if (resolvedSetId === "mep" && /^\d{1,4}$/.test(trimmed)) return `MEP${trimmed.padStart(3, "0")}`;
+  return trimmed;
+}
+
 function stripLookupNoise(input: string): string {
   return input
     .replace(/(?:£\s*)\d+(?:[.,]\d{1,2})?/gi, " ")
     .replace(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?\d+(?:[.,]\d{1,2})?\b/gi, " ")
-    .replace(/\bbgs\s*9(?:\.|,)?5\b/gi, " ")
-    .replace(/\b(?:psa|cgc|ace)\s*(?:9|10)\b/gi, " ")
+    .replace(/\b(?:psa|bgs|cgc|ace)\s*(?:10|[1-9](?:\s*[.,]\s*5)?)\b/gi, " ")
     .replace(/\b(?:1st|first)\s*(?:edition|ed)\b/gi, " ")
     .replace(/\b(?:unlimited|shadowless)\b/gi, " ")
     .replace(/\b(?:raw|ungraded|nm|near mint|lp|light(?:ly)?\s*played|mp|moderately\s*played|hp|heavily\s*played|dmg|damaged)\b/gi, " ")

@@ -135,6 +135,20 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     number: "SVP208",
   });
 
+  assert.deepEqual(normalizeCatalogCardSearchInput("Victini (208)", "SV Promos"), {
+    query: "Victini SVP208",
+    name: "Victini",
+    setName: "Scarlet & Violet Black Star Promos",
+    number: "SVP208",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Victini 208", "SV Promos"), {
+    query: "Victini SVP208",
+    name: "Victini",
+    setName: "Scarlet & Violet Black Star Promos",
+    number: "SVP208",
+  });
+
   assert.deepEqual(normalizeCatalogCardSearchInput("Snivy XYZ 001 raw £2"), {
     query: "Snivy XYZ001",
     name: "Snivy",
@@ -145,6 +159,13 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
   assert.deepEqual(normalizeCatalogCardSearchInput("Hitmontop Neo Genesis 1st Edition LP"), {
     query: "Hitmontop",
     name: "Hitmontop",
+    setName: "Neo Genesis",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Lugia Neo Genesis BGS 7.5"), {
+    query: "Lugia",
+    name: "Lugia",
     setName: "Neo Genesis",
     number: undefined,
   });

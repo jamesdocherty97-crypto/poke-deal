@@ -211,6 +211,48 @@ test("resolveCatalogCard can fall back to modern promo metadata before live cata
   assert.equal(resolved?.imageUrl, undefined);
 });
 
+test("resolveCatalogCard creates a future promo identity when the live catalog has not caught up", async () => {
+  const source = {
+    async resolve() {
+      return null;
+    },
+    async search() {
+      return [];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const resolved = await resolveCatalogCard(
+    { name: "Victini", setName: "SV Promos", number: "SVP208" },
+    source,
+  );
+
+  assert.equal(resolved?.name, "Victini");
+  assert.equal(resolved?.setName, "Scarlet & Violet Black Star Promos");
+  assert.equal(resolved?.setCode, "svp");
+  assert.equal(resolved?.number, "SVP208");
+  assert.equal(resolved?.tcgApiId, "svp-208");
+  assert.equal(resolved?.imageUrl, undefined);
+});
+
+test("resolveCatalogCard preserves typed future promo padding", async () => {
+  const source = {
+    async resolve() {
+      return null;
+    },
+    async search() {
+      return [];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const resolved = await resolveCatalogCard(
+    { name: "Alakazam", setName: "Mega Evolution Promos", number: "MEP0079" },
+    source,
+  );
+
+  assert.equal(resolved?.number, "MEP0079");
+  assert.equal(resolved?.tcgApiId, "mep-79");
+});
+
 test("findCatalogAlternatives returns safe wrong-set recovery candidates", async () => {
   const wrongSetCard: CatalogCard = {
     game: "POKEMON",

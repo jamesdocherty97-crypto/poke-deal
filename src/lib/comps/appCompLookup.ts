@@ -5,6 +5,7 @@ import {
   rankCatalogCards,
 } from "../catalog/cardSearch.js";
 import { searchChaseCards } from "../catalog/chaseCards.js";
+import { buildPromoCatalogFallback } from "../catalog/promoFallback.js";
 import type { CatalogCard, CatalogSource } from "../catalog/types.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
@@ -32,7 +33,7 @@ async function resolveCatalogCardUnbounded(
 
   const searched = await catalogSource.search(card, 5).catch(() => []);
   const best = searched.find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null;
-  const fallback = best ?? findChaseCatalogMatch(card);
+  const fallback = best ?? findChaseCatalogMatch(card) ?? buildPromoCatalogFallback(card);
   if (!fallback?.tcgApiId) return fallback;
 
   return catalogSource.resolve({ ...card, tcgApiId: fallback.tcgApiId })
@@ -141,6 +142,6 @@ function findChaseCatalogMatch(card: CardRef): CatalogCard | null {
 
   return (
     searchChaseCards(query, card.setName ?? normalized.setName, 5)
-      .find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null
+      .find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? buildPromoCatalogFallback(card)
   );
 }

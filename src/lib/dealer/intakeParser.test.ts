@@ -132,6 +132,13 @@ test("parseQuickIntake accepts broader slab grades", () => {
     cost: "20.00",
   });
 
+  assert.deepEqual(parseQuickIntake("Lugia Neo Genesis BGS 7.5 £80"), {
+    name: "Lugia",
+    setName: "Neo Genesis",
+    grade: "BGS_7_5",
+    cost: "80.00",
+  });
+
   assert.deepEqual(parseQuickIntake("Charizard 151 199/165 ACE 10 £120"), {
     name: "Charizard",
     setName: "151",

@@ -9,6 +9,8 @@ export const GRADE_VALUES = [
   "RAW",
   "PSA_1", "PSA_2", "PSA_3", "PSA_4", "PSA_5",
   "PSA_6", "PSA_7", "PSA_8", "PSA_9", "PSA_10",
+  "BGS_1", "BGS_1_5", "BGS_2", "BGS_2_5", "BGS_3", "BGS_3_5", "BGS_4", "BGS_4_5",
+  "BGS_5", "BGS_5_5", "BGS_6", "BGS_6_5", "BGS_7", "BGS_7_5", "BGS_8", "BGS_8_5",
   "BGS_9", "BGS_9_5", "BGS_10",
   "CGC_1", "CGC_1_5", "CGC_2", "CGC_2_5", "CGC_3", "CGC_3_5", "CGC_4", "CGC_4_5",
   "CGC_5", "CGC_5_5", "CGC_6", "CGC_6_5", "CGC_7", "CGC_7_5", "CGC_8", "CGC_8_5",

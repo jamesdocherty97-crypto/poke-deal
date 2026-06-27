@@ -102,6 +102,7 @@ import {
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
 import { textMentionsFirstEdition } from "@/lib/comps/variants";
+import { normalizeCatalogCardSearchInput } from "@/lib/catalog/cardSearch";
 
 type View = "today" | "acquire" | "inventory" | "listings" | "pnl";
 type Grade = DomainGrade;
@@ -764,21 +765,22 @@ export default function Home() {
 
   useEffect(() => {
     if (!cardSuggestionsOpen) return;
-    const query = name.trim();
+    const parsed = normalizeCatalogCardSearchInput([name.trim(), number.trim()].filter(Boolean).join(" "), setNameValue);
+    const query = parsed.query;
     if (!query) {
       setCardSuggestions([]);
       return;
     }
     const handle = setTimeout(() => {
       const qs = new URLSearchParams({ q: query, limit: "8" });
-      if (setNameValue.trim()) qs.set("set", setNameValue.trim());
+      if (parsed.setName ?? setNameValue.trim()) qs.set("set", parsed.setName ?? setNameValue.trim());
       fetch(`/api/catalog/cards?${qs}`)
         .then(readJson)
         .then((payload) => setCardSuggestions(payload.cards ?? []))
         .catch(() => {});
     }, 180);
     return () => clearTimeout(handle);
-  }, [name, setNameValue, cardSuggestionsOpen]);
+  }, [name, number, setNameValue, cardSuggestionsOpen]);
 
   const sellingItem = useMemo(
     () => inventory.find((item) => item.id === sellingId) ?? null,
@@ -1926,7 +1928,32 @@ export default function Home() {
     await lookupComp({ name, setName: setNameValue, number, grade });
   }
 
+  function normalizeLookupInput(input: LookupInput): LookupInput {
+    const parsed = normalizeCatalogCardSearchInput(
+      [input.name.trim(), input.number.trim()].filter(Boolean).join(" "),
+      input.setName,
+    );
+
+    return {
+      name: parsed.name || input.name,
+      setName: parsed.setName ?? input.setName,
+      number: parsed.number ?? input.number,
+      grade: input.grade,
+    };
+  }
+
+  function applyNormalizedLookupFields(input: LookupInput) {
+    if (input.name !== name) setName(input.name);
+    if (input.setName !== setNameValue) {
+      setSetNameValue(input.setName);
+      pinRecentSetName(input.setName);
+    }
+    if (input.number !== number) setNumber(input.number);
+  }
+
   async function lookupComp(input: LookupInput) {
+    const normalizedInput = normalizeLookupInput(input);
+    applyNormalizedLookupFields(normalizedInput);
     setBusy("lookup");
     setError(null);
     setNotice(null);
@@ -1934,18 +1961,18 @@ export default function Home() {
     clearCheckedComp();
     try {
       const qs = new URLSearchParams({
-        name: input.name,
-        set: input.setName,
-        number: input.number,
-        grade: input.grade,
+        name: normalizedInput.name,
+        set: normalizedInput.setName,
+        number: normalizedInput.number,
+        grade: normalizedInput.grade,
       });
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "lookup failed");
       setComp(payload);
       setCardArtUrl(payload.catalog?.imageUrl ?? null);
-      pinRecentSetName(payload.catalog?.setName ?? input.setName);
-      rememberRecentComp(payload, input);
+      pinRecentSetName(payload.catalog?.setName ?? normalizedInput.setName);
+      rememberRecentComp(payload, normalizedInput);
       setGradeComp(null);
       setScrollToComp(true);
     } catch (err) {
@@ -2587,6 +2614,29 @@ export default function Home() {
     setCardSuggestionsOpen(false);
     setManualCompQuery("");
     setError(null);
+  }
+
+  function handleCardNameChange(value: string) {
+    editCompIdentity();
+    setName(value);
+  }
+
+  function applyTypedCardIdentity() {
+    const parsed = normalizeCatalogCardSearchInput(name, setNameValue);
+    const shouldApplyParsedFields = Boolean(
+      parsed.name &&
+        parsed.name !== name.trim() &&
+        (parsed.setName || parsed.number),
+    );
+
+    if (!shouldApplyParsedFields) return;
+
+    setName(parsed.name);
+    if (parsed.setName) {
+      setSetNameValue(parsed.setName);
+      pinRecentSetName(parsed.setName);
+    }
+    if (parsed.number) setNumber(parsed.number);
   }
 
   function loadRecentBuy(item: InventoryItem, options: { lookupAfter?: boolean; repeatBuy?: boolean } = {}) {
@@ -4449,11 +4499,13 @@ export default function Home() {
               <input
                 value={name}
                 onChange={(event) => {
-                  editCompIdentity();
-                  setName(event.target.value);
+                  handleCardNameChange(event.target.value);
                 }}
                 onFocus={() => setCardSuggestionsOpen(true)}
-                onBlur={() => setTimeout(() => setCardSuggestionsOpen(false), 150)}
+                onBlur={() => {
+                  applyTypedCardIdentity();
+                  setTimeout(() => setCardSuggestionsOpen(false), 150);
+                }}
                 placeholder="Charizard, Moonbreon, Mr Mime..."
                 autoComplete="off"
               />

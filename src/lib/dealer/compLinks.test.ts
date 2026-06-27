@@ -38,7 +38,10 @@ test("buildManualCompLinks creates UK-relevant raw comp links", () => {
 test("buildManualCompLinks adds slab grade only to eBay sold searches", () => {
   const links = buildManualCompLinks(card, "BGS_9_5");
 
-  assert.match(new URL(links[0]!.url).searchParams.get("_nkw") ?? "", /BGS 9\.5/);
+  assert.equal(
+    new URL(links[0]!.url).searchParams.get("_nkw"),
+    'Gengar TG06/TG30 Lost Origin Trainer Gallery ("BGS 9.5" OR BGS9.5)',
+  );
   assert.doesNotMatch(new URL(links[0]!.url).searchParams.get("_nkw") ?? "", /-PSA/);
   assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /BGS/);
   assert.doesNotMatch(new URL(links[3]!.url).searchParams.get("q") ?? "", /BGS/);
@@ -47,14 +50,30 @@ test("buildManualCompLinks adds slab grade only to eBay sold searches", () => {
 test("buildManualCompLinks adds ACE slab grades to eBay sold searches", () => {
   const links = buildManualCompLinks(card, "ACE_10");
 
-  assert.match(new URL(links[0]!.url).searchParams.get("_nkw") ?? "", /ACE 10/);
+  assert.equal(
+    new URL(links[0]!.url).searchParams.get("_nkw"),
+    'Gengar TG06/TG30 Lost Origin Trainer Gallery ("ACE 10" OR ACE10)',
+  );
   assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /ACE/);
 });
 
 test("buildManualCompLinks formats low CGC half grades for eBay sold searches", () => {
   const links = buildManualCompLinks({ name: "Lugia", setName: "Neo Genesis" }, "CGC_1_5");
 
-  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), "Lugia Neo Genesis CGC 1.5");
+  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), 'Lugia Neo Genesis ("CGC 1.5" OR CGC1.5)');
+});
+
+test("buildManualCompLinks formats BGS half grades for eBay sold searches", () => {
+  const links = buildManualCompLinks({ name: "Lugia", setName: "Neo Genesis" }, "BGS_8_5");
+
+  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), 'Lugia Neo Genesis ("BGS 8.5" OR BGS8.5)');
+});
+
+test("buildManualCompLinks adds spaced and compact boolean forms for all slab companies", () => {
+  assert.equal(ebaySoldSearchQuery("Victini SVP208", "ACE_10"), 'Victini SVP208 ("ACE 10" OR ACE10)');
+  assert.equal(ebaySoldSearchQuery("Charizard 151", "PSA_10"), 'Charizard 151 ("PSA 10" OR PSA10)');
+  assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis", "CGC_9_5"), 'Lugia Neo Genesis ("CGC 9.5" OR CGC9.5)');
+  assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis", "BGS_7_5"), 'Lugia Neo Genesis ("BGS 7.5" OR BGS7.5)');
 });
 
 test("buildManualCompLinks preserves typed vintage qualifiers for eBay", () => {
@@ -125,5 +144,6 @@ test("normalizeManualCompSearchText keeps ex card names separate from collector 
 test("ebaySoldSearchQuery keeps explicit graded wording instead of adding raw exclusions", () => {
   assert.equal(ebaySoldSearchQuery("Umbreon VMAX PSA 10", "RAW"), "Umbreon VMAX PSA 10");
   assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis CGC 1.5", "RAW"), "Lugia Neo Genesis CGC 1.5");
-  assert.equal(ebaySoldSearchQuery("Umbreon VMAX", "PSA_10"), "Umbreon VMAX PSA 10");
+  assert.equal(ebaySoldSearchQuery("Umbreon VMAX", "PSA_10"), 'Umbreon VMAX ("PSA 10" OR PSA10)');
+  assert.equal(ebaySoldSearchQuery("Umbreon VMAX PSA10", "PSA_10"), "Umbreon VMAX PSA10");
 });
