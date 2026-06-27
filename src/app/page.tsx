@@ -543,6 +543,7 @@ export default function Home() {
   const [checkedCompNote, setCheckedCompNote] = useState("");
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
+  const [shouldCreateListing, setShouldCreateListing] = useState(true);
   const [keepBuying, setKeepBuying] = useState(DEFAULT_INTAKE_PREFERENCES.keepBuying);
   const [comp, setComp] = useState<Reconciled | null>(null);
   const [stockCompItemId, setStockCompItemId] = useState<string | null>(null);
@@ -1896,6 +1897,7 @@ export default function Home() {
     }
     if (parsed.listingState) {
       setAcquireListingState(parsed.listingState);
+      setShouldCreateListing(true);
       filled.push("listing");
     }
     if (manualQuery) {
@@ -2064,7 +2066,7 @@ export default function Home() {
           channel,
           listPricePence: overrideListPricePence ?? undefined,
           listingState: acquireListingState,
-          createListing: true,
+          createListing: shouldCreateListing,
           checkedComp: checkedComp
             ? {
                 pricePence: checkedComp.medianPence,
@@ -2088,7 +2090,9 @@ export default function Home() {
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
       pinRecentSetName(payload.catalog?.setName ?? setNameValue);
       const listedPence = payload.listing?.listPrice ?? payload.listing?.suggestedPrice ?? payload.suggestion.pricePence;
-      const listingVerb = payload.listing?.state === "ACTIVE" ? "Listed" : "Drafted";
+      const listingVerb = payload.listing
+        ? payload.listing.state === "ACTIVE" ? "Listed" : "Drafted"
+        : "Not listed";
       setLastStocked({
         itemId: payload.item.id,
         listingId: payload.listing?.id ?? null,
@@ -2104,7 +2108,9 @@ export default function Home() {
         imageUrl: payload.catalog?.imageUrl ?? cardArtUrl,
       });
       setNotice(
-        `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${listingVerb} at ${gbp(listedPence)}.`,
+        `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${
+          payload.listing ? `${listingVerb} at ${gbp(listedPence)}.` : "Listing skipped."
+        }`,
       );
       await refreshAll();
       applyPostStockFlow();
@@ -2161,7 +2167,7 @@ export default function Home() {
       if (!res.ok) throw new Error(payload.error ?? "manual stock failed");
 
       let createdListing: Listing | null = null;
-      if (payload.item?.id) {
+      if (shouldCreateListing && payload.item?.id) {
         const listPricePence = overrideListPricePence ?? draftDefaults.listPricePence;
         const listingRes = await fetch("/api/listings", {
           method: "POST",
@@ -4978,6 +4984,31 @@ export default function Home() {
                       tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
                     />
                   </div>
+                  <div className="listing-choice" role="group" aria-label="After stock listing choice">
+                    <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
+                      List later
+                    </button>
+                    <button
+                      type="button"
+                      className={shouldCreateListing && acquireListingState === "DRAFT" ? "selected" : ""}
+                      onClick={() => {
+                        setShouldCreateListing(true);
+                        setAcquireListingState("DRAFT");
+                      }}
+                    >
+                      Draft
+                    </button>
+                    <button
+                      type="button"
+                      className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
+                      onClick={() => {
+                        setShouldCreateListing(true);
+                        setAcquireListingState("ACTIVE");
+                      }}
+                    >
+                      Active
+                    </button>
+                  </div>
                   {totalCostSplit && (
                     <div className="split-cost-card">
                       <div>
@@ -5004,6 +5035,32 @@ export default function Home() {
                           {option.label} {gbp(option.valuePence)}
                         </button>
                       ))}
+                    </div>
+                  )}
+                  {buyPlan && quickStockCostPence > 0 && (
+                    <div className={`buy-plan compact ${buyPlan.tone}`} aria-label="Buy decision">
+                      <div className="buy-plan-heading">
+                        <span>Verdict</span>
+                        <strong>{buyPlan.label}</strong>
+                        <small>{buyPlan.note}</small>
+                      </div>
+                      <div>
+                        <span>Expected sale</span>
+                        <strong>{gbp(buyPlan.unitGrossSalePence)}</strong>
+                        <small>net {gbp(buyPlan.unitNetPence)}</small>
+                      </div>
+                      <div>
+                        <span>Costs</span>
+                        <strong>{gbp(buyPlan.unitFeesPence + buyPlan.unitPostagePence)}</strong>
+                        <small>
+                          fees {gbp(buyPlan.unitFeesPence)} · post {gbp(buyPlan.unitPostagePence)}
+                        </small>
+                      </div>
+                      <div>
+                        <span>Return</span>
+                        <strong>{formatPct(buyPlan.roiPct)}</strong>
+                        <small>{formatPct(buyPlan.marginPct)} margin</small>
+                      </div>
                     </div>
                   )}
                   <button
@@ -5305,6 +5362,31 @@ export default function Home() {
                   <option value="ACTIVE">Active</option>
                 </select>
               </label>
+            </div>
+            <div className="listing-choice" role="group" aria-label="After stock listing choice">
+              <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
+                List later
+              </button>
+              <button
+                type="button"
+                className={shouldCreateListing && acquireListingState === "DRAFT" ? "selected" : ""}
+                onClick={() => {
+                  setShouldCreateListing(true);
+                  setAcquireListingState("DRAFT");
+                }}
+              >
+                Draft
+              </button>
+              <button
+                type="button"
+                className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
+                onClick={() => {
+                  setShouldCreateListing(true);
+                  setAcquireListingState("ACTIVE");
+                }}
+              >
+                Active
+              </button>
             </div>
             <details className="buy-advanced-details">
               <summary>More stock details</summary>
@@ -7924,8 +8006,10 @@ function LastStockedPanel({
           {card.number ? ` #${card.number}` : ""} · {card.grade.replace(/_/g, " ")}
         </small>
         <small>
-          {card.quantity} @ {gbp(card.costPence)} · {channelLabel(card.channel)} {card.listingState.toLowerCase()}{" "}
-          {gbp(card.listPricePence)}
+          {card.quantity} @ {gbp(card.costPence)} ·{" "}
+          {card.listingId
+            ? `${channelLabel(card.channel)} ${card.listingState.toLowerCase()} ${gbp(card.listPricePence)}`
+            : "not listed"}
         </small>
       </div>
       <div className="last-stocked-actions">

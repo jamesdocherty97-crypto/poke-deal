@@ -2927,6 +2927,29 @@ label {
   padding-bottom: 8px;
 }
 
+.listing-choice {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.listing-choice button {
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 8px;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.listing-choice button.selected {
+  border-color: rgba(52, 211, 153, 0.46);
+  background: rgba(52, 211, 153, 0.14);
+  color: #c8ffe4;
+}
+
 .dealer-verdict {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -4751,6 +4774,20 @@ label {
   font-size: 22px;
 }
 
+.buy-plan.compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  padding: 9px;
+}
+
+.buy-plan.compact strong {
+  font-size: 16px;
+}
+
+.buy-plan.compact .buy-plan-heading strong {
+  font-size: 18px;
+}
+
 .mobile-buy-spacer {
   display: none;
 }
@@ -5261,8 +5298,38 @@ label {
 }
 
 @media (max-width: 759px) {
+  .hero-board {
+    display: none;
+  }
+
   .lookup-panel {
     margin-bottom: 72px;
+  }
+
+  .detail-grid,
+  .form-grid,
+  .deal-banner,
+  .quick-stock-grid,
+  .split-cost-card,
+  .buy-plan.compact,
+  .sale-preview,
+  .listing-economics,
+  .listing-pack-summary,
+  .listing-pack-specifics {
+    grid-template-columns: 1fr;
+  }
+
+  .smart-grade-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-intake-actions,
+  .quick-intake-actions.has-next {
+    grid-template-columns: minmax(0, 1fr) 66px 58px;
+  }
+
+  .quick-intake-actions.has-next .quick-next-button {
+    grid-column: 1 / -1;
   }
 
   .mobile-buy-spacer {

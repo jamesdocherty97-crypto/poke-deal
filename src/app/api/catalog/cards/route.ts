@@ -43,8 +43,9 @@ export async function GET(request: Request) {
 
   const lookup = normalizeCatalogCardSearchInput(q, setName);
   const parsedQuery = parseCardSearchQuery(lookup.query);
+  const rankingPoolLimit = Math.max(limit * 3, 20);
   const localCards = await findLocalCards(lookup.query, lookup.setName, parsedQuery).catch(() => []);
-  const localRanked = rankCatalogCards(lookup.query, localCards, { setName: lookup.setName, limit });
+  const localRanked = rankCatalogCards(lookup.query, localCards, { setName: lookup.setName, limit: rankingPoolLimit });
 
   let liveCards: CatalogCard[] = [];
   if (localRanked.length < limit) {
@@ -80,7 +81,7 @@ export async function GET(request: Request) {
   const rankedCards = rankCatalogCards(
     lookup.query,
     [...localRanked, ...liveCards, ...tcgDexCards, ...chaseCards, ...(promoFallback ? [promoFallback] : [])],
-    { setName: lookup.setName, limit },
+    { setName: lookup.setName, limit: rankingPoolLimit },
   );
   const setMatchedCards = lookup.setName
     ? rankedCards.filter((card) => catalogCardMatchesSetContext(card, lookup.setName))
@@ -96,6 +97,16 @@ async function findLocalCards(
 ): Promise<CatalogCard[]> {
   const db = getPrisma();
   const nameQuery = parsedQuery.name || q;
+  const nameMatches = await db.card.findMany({
+    where: {
+      game: "POKEMON",
+      language: "EN",
+      name: { contains: nameQuery, mode: "insensitive" },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 80,
+  });
+
   const containsMatches = await db.card.findMany({
     where: {
       game: "POKEMON",
@@ -122,7 +133,7 @@ async function findLocalCards(
     take: 120,
   });
 
-  return [...containsMatches, ...recentMatches].map(dbCardToCatalogCard);
+  return [...nameMatches, ...containsMatches, ...recentMatches].map(dbCardToCatalogCard);
 }
 
 async function cacheCatalogCards(cards: CatalogCard[]): Promise<void> {
