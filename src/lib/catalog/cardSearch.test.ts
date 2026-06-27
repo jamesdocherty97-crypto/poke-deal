@@ -252,6 +252,17 @@ test("rankCatalogCards matches SVP promo numbers against API-style numeric promo
   assert.equal(rankCatalogCards("Pikachu SVP085", mixed, { setName: "SV Promos" })[0]?.number, "85");
 });
 
+test("rankCatalogCards prefers modern promos for generic promo searches", () => {
+  const mixed: CatalogCard[] = [
+    { game: "POKEMON", language: "EN", name: "Victini", setName: "XY Black Star Promos", setCode: "xyp", number: "XY189" },
+    { game: "POKEMON", language: "EN", name: "Victini", setName: "BW Black Star Promos", setCode: "bwp", number: "BW32" },
+    { game: "POKEMON", language: "EN", name: "Victini", setName: "Scarlet & Violet Black Star Promos", setCode: "svp", number: "SVP208" },
+  ];
+
+  assert.equal(rankCatalogCards("Victini", mixed, { setName: "Promo" })[0]?.number, "SVP208");
+  assert.equal(rankCatalogCards("Victini XY189", mixed, { setName: "Promo" })[0]?.number, "XY189");
+});
+
 test("rankCatalogCards applies cached set aliases to card suggestion context", () => {
   const mixed: CatalogCard[] = [
     { game: "POKEMON", language: "EN", name: "Umbreon VMAX", setName: "Brilliant Stars", setCode: "swsh9", number: "TG23/TG30" },

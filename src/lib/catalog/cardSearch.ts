@@ -214,7 +214,7 @@ function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
       /\bpromos?\b/i.test(card.setName) ? 720 : 0,
       /\bp(?:romos?)?$/i.test(card.setCode ?? "") ? 420 : 0,
     );
-    return promoScore;
+    return promoScore > 0 ? promoScore + recentSetScore(card) : 0;
   }
 
   const directScore = Math.max(
@@ -232,6 +232,17 @@ function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
   );
 
   return Math.max(directScore, resolvedScore);
+}
+
+function recentSetScore(card: CatalogCard): number {
+  const set = card.setCode ? getSetById(card.setCode) : undefined;
+  const year = Number.parseInt(set?.releaseDate?.slice(0, 4) ?? "", 10);
+  if (!Number.isFinite(year)) return 0;
+  if (year >= 2025) return 160;
+  if (year >= 2023) return 120;
+  if (year >= 2019) return 80;
+  if (year >= 2013) return 40;
+  return 12;
 }
 
 function isGenericPromoSetContext(setName: string | undefined): boolean {
