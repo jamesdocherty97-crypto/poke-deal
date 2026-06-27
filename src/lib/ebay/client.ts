@@ -15,6 +15,12 @@ export async function ebayFetch(
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
     "Content-Language": config.contentLanguage,
+    // eBay's Inventory API (createOrReplaceInventoryItem, bulkMigrateListing, etc.)
+    // rejects requests with errorId 25709 "Invalid value for header
+    // Accept-Language" when this header is missing, despite general eBay REST
+    // docs listing it as optional. Must be a hyphenated IETF tag (en-GB, not
+    // en_GB) — send the same locale we declare for Content-Language.
+    "Accept-Language": config.contentLanguage,
     Accept: "application/json",
     ...(marketplaceId ? { "X-EBAY-C-MARKETPLACE-ID": marketplaceId } : {}),
     ...(extraHeaders as Record<string, string> | undefined ?? {}),
