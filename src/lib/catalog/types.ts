@@ -24,6 +24,7 @@ export interface CatalogCard {
   setLogoUrl?: string;
   setSymbolUrl?: string;
   tcgApiId?: string;
+  tcgDexId?: string;
   priceSignals?: CatalogPriceSignal[];
 }
 
@@ -31,4 +32,5 @@ export interface CatalogSource {
   readonly name: string;
   readonly live: boolean;
   resolve(card: CardRef): Promise<CatalogCard | null>;
+  search?(card: CardRef, limit?: number): Promise<CatalogCard[]>;
 }

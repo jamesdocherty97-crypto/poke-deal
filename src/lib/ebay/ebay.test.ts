@@ -230,18 +230,24 @@ const slabInput = {
   certNumber: "84213567",
 };
 
-test("buildInventoryItemPayload produces LIKE_NEW condition for raw cards", () => {
+test("buildInventoryItemPayload produces trading-card condition descriptors for raw cards", () => {
   const item = buildInventoryItemPayload(rawInput, 1);
-  assert.equal(item.condition, "LIKE_NEW");
+  assert.equal(item.condition, "USED_VERY_GOOD");
+  assert.deepEqual(item.conditionDescriptors, [{ name: "40001", values: ["400010"] }]);
   assert.match(item.product.title, /Umbreon VMAX/);
   assert.deepEqual(item.availability.shipToLocationAvailability, { quantity: 1 });
   assert.equal(item.product.aspects["Game"]?.[0], "Pokémon TCG");
   assert.equal(item.product.aspects["Card Name"]?.[0], "Umbreon VMAX");
 });
 
-test("buildInventoryItemPayload produces GRADED condition for PSA slab", () => {
+test("buildInventoryItemPayload produces trading-card condition descriptors for PSA slab", () => {
   const item = buildInventoryItemPayload(slabInput, 1);
-  assert.equal(item.condition, "GRADED");
+  assert.equal(item.condition, "LIKE_NEW");
+  assert.deepEqual(item.conditionDescriptors, [
+    { name: "27501", values: ["275010"] },
+    { name: "27502", values: ["275020"] },
+    { name: "27503", values: ["84213567"] },
+  ]);
   assert.match(item.product.title, /Charizard ex/);
   assert.equal(item.product.aspects["Professional Grader"]?.[0], "PSA");
   assert.equal(item.product.aspects["Grade"]?.[0], "10");

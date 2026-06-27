@@ -12,6 +12,7 @@ export type PrismaCard = {
   rarity: string | null;
   imageUrl: string | null;
   tcgApiId: string | null;
+  tcgDexId?: string | null;
 };
 
 export type PrismaCardData = {
@@ -24,18 +25,15 @@ export type PrismaCardData = {
   rarity?: string;
   imageUrl?: string;
   tcgApiId?: string;
+  tcgDexId?: string;
 };
 
 export type PrismaCardDb = {
   card: {
-    findUnique(args: { where: { id?: string; tcgApiId?: string } }): Promise<PrismaCard | null>;
+    findUnique(args: any): Promise<PrismaCard | null>;
     findFirst(args: { where: Partial<PrismaCardData> }): Promise<PrismaCard | null>;
     create(args: { data: PrismaCardData }): Promise<PrismaCard>;
-    upsert(args: {
-      where: { tcgApiId: string };
-      create: PrismaCardData;
-      update: Partial<PrismaCardData>;
-    }): Promise<PrismaCard>;
+    upsert(args: any): Promise<PrismaCard>;
   };
 };
 
@@ -69,6 +67,13 @@ export class PrismaCardCache {
         update: data,
       });
     }
+    if (data.tcgDexId) {
+      return this.db.card.upsert({
+        where: { tcgDexId: data.tcgDexId },
+        create: data,
+        update: data,
+      });
+    }
 
     const existing = await this.db.card.findFirst({ where: cardLookupWhere(data) });
     return existing ?? this.db.card.create({ data });
@@ -77,6 +82,10 @@ export class PrismaCardCache {
   private async findCachedCard(data: PrismaCardData): Promise<PrismaCard | null> {
     if (data.tcgApiId) {
       const existing = await this.db.card.findUnique({ where: { tcgApiId: data.tcgApiId } });
+      if (existing) return existing;
+    }
+    if (data.tcgDexId) {
+      const existing = await this.db.card.findUnique({ where: { tcgDexId: data.tcgDexId } });
       if (existing) return existing;
     }
 
@@ -102,6 +111,7 @@ export function toCardRef(card: PrismaCard): CardRef {
     setName: card.setName,
     number: card.number ?? undefined,
     tcgApiId: card.tcgApiId ?? undefined,
+    tcgDexId: card.tcgDexId ?? undefined,
   };
 }
 
@@ -120,6 +130,7 @@ export function toCardData(card: CardRef | CatalogCard): PrismaCardData {
     rarity: cleanOptional("rarity" in card ? card.rarity : undefined),
     imageUrl: cleanOptional("imageUrl" in card ? card.imageUrl : undefined),
     tcgApiId: cleanOptional(card.tcgApiId),
+    tcgDexId: cleanOptional("tcgDexId" in card ? card.tcgDexId : undefined),
   };
 }
 

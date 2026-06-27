@@ -30,6 +30,7 @@ model Card {
 
   // External catalog references, for adapter lookups.
   tcgApiId    String? @unique // pokemontcg.io id
+  tcgDexId    String? @unique // tcgdex.net id
   cardmarketId String?
 
   inventory   InventoryItem[]
@@ -42,6 +43,8 @@ model Card {
 
   @@index([game, language])
   @@index([name])
+  @@index([setName])
+  @@index([setCode])
 }
 
 // ─────────────────────────────────────────────────────────────

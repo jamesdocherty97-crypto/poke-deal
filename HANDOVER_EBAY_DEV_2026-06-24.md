@@ -7,28 +7,46 @@
 | eBay library layer | **Done** |
 | API routes | **Done** |
 | UI integration | **Done** |
-| Tests | **318/318 pass** |
+| Readiness checks + row actions | **Done** (0997cca) |
+| Tests | **328/328 pass** |
 | TypeScript check | **Clean** |
 | Build | **Clean** |
-| eBay Developer credentials captured | **Pending** — user needs to complete login |
-| OAuth completed | **Not yet** — awaiting credentials |
+| eBay Developer account created | **Done** — keyset "Poke Deal" exists |
+| Client ID captured | **Done** — see below |
+| Cert ID / Client Secret | **Pending** — portal was erroring; read from keys page when it recovers |
+| Keyset compliance | **Pending** — keyset flagged Non Compliant; needs exemption applied |
+| Redirect URLs / RuName | **Pending** — User Tokens page was erroring |
+| OAuth completed | **Not yet** — awaiting full credentials |
 | Offer created | **Not yet** |
 | Published live | **No** |
 
 ---
 
-## What was configured in eBay Developer
+## eBay Developer — what's been done
 
-Nothing has been configured yet — the eBay Developer portal required login which was not completed during this session.
+**Account:** `jiddlecards` on developer.ebay.com  
+**App name:** Poke Deal  
+**Client ID (App ID):** `JamesDoc-PokeDeal-PRD-2dcdd52e5-8b209a0b`
 
-**Action required:**
-1. Log into https://developer.ebay.com/my/keys
-2. If a Production keyset already exists, use it. Otherwise create one for this app.
-3. Under the keyset, navigate to "Auth accepted URL" / "User Tokens" section.
-4. Add these Accept/Redirect URLs:
-   - Production: `https://poke-deal.vercel.app/api/ebay/oauth/callback`
-   - Local dev: `http://localhost:3000/api/ebay/oauth/callback`
-5. Note the **RuName** — it is a string like `YourName-AppName-PRD-abc123-abc12345` shown under the OAuth Accept URL section.
+The Production keyset was created on 2026-06-24. The portal was experiencing errors so the Cert ID, Dev ID, and RuName could not be retrieved in the same session.
+
+**Remaining portal steps (do when developer.ebay.com is stable):**
+
+1. Go to https://developer.ebay.com/my/keys
+2. Under "Poke Deal" → click **"marketplace deletion/account closure notification"** → apply for exemption (or agree to the process). This un-disables the keyset.
+3. Click **"Cert ID (Client Secret)"** row — copy the value.
+4. Click **User Tokens** → scroll to "OAuth Accepted URLs" → add:
+   - `https://poke-deal.vercel.app/api/ebay/oauth/callback`
+   - `http://localhost:3000/api/ebay/oauth/callback`
+5. Copy the **RuName** that appears (looks like `JamesDo-PokeDeal-PRD-xxxxxxxx-xxxxxxxx`).
+6. Optionally fill in the identity/address verification form on the User Tokens page (legal name + address).
+
+**Then** add to `.env` and Vercel:
+```
+EBAY_CLIENT_ID=JamesDoc-PokeDeal-PRD-2dcdd52e5-8b209a0b
+EBAY_CLIENT_SECRET=<cert id from step 3>
+EBAY_RU_NAME=<runame from step 5>
+```
 
 ---
 

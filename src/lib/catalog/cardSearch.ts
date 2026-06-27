@@ -307,7 +307,7 @@ function dedupeCards(cards: CatalogCard[]): CatalogCard[] {
   const seen = new Set<string>();
   const result: CatalogCard[] = [];
   for (const card of cards) {
-    const key = card.tcgApiId ?? [
+    const key = card.tcgApiId ?? card.tcgDexId ?? [
       normalizeSearchText(card.name),
       normalizeSearchText(card.setName),
       normalizeSearchText(card.number ?? ""),

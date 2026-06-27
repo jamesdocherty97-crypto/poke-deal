@@ -6,6 +6,7 @@ import {
 } from "../catalog/cardSearch.js";
 import { searchChaseCards } from "../catalog/chaseCards.js";
 import { buildPromoCatalogFallback } from "../catalog/promoFallback.js";
+import { TcgDexCatalogSource } from "../catalog/tcgDex.js";
 import type { CatalogCard, CatalogSource } from "../catalog/types.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
@@ -33,7 +34,10 @@ async function resolveCatalogCardUnbounded(
 
   const searched = await catalogSource.search(card, 5).catch(() => []);
   const best = searched.find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null;
-  const fallback = best ?? findChaseCatalogMatch(card) ?? buildPromoCatalogFallback(card);
+  const tcgDexFallback = best || catalogSource.name !== "pokemon-tcg-api"
+    ? null
+    : await new TcgDexCatalogSource().resolve(card).catch(() => null);
+  const fallback = best ?? tcgDexFallback ?? findChaseCatalogMatch(card) ?? buildPromoCatalogFallback(card);
   if (!fallback?.tcgApiId) return fallback;
 
   return catalogSource.resolve({ ...card, tcgApiId: fallback.tcgApiId })

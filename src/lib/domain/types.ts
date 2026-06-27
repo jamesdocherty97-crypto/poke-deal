@@ -29,6 +29,7 @@ export interface CardRef {
   setName?: string;
   number?: string;
   tcgApiId?: string;
+  tcgDexId?: string;
   game?: Game;
   language?: Language;
 }

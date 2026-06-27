@@ -9,6 +9,7 @@ import { searchChaseCards } from "@/lib/catalog/chaseCards";
 import { buildPromoCatalogFallback } from "@/lib/catalog/promoFallback";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { toCardData } from "@/lib/catalog/prismaCardCache";
+import { TcgDexCatalogSource } from "@/lib/catalog/tcgDex";
 import type { CatalogCard } from "@/lib/catalog/types";
 import { getPrisma } from "@/lib/db/prisma";
 import type { Game, Language } from "@/lib/domain/types";
@@ -27,6 +28,7 @@ type DbCard = {
   rarity: string | null;
   imageUrl: string | null;
   tcgApiId: string | null;
+  tcgDexId: string | null;
 };
 
 export async function GET(request: Request) {
@@ -54,6 +56,17 @@ export async function GET(request: Request) {
       console.warn("[catalog/cards] live card cache skipped:", err instanceof Error ? err.message : "unknown error");
     });
   }
+  let tcgDexCards: CatalogCard[] = [];
+  if (localRanked.length + liveCards.length < limit) {
+    const source = new TcgDexCatalogSource();
+    const liveName = lookup.name || parsedQuery.name || q;
+    tcgDexCards = await source
+      .search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: lookup.setName, game: "POKEMON", language: "EN" }, limit)
+      .catch(() => []);
+    await cacheCatalogCards(tcgDexCards).catch((err) => {
+      console.warn("[catalog/cards] tcgdex card cache skipped:", err instanceof Error ? err.message : "unknown error");
+    });
+  }
 
   const chaseCards = searchChaseCards(lookup.query, lookup.setName, limit);
   const promoFallback = buildPromoCatalogFallback({
@@ -65,7 +78,7 @@ export async function GET(request: Request) {
   });
   const cards = rankCatalogCards(
     lookup.query,
-    [...localRanked, ...liveCards, ...chaseCards, ...(promoFallback ? [promoFallback] : [])],
+    [...localRanked, ...liveCards, ...tcgDexCards, ...chaseCards, ...(promoFallback ? [promoFallback] : [])],
     { setName: lookup.setName, limit },
   );
   return NextResponse.json({ cards });
@@ -110,13 +123,21 @@ async function findLocalCards(
 async function cacheCatalogCards(cards: CatalogCard[]): Promise<void> {
   const db = getPrisma();
   for (const card of cards) {
-    if (!card.tcgApiId) continue;
+    if (!card.tcgApiId && !card.tcgDexId) continue;
     const data = toCardData(card);
-    await db.card.upsert({
-      where: { tcgApiId: card.tcgApiId },
-      create: data,
-      update: data,
-    });
+    if (card.tcgApiId) {
+      await db.card.upsert({
+        where: { tcgApiId: card.tcgApiId },
+        create: data,
+        update: data,
+      });
+    } else if (card.tcgDexId) {
+      await db.card.upsert({
+        where: { tcgDexId: card.tcgDexId },
+        create: data,
+        update: data,
+      });
+    }
   }
 }
 
@@ -131,6 +152,7 @@ function dbCardToCatalogCard(card: DbCard): CatalogCard {
     rarity: card.rarity ?? undefined,
     imageUrl: card.imageUrl ?? undefined,
     tcgApiId: card.tcgApiId ?? undefined,
+    tcgDexId: card.tcgDexId ?? undefined,
   };
 }
 

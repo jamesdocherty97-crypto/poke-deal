@@ -163,6 +163,7 @@ type CatalogCard = {
   setLogoUrl?: string;
   setSymbolUrl?: string;
   tcgApiId?: string;
+  tcgDexId?: string;
   priceSignals?: CatalogPriceSignal[];
 };
 
