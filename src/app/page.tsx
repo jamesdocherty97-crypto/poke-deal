@@ -5316,7 +5316,13 @@ export default function Home() {
           )}
 
           {(!headline || needsManualComp) && (
-          <form className="panel fallback-stock-panel" onSubmit={acquire}>
+          <form
+            className="panel fallback-stock-panel"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void stockWithoutComp();
+            }}
+          >
             <div className="panel-heading">
               <h2>Stock this card</h2>
               <span className="muted">{quickStockListPence > 0 ? `List ${gbp(quickStockListPence)}` : "price later"}</span>
@@ -5525,13 +5531,17 @@ export default function Home() {
             <button
               className="primary-action"
               type="submit"
-              disabled={busy === "acquire" || !quickStockCanSubmit}
+              disabled={busy === "manual-stock" || !manualStockReady}
             >
-              {acquireButtonLabel}
+              {busy === "manual-stock"
+                ? "Stocking..."
+                : shouldCreateListing
+                  ? acquireListingState === "ACTIVE"
+                    ? "Stock + mark active"
+                    : "Stock + draft listing"
+                  : "Stock now"}
             </button>
-            <button className="secondary-action" type="button" onClick={stockWithoutComp} disabled={busy === "manual-stock"}>
-              {busy === "manual-stock" ? "Stocking..." : "Stock now, price later"}
-            </button>
+            {!manualStockReady && <p className="hint">Add card, cost and quantity to stock without an auto comp.</p>}
             {suggestion && (
               <p className="hint">
                 Suggested list price {gbp(suggestion.pricePence)}. {suggestion.rationale}
