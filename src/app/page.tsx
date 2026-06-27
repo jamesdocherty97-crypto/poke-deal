@@ -4103,17 +4103,22 @@ export default function Home() {
             />
           )}
         </div>
-        <button
-          className={`icon-button ${refreshing ? "is-loading" : ""}`}
-          type="button"
-          onClick={() => void refreshAll({ toast: true, user: true })}
-          disabled={refreshing}
-          aria-label={refreshing ? "Refreshing data" : "Refresh data"}
-        >
-          <span className="refresh-icon" aria-hidden="true">
-            ↻
-          </span>
-        </button>
+        <div className="topbar-actions">
+          <button className={view === "today" ? "topbar-secondary active" : "topbar-secondary"} type="button" onClick={() => setView("today")}>
+            Today
+          </button>
+          <button
+            className={`icon-button ${refreshing ? "is-loading" : ""}`}
+            type="button"
+            onClick={() => void refreshAll({ toast: true, user: true })}
+            disabled={refreshing}
+            aria-label={refreshing ? "Refreshing data" : "Refresh data"}
+          >
+            <span className="refresh-icon" aria-hidden="true">
+              ↻
+            </span>
+          </button>
+        </div>
       </header>
 
       <section className="hero-board" aria-label="Dealer command board">
@@ -6920,10 +6925,9 @@ export default function Home() {
 
       <nav className="bottom-nav" aria-label="Primary">
         <TabButton active={view === "acquire"} label="Buy" onClick={() => setView("acquire")} />
-        <TabButton active={view === "inventory"} label="Stock" onClick={() => setView("inventory")} />
-        <TabButton active={view === "listings"} label="List" onClick={() => setView("listings")} />
-        <TabButton active={view === "pnl"} label="Profit" onClick={() => setView("pnl")} />
-        <TabButton active={view === "today"} label="Today" onClick={() => setView("today")} />
+        <TabButton active={view === "inventory"} label="Inventory" onClick={() => setView("inventory")} />
+        <TabButton active={view === "listings"} label="Listings" onClick={() => setView("listings")} />
+        <TabButton active={view === "pnl"} label="P&L" onClick={() => setView("pnl")} />
       </nav>
     </main>
   );
@@ -8580,9 +8584,9 @@ function ageLabel(value: string): string {
 function viewTitle(view: View): string {
   if (view === "today") return "Today";
   if (view === "acquire") return "Buy cards";
-  if (view === "inventory") return "Stock";
+  if (view === "inventory") return "Inventory";
   if (view === "listings") return "Listings";
-  return "Profit";
+  return "P&L";
 }
 
 function sourceStatusLabel(status: SystemSource["status"]): string {
