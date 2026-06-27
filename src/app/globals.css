@@ -1023,11 +1023,11 @@ label {
 }
 
 .quick-intake-actions {
-  grid-template-columns: minmax(0, 1fr) 64px 72px;
+  grid-template-columns: minmax(0, 1fr) 72px;
 }
 
 .quick-intake-actions.has-next {
-  grid-template-columns: minmax(0, 1fr) 56px 64px 58px;
+  grid-template-columns: minmax(0, 1fr) 72px 64px;
 }
 
 .quick-intake-row button {
@@ -5511,7 +5511,7 @@ label {
 
   .quick-intake-actions,
   .quick-intake-actions.has-next {
-    grid-template-columns: minmax(0, 1fr) 66px 58px;
+    grid-template-columns: minmax(0, 1fr) 66px;
   }
 
   .quick-intake-actions.has-next .quick-next-button {

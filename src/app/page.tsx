@@ -1043,6 +1043,7 @@ export default function Home() {
       graderCert.trim() ||
       psaResult,
   );
+  const canRunSmartComp = Boolean(quickIntake.trim() || name.trim());
   const selectedCardImage = cardArtUrl ?? catalogCard?.imageUrl ?? matchingQuickHunt?.imageUrl ?? null;
   const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
   const spotlightImage =
@@ -1927,6 +1928,14 @@ export default function Home() {
       return;
     }
     setNotice(`Filled ${filled.join(", ")}.`);
+  }
+
+  function runSmartComp() {
+    if (quickIntake.trim()) {
+      applyQuickIntake({ lookupAfter: true });
+      return;
+    }
+    void lookupComp({ name, setName: setNameValue, number, grade });
   }
 
   async function lookup(event?: FormEvent) {
@@ -4479,14 +4488,11 @@ export default function Home() {
                 />
                 <button
                   type="button"
-                  onClick={() => applyQuickIntake({ lookupAfter: true })}
-                  disabled={!quickIntake.trim() || busy === "lookup"}
-                  aria-label="Comp quick fill"
+                  onClick={runSmartComp}
+                  disabled={!canRunSmartComp || busy === "lookup"}
+                  aria-label="Comp current card"
                 >
-                  Comp
-                </button>
-                <button type="button" onClick={() => applyQuickIntake()} disabled={!quickIntake.trim()}>
-                  Fill
+                  {busy === "lookup" ? "..." : "Comp"}
                 </button>
                 {canClearCurrentComp && (
                   <button
@@ -4557,7 +4563,7 @@ export default function Home() {
               ))}
             </div>
             <details className="buy-advanced-details identity-details">
-              <summary>Card fields and buying defaults</summary>
+              <summary>Advanced card, slab and buying details</summary>
             <IntakeSessionCard
               source={source}
               location={location}
@@ -4647,6 +4653,43 @@ export default function Home() {
                 />
               </label>
             </div>
+            <div className="form-grid">
+              <label className="grade-select-field">
+                Full grade list
+                <select
+                  value={grade}
+                  onChange={(event) => {
+                    clearCompEvidence();
+                    setGrade(event.target.value as Grade);
+                  }}
+                >
+                  {gradeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="psa-lookup-field">
+                PSA cert
+                <div className="quick-intake-row">
+                  <input
+                    inputMode="numeric"
+                    value={graderCert}
+                    onChange={(event) => setGraderCert(event.target.value)}
+                    placeholder={grade === "RAW" ? "optional for slabs" : "cert number"}
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyPsaCert}
+                    disabled={busy === "psa" || !graderCert.trim()}
+                  >
+                    {busy === "psa" ? "..." : "Verify"}
+                  </button>
+                </div>
+              </label>
+            </div>
+            {psaResult && <PsaCertCard result={psaResult} />}
             {recentSets.length > 0 && (
               <div className="set-chip-stack" aria-label="Recent sets">
                 <span>Recent sets</span>
@@ -4687,46 +4730,6 @@ export default function Home() {
               </div>
             )}
             </details>
-            <div className="grade-controls">
-              <label className="grade-select-field">
-                Full grade list
-                <select
-                  value={grade}
-                  onChange={(event) => {
-                    clearCompEvidence();
-                    setGrade(event.target.value as Grade);
-                  }}
-                >
-                  {gradeOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option.replace(/_/g, " ")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="psa-lookup-field">
-              PSA cert
-              <div className="quick-intake-row">
-                <input
-                  inputMode="numeric"
-                  value={graderCert}
-                  onChange={(event) => setGraderCert(event.target.value)}
-                  placeholder={grade === "RAW" ? "optional for slabs" : "cert number"}
-                />
-                <button
-                  type="button"
-                  onClick={verifyPsaCert}
-                  disabled={busy === "psa" || !graderCert.trim()}
-                >
-                  {busy === "psa" ? "..." : "Verify"}
-                </button>
-              </div>
-            </label>
-            {psaResult && <PsaCertCard result={psaResult} />}
-            <button className="primary-action" type="submit" disabled={busy === "lookup"}>
-              {busy === "lookup" ? "Looking up..." : "Look up comp"}
-            </button>
             {!headline && renderManualCompLinks("compact")}
             {!headline && renderCheckedCompCard("priority")}
             {!headline && (
