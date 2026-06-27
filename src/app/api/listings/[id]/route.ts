@@ -48,6 +48,37 @@ export async function PATCH(
   try {
     const d = parsed.data;
     const prisma = getPrisma();
+
+    // Guard: EBAY-channel listings must not be flipped to ACTIVE through this
+    // generic patch unless they are genuinely live on eBay already. The real
+    // publish flow (offer -> publish) sets state/externalRef/externalUrl
+    // together via /api/listings/[id]/ebay/publish and never goes through
+    // this route, so this only blocks bypasses (e.g. a stray "Activate"
+    // button) from faking a live listing without ever calling eBay.
+    if (d.state === "ACTIVE") {
+      const existing = await prisma.listing.findUnique({ where: { id: params.id } });
+      if (!existing) {
+        return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+      }
+      const effectiveChannel = d.channel ?? existing.channel;
+      if (effectiveChannel === "EBAY") {
+        const effectiveExternalRef = d.externalRef !== undefined ? d.externalRef : existing.externalRef;
+        const effectiveExternalUrl = d.externalUrl !== undefined ? d.externalUrl : existing.externalUrl;
+        const genuinelyLive = Boolean(
+          effectiveExternalUrl && effectiveExternalRef && !effectiveExternalRef.startsWith("offer:"),
+        );
+        if (!genuinelyLive) {
+          return NextResponse.json(
+            {
+              error:
+                "EBAY listings can only be activated by publishing them on eBay (Create offer -> Publish) or by pasting a genuine live eBay URL. Use the eBay publish flow instead of marking active directly.",
+            },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
     const listing = await prisma.$transaction(async (tx) => {
       const current = await tx.listing.findUnique({
         where: { id: params.id },

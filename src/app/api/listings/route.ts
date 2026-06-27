@@ -57,8 +57,23 @@ export async function POST(request: Request) {
     );
   }
 
+  const d = parsed.data;
+
+  // Guard: a brand-new EBAY listing can only be created ACTIVE if a genuine
+  // live eBay URL is supplied with it (e.g. tracking a listing made outside
+  // the app). Otherwise it must start as DRAFT and go through the real
+  // offer -> publish flow before it can become ACTIVE.
+  if (d.state === "ACTIVE" && d.channel === "EBAY" && !d.externalUrl) {
+    return NextResponse.json(
+      {
+        error:
+          "New EBAY listings must start as DRAFT and be activated via Create offer -> Publish, unless you provide a genuine live eBay URL.",
+      },
+      { status: 400 },
+    );
+  }
+
   try {
-    const d = parsed.data;
     const listing = await getPrisma().$transaction(async (tx) => {
       const item = await tx.inventoryItem.findUnique({
         where: { id: d.itemId },

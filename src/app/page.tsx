@@ -3188,6 +3188,13 @@ export default function Home() {
     setBusy(`create-listing-${item.id}`);
     setError(null);
     setNotice(null);
+    // EBAY listings can only start ACTIVE if a genuine live URL is supplied —
+    // otherwise they must go through Create offer -> Publish. Other channels
+    // (Cardmarket/Vinted/in-person) are manually tracked, so direct activate
+    // is fine.
+    const trimmedExternalUrl = listingExternalUrl.trim();
+    const canActivateDirect =
+      listingState === "ACTIVE" && (listingChannel !== "EBAY" || Boolean(trimmedExternalUrl));
     try {
       const res = await fetch("/api/listings", {
         method: "POST",
@@ -3195,9 +3202,9 @@ export default function Home() {
         body: JSON.stringify({
           itemId: item.id,
           channel: listingChannel,
-          state: listingState === "ACTIVE" ? "ACTIVE" : "DRAFT",
+          state: canActivateDirect ? "ACTIVE" : "DRAFT",
           listPricePence: poundsToPence(listingPrice),
-          externalUrl: listingExternalUrl.trim() || null,
+          externalUrl: trimmedExternalUrl || null,
         }),
       });
       const payload = await readJson(res);
@@ -3205,9 +3212,15 @@ export default function Home() {
       const listing = payload.listing as Listing;
       setCreatingListingItemId(null);
       setView("listings");
-      setListingStateFilter(listingState === "ACTIVE" ? "ACTIVE" : "DRAFT");
+      setListingStateFilter(canActivateDirect ? "ACTIVE" : "DRAFT");
       openListingPack(listing);
-      setNotice(`${item.card.name} listing ${listingState === "ACTIVE" ? "activated" : "drafted"}. Listing pack is ready.`);
+      setNotice(
+        canActivateDirect
+          ? `${item.card.name} listing activated. Listing pack is ready.`
+          : listingState === "ACTIVE" && listingChannel === "EBAY"
+            ? `${item.card.name} listing drafted. Create the eBay offer and publish it to go live.`
+            : `${item.card.name} listing drafted. Listing pack is ready.`,
+      );
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "listing create failed");
@@ -3259,6 +3272,18 @@ export default function Home() {
     const listing = item.listings.find((row) => row.state !== "SOLD" && row.state !== "ENDED") ?? item.listings[0];
     if (!listing) {
       await quickDraftListingForItem(item);
+      return;
+    }
+    const isUnpublishedEbay =
+      listing.channel === "EBAY" &&
+      !(listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl);
+    if (isUnpublishedEbay) {
+      // eBay listings can't be activated directly — route to the listing
+      // pack so the real Create offer -> Publish flow runs.
+      setView("listings");
+      setListingStateFilter(listing.state === "DRAFT" ? "DRAFT" : "ALL");
+      openListingPack(listing);
+      setNotice("Create the eBay offer and publish it to make this listing live.");
       return;
     }
     await patchListing(listing, { state: "ACTIVE" }, "Listing activated.");
@@ -6878,7 +6903,6 @@ function ListingPackSheet({
   const specifics = Object.entries(pack.itemSpecifics);
   const copyFields = listingPackCopyFields(pack);
   const venueAction = listingVenueAction(listing.channel, { query: listingPackSearchQuery(listing, pack) });
-  const canActivate = listing.state === "DRAFT";
   const canSell = Boolean(item && item.status !== "SOLD" && listing.state !== "SOLD");
   const economics = item
     ? buildListingEconomics({
@@ -6892,6 +6916,9 @@ function ListingPackSheet({
   const isEbayListing = listing.channel === "EBAY";
   const hasOffer = Boolean(listing.externalRef?.startsWith("offer:"));
   const isPublished = Boolean(listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl);
+  // eBay listings can only be marked active via the real publish flow (or by
+  // pasting a genuine live URL) — never via this generic shortcut.
+  const canActivate = listing.state === "DRAFT" && !(isEbayListing && !isPublished);
 
   const ebayReadiness = isEbayListing
     ? checkEbayReadiness({
@@ -7617,7 +7644,7 @@ function ListingRow({
               Pack
             </button>
           )}
-          {listing.state !== "ACTIVE" && listing.state !== "SOLD" && (
+          {listing.state !== "ACTIVE" && listing.state !== "SOLD" && !(isEbay && !isPublished) && (
             <button type="button" onClick={() => onState("ACTIVE")} disabled={isBusy}>
               Activate
             </button>
