@@ -1108,6 +1108,76 @@ label {
   color: var(--muted);
 }
 
+.optional-tool-panel {
+  gap: 10px;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(13, 20, 36, 0.72);
+}
+
+.optional-tool-panel > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.optional-tool-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.optional-tool-panel > summary::after {
+  content: "+";
+  grid-row: 1 / span 3;
+  grid-column: 2;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--yellow);
+  font-size: 18px;
+  font-weight: 1000;
+}
+
+.optional-tool-panel[open] > summary::after {
+  content: "-";
+}
+
+.optional-tool-panel > summary span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.optional-tool-panel > summary strong {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.08;
+}
+
+.optional-tool-panel > summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.optional-tool-panel[open] {
+  background:
+    linear-gradient(120deg, rgba(42, 117, 187, 0.11), transparent 52%),
+    rgba(13, 20, 36, 0.86);
+}
+
+.optional-tool-panel[open] > summary {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .fallback-stock-panel {
   border-color: rgba(255, 203, 5, 0.24);
   background:

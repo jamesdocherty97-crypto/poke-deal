@@ -302,6 +302,7 @@ function scoreSetPhrase(phrase: string, number: string | undefined): SetPhraseMa
 }
 
 function resolveSetDisplayName(setName: string, number: string | undefined): string {
+  if (isGenericPromoSetContext(setName)) return setName;
   const resolvedId = resolveSetIdForCard(setName, number);
   return (resolvedId && getSetById(resolvedId)?.name) || setName;
 }

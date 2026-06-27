@@ -42,6 +42,7 @@ export async function GET(request: Request) {
   if (!q.trim()) return NextResponse.json({ cards: [] });
 
   const lookup = normalizeCatalogCardSearchInput(q, setName);
+  const sourceSetName = isGenericPromoSetContext(lookup.setName) ? undefined : lookup.setName;
   const parsedQuery = parseCardSearchQuery(lookup.query);
   const rankingPoolLimit = Math.max(limit * 3, 20);
   const localCards = await findLocalCards(lookup.query, lookup.setName, parsedQuery).catch(() => []);
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
     const source = new PokemonTcgApiCatalogSource();
     const liveName = lookup.name || parsedQuery.name || q;
     liveCards = await source
-      .search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: lookup.setName, game: "POKEMON", language: "EN" }, limit)
+      .search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit)
       .catch(() => []);
     await cacheCatalogCards(liveCards).catch((err) => {
       console.warn("[catalog/cards] live card cache skipped:", err instanceof Error ? err.message : "unknown error");
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
     const source = new TcgDexCatalogSource();
     const liveName = lookup.name || parsedQuery.name || q;
     tcgDexCards = await source
-      .search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: lookup.setName, game: "POKEMON", language: "EN" }, limit)
+      .search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit)
       .catch(() => []);
     await cacheCatalogCards(tcgDexCards).catch((err) => {
       console.warn("[catalog/cards] tcgdex card cache skipped:", err instanceof Error ? err.message : "unknown error");
@@ -88,6 +89,10 @@ export async function GET(request: Request) {
     : [];
   const cards = setMatchedCards.length > 0 ? setMatchedCards.slice(0, limit) : rankedCards;
   return NextResponse.json({ cards });
+}
+
+function isGenericPromoSetContext(setName: string | undefined): boolean {
+  return /^promos?$/i.test(setName?.trim() ?? "");
 }
 
 async function findLocalCards(

@@ -4408,88 +4408,6 @@ export default function Home() {
               <h2>Comp, buy, stock</h2>
               <span className="muted">type what is on the card</span>
             </div>
-            <div className="selected-card-strip" aria-label="Selected card">
-              <CardImage
-                src={selectedCardImage}
-                className="selected-card-art"
-                fallbackClassName="selected-card-art blank"
-                alt={`${selectedCardTitle} card art`}
-              />
-              <div>
-                <span>Current card</span>
-                <strong>{selectedCardTitle}</strong>
-                <small>{selectedCardMeta}</small>
-              </div>
-              <div className="selected-card-actions">
-                {selectedCardMarkUrl && (
-                  <img
-                    className="selected-set-mark"
-                    src={selectedCardMarkUrl}
-                    alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
-                    onError={hideBrokenImage}
-                  />
-                )}
-                <button
-                  className="clear-comp-button"
-                  type="button"
-                  onClick={() => clearCurrentComp()}
-                  aria-label="Clear and comp another card"
-                  title="Clear and comp another card"
-                  disabled={busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
-                >
-                  X
-                </button>
-              </div>
-            </div>
-            {recentComps.length > 0 && (
-              <div className="recent-comp-strip" aria-label="Recent comps">
-                <div className="recent-comp-heading">
-                  <span>Recent comps</span>
-                  <button className="ghost-button" type="button" onClick={clearRecentComps}>
-                    Clear
-                  </button>
-                </div>
-                <div className="recent-comp-row">
-                  {recentComps.map((entry) => (
-                    <article className={`recent-comp-card ${entry.confidenceTone}`} key={recentCompKey(entry)}>
-                      <button
-                        className="recent-comp-pick"
-                        type="button"
-                        onClick={() => chooseRecentComp(entry, { lookupAfter: true })}
-                        disabled={busy === "lookup"}
-                      >
-                        <CardImage
-                          src={entry.imageUrl}
-                          className="recent-comp-art"
-                          fallbackClassName="recent-comp-art blank"
-                          alt=""
-                        />
-                        <span className="recent-comp-copy">
-                          <strong>{entry.name}</strong>
-                          <small>
-                            {entry.setName}
-                            {entry.number ? ` #${entry.number}` : ""} · {entry.grade.replace(/_/g, " ")}
-                          </small>
-                          <em>
-                            {entry.pricePence > 0 ? `Last ${gbp(entry.pricePence)}` : "No price"} · {entry.confidenceLabel}
-                          </em>
-                          <small className="recent-comp-meta">{recentCompMeta(entry)}</small>
-                          <small className="recent-comp-recheck">Tap to recheck live</small>
-                        </span>
-                      </button>
-                      <button
-                        className="recent-comp-remove danger-button"
-                        type="button"
-                        onClick={() => removeRecentCompEntry(entry)}
-                        aria-label={`Remove ${entry.name} recent comp`}
-                      >
-                        x
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            )}
             <div className="quick-intake-field">
               <label htmlFor="quick-intake">Smart comp search</label>
               <div className={`quick-intake-row quick-intake-actions ${canClearCurrentComp ? "has-next" : ""}`}>
@@ -4591,6 +4509,88 @@ export default function Home() {
                     {[...quickIntakePreview.missing.map((item) => `Needs ${item}`), ...quickIntakePreview.warnings].join(" · ")}
                   </p>
                 )}
+              </div>
+            )}
+            <div className="selected-card-strip" aria-label="Selected card">
+              <CardImage
+                src={selectedCardImage}
+                className="selected-card-art"
+                fallbackClassName="selected-card-art blank"
+                alt={`${selectedCardTitle} card art`}
+              />
+              <div>
+                <span>Current card</span>
+                <strong>{selectedCardTitle}</strong>
+                <small>{selectedCardMeta}</small>
+              </div>
+              <div className="selected-card-actions">
+                {selectedCardMarkUrl && (
+                  <img
+                    className="selected-set-mark"
+                    src={selectedCardMarkUrl}
+                    alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+                    onError={hideBrokenImage}
+                  />
+                )}
+                <button
+                  className="clear-comp-button"
+                  type="button"
+                  onClick={() => clearCurrentComp()}
+                  aria-label="Clear and comp another card"
+                  title="Clear and comp another card"
+                  disabled={busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
+                >
+                  X
+                </button>
+              </div>
+            </div>
+            {recentComps.length > 0 && (
+              <div className="recent-comp-strip" aria-label="Recent comps">
+                <div className="recent-comp-heading">
+                  <span>Recent comps</span>
+                  <button className="ghost-button" type="button" onClick={clearRecentComps}>
+                    Clear
+                  </button>
+                </div>
+                <div className="recent-comp-row">
+                  {recentComps.map((entry) => (
+                    <article className={`recent-comp-card ${entry.confidenceTone}`} key={recentCompKey(entry)}>
+                      <button
+                        className="recent-comp-pick"
+                        type="button"
+                        onClick={() => chooseRecentComp(entry, { lookupAfter: true })}
+                        disabled={busy === "lookup"}
+                      >
+                        <CardImage
+                          src={entry.imageUrl}
+                          className="recent-comp-art"
+                          fallbackClassName="recent-comp-art blank"
+                          alt=""
+                        />
+                        <span className="recent-comp-copy">
+                          <strong>{entry.name}</strong>
+                          <small>
+                            {entry.setName}
+                            {entry.number ? ` #${entry.number}` : ""} · {entry.grade.replace(/_/g, " ")}
+                          </small>
+                          <em>
+                            {entry.pricePence > 0 ? `Last ${gbp(entry.pricePence)}` : "No price"} · {entry.confidenceLabel}
+                          </em>
+                          <small className="recent-comp-meta">{recentCompMeta(entry)}</small>
+                          <small className="recent-comp-recheck">Tap to recheck live</small>
+                        </span>
+                      </button>
+                      <button
+                        className="recent-comp-remove danger-button"
+                        type="button"
+                        onClick={() => removeRecentCompEntry(entry)}
+                        aria-label={`Remove ${entry.name} recent comp`}
+                      >
+                        x
+                      </button>
+                    </article>
+                  ))}
+                </div>
               </div>
             )}
             <div className="smart-grade-strip" aria-label="Quick grade">
@@ -5282,11 +5282,12 @@ export default function Home() {
           )}
 
           {headline && grade === "RAW" && !needsManualComp && (
-            <section className="panel grade-lab">
-              <div className="panel-heading">
-                <h2>Grade lab</h2>
-                <span className="muted">RAW to PSA 10 EV</span>
-              </div>
+            <details className="panel optional-tool-panel grade-lab">
+              <summary>
+                <span>Optional</span>
+                <strong>Grade lab</strong>
+                <small>RAW to PSA 10 EV</small>
+              </summary>
               <div className="form-grid">
                 <label>
                   PSA 10 odds %
@@ -5306,15 +5307,16 @@ export default function Home() {
                   <strong>{gradeEv.liftPence >= 0 ? "+" : ""}{gbp(gradeEv.liftPence)} EV lift</strong>
                 </div>
               )}
-            </section>
+            </details>
           )}
 
           {headline && !needsManualComp && (
-            <section className="panel watch-panel">
-              <div className="panel-heading">
-                <h2>Buy target</h2>
-                <span className="muted">{watches.filter((watch) => watch.active).length} watched</span>
-              </div>
+            <details className="panel optional-tool-panel watch-panel">
+              <summary>
+                <span>Optional</span>
+                <strong>Buy target</strong>
+                <small>{watches.filter((watch) => watch.active).length} watched</small>
+              </summary>
               <div className="form-grid">
                 <label>
                   Target
@@ -5361,7 +5363,7 @@ export default function Home() {
               <button className="secondary-action" type="button" onClick={createWatch} disabled={busy === "watch-create"}>
                 {busy === "watch-create" ? "Saving watch..." : "Watch for buy price"}
               </button>
-            </section>
+            </details>
           )}
 
           {(!headline || needsManualComp) && (
