@@ -1,4 +1,4 @@
-import type { Grade } from "../domain/types.js";
+import { GRADE_VALUES, type Grade } from "../domain/types.js";
 import { parseQuickIntake } from "./intakeParser.js";
 
 export type ImportChannel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
@@ -54,27 +54,7 @@ const ORDERED_COLUMNS = [
 
 type OrderedColumn = (typeof ORDERED_COLUMNS)[number];
 
-const SUPPORTED_GRADES = new Set<Grade>([
-  "RAW",
-  "PSA_1",
-  "PSA_2",
-  "PSA_3",
-  "PSA_4",
-  "PSA_5",
-  "PSA_6",
-  "PSA_7",
-  "PSA_8",
-  "PSA_9",
-  "PSA_10",
-  "BGS_9",
-  "BGS_9_5",
-  "BGS_10",
-  "CGC_9",
-  "CGC_9_5",
-  "CGC_10",
-  "ACE_9",
-  "ACE_10",
-]);
+const SUPPORTED_GRADES = new Set<Grade>(GRADE_VALUES);
 
 
 const HEADER_ALIASES: Record<string, OrderedColumn> = {

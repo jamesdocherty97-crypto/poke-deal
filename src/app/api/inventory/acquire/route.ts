@@ -17,19 +17,12 @@ import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { acquireToInventory } from "@/lib/inventory/inventoryService";
 import { getPrisma } from "@/lib/db/prisma";
 import { buildCheckedComp } from "@/lib/dealer/checkedComp";
-import type { CardRef } from "@/lib/domain/types";
+import { GRADE_VALUES, type CardRef } from "@/lib/domain/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const gradeSchema = z.enum([
-  "RAW",
-  "PSA_1", "PSA_2", "PSA_3", "PSA_4", "PSA_5",
-  "PSA_6", "PSA_7", "PSA_8", "PSA_9", "PSA_10",
-  "BGS_9", "BGS_9_5", "BGS_10",
-  "CGC_9", "CGC_9_5", "CGC_10",
-  "ACE_9", "ACE_10",
-]);
+const gradeSchema = z.enum(GRADE_VALUES);
 
 const acquireSchema = z.object({
   card: z.object({

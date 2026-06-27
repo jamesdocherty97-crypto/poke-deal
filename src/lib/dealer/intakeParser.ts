@@ -1,6 +1,6 @@
 import { getSetById, searchSets, resolveExactSetId, resolveSetIdForCard } from "../catalog/setCatalog.js";
 import { normalizeSearchText, tokenizeSearchText, tokenMatches } from "../catalog/fuzzy.js";
-import type { Grade } from "../domain/types.js";
+import { GRADE_VALUES, type Grade } from "../domain/types.js";
 import { splitTotalCostToUnitPence } from "./bundleCost.js";
 import type { SaleChannel } from "./saleFees.js";
 
@@ -44,27 +44,7 @@ const NUMBER_PATTERNS = [
   /\b(?!SET\b)[A-Z]{2,5}\s*0?\d{1,4}\b/i,
 ];
 
-const SUPPORTED_QUICK_GRADES = new Set<ParsedQuickIntakeGrade>([
-  "RAW",
-  "PSA_1",
-  "PSA_2",
-  "PSA_3",
-  "PSA_4",
-  "PSA_5",
-  "PSA_6",
-  "PSA_7",
-  "PSA_8",
-  "PSA_9",
-  "PSA_10",
-  "BGS_9",
-  "BGS_9_5",
-  "BGS_10",
-  "CGC_9",
-  "CGC_9_5",
-  "CGC_10",
-  "ACE_9",
-  "ACE_10",
-]);
+const SUPPORTED_QUICK_GRADES = new Set<ParsedQuickIntakeGrade>(GRADE_VALUES);
 
 const STRONG_SET_ALIASES = new Set([
   "151",
@@ -273,7 +253,7 @@ function extractCondition(input: string): { value: string; match: string } | nul
 }
 
 function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: string } | null {
-  const slab = input.match(/\b(PSA|BGS|CGC|ACE)\s*(10|9(?:[.,]5)?|[1-8])\b/i);
+  const slab = input.match(/\b(PSA|BGS|CGC|ACE)\s*(10|9[.,]5|9|[1-8][.,]5|[1-8])\b/i);
   if (slab?.[0] && slab[1] && slab[2]) {
     const company = slab[1].toUpperCase();
     const numeric = slab[2].replace(",", ".").replace(".", "_");
@@ -288,7 +268,7 @@ function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: st
 }
 
 function extractUnsupportedSlabGrade(input: string): { match: string } | null {
-  const slab = input.match(/\b(?:PSA|BGS|CGC|ACE)\s*(?:10|9(?:[.,]5)?|[1-8](?:[.,]5)?)\b/i);
+  const slab = input.match(/\b(?:PSA|BGS|CGC|ACE)\s*(?:10|9[.,]5|9|[1-8][.,]5|[1-8])\b/i);
   return slab?.[0] ? { match: slab[0] } : null;
 }
 

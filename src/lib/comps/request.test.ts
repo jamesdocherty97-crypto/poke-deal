@@ -124,6 +124,14 @@ test("readCompLookupRequest normalizes typed slab grades", () => {
   }));
 
   assert.equal("grade" in parsed ? parsed.grade : null, "ACE_10");
+
+  const lowCgc = readCompLookupRequest(new URLSearchParams({
+    name: "Lugia",
+    set: "Neo Genesis",
+    grade: "CGC 1.5",
+  }));
+
+  assert.equal("grade" in lowCgc ? lowCgc.grade : null, "CGC_1_5");
 });
 
 test("readCompLookupRequest preserves canonical URL grade values", () => {

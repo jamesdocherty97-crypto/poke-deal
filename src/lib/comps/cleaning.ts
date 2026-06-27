@@ -9,7 +9,7 @@
 // in so it is fully deterministic and testable. This is why it is hard to break.
 // ─────────────────────────────────────────────────────────────
 
-import type { CardRef, CompResult, Grade, RawSale } from "../domain/types.js";
+import { GRADE_VALUES, type CardRef, type CompResult, type Grade, type RawSale } from "../domain/types.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "./currency.js";
 
 // ── Stats helpers (exported for tests) ───────────────────────
@@ -44,12 +44,13 @@ export function normalizeGradeLabel(label: string | undefined): Grade | null {
   if (t === "") return "RAW";
   if (/\b(raw|ungraded|not graded|nm|near mint|loose)\b/.test(t)) return "RAW";
 
-  const m = t.match(/\b(psa|bgs|cgc|ace)\s*\.?\s*(10|9\s*\.?\s*5|9|8|7|6|5|4|3|2|1)\b/);
+  const m = t.match(/\b(psa|bgs|cgc|ace)\s*\.?\s*(10|[1-9]\s*\.?\s*5|[1-9])\b/);
   if (m) {
     const company = m[1]!.toUpperCase();
     const compactNum = m[2]!.replace(/\s+/g, "");
     const num = compactNum === "95" ? "9_5" : compactNum.replace(".", "_");
-    return `${company}_${num}` as Grade;
+    const grade = `${company}_${num}` as Grade;
+    return GRADE_VALUES.includes(grade) ? grade : null;
   }
   return null; // unrecognised — caller decides (we drop it)
 }

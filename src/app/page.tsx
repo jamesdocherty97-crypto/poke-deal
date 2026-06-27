@@ -7,7 +7,7 @@ import {
   suggestListPrice,
   type PricingStrategy,
 } from "@/lib/comps/pricing";
-import type { CompResult as DomainCompResult, Grade as DomainGrade } from "@/lib/domain/types";
+import { GRADE_VALUES, type CompResult as DomainCompResult, type Grade as DomainGrade } from "@/lib/domain/types";
 import {
   buildInventoryView,
   buildListingView,
@@ -470,15 +470,8 @@ type SystemSource = {
   setupHint?: string;
 };
 
-const quickGrades: Grade[] = ["RAW", "PSA_8", "PSA_9", "PSA_10", "ACE_9", "ACE_10", "BGS_9_5", "CGC_10"];
-const gradeOptions: Grade[] = [
-  "RAW",
-  "PSA_1", "PSA_2", "PSA_3", "PSA_4", "PSA_5",
-  "PSA_6", "PSA_7", "PSA_8", "PSA_9", "PSA_10",
-  "BGS_9", "BGS_9_5", "BGS_10",
-  "CGC_9", "CGC_9_5", "CGC_10",
-  "ACE_9", "ACE_10",
-];
+const quickGrades: Grade[] = ["RAW", "PSA_8", "PSA_9", "PSA_10", "CGC_1_5", "ACE_9", "ACE_10", "BGS_9_5", "CGC_10"];
+const gradeOptions: Grade[] = [...GRADE_VALUES];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCGPLAYER", "OTHER"];
 const checkedCompSampleOptions = ["1", "2", "3", "5"];

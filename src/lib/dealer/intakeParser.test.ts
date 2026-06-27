@@ -106,10 +106,11 @@ test("parseQuickIntake resolves parenthesised modern promo shorthand", () => {
   });
 });
 
-test("parseQuickIntake keeps unsupported slab grades out of the card name", () => {
+test("parseQuickIntake accepts low CGC half grades", () => {
   assert.deepEqual(parseQuickIntake("Lugia Neo Genesis CGC 1.5 £80"), {
     name: "Lugia",
     setName: "Neo Genesis",
+    grade: "CGC_1_5",
     cost: "80.00",
   });
 });

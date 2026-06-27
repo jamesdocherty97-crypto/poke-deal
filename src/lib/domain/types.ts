@@ -5,13 +5,18 @@
 export type Game = "POKEMON" | "SOCCER";
 export type Language = "EN" | "JP";
 
-export type Grade =
-  | "RAW"
-  | "PSA_1" | "PSA_2" | "PSA_3" | "PSA_4" | "PSA_5"
-  | "PSA_6" | "PSA_7" | "PSA_8" | "PSA_9" | "PSA_10"
-  | "BGS_9" | "BGS_9_5" | "BGS_10"
-  | "CGC_9" | "CGC_9_5" | "CGC_10"
-  | "ACE_9" | "ACE_10";
+export const GRADE_VALUES = [
+  "RAW",
+  "PSA_1", "PSA_2", "PSA_3", "PSA_4", "PSA_5",
+  "PSA_6", "PSA_7", "PSA_8", "PSA_9", "PSA_10",
+  "BGS_9", "BGS_9_5", "BGS_10",
+  "CGC_1", "CGC_1_5", "CGC_2", "CGC_2_5", "CGC_3", "CGC_3_5", "CGC_4", "CGC_4_5",
+  "CGC_5", "CGC_5_5", "CGC_6", "CGC_6_5", "CGC_7", "CGC_7_5", "CGC_8", "CGC_8_5",
+  "CGC_9", "CGC_9_5", "CGC_10",
+  "ACE_9", "ACE_10",
+] as const;
+
+export type Grade = (typeof GRADE_VALUES)[number];
 
 export type Currency = "GBP" | "EUR" | "USD" | "JPY";
 
