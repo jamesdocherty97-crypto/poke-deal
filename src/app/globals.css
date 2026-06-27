@@ -986,6 +986,9 @@ label {
 }
 
 .quick-intake-field {
+  position: relative;
+  display: grid;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -1021,6 +1024,72 @@ label {
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.08);
   color: var(--muted);
+}
+
+.smart-card-suggestions {
+  display: grid;
+  gap: 4px;
+  max-height: min(390px, 52vh);
+  overflow-y: auto;
+  border: 1px solid rgba(255, 203, 5, 0.26);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 203, 5, 0.08), transparent 42%),
+    rgba(3, 8, 20, 0.82);
+  padding: 6px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+}
+
+.smart-card-suggestions .suggestion-item {
+  min-height: 56px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.smart-grade-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.smart-grade-strip button {
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 8px;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.smart-grade-strip button.selected {
+  border-color: rgba(255, 203, 5, 0.58);
+  background: rgba(255, 203, 5, 0.16);
+  color: #fff4b0;
+}
+
+.identity-details {
+  display: grid;
+  gap: 10px;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(3, 8, 20, 0.22);
+}
+
+.identity-details[open] {
+  padding-bottom: 10px;
+}
+
+.identity-details > summary {
+  color: var(--muted);
+}
+
+.fallback-stock-panel {
+  border-color: rgba(255, 203, 5, 0.24);
+  background:
+    linear-gradient(120deg, rgba(255, 203, 5, 0.08), transparent 44%),
+    var(--panel);
 }
 
 .quick-intake-preview {
@@ -4868,6 +4937,10 @@ label {
     align-items: start;
   }
 
+  .buy-workspace {
+    grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+  }
+
   .workspace > .section-heading,
   .workspace > .dex-controls,
   .workspace > .pnl-summary,
@@ -4879,6 +4952,17 @@ label {
   .mobile-buy-action,
   .mobile-buy-spacer {
     display: none;
+  }
+
+  .buy-workspace > .lookup-panel {
+    position: sticky;
+    top: 84px;
+  }
+
+  .buy-workspace > .stock-import-panel,
+  .buy-workspace > .recent-intake-panel,
+  .buy-workspace > .last-stocked-panel {
+    grid-column: 1 / -1;
   }
 
   .sell-sheet {

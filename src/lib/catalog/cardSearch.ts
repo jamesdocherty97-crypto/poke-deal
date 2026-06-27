@@ -68,7 +68,7 @@ export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setN
   if (nameScore === 0 && numberScore === 0) return 0;
   if (parsed.number && isStrictPrefixedCollectorNumber(parsed.number) && numberScore === 0) return 0;
 
-  const resolvedSetId = setName?.trim() ? resolveSetId(setName) : undefined;
+  const resolvedSetId = setName?.trim() && !isGenericPromoSetContext(setName) ? resolveSetId(setName) : undefined;
   if (isApiUnavailableSetId(resolvedSetId) && card.setCode !== resolvedSetId) return 0;
 
   let score = nameScore * 4 + numberScore;
@@ -88,6 +88,7 @@ export function catalogCardMatchesSetContext(
 ): boolean {
   if (!setName?.trim()) return true;
   if (!card) return false;
+  if (isGenericPromoSetContext(setName)) return scoreSetContextForSearch(setName, card) > 0;
 
   const resolvedSetId = resolveSetId(setName);
   if (resolvedSetId) {
@@ -173,6 +174,12 @@ export function normalizeCatalogCardSearchInput(
     if (setMatch) {
       setName = setMatch.setName;
       name = removePhrase(name, setMatch.phrase);
+    } else {
+      const genericPromo = removeGenericPromoQualifier(name);
+      if (genericPromo !== name) {
+        name = genericPromo;
+        setName = "Promo";
+      }
     }
   }
 
@@ -194,7 +201,22 @@ function normalizeParentheticalPromoNumbers(input: string): string {
   );
 }
 
+function removeGenericPromoQualifier(input: string): string {
+  return input
+    .replace(/\b(?:black\s+star\s+)?promos?\b/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
+  if (isGenericPromoSetContext(setName)) {
+    const promoScore = Math.max(
+      /\bpromos?\b/i.test(card.setName) ? 720 : 0,
+      /\bp(?:romos?)?$/i.test(card.setCode ?? "") ? 420 : 0,
+    );
+    return promoScore;
+  }
+
   const directScore = Math.max(
     scoreSearchText(setName, card.setName),
     scoreSearchText(setName, card.setCode ?? ""),
@@ -210,6 +232,10 @@ function scoreSetContextForSearch(setName: string, card: CatalogCard): number {
   );
 
   return Math.max(directScore, resolvedScore);
+}
+
+function isGenericPromoSetContext(setName: string | undefined): boolean {
+  return /^promos?$/i.test(setName?.trim() ?? "");
 }
 
 function formatPromoDisplayNumber(number: string | undefined, setName: string | undefined): string | undefined {

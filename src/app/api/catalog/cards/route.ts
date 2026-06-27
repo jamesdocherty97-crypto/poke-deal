@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  catalogCardMatchesSetContext,
   normalizeCatalogCardSearchInput,
   parseCardSearchQuery,
   rankCatalogCards,
@@ -76,11 +77,15 @@ export async function GET(request: Request) {
     game: "POKEMON",
     language: "EN",
   });
-  const cards = rankCatalogCards(
+  const rankedCards = rankCatalogCards(
     lookup.query,
     [...localRanked, ...liveCards, ...tcgDexCards, ...chaseCards, ...(promoFallback ? [promoFallback] : [])],
     { setName: lookup.setName, limit },
   );
+  const setMatchedCards = lookup.setName
+    ? rankedCards.filter((card) => catalogCardMatchesSetContext(card, lookup.setName))
+    : [];
+  const cards = setMatchedCards.length > 0 ? setMatchedCards.slice(0, limit) : rankedCards;
   return NextResponse.json({ cards });
 }
 

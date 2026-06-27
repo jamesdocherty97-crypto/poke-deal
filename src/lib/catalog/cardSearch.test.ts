@@ -135,6 +135,13 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     number: "SVP208",
   });
 
+  assert.deepEqual(normalizeCatalogCardSearchInput("Victini promo"), {
+    query: "Victini",
+    name: "Victini",
+    setName: "Promo",
+    number: undefined,
+  });
+
   assert.deepEqual(normalizeCatalogCardSearchInput("Victini (208)", "SV Promos"), {
     query: "Victini SVP208",
     name: "Victini",

@@ -519,7 +519,7 @@ type RefreshOptions = {
 };
 
 export default function Home() {
-  const [view, setView] = useState<View>("today");
+  const [view, setView] = useState<View>("acquire");
   const [name, setName] = useState("");
   const [setNameValue, setSetNameValue] = useState("");
   const [number, setNumber] = useState("");
@@ -766,7 +766,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!cardSuggestionsOpen) return;
-    const parsed = normalizeCatalogCardSearchInput([name.trim(), number.trim()].filter(Boolean).join(" "), setNameValue);
+    const smartText = quickIntake.trim() || [name.trim(), number.trim()].filter(Boolean).join(" ");
+    const parsed = normalizeCatalogCardSearchInput(smartText, setNameValue);
     const query = parsed.query;
     if (!query) {
       setCardSuggestions([]);
@@ -781,7 +782,7 @@ export default function Home() {
         .catch(() => {});
     }, 180);
     return () => clearTimeout(handle);
-  }, [name, number, setNameValue, cardSuggestionsOpen]);
+  }, [name, number, quickIntake, setNameValue, cardSuggestionsOpen]);
 
   const sellingItem = useMemo(
     () => inventory.find((item) => item.id === sellingId) ?? null,
@@ -4343,7 +4344,7 @@ export default function Home() {
       )}
 
       {view === "acquire" && (
-        <section className="workspace">
+        <section className="workspace buy-workspace">
           <BuyFlowRail steps={buyFlowSteps} />
           {lastStocked && (
             <LastStockedPanel
@@ -4356,8 +4357,8 @@ export default function Home() {
           )}
           <form className="panel lookup-panel" onSubmit={lookup}>
             <div className="panel-heading">
-              <h2>Fast comp</h2>
-              <span className="muted">Live GBP valuation</span>
+              <h2>Comp, buy, stock</h2>
+              <span className="muted">type what is on the card</span>
             </div>
             <div className="selected-card-strip" aria-label="Selected card">
               <CardImage
@@ -4442,7 +4443,7 @@ export default function Home() {
               </div>
             )}
             <div className="quick-intake-field">
-              <label htmlFor="quick-intake">Quick fill</label>
+              <label htmlFor="quick-intake">Smart comp search</label>
               <div className={`quick-intake-row quick-intake-actions ${canClearCurrentComp ? "has-next" : ""}`}>
                 <input
                   id="quick-intake"
@@ -4452,18 +4453,17 @@ export default function Home() {
                     setQuickIntake(event.target.value);
                     if (comp || checkedCompPrice.trim()) clearCompEvidence();
                   }}
+                  onFocus={() => setCardSuggestionsOpen(true)}
+                  onBlur={() => setTimeout(() => setCardSuggestionsOpen(false), 150)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && quickIntake.trim()) {
                       event.preventDefault();
                       applyQuickIntake({ lookupAfter: true });
                     }
                   }}
-                  placeholder="Gengar lor tg TG06 raw £10 LP vinted binder"
+                  placeholder="Umbreon prismatic, Victini promo, Lugia Neo Genesis CGC 1.5..."
                   autoComplete="off"
                 />
-                <button type="button" onClick={() => applyQuickIntake()} disabled={!quickIntake.trim()}>
-                  Fill
-                </button>
                 <button
                   type="button"
                   onClick={() => applyQuickIntake({ lookupAfter: true })}
@@ -4471,6 +4471,9 @@ export default function Home() {
                   aria-label="Comp quick fill"
                 >
                   Comp
+                </button>
+                <button type="button" onClick={() => applyQuickIntake()} disabled={!quickIntake.trim()}>
+                  Fill
                 </button>
                 {canClearCurrentComp && (
                   <button
@@ -4484,6 +4487,25 @@ export default function Home() {
                   </button>
                 )}
               </div>
+              {cardSuggestionsOpen && quickIntake.trim() && cardSuggestions.length > 0 && (
+                <div className="smart-card-suggestions" role="listbox" aria-label="Card suggestions">
+                  {cardSuggestions.map((card) => (
+                    <button
+                      key={card.tcgApiId ?? card.tcgDexId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
+                      type="button"
+                      className="suggestion-item card-option"
+                      onClick={() => chooseCard(card)}
+                    >
+                      <CardImage src={card.imageUrl ?? null} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
+                      <span>{card.name}</span>
+                      <small>
+                        {card.setName}
+                        {card.number ? ` #${card.number}` : ""}
+                      </small>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {quickIntakePreview && (
               <div className={`quick-intake-preview ${quickIntakePreview.tone}`} aria-label="Quick fill preview">
@@ -4506,6 +4528,23 @@ export default function Home() {
                 )}
               </div>
             )}
+            <div className="smart-grade-strip" aria-label="Quick grade">
+              {quickGrades.map((g) => (
+                <button
+                  key={g}
+                  className={grade === g ? "selected" : ""}
+                  type="button"
+                  onClick={() => {
+                    clearCompEvidence();
+                    setGrade(g);
+                  }}
+                >
+                  {g.replace(/_/g, " ")}
+                </button>
+              ))}
+            </div>
+            <details className="buy-advanced-details identity-details">
+              <summary>Card fields and buying defaults</summary>
             <IntakeSessionCard
               source={source}
               location={location}
@@ -4634,24 +4673,10 @@ export default function Home() {
                 </div>
               </div>
             )}
+            </details>
             <div className="grade-controls">
-              <div className="segmented" role="group" aria-label="Quick grade">
-                {quickGrades.map((g) => (
-                  <button
-                    key={g}
-                    className={grade === g ? "selected" : ""}
-                    type="button"
-                    onClick={() => {
-                      clearCompEvidence();
-                      setGrade(g);
-                    }}
-                  >
-                    {g.replace(/_/g, " ")}
-                  </button>
-                ))}
-              </div>
               <label className="grade-select-field">
-                Grade
+                Full grade list
                 <select
                   value={grade}
                   onChange={(event) => {
@@ -5226,7 +5251,8 @@ export default function Home() {
             </section>
           )}
 
-          <form className="panel" onSubmit={acquire}>
+          {(!headline || needsManualComp) && (
+          <form className="panel fallback-stock-panel" onSubmit={acquire}>
             <div className="panel-heading">
               <h2>Stock this card</h2>
               <span className="muted">{quickStockListPence > 0 ? `List ${gbp(quickStockListPence)}` : "price later"}</span>
@@ -5423,6 +5449,7 @@ export default function Home() {
               </p>
             )}
           </form>
+          )}
           <form className="panel stock-import-panel" onSubmit={importStockRows} ref={stockImportRef}>
             <div className="panel-heading">
               <div>
@@ -6802,11 +6829,11 @@ export default function Home() {
       )}
 
       <nav className="bottom-nav" aria-label="Primary">
-        <TabButton active={view === "today"} label="Today" onClick={() => setView("today")} />
         <TabButton active={view === "acquire"} label="Buy" onClick={() => setView("acquire")} />
         <TabButton active={view === "inventory"} label="Stock" onClick={() => setView("inventory")} />
         <TabButton active={view === "listings"} label="List" onClick={() => setView("listings")} />
         <TabButton active={view === "pnl"} label="Profit" onClick={() => setView("pnl")} />
+        <TabButton active={view === "today"} label="Today" onClick={() => setView("today")} />
       </nav>
     </main>
   );
