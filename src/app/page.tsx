@@ -557,7 +557,7 @@ export default function Home() {
   const [checkedCompNote, setCheckedCompNote] = useState("");
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
-  const [shouldCreateListing, setShouldCreateListing] = useState(true);
+  const [shouldCreateListing, setShouldCreateListing] = useState(false);
   const [keepBuying, setKeepBuying] = useState(DEFAULT_INTAKE_PREFERENCES.keepBuying);
   const [comp, setComp] = useState<Reconciled | null>(null);
   const [stockCompItemId, setStockCompItemId] = useState<string | null>(null);
@@ -4122,7 +4122,9 @@ export default function Home() {
               {requiresCheckedCompBeforeStock
                 ? "Add checked comp"
                 : quickStockReady
-                  ? `${quickStockQuantity} to ${acquireListingState === "ACTIVE" ? "list" : "draft"}`
+                  ? shouldCreateListing
+                    ? `${quickStockQuantity} + ${acquireListingState === "ACTIVE" ? "active listing" : "draft"}`
+                    : `${quickStockQuantity} to stock`
                   : "Add cost"}
             </strong>
           </div>
@@ -4152,31 +4154,46 @@ export default function Home() {
             tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
           />
         </div>
-        <div className="listing-choice" role="group" aria-label="After stock listing choice">
-          <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
-            List later
-          </button>
-          <button
-            type="button"
-            className={shouldCreateListing && acquireListingState === "DRAFT" ? "selected" : ""}
-            onClick={() => {
-              setShouldCreateListing(true);
-              setAcquireListingState("DRAFT");
-            }}
-          >
-            Draft
-          </button>
-          <button
-            type="button"
-            className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
-            onClick={() => {
-              setShouldCreateListing(true);
-              setAcquireListingState("ACTIVE");
-            }}
-          >
-            Active
-          </button>
-        </div>
+        <details className="buy-advanced-details optional-listing-details">
+          <summary>Optional listing after stock</summary>
+          <div className="form-grid">
+            <label>
+              List price
+              <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="auto" />
+            </label>
+            <label>
+              Channel
+              <select value={channel} onChange={(event) => setChannel(event.target.value as Channel)}>
+                {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="listing-choice" role="group" aria-label="After stock listing choice">
+            <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
+              List later
+            </button>
+            <button
+              type="button"
+              className={shouldCreateListing && acquireListingState === "DRAFT" ? "selected" : ""}
+              onClick={() => {
+                setShouldCreateListing(true);
+                setAcquireListingState("DRAFT");
+              }}
+            >
+              Draft
+            </button>
+            <button
+              type="button"
+              className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
+              onClick={() => {
+                setShouldCreateListing(true);
+                setAcquireListingState("ACTIVE");
+              }}
+            >
+              Active
+            </button>
+          </div>
+        </details>
         {totalCostSplit && (
           <div className="split-cost-card">
             <div>
@@ -4243,7 +4260,9 @@ export default function Home() {
               ? "Add cost"
               : requiresCheckedCompBeforeStock
                 ? "Add checked comp first"
-                : stockButtonLabel}
+                : shouldCreateListing
+                  ? `${stockButtonLabel} + listing`
+                  : stockButtonLabel}
         </button>
       </div>
     );
@@ -4922,7 +4941,16 @@ export default function Home() {
             )}
             </details>
             {!headline && renderManualCompLinks("compact")}
-            {!headline && renderCheckedCompCard("priority")}
+            {!headline && (
+              <details className="panel optional-tool-panel manual-check-panel">
+                <summary>
+                  <span>Optional</span>
+                  <strong>Enter checked price</strong>
+                  <small>after eBay solds</small>
+                </summary>
+                {renderCheckedCompCard("priority")}
+              </details>
+            )}
             {!headline && (
               <>
                 <div className="quick-hunt-toolbar" aria-label="Quick hunt controls">
@@ -5447,46 +5475,46 @@ export default function Home() {
                 </button>
               </div>
             )}
-            <div className="form-grid">
-              <label>
-                List price
-                <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="auto" />
-              </label>
-              <label>
-                Listing
-                <select value={acquireListingState} onChange={(event) => setAcquireListingState(event.target.value as AcquireListingState)}>
-                  <option value="DRAFT">Draft</option>
-                  <option value="ACTIVE">Active</option>
-                </select>
-              </label>
-            </div>
-            <div className="listing-choice" role="group" aria-label="After stock listing choice">
-              <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
-                List later
-              </button>
-              <button
-                type="button"
-                className={shouldCreateListing && acquireListingState === "DRAFT" ? "selected" : ""}
-                onClick={() => {
-                  setShouldCreateListing(true);
-                  setAcquireListingState("DRAFT");
-                }}
-              >
-                Draft
-              </button>
-              <button
-                type="button"
-                className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
-                onClick={() => {
-                  setShouldCreateListing(true);
-                  setAcquireListingState("ACTIVE");
-                }}
-              >
-                Active
-              </button>
-            </div>
             <details className="buy-advanced-details">
-              <summary>More stock details</summary>
+              <summary>More stock and listing details</summary>
+              <div className="form-grid">
+                <label>
+                  List price
+                  <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="auto" />
+                </label>
+                <label>
+                  Listing
+                  <select value={acquireListingState} onChange={(event) => setAcquireListingState(event.target.value as AcquireListingState)}>
+                    <option value="DRAFT">Draft</option>
+                    <option value="ACTIVE">Active</option>
+                  </select>
+                </label>
+              </div>
+              <div className="listing-choice" role="group" aria-label="After stock listing choice">
+                <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
+                  List later
+                </button>
+                <button
+                  type="button"
+                  className={shouldCreateListing && acquireListingState === "DRAFT" ? "selected" : ""}
+                  onClick={() => {
+                    setShouldCreateListing(true);
+                    setAcquireListingState("DRAFT");
+                  }}
+                >
+                  Draft
+                </button>
+                <button
+                  type="button"
+                  className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
+                  onClick={() => {
+                    setShouldCreateListing(true);
+                    setAcquireListingState("ACTIVE");
+                  }}
+                >
+                  Active
+                </button>
+              </div>
               <div className="form-grid">
                 <label>
                   Strategy
@@ -5621,8 +5649,8 @@ export default function Home() {
                 ? "Stocking..."
                 : shouldCreateListing
                   ? acquireListingState === "ACTIVE"
-                    ? "Stock + mark active"
-                    : "Stock + draft listing"
+                    ? "Stock + active listing"
+                    : "Stock + draft"
                   : "Stock now"}
             </button>
             {!manualStockReady && <p className="hint">Add card, cost and quantity to stock without an auto comp.</p>}

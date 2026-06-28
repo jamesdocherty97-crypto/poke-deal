@@ -93,6 +93,13 @@ test("normalizeCatalogCardSearchInput splits dealer shorthand into card, set and
 });
 
 test("normalizeCatalogCardSearchInput understands curated set aliases inside full card text", () => {
+  assert.deepEqual(normalizeCatalogCardSearchInput("Umbreon prismatic raw"), {
+    query: "Umbreon",
+    name: "Umbreon",
+    setName: "Prismatic Evolutions",
+    number: undefined,
+  });
+
   assert.deepEqual(normalizeCatalogCardSearchInput("Giratina VSTAR cz gg GG69 bgs 9.5 £80"), {
     query: "Giratina VSTAR GG69",
     name: "Giratina VSTAR",
@@ -180,6 +187,13 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
   assert.deepEqual(normalizeCatalogCardSearchInput("Lugia Neo Genesis BGS 7.5"), {
     query: "Lugia",
     name: "Lugia",
+    setName: "Neo Genesis",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Neo Genesis 1st Ed Hitmontop LP"), {
+    query: "Hitmontop",
+    name: "Hitmontop",
     setName: "Neo Genesis",
     number: undefined,
   });
