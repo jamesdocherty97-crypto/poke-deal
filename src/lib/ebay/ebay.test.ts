@@ -611,6 +611,7 @@ test("checkEbayReadiness returns ready when all checks pass", () => {
   const result = checkEbayReadiness(READY_INPUT);
   assert.equal(result.ready, true);
   assert.equal(result.offerReady, true);
+  assert.equal(result.publishReady, true);
   assert.ok(result.checks.every((c) => c.status !== "fail"));
 });
 
@@ -619,9 +620,21 @@ test("checkEbayReadiness allows preflight but blocks offer writes when merchant 
 
   assert.equal(result.ready, true);
   assert.equal(result.offerReady, false);
+  assert.equal(result.publishReady, false);
   const check = result.checks.find((c) => c.key === "merchant_location");
   assert.equal(check?.status, "warn");
   assert.match(check?.detail ?? "", /merchant location key/);
+});
+
+test("checkEbayReadiness allows offer prep but blocks publish when seller registration is incomplete", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, sellerRegistrationCompleted: false });
+
+  assert.equal(result.ready, true);
+  assert.equal(result.offerReady, true);
+  assert.equal(result.publishReady, false);
+  const check = result.checks.find((c) => c.key === "seller_registration");
+  assert.equal(check?.status, "warn");
+  assert.match(check?.detail ?? "", /publish is blocked/);
 });
 
 test("checkEbayReadiness fails when eBay not configured", () => {

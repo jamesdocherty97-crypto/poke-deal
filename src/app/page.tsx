@@ -300,6 +300,11 @@ type EbayStatus = {
     missingFields?: string[];
     merchantLocationKey?: string | null;
   };
+  sellerRegistration?: {
+    completed: boolean | null;
+    sellingLimit?: unknown;
+    checkError?: string;
+  };
   error?: string;
 };
 
@@ -7449,15 +7454,17 @@ function ListingPackSheet({
         externalRef: listing.externalRef,
         hasMerchantLocation: Boolean(ebayStatus?.hasMerchantLocation || ebayStatus?.policies?.merchantLocationKey),
         hasImage: Boolean(listing.item?.photos?.length),
+        sellerRegistrationCompleted: ebayStatus?.sellerRegistration?.completed,
       })
     : null;
   const ebayOfferReady = ebayReadiness?.offerReady ?? false;
+  const ebayPublishReady = ebayReadiness?.publishReady ?? false;
   const sellingSteps = buildListingSellFlow({
     channel: listing.channel,
     state: listing.state,
     externalRef: listing.externalRef,
     externalUrl: listing.externalUrl,
-    ebayReady: ebayOfferReady,
+    ebayReady: hasOffer ? ebayPublishReady : ebayOfferReady,
     sellable: canSell,
   });
   const nextAction = buildListingNextAction({
@@ -7465,7 +7472,7 @@ function ListingPackSheet({
     state: listing.state,
     externalRef: listing.externalRef,
     externalUrl: listing.externalUrl,
-    ebayReady: ebayOfferReady,
+    ebayReady: hasOffer ? ebayPublishReady : ebayOfferReady,
     sellable: canSell,
     hasVenueAction: Boolean(venueAction),
     packCopied: copied,
@@ -7644,7 +7651,7 @@ function ListingPackSheet({
               className="ghost-button"
               type="button"
               onClick={onRequestPublish}
-              disabled={busy}
+              disabled={busy || !ebayPublishReady}
             >
               {busy ? "Working..." : "Publish to eBay"}
             </button>

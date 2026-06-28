@@ -3,6 +3,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
 import { publishEbayOffer } from "@/lib/ebay/offer";
+import { fetchEbaySellingPrivileges } from "@/lib/ebay/policies";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,17 @@ export async function POST(
 
   try {
     const accessToken = await getAccessToken(config);
+    const privileges = await fetchEbaySellingPrivileges(config, accessToken);
+    if (privileges.sellerRegistrationCompleted === false) {
+      return NextResponse.json(
+        {
+          error:
+            "eBay has not marked this seller account fully ready yet. You can create offers, but live publish is blocked until seller registration/payments onboarding is complete in eBay.",
+        },
+        { status: 409 },
+      );
+    }
+
     const result = await publishEbayOffer(config, offerId, accessToken);
     const listingId = result.listingId;
     const listingUrl = ebayListingUrl(listingId);

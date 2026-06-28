@@ -16,6 +16,7 @@ export interface EbayReadinessInput {
   pricePence: number | null;
   externalRef: string | null;
   hasImage: boolean;
+  sellerRegistrationCompleted?: boolean | null;
 }
 
 export interface EbayReadinessResult {
@@ -23,6 +24,8 @@ export interface EbayReadinessResult {
   ready: boolean;
   /** True when the app should write inventory/offer data to eBay. */
   offerReady: boolean;
+  /** True when an existing eBay offer is safe to publish live. */
+  publishReady: boolean;
   checks: EbayReadinessCheck[];
 }
 
@@ -52,6 +55,18 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
         ? "No merchant location key found; offer creation may ask for one in eBay business settings"
         : undefined,
   });
+
+  if (input.sellerRegistrationCompleted !== undefined) {
+    checks.push({
+      key: "seller_registration",
+      label: "Seller registration",
+      status: input.sellerRegistrationCompleted === false ? "warn" : "pass",
+      detail:
+        input.sellerRegistrationCompleted === false
+          ? "eBay has not marked the seller account fully ready; offers can be prepared, but live publish is blocked"
+          : undefined,
+    });
+  }
 
   checks.push({
     key: "channel_ebay",
@@ -97,6 +112,10 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
   return {
     ready,
     offerReady: ready && input.hasMerchantLocation !== false,
+    publishReady:
+      ready &&
+      input.hasMerchantLocation !== false &&
+      input.sellerRegistrationCompleted !== false,
     checks,
   };
 }
