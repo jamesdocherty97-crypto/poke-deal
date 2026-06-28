@@ -4310,7 +4310,10 @@ export default function Home() {
         </div>
         <div className="topbar-actions">
           <button className={view === "today" ? "topbar-secondary active" : "topbar-secondary"} type="button" onClick={() => setView("today")}>
-            Today
+            Status
+          </button>
+          <button className="topbar-secondary" type="button" onClick={openBuyWatchesPanel}>
+            Watch
           </button>
           <button
             className={`icon-button ${refreshing ? "is-loading" : ""}`}
@@ -8723,7 +8726,7 @@ function ageLabel(value: string): string {
 }
 
 function viewTitle(view: View): string {
-  if (view === "today") return "Today";
+  if (view === "today") return "Status";
   if (view === "acquire") return "Buy cards";
   if (view === "inventory") return "Inventory";
   if (view === "listings") return "Listings";

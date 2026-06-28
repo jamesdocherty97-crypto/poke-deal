@@ -233,7 +233,7 @@ label {
 }
 
 .topbar h1 {
-  max-width: 240px;
+  max-width: min(240px, 44vw);
   overflow-wrap: anywhere;
   font-size: 28px;
   line-height: 1.04;
@@ -244,6 +244,7 @@ label {
   align-items: center;
   flex: 0 0 auto;
   gap: 8px;
+  min-width: 0;
 }
 
 .topbar-secondary {
@@ -5453,6 +5454,42 @@ label {
 }
 
 @media (max-width: 430px) {
+  .topbar {
+    gap: 8px;
+  }
+
+  .app-mark,
+  .app-mark-image {
+    width: 36px;
+  }
+
+  .app-mark {
+    height: 36px;
+  }
+
+  .app-mark-image {
+    height: 50px;
+  }
+
+  .brand-lockup {
+    gap: 8px;
+  }
+
+  .topbar h1 {
+    max-width: 34vw;
+    font-size: 22px;
+  }
+
+  .topbar-secondary {
+    min-height: 34px;
+    padding: 6px 7px;
+    font-size: 11px;
+  }
+
+  .topbar-actions {
+    gap: 5px;
+  }
+
   .hero-board {
     display: none;
   }
