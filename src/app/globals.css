@@ -982,6 +982,7 @@ label {
 
 .quick-hunt-copy {
   display: grid;
+  min-width: 0;
   gap: 2px;
 }
 
@@ -993,13 +994,11 @@ label {
 }
 
 .quick-hunt-copy small {
-  overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 10px;
   font-weight: 850;
   line-height: 1.12;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .selected-card-strip {
@@ -5863,7 +5862,28 @@ label {
   }
 
   .lookup-panel {
-    margin-bottom: 72px;
+    order: 1;
+    margin-bottom: 0;
+  }
+
+  .buy-workspace > .comp-panel,
+  .buy-workspace > .fallback-stock-panel {
+    order: 2;
+  }
+
+  .buy-workspace > .buy-flow-rail {
+    order: 3;
+  }
+
+  .buy-workspace > .last-stocked-panel,
+  .buy-workspace > .grade-lab,
+  .buy-workspace > .watch-panel,
+  .buy-workspace > .recent-intake-panel {
+    order: 4;
+  }
+
+  .buy-workspace > .stock-import-panel {
+    order: 5;
   }
 
   .inventory-workspace,
