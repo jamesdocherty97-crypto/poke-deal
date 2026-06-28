@@ -258,6 +258,17 @@ test("buildInventoryItemPayload includes image URL when provided", () => {
   assert.deepEqual(item.product.imageUrls, ["https://images.pokemontcg.io/swsh7/215_hires.png"]);
 });
 
+test("buildInventoryItemPayload includes ordered item photo URLs when provided", () => {
+  const item = buildInventoryItemPayload(rawInput, 1, [
+    "https://blob.vercel-storage.com/front.jpg",
+    "https://blob.vercel-storage.com/back.jpg",
+  ]);
+  assert.deepEqual(item.product.imageUrls, [
+    "https://blob.vercel-storage.com/front.jpg",
+    "https://blob.vercel-storage.com/back.jpg",
+  ]);
+});
+
 test("buildInventoryItemPayload omits imageUrls when no image provided", () => {
   const item = buildInventoryItemPayload(rawInput, 1, null);
   assert.equal(item.product.imageUrls, undefined);
@@ -336,7 +347,7 @@ test("buildEbayOfferPreflight previews inventory and offer payloads without writ
     listingId: "listing-123",
     packInput: slabInput,
     quantity: 2,
-    imageUrl: "https://images.pokemontcg.io/sv3pt5/199_hires.png",
+    imageUrls: ["https://blob.vercel-storage.com/charizard-front.jpg"],
     policies: MOCK_POLICIES,
     config: TEST_CONFIG,
   });
@@ -349,10 +360,24 @@ test("buildEbayOfferPreflight previews inventory and offer payloads without writ
   assert.equal(preflight.policyKeys.fulfillmentPolicyId, true);
   assert.equal(preflight.policyKeys.returnPolicyId, true);
   assert.equal(preflight.policyKeys.merchantLocationKey, true);
-  assert.deepEqual(preflight.inventoryItem.product.imageUrls, ["https://images.pokemontcg.io/sv3pt5/199_hires.png"]);
+  assert.deepEqual(preflight.inventoryItem.product.imageUrls, ["https://blob.vercel-storage.com/charizard-front.jpg"]);
   assert.equal(preflight.offer.sku, preflight.sku);
   assert.equal(preflight.offer.availableQuantity, 2);
   assert.equal(preflight.offer.pricingSummary.price.currency, "GBP");
+});
+
+test("buildEbayOfferPreflight reports missing item photos", () => {
+  const preflight = buildEbayOfferPreflight({
+    listingId: "listing-no-photo",
+    packInput: slabInput,
+    quantity: 1,
+    imageUrls: [],
+    policies: MOCK_POLICIES,
+    config: TEST_CONFIG,
+  });
+
+  assert.equal(preflight.hasImage, false);
+  assert.equal(preflight.inventoryItem.product.imageUrls, undefined);
 });
 
 // ── merchant location setup ───────────────────────────────────────────────────
@@ -648,11 +673,12 @@ test("checkEbayReadiness does not fail for pending offer state", () => {
   assert.equal(check?.status, "pass");
 });
 
-test("checkEbayReadiness fails when no image", () => {
+test("checkEbayReadiness fails when no real item photo is attached", () => {
   const result = checkEbayReadiness({ ...READY_INPUT, hasImage: false });
   assert.equal(result.ready, false);
   const check = result.checks.find((c) => c.key === "has_image");
   assert.equal(check?.status, "fail");
+  assert.match(check?.detail ?? "", /real item photo/);
 });
 
 test("checkEbayReadiness fails when channel is not EBAY", () => {

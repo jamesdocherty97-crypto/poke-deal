@@ -87,9 +87,9 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
 
   checks.push({
     key: "has_image",
-    label: "Card image available",
+    label: "Real card photo",
     status: input.hasImage ? "pass" : "fail",
-    detail: input.hasImage ? undefined : "Add a card image before creating an eBay offer",
+    detail: input.hasImage ? undefined : "Add at least one real item photo before creating an eBay offer",
   });
 
   const blockingFails = checks.filter((c) => c.status === "fail");

@@ -70,12 +70,27 @@ model InventoryItem {
 
   listings      Listing[]
   sales         Sale[]
+  photos        CardPhoto[]
 
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
   @@index([status])
   @@index([cardId, grade])
+}
+
+model CardPhoto {
+  id              String        @id @default(cuid())
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItemId String
+  url             String
+  role            PhotoRole     @default(FRONT)
+  width           Int?
+  height          Int?
+  order           Int           @default(0)
+  createdAt       DateTime      @default(now())
+
+  @@index([inventoryItemId])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -304,6 +319,13 @@ enum ListingState {
   ACTIVE
   SOLD
   ENDED
+}
+
+enum PhotoRole {
+  FRONT
+  BACK
+  SLAB
+  EXTRA
 }
 
 enum ExpenseCategory {

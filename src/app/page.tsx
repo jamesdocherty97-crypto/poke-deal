@@ -1,5 +1,6 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import { forwardRef, type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   conditionAdjustedPricePence,
@@ -214,6 +215,16 @@ type Suggestion = {
   rationale: string;
 };
 
+type CardPhoto = {
+  id: string;
+  url: string;
+  role: "FRONT" | "BACK" | "SLAB" | "EXTRA";
+  width: number | null;
+  height: number | null;
+  order: number;
+  createdAt: string;
+};
+
 type InventoryItem = {
   id: string;
   card: {
@@ -233,6 +244,7 @@ type InventoryItem = {
   createdAt: string;
   listings: Listing[];
   sales: Sale[];
+  photos?: CardPhoto[];
 };
 
 type Listing = {
@@ -1617,6 +1629,49 @@ export default function Home() {
     } finally {
       setRefreshing(false);
       if (options.user) setUserRefreshing(false);
+    }
+  }
+
+  async function addPhotosToInventory(item: InventoryItem, files: FileList | File[]) {
+    const selected = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    if (selected.length === 0) return;
+    setBusy(`photo-${item.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const existingCount = item.photos?.length ?? 0;
+      for (const [index, file] of selected.entries()) {
+        const processed = await compressPhotoForUpload(file);
+        const blob = await upload(
+          `inventory/${item.id}/${Date.now()}-${index}.jpg`,
+          processed.blob,
+          {
+            access: "public",
+            contentType: "image/jpeg",
+            handleUploadUrl: `/api/inventory/${item.id}/photos/upload-token`,
+          },
+        );
+        const role = inferPhotoRole(existingCount + index);
+        const saveRes = await fetch(`/api/inventory/${item.id}/photos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: blob.url,
+            role,
+            width: processed.width,
+            height: processed.height,
+            order: existingCount + index,
+          }),
+        });
+        const savePayload = await readJson(saveRes);
+        if (!saveRes.ok) throw new Error(savePayload.error ?? "Photo save failed");
+      }
+      setNotice(selected.length === 1 ? "Photo added." : `${selected.length} photos added.`);
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Photo upload failed");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -4487,7 +4542,7 @@ export default function Home() {
               </div>
               <div className="listing-desk-card">
                 <CardImage
-                  src={firstSaleListingTarget.item.card.imageUrl}
+                  src={inventoryDisplayImage(firstSaleListingTarget.item)}
                   className="mini-card-art"
                   fallbackClassName="mini-card-art blank"
                   alt=""
@@ -5995,6 +6050,7 @@ export default function Home() {
               onPack={openRecentListingWork}
               onStatus={updateStatus}
               onDelete={requestDeleteItem}
+              onPhotos={addPhotosToInventory}
             />
           ))}
           {activeInventory.length === 0 ? (
@@ -6137,6 +6193,7 @@ export default function Home() {
                   onPack={openRecentListingWork}
                   onStatus={updateStatus}
                   onDelete={requestDeleteItem}
+                  onPhotos={addPhotosToInventory}
                 />
               ))}
               {visibleSoldInventory.length === 0 && <EmptyState text="No matching sold rows." />}
@@ -6170,7 +6227,7 @@ export default function Home() {
               {firstDraftListingTarget?.item ? (
                 <div className="listing-desk-card">
                   <CardImage
-                    src={firstDraftListingTarget.item.card.imageUrl}
+                    src={inventoryDisplayImage(firstDraftListingTarget.item)}
                     className="mini-card-art"
                     fallbackClassName="mini-card-art blank"
                     alt=""
@@ -6190,7 +6247,7 @@ export default function Home() {
               ) : (
                 <div className="listing-desk-card">
                   <CardImage
-                    src={unlistedStock[0]?.card.imageUrl ?? null}
+                    src={inventoryDisplayImage(unlistedStock[0])}
                     className="mini-card-art"
                     fallbackClassName="mini-card-art blank"
                     alt=""
@@ -6233,7 +6290,7 @@ export default function Home() {
               </div>
               <div className="listing-desk-card">
                 <CardImage
-                  src={firstSaleListingTarget.item.card.imageUrl}
+                  src={inventoryDisplayImage(firstSaleListingTarget.item)}
                   className="mini-card-art"
                   fallbackClassName="mini-card-art blank"
                   alt=""
@@ -6317,6 +6374,7 @@ export default function Home() {
                     onDraft={listInventoryItem}
                     onEdit={openInventoryEditor}
                     onSell={openSell}
+                    onPhotos={addPhotosToInventory}
                   />
                 ))}
               </div>
@@ -6408,7 +6466,7 @@ export default function Home() {
                 <div className="ebay-publish-confirm">
                   <div className="ebay-publish-card">
                     <CardImage
-                      src={pl.item?.card.imageUrl ?? null}
+                      src={inventoryDisplayImage(pl.item)}
                       className="mini-card-art"
                       fallbackClassName="mini-card-art blank"
                       alt=""
@@ -7326,7 +7384,7 @@ function ListingPackSheet({
         pricePence: listing.listPrice ?? listing.suggestedPrice ?? null,
         externalRef: listing.externalRef,
         hasMerchantLocation: Boolean(ebayStatus?.hasMerchantLocation || ebayStatus?.policies?.merchantLocationKey),
-        hasImage: Boolean(listing.item?.card.imageUrl),
+        hasImage: Boolean(listing.item?.photos?.length),
       })
     : null;
   const ebayOfferReady = ebayReadiness?.offerReady ?? false;
@@ -7701,6 +7759,7 @@ function InventoryRow({
   onPack,
   onStatus,
   onDelete,
+  onPhotos,
 }: {
   item: InventoryItem;
   busy: string | null;
@@ -7711,6 +7770,7 @@ function InventoryRow({
   onPack: (item: InventoryItem) => void;
   onStatus: (item: InventoryItem, status: ItemStatus) => void;
   onDelete: (item: InventoryItem) => void;
+  onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
 }) {
   const listing = item.listings[0];
   const draftListing = item.listings.find((row) => row.state === "DRAFT");
@@ -7731,6 +7791,7 @@ function InventoryRow({
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const swipeDelta = useRef({ x: 0, y: 0 });
   const canSell = item.status !== "SOLD";
+  const photoCount = item.photos?.length ?? 0;
 
   function startSwipe(event: TouchEvent<HTMLElement>) {
     if (isInteractiveTarget(event.target)) return;
@@ -7783,7 +7844,7 @@ function InventoryRow({
         <span className="swipe-action delete">Delete</span>
       </div>
       <div className="swipe-content" style={{ transform: `translateX(${swipeOffset}px)` }}>
-        <CardImage src={item.card.imageUrl} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
+        <CardImage src={inventoryDisplayImage(item)} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
         <div className="item-main">
           <div className="item-title-line">
             <h3>{item.card.name}</h3>
@@ -7800,6 +7861,7 @@ function InventoryRow({
             {listing ? `${listingStateLabel} ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
             {soldNote}
           </p>
+          {photoCount > 0 && <p>{photoCount} real photo{photoCount === 1 ? "" : "s"} ready for eBay</p>}
           {item.status !== "SOLD" && (
             <div className="next-action-strip">
               {draftListing ? (
@@ -7830,6 +7892,22 @@ function InventoryRow({
             </div>
           )}
           <div className="row-actions">
+            {item.status !== "SOLD" && (
+              <label className={`row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
+                {busy === `photo-${item.id}` ? "Uploading..." : photoCount > 0 ? "Add photos" : "Photos"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={busy === `photo-${item.id}`}
+                  onChange={(event) => {
+                    const files = event.currentTarget.files;
+                    if (files) onPhotos(item, files);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            )}
             {item.status !== "SOLD" && (
               <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
                 Comp
@@ -7875,20 +7953,24 @@ function ListingQueueRow({
   onDraft,
   onEdit,
   onSell,
+  onPhotos,
 }: {
   item: InventoryItem;
   busy: string | null;
   onDraft: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onSell: (item: InventoryItem) => void;
+  onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
 }) {
   const stockNotes = [item.condition, item.graderCert ? `cert ${item.graderCert}` : null, item.location]
     .filter(Boolean)
     .join(" · ");
 
+  const photoCount = item.photos?.length ?? 0;
+
   return (
     <article className="item-row listing-queue-row">
-      <CardImage src={item.card.imageUrl} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
+      <CardImage src={inventoryDisplayImage(item)} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
       <div className="item-main">
         <div className="item-title-line">
           <h3>{item.card.name}</h3>
@@ -7901,7 +7983,22 @@ function ListingQueueRow({
           {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
         </p>
         {stockNotes && <p>{stockNotes}</p>}
+        {photoCount > 0 && <p>{photoCount} real photo{photoCount === 1 ? "" : "s"} ready for eBay</p>}
         <div className="row-actions">
+          <label className={`row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
+            {busy === `photo-${item.id}` ? "Uploading..." : photoCount > 0 ? "Add photos" : "Photos"}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={busy === `photo-${item.id}`}
+              onChange={(event) => {
+                const files = event.currentTarget.files;
+                if (files) onPhotos(item, files);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
           <button
             type="button"
             onClick={() => onDraft(item)}
@@ -7975,7 +8072,7 @@ function ListingRow({
 
   return (
     <article className="item-row">
-      <CardImage src={card?.imageUrl ?? null} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
+      <CardImage src={inventoryDisplayImage(listing.item)} className="card-thumb" fallbackClassName="card-thumb blank" alt="" />
       <div className="item-main">
         <div className="item-title-line">
           <h3>{title}</h3>
@@ -8840,6 +8937,50 @@ function medianSpreadPct(results: CompResult[]): number | null {
   const min = Math.min(...medians);
   const max = Math.max(...medians);
   return Math.round(((max - min) / min) * 100);
+}
+
+function primaryItemPhoto(item: InventoryItem | undefined | null): CardPhoto | null {
+  return item?.photos?.[0] ?? null;
+}
+
+function inventoryDisplayImage(item: InventoryItem | undefined | null): string | null {
+  return primaryItemPhoto(item)?.url ?? item?.card.imageUrl ?? null;
+}
+
+function inferPhotoRole(index: number): CardPhoto["role"] {
+  if (index === 0) return "FRONT";
+  if (index === 1) return "BACK";
+  if (index === 2) return "SLAB";
+  return "EXTRA";
+}
+
+async function compressPhotoForUpload(file: File): Promise<{ blob: Blob; width: number; height: number }> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  if (Math.max(width, height) < 500) {
+    bitmap.close();
+    throw new Error("Photo is too small for eBay. Use an image at least 500px on the longest side.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    throw new Error("Could not prepare photo.");
+  }
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((output) => {
+      if (output) resolve(output);
+      else reject(new Error("Could not compress photo."));
+    }, "image/jpeg", 0.85);
+  });
+  return { blob, width, height };
 }
 
 function trendBarWidth(point: PortfolioPoint, points: PortfolioPoint[]): number {

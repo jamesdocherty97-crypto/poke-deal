@@ -23,7 +23,7 @@ export async function GET(
   const prisma = getPrisma();
   const listing = await prisma.listing.findUnique({
     where: { id: params.id },
-    include: { item: { include: { card: true } } },
+    include: { item: { include: { card: true, photos: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] } } } },
   });
 
   if (!listing) {
@@ -70,7 +70,7 @@ export async function GET(
       listingId: params.id,
       packInput,
       quantity: listing.item.quantity ?? 1,
-      imageUrl: listing.item.card.imageUrl,
+      imageUrls: listing.item.photos.map((photo) => photo.url),
       policies,
       config,
     });

@@ -4103,12 +4103,33 @@ label {
 }
 
 .row-actions button,
+.row-file-action,
 .ghost-button,
 .danger-button {
   min-height: 36px;
   padding: 7px 10px;
   font-size: 12px;
   font-weight: 900;
+}
+
+.row-file-action {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+}
+
+.row-file-action input {
+  display: none;
+}
+
+.row-file-action.disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .ghost-button {
@@ -5493,7 +5514,9 @@ label {
   }
 
   .inventory-workspace .row-actions button,
-  .listings-workspace .row-actions button {
+  .inventory-workspace .row-file-action,
+  .listings-workspace .row-actions button,
+  .listings-workspace .row-file-action {
     min-width: 0;
   }
 
@@ -5655,7 +5678,8 @@ label {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .row-actions button {
+  .row-actions button,
+  .row-file-action {
     min-width: 0;
     padding-right: 6px;
     padding-left: 6px;

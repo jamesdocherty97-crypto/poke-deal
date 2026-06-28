@@ -39,6 +39,7 @@ export async function GET() {
         card: true,
         listings: { orderBy: { createdAt: "desc" } },
         sales: { orderBy: { soldAt: "desc" } },
+        photos: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
       },
       orderBy: { createdAt: "desc" },
     });

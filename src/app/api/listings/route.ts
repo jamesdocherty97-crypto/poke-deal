@@ -27,6 +27,7 @@ export async function GET() {
           include: {
             card: true,
             sales: { orderBy: { soldAt: "desc" } },
+            photos: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
           },
         },
       },
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
             include: {
               card: true,
               sales: { orderBy: { soldAt: "desc" } },
+              photos: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
             },
           },
         },

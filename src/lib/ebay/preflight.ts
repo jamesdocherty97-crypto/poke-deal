@@ -11,7 +11,7 @@ export interface EbayOfferPreflightInput {
   listingId: string;
   packInput: ListingPackInput;
   quantity: number;
-  imageUrl?: string | null;
+  imageUrls?: string[];
   policies: EbayPolicies;
   config: EbayConfig;
 }
@@ -42,7 +42,8 @@ export function buildEbayOfferPreflight(input: EbayOfferPreflightInput): EbayOff
   const pack = buildListingPack(input.packInput);
   const sku = toEbaySku(input.listingId);
   const quantity = Math.max(1, input.quantity);
-  const inventoryItem = buildInventoryItemPayload(input.packInput, quantity, input.imageUrl);
+  const imageUrls = (input.imageUrls ?? []).map((url) => url.trim()).filter(Boolean).slice(0, 12);
+  const inventoryItem = buildInventoryItemPayload(input.packInput, quantity, imageUrls);
   const offer = buildOfferPayload(sku, pack, input.policies, input.config, quantity);
 
   return {
@@ -52,7 +53,7 @@ export function buildEbayOfferPreflight(input: EbayOfferPreflightInput): EbayOff
     quantity,
     marketplaceId: offer.marketplaceId,
     categoryId: offer.categoryId,
-    hasImage: Boolean(input.imageUrl),
+    hasImage: imageUrls.length > 0,
     policyKeys: {
       paymentPolicyId: Boolean(input.policies.paymentPolicyId),
       fulfillmentPolicyId: Boolean(input.policies.fulfillmentPolicyId),

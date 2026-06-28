@@ -117,6 +117,7 @@ export async function PATCH(
             include: {
               card: true,
               sales: { orderBy: { soldAt: "desc" } },
+              photos: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
             },
           },
         },

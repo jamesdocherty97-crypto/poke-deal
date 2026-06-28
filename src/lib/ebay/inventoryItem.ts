@@ -145,7 +145,7 @@ function buildConditionFields(input: ListingPackInput): {
 export function buildInventoryItemPayload(
   input: ListingPackInput,
   quantity: number,
-  imageUrl?: string | null,
+  imageUrls?: string[] | string | null,
 ): EbayInventoryItem {
   const pack = buildListingPack(input);
 
@@ -176,8 +176,10 @@ export function buildInventoryItemPayload(
     },
   };
 
-  if (imageUrl) {
-    payload.product.imageUrls = [imageUrl];
+  const urls = Array.isArray(imageUrls) ? imageUrls : imageUrls ? [imageUrls] : [];
+  const cleanUrls = urls.map((url) => url.trim()).filter(Boolean).slice(0, 12);
+  if (cleanUrls.length > 0) {
+    payload.product.imageUrls = cleanUrls;
   }
 
   return payload;

@@ -51,6 +51,7 @@ export async function PATCH(
         card: true,
         listings: { orderBy: { createdAt: "desc" } },
         sales: { orderBy: { soldAt: "desc" } },
+        photos: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
       },
     });
     return NextResponse.json({ item });

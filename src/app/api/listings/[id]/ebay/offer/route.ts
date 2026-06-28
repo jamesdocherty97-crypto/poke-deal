@@ -24,7 +24,7 @@ export async function POST(
   const prisma = getPrisma();
   const listing = await prisma.listing.findUnique({
     where: { id: params.id },
-    include: { item: { include: { card: true } } },
+    include: { item: { include: { card: true, photos: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] } } } },
   });
 
   if (!listing) {
@@ -75,10 +75,17 @@ export async function POST(
       listingId: params.id,
       packInput,
       quantity: listing.item.quantity ?? 1,
-      imageUrl: listing.item.card.imageUrl,
+      imageUrls: listing.item.photos.map((photo) => photo.url),
       policies,
       config,
     });
+
+    if (!preflight.hasImage) {
+      return NextResponse.json(
+        { error: "Add at least one real card photo before creating an eBay offer." },
+        { status: 400 },
+      );
+    }
 
     // Upsert the inventory item (idempotent — safe to call multiple times)
     await upsertInventoryItem(config, preflight.sku, preflight.inventoryItem, accessToken);
