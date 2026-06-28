@@ -18,6 +18,8 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
   const rawNameParam = readFirst(searchParams, "name", "cardName", "card");
   const explicitSetName = readFirst(searchParams, "set", "setName");
   const explicitNumber = readFirst(searchParams, "number", "collectorNumber", "cardNumber");
+  const explicitTcgApiId = readFirst(searchParams, "tcgApiId", "pokemonTcgId");
+  const explicitTcgDexId = readFirst(searchParams, "tcgDexId");
   const parsedNameParam = rawNameParam ? normalizeCatalogCardSearchInput(rawNameParam, explicitSetName) : null;
   const rawName = cleanCompRequestName(parsedNameParam?.name ?? parsed?.name);
   const name = cleanCompRequestName(preserveVariantText(rawName, [freeText, rawNameParam].filter(Boolean).join(" ")));
@@ -36,6 +38,8 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
       name,
       setName,
       number,
+      ...(explicitTcgApiId ? { tcgApiId: explicitTcgApiId } : {}),
+      ...(explicitTcgDexId ? { tcgDexId: explicitTcgDexId } : {}),
       game: "POKEMON",
       language: "EN",
     },

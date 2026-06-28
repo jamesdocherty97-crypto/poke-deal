@@ -138,6 +138,8 @@ type LookupInput = {
   setName: string;
   number: string;
   grade: Grade;
+  tcgApiId?: string;
+  tcgDexId?: string;
 };
 
 type LastStockedCard = {
@@ -200,6 +202,7 @@ type Reconciled = {
   headline: CompResult;
   all: CompResult[];
   sourcesDisagree: boolean;
+  ambiguous?: boolean;
   catalog?: CatalogCard | null;
   alternatives?: CatalogCard[];
 };
@@ -1090,6 +1093,7 @@ export default function Home() {
   const ownedSalesComp =
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
+  const compLimitations = useMemo(() => (compForReceipt ? buildCompLimitations(compForReceipt) : []), [compForReceipt]);
   const needsManualComp = Boolean(
     apiHeadline &&
       !checkedComp &&
@@ -1992,6 +1996,8 @@ export default function Home() {
       setName: parsed.setName ?? input.setName,
       number: parsed.number ?? input.number,
       grade: input.grade,
+      ...(input.tcgApiId ? { tcgApiId: input.tcgApiId } : {}),
+      ...(input.tcgDexId ? { tcgDexId: input.tcgDexId } : {}),
     };
   }
 
@@ -2016,6 +2022,8 @@ export default function Home() {
       const qs = new URLSearchParams({ name: normalizedInput.name, grade: normalizedInput.grade });
       if (normalizedInput.setName) qs.set("set", normalizedInput.setName);
       if (normalizedInput.number?.trim()) qs.set("number", normalizedInput.number.trim());
+      if (normalizedInput.tcgApiId) qs.set("tcgApiId", normalizedInput.tcgApiId);
+      if (normalizedInput.tcgDexId) qs.set("tcgDexId", normalizedInput.tcgDexId);
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "lookup failed");
@@ -2598,6 +2606,8 @@ export default function Home() {
       setName: card.setName,
       number: card.number ?? "",
       grade,
+      ...(card.tcgApiId ? { tcgApiId: card.tcgApiId } : {}),
+      ...(card.tcgDexId ? { tcgDexId: card.tcgDexId } : {}),
     };
 
     clearCompEvidence();
@@ -2682,6 +2692,8 @@ export default function Home() {
       setName: card.setName,
       number: card.number ?? "",
       grade: nextGrade,
+      ...(card.tcgApiId ? { tcgApiId: card.tcgApiId } : {}),
+      ...(card.tcgDexId ? { tcgDexId: card.tcgDexId } : {}),
     } satisfies LookupInput;
 
     clearCompEvidence();
@@ -5116,6 +5128,18 @@ export default function Home() {
 
           {headline && (
             <section className="panel comp-panel" ref={compPanelRef}>
+              {comp?.ambiguous && (
+                <div className="manual-rescue-card soft">
+                  <div>
+                    <span>More than one card matches</span>
+                    <strong>Pick the exact card before trusting the price</strong>
+                  </div>
+                  <ol>
+                    <li>Use the matching image, collector number and rarity.</li>
+                    <li>Tap a possible match below to recheck that exact card.</li>
+                  </ol>
+                </div>
+              )}
               <div className="comp-hero">
                 <div>
                   <p className="eyebrow">
@@ -5166,21 +5190,29 @@ export default function Home() {
               {needsManualComp && (
                 <div className="manual-rescue-card">
                   <div>
-                    <span>Vintage, promos and odd variants</span>
+                    <span>{compLimitations.length > 0 ? "Auto comp limits" : "Vintage, promos and odd variants"}</span>
                     <strong>Check solds, then enter the price</strong>
                   </div>
                   <ol>
-                    <li>Open eBay UK solds with the exact typed wording.</li>
-                    <li>Use same grade, edition, language and condition.</li>
-                    <li>Enter the checked sold price below, then stock it.</li>
+                    {compLimitations.length > 0 ? (
+                      compLimitations.slice(0, 3).map((item) => (
+                        <li key={item.key}>{item.reason}</li>
+                      ))
+                    ) : (
+                      <>
+                        <li>Open eBay UK solds with the exact typed wording.</li>
+                        <li>Use same grade, edition, language and condition.</li>
+                        <li>Enter the checked sold price below, then stock it.</li>
+                      </>
+                    )}
                   </ol>
                 </div>
               )}
               {comp?.alternatives && comp.alternatives.length > 0 && (
                 <div className="catalog-alternatives" aria-label="Possible catalog matches">
                   <div className="catalog-alternatives-heading">
-                    <span>Possible matches</span>
-                    <strong>Tap to recheck</strong>
+                    <span>{comp?.ambiguous ? "Confirm exact card" : "Possible matches"}</span>
+                    <strong>{comp?.ambiguous ? "More than one card matches" : "Tap to recheck"}</strong>
                   </div>
                   <div className="catalog-alternative-row">
                     {comp.alternatives.map((card) => (
@@ -8692,6 +8724,16 @@ function buildCompReceipt(comp: Reconciled): Array<{
     }));
 }
 
+function buildCompLimitations(comp: Reconciled): Array<{ key: string; reason: string }> {
+  return comp.all
+    .filter((result) => result.sampleSize <= 0 || result.medianPence <= 0)
+    .map((result) => ({
+      key: `${result.source}-${result.grade}`,
+      reason: sourceEmptyReason(result),
+    }))
+    .filter((item, index, rows) => rows.findIndex((row) => row.reason === item.reason) === index);
+}
+
 function receiptRank(result: CompResult, headline: CompResult): number {
   if (result.source === headline.source) return 0;
   if (result.source === "owned-sales") return 1;
@@ -8758,6 +8800,29 @@ function compMeta(result: CompResult): string {
 
 function rawReason(result: CompResult): string | null {
   return typeof result.raw?.reason === "string" && result.raw.reason.trim() ? result.raw.reason : null;
+}
+
+function sourceEmptyReason(result: CompResult): string {
+  const source = sourceLabel(result.source, false);
+  const grade = result.grade.replace(/_/g, " ");
+  const reason = rawReason(result);
+  if (result.source === "pokemon-price-tracker") {
+    return reason && !/no price tracker data/i.test(reason)
+      ? `${source}: ${reason}`
+      : `Price Tracker: no eBay sold sample for ${grade}.`;
+  }
+  if (result.source === "poketrace") {
+    return result.grade === "RAW"
+      ? "PokeTrace: no usable RAW market baseline for this card."
+      : "PokeTrace: no graded tier data for this card/grade.";
+  }
+  if (result.source === "pokemon-tcg-market") {
+    return "Catalog: no RAW market baseline for this exact card.";
+  }
+  if (result.source === "owned-sales") {
+    return "Owned sales: no previous sold history for this card/grade yet.";
+  }
+  return reason ? `${source}: ${reason}` : `${source}: no matching signal for ${grade}.`;
 }
 
 function receiptTone(result: CompResult, headline: CompResult, sourcesDisagree: boolean): string {

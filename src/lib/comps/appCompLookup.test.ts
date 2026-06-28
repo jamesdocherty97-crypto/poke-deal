@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { catalogToCardRef, findCatalogAlternatives, resolveCatalogCard } from "./appCompLookup.js";
+import {
+  catalogToCardRef,
+  findAmbiguousCatalogCandidates,
+  findCatalogAlternatives,
+  findVariantSiblings,
+  refreshCachedCatalogPriceSignals,
+  requestHasExplicitCardNumber,
+  resolveCatalogCard,
+} from "./appCompLookup.js";
 import type { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
 import type { CatalogCard } from "../catalog/types.js";
 import type { CardRef } from "../domain/types.js";
@@ -331,4 +339,318 @@ test("resolveCatalogCard rejects same-set cards when the requested name differs"
   );
 
   assert.equal(resolved, null);
+});
+
+test("resolveCatalogCard resolves a selected tcgApiId directly before text fallback", async () => {
+  const selected: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Zapdos ex",
+    setName: "151",
+    number: "192/165",
+    tcgApiId: "sv3pt5-192",
+  };
+  const wrongTextFallback: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Zapdos ex",
+    setName: "151",
+    number: "145/165",
+    tcgApiId: "sv3pt5-145",
+  };
+  const calls: string[] = [];
+  const source = {
+    async resolve(card: CardRef) {
+      calls.push(`resolve:${card.tcgApiId ?? "freeform"}`);
+      return card.tcgApiId === "sv3pt5-192" ? selected : wrongTextFallback;
+    },
+    async search() {
+      calls.push("search");
+      return [wrongTextFallback];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const resolved = await resolveCatalogCard(
+    { name: "Zapdos ex", setName: "151", number: "192/165", tcgApiId: "sv3pt5-192" },
+    source,
+  );
+
+  assert.deepEqual(calls, ["resolve:sv3pt5-192"]);
+  assert.equal(resolved?.tcgApiId, "sv3pt5-192");
+});
+
+test("findAmbiguousCatalogCandidates returns matching variants for a bare same-set search", async () => {
+  const umbreonV: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Umbreon V",
+    setName: "Evolving Skies",
+    number: "94/203",
+    tcgApiId: "swsh7-94",
+  };
+  const umbreonVmax: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Umbreon VMAX",
+    setName: "Evolving Skies",
+    number: "95/203",
+    tcgApiId: "swsh7-95",
+  };
+  const moonbreon: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Umbreon VMAX",
+    setName: "Evolving Skies",
+    number: "215/203",
+    tcgApiId: "swsh7-215",
+  };
+  const source = {
+    async search() {
+      return [umbreonV, umbreonVmax, moonbreon];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const candidates = await findAmbiguousCatalogCandidates(
+    { name: "Umbreon", setName: "Evolving Skies" },
+    source,
+  );
+
+  assert.deepEqual(new Set(candidates.map((card) => card.tcgApiId)), new Set(["swsh7-94", "swsh7-95", "swsh7-215"]));
+});
+
+test("findAmbiguousCatalogCandidates skips exact-number and selected-id lookups", async () => {
+  let searchCalls = 0;
+  const source = {
+    async search() {
+      searchCalls += 1;
+      return [];
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  assert.deepEqual(
+    await findAmbiguousCatalogCandidates({ name: "Zapdos ex", setName: "151", number: "192/165" }, source),
+    [],
+  );
+  assert.deepEqual(
+    await findAmbiguousCatalogCandidates({ name: "Zapdos ex", setName: "151", tcgApiId: "sv3pt5-192" }, source),
+    [],
+  );
+  assert.equal(searchCalls, 0);
+});
+
+test("requestHasExplicitCardNumber recognises a separate number field and embedded collector numbers", () => {
+  assert.equal(requestHasExplicitCardNumber({ name: "Charizard ex", setName: "151", number: "199/165" }), true);
+  assert.equal(requestHasExplicitCardNumber({ name: "Zapdos 192", setName: "151" }), true);
+  assert.equal(requestHasExplicitCardNumber({ name: "Umbreon", setName: "Evolving Skies" }), false);
+  assert.equal(requestHasExplicitCardNumber({ name: "Umbreon VMAX", setName: "Evolving Skies" }), false);
+});
+
+test("findVariantSiblings surfaces same-set V/VMAX/alt-art siblings when no number was given", () => {
+  const umbreonV: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Umbreon V",
+    setName: "Evolving Skies",
+    number: "94",
+    tcgApiId: "swsh7-94",
+  };
+  const umbreonVmax: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Umbreon VMAX",
+    setName: "Evolving Skies",
+    number: "95",
+    tcgApiId: "swsh7-95",
+  };
+  const moonbreon: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Umbreon VMAX",
+    setName: "Evolving Skies",
+    number: "215",
+    tcgApiId: "swsh7-215",
+  };
+  const unrelatedSet: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Umbreon VMAX",
+    setName: "Brilliant Stars",
+    number: "121",
+    tcgApiId: "swsh9-121",
+  };
+  const unrelatedName: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Espeon V",
+    setName: "Evolving Skies",
+    number: "189",
+    tcgApiId: "swsh7-189-espeon",
+  };
+
+  const siblings = findVariantSiblings(umbreonV, [umbreonV, umbreonVmax, moonbreon, unrelatedSet, unrelatedName]);
+
+  assert.deepEqual(siblings, [umbreonVmax, moonbreon]);
+});
+
+test("findVariantSiblings catches same-name reprints that differ only by number (e.g. regular vs SIR)", () => {
+  const regular: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Charizard ex",
+    setName: "151",
+    number: "6",
+    tcgApiId: "sv3pt5-6",
+  };
+  const specialIllustrationRare: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Charizard ex",
+    setName: "151",
+    number: "199/165",
+    tcgApiId: "sv3pt5-199",
+  };
+
+  const siblings = findVariantSiblings(regular, [regular, specialIllustrationRare]);
+
+  assert.deepEqual(siblings, [specialIllustrationRare]);
+});
+
+test("refreshCachedCatalogPriceSignals re-resolves a DB-cached identity (no price signals) by id to pick up live prices", async () => {
+  const cachedIdentity: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Blastoise-EX",
+    setName: "Evolutions",
+    setCode: "xy12",
+    number: "21/108",
+    tcgApiId: "xy12-21",
+    // No priceSignals -- this is exactly what findCachedCatalogMatch returns,
+    // since the local Card table only stores identity, not live prices.
+  };
+  const priced: CatalogCard = {
+    ...cachedIdentity,
+    priceSignals: [
+      {
+        source: "cardmarket",
+        label: "Cardmarket Trend Price",
+        pricePence: 783,
+        originalAmount: 7.83,
+        originalCurrency: "EUR",
+        kind: "trendPrice",
+      },
+    ],
+  };
+  const calls: string[] = [];
+  const source = {
+    name: "pokemon-tcg-api",
+    live: true,
+    async resolve(card: CardRef) {
+      calls.push(`resolve:${card.tcgApiId}`);
+      return priced;
+    },
+  };
+
+  const refreshed = await refreshCachedCatalogPriceSignals(
+    cachedIdentity,
+    { name: "Blastoise-EX", setName: "Evolutions", number: "21/108" },
+    source,
+  );
+
+  assert.deepEqual(calls, ["resolve:xy12-21"]);
+  assert.equal(refreshed.priceSignals?.[0]?.pricePence, 783);
+});
+
+test("refreshCachedCatalogPriceSignals skips the live refresh when the cached entry already carries price signals", async () => {
+  const alreadyPriced: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Charizard ex",
+    setName: "151",
+    number: "6",
+    tcgApiId: "sv3pt5-6",
+    priceSignals: [
+      {
+        source: "tcgplayer",
+        label: "TCGPlayer Holofoil market",
+        pricePence: 1417,
+        originalAmount: 18,
+        originalCurrency: "USD",
+        kind: "market",
+      },
+    ],
+  };
+  let resolveCalled = false;
+  const source = {
+    name: "pokemon-tcg-api",
+    live: true,
+    async resolve() {
+      resolveCalled = true;
+      return null;
+    },
+  };
+
+  const refreshed = await refreshCachedCatalogPriceSignals(
+    alreadyPriced,
+    { name: "Charizard ex", setName: "151", number: "6" },
+    source,
+  );
+
+  assert.equal(resolveCalled, false);
+  assert.deepEqual(refreshed, alreadyPriced);
+});
+
+test("refreshCachedCatalogPriceSignals falls back to the cached identity untouched when the live refresh fails or is empty", async () => {
+  const cachedIdentity: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Blastoise-EX",
+    setName: "Evolutions",
+    number: "21/108",
+    tcgApiId: "xy12-21",
+  };
+
+  const timeoutSource = {
+    name: "pokemon-tcg-api",
+    live: true,
+    async resolve() {
+      throw new Error("rate limited");
+    },
+  };
+  const emptySource = {
+    name: "pokemon-tcg-api",
+    live: true,
+    async resolve() {
+      return null;
+    },
+  };
+
+  assert.deepEqual(
+    await refreshCachedCatalogPriceSignals(cachedIdentity, { name: "Blastoise-EX" }, timeoutSource),
+    cachedIdentity,
+  );
+  assert.deepEqual(
+    await refreshCachedCatalogPriceSignals(cachedIdentity, { name: "Blastoise-EX" }, emptySource),
+    cachedIdentity,
+  );
+});
+
+test("findVariantSiblings returns nothing when the resolved card has no same-set siblings", () => {
+  const onlyPrinting: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Hitmontop",
+    setName: "Neo Genesis",
+    number: "3/111",
+    tcgApiId: "neo1-3",
+  };
+  const differentPokemon: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Bellossom",
+    setName: "Neo Genesis",
+    number: "4/111",
+    tcgApiId: "neo1-4",
+  };
+
+  assert.deepEqual(findVariantSiblings(onlyPrinting, [differentPokemon]), []);
 });

@@ -40,19 +40,19 @@ test("buildManualCompLinks adds slab grade only to eBay sold searches", () => {
 
   assert.equal(
     new URL(links[0]!.url).searchParams.get("_nkw"),
-    'Gengar TG06/TG30 Lost Origin Trainer Gallery ("BGS 9.5" OR BGS9.5)',
+    "Gengar TG06/TG30 Lost Origin Trainer Gallery BGS 9.5",
   );
   assert.doesNotMatch(new URL(links[0]!.url).searchParams.get("_nkw") ?? "", /-PSA/);
   assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /BGS/);
   assert.doesNotMatch(new URL(links[3]!.url).searchParams.get("q") ?? "", /BGS/);
 });
 
-test("buildManualCompLinks adds ACE slab grades to eBay sold searches", () => {
+test("buildManualCompLinks adds ACE slab grades to eBay sold searches using plain human wording", () => {
   const links = buildManualCompLinks(card, "ACE_10");
 
   assert.equal(
     new URL(links[0]!.url).searchParams.get("_nkw"),
-    'Gengar TG06/TG30 Lost Origin Trainer Gallery ("ACE 10" OR ACE10)',
+    "Gengar TG06/TG30 Lost Origin Trainer Gallery ACE 10",
   );
   assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /ACE/);
 });
@@ -60,20 +60,33 @@ test("buildManualCompLinks adds ACE slab grades to eBay sold searches", () => {
 test("buildManualCompLinks formats low CGC half grades for eBay sold searches", () => {
   const links = buildManualCompLinks({ name: "Lugia", setName: "Neo Genesis", number: "9" }, "CGC_1_5");
 
-  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), 'Lugia 9 Neo Genesis ("CGC 1.5" OR CGC1.5)');
+  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), "Lugia 9 Neo Genesis CGC 1.5");
 });
 
 test("buildManualCompLinks formats BGS half grades for eBay sold searches", () => {
   const links = buildManualCompLinks({ name: "Lugia", setName: "Neo Genesis" }, "BGS_8_5");
 
-  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), 'Lugia Neo Genesis ("BGS 8.5" OR BGS8.5)');
+  assert.equal(new URL(links[0]!.url).searchParams.get("_nkw"), "Lugia Neo Genesis BGS 8.5");
 });
 
-test("buildManualCompLinks adds spaced and compact boolean forms for all slab companies", () => {
-  assert.equal(ebaySoldSearchQuery("Victini SVP208", "ACE_10"), 'Victini SVP208 ("ACE 10" OR ACE10)');
-  assert.equal(ebaySoldSearchQuery("Charizard 151", "PSA_10"), 'Charizard 151 ("PSA 10" OR PSA10)');
-  assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis", "CGC_9_5"), 'Lugia Neo Genesis ("CGC 9.5" OR CGC9.5)');
-  assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis", "BGS_7_5"), 'Lugia Neo Genesis ("BGS 7.5" OR BGS7.5)');
+test("buildManualCompLinks uses plain human grade wording for all slab companies (no boolean syntax)", () => {
+  assert.equal(ebaySoldSearchQuery("Victini SVP208", "ACE_10"), "Victini SVP 208 ACE 10");
+  assert.equal(ebaySoldSearchQuery("Charizard 151", "PSA_10"), "Charizard 151 PSA 10");
+  assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis", "CGC_9_5"), "Lugia Neo Genesis CGC 9.5");
+  assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis", "BGS_7_5"), "Lugia Neo Genesis BGS 7.5");
+});
+
+test("ebaySoldSearchQuery never emits bracketed/boolean grade syntax for graded searches", () => {
+  for (const [query, grade] of [
+    ["Victini SVP 208", "ACE_10"],
+    ["Charizard 151", "PSA_10"],
+    ["Lugia Neo Genesis", "BGS_9_5"],
+    ["Lugia Neo Genesis", "CGC_1_5"],
+  ] as const) {
+    const result = ebaySoldSearchQuery(query, grade);
+    assert.doesNotMatch(result, /\(.*OR.*\)/);
+    assert.doesNotMatch(result, /"/);
+  }
 });
 
 test("buildManualCompLinks preserves typed vintage qualifiers for eBay", () => {
@@ -128,12 +141,21 @@ test("normalizeManualCompSearchText strips buy-flow noise but keeps comp qualifi
   );
 });
 
-test("normalizeManualCompSearchText joins modern promo codes for manual eBay searches", () => {
-  assert.equal(normalizeManualCompSearchText("Snivy MEP 049 raw £2"), "Snivy MEP049");
-  assert.equal(normalizeManualCompSearchText("Alakazam MEP0079 raw"), "Alakazam MEP0079");
-  assert.equal(normalizeManualCompSearchText("Pikachu SVP 085 LP"), "Pikachu SVP085 LP");
-  assert.equal(normalizeManualCompSearchText("Victini 208 IR Promo (SVP) ACE 10"), "Victini SVP208 ACE 10");
-  assert.equal(normalizeManualCompSearchText("Snivy XYZ 001 raw £2"), "Snivy XYZ001");
+test("normalizeManualCompSearchText spaces modern promo codes into human wording for manual eBay searches", () => {
+  assert.equal(normalizeManualCompSearchText("Snivy MEP 049 raw £2"), "Snivy MEP 049");
+  assert.equal(normalizeManualCompSearchText("Alakazam MEP0079 raw"), "Alakazam MEP 079");
+  assert.equal(normalizeManualCompSearchText("Pikachu SVP 085 LP"), "Pikachu SVP 085 LP");
+  assert.equal(normalizeManualCompSearchText("Victini 208 IR Promo (SVP) ACE 10"), "Victini SVP 208 ACE 10");
+  assert.equal(normalizeManualCompSearchText("Victini SVP208 ACE 10"), "Victini SVP 208 ACE 10");
+  // Unrecognized prefixes aren't a real collector-number convention, so leave them as typed.
+  assert.equal(normalizeManualCompSearchText("Snivy XYZ 001 raw £2"), "Snivy XYZ 001");
+});
+
+test("cardSearchQuery humanizes joined promo catalog numbers for user-facing search text", () => {
+  assert.equal(cardSearchQuery({ name: "Victini", setName: "Scarlet & Violet Promos", number: "SVP208" }), "Victini SVP 208 Scarlet & Violet Promos");
+  assert.equal(cardSearchQuery({ name: "Alakazam", setName: "McDonald's Promos", number: "MEP0079" }), "Alakazam MEP 079 McDonald's Promos");
+  // Galarian/Trainer Gallery joined numbers are the standard convention — left untouched.
+  assert.equal(cardSearchQuery({ name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" }), "Gengar TG06/TG30 Lost Origin Trainer Gallery");
 });
 
 test("normalizeManualCompSearchText keeps ex card names separate from collector numbers", () => {
@@ -145,6 +167,6 @@ test("normalizeManualCompSearchText keeps ex card names separate from collector 
 test("ebaySoldSearchQuery keeps explicit graded wording instead of adding raw exclusions", () => {
   assert.equal(ebaySoldSearchQuery("Umbreon VMAX PSA 10", "RAW"), "Umbreon VMAX PSA 10");
   assert.equal(ebaySoldSearchQuery("Lugia Neo Genesis CGC 1.5", "RAW"), "Lugia Neo Genesis CGC 1.5");
-  assert.equal(ebaySoldSearchQuery("Umbreon VMAX", "PSA_10"), 'Umbreon VMAX ("PSA 10" OR PSA10)');
+  assert.equal(ebaySoldSearchQuery("Umbreon VMAX", "PSA_10"), "Umbreon VMAX PSA 10");
   assert.equal(ebaySoldSearchQuery("Umbreon VMAX PSA10", "PSA_10"), "Umbreon VMAX PSA10");
 });

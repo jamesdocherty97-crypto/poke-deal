@@ -2,6 +2,7 @@ import { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
 import {
   catalogCardMatchesLookupContext,
   normalizeCatalogCardSearchInput,
+  parseCardSearchQuery,
   rankCatalogCards,
 } from "../catalog/cardSearch.js";
 import { searchChaseCards } from "../catalog/chaseCards.js";
@@ -29,10 +30,15 @@ async function resolveCatalogCardUnbounded(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource,
 ): Promise<CatalogCard | null> {
+  if (card.tcgApiId) {
+    const directById = await catalogSource.resolve(card).catch(() => null);
+    if (directById) return directById;
+  }
+
   const cached = catalogSource.name === "pokemon-tcg-api"
     ? await findCachedCatalogMatch(card).catch(() => null)
     : null;
-  if (cached) return cached;
+  if (cached) return refreshCachedCatalogPriceSignals(cached, card, catalogSource);
 
   const direct = await catalogSource.resolve(card).catch(() => null);
   if (direct && catalogCardMatchesLookupContext(direct, card)) return direct;
@@ -48,6 +54,30 @@ async function resolveCatalogCardUnbounded(
   return catalogSource.resolve({ ...card, tcgApiId: fallback.tcgApiId })
     .then((resolved) => (resolved && catalogCardMatchesLookupContext(resolved, card) ? resolved : fallback))
     .catch(() => fallback);
+}
+
+/**
+ * `findCachedCatalogMatch` only ever returns stable identity fields (name,
+ * set, number, image, ids) -- never live price signals, since the local
+ * Card table is an identity cache, not a price cache. Without this
+ * refresh, any card that already exists in the DB (e.g. it's already in
+ * inventory) would short-circuit straight past the live catalog fetch,
+ * silently starving the pokemon-tcg-market RAW fallback source of the
+ * current TCGPlayer/Cardmarket prices it would otherwise have found --
+ * even though the comp lookup overall looked like it "worked" (a catalog
+ * card was resolved), the price-bearing source behind it never ran.
+ * Re-resolves by id to pick up current prices and falls back to the
+ * cached identity untouched if the live refresh fails or is empty, so a
+ * slow/rate-limited API never turns a cache hit into a worse outcome.
+ */
+export async function refreshCachedCatalogPriceSignals(
+  cached: CatalogCard,
+  card: CardRef,
+  catalogSource: CatalogSource,
+): Promise<CatalogCard> {
+  if ((cached.priceSignals?.length ?? 0) > 0 || !cached.tcgApiId) return cached;
+  const refreshed = await catalogSource.resolve({ ...card, tcgApiId: cached.tcgApiId }).catch(() => null);
+  return refreshed ?? cached;
 }
 
 export async function findCatalogAlternatives(
@@ -80,6 +110,83 @@ export async function findCatalogAlternatives(
     if (alternatives.length >= safeLimit) break;
   }
   return alternatives;
+}
+
+export async function findAmbiguousCatalogCandidates(
+  card: CardRef,
+  catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
+  limit = 8,
+  options: { timeoutMs?: number } = {},
+): Promise<CatalogCard[]> {
+  if (card.tcgApiId || requestHasExplicitCardNumber(card)) return [];
+  const safeLimit = Math.max(2, Math.min(12, Math.round(limit)));
+  const normalized = normalizeCatalogCardSearchInput(card.name, card.setName);
+  const query = [normalized.name || card.name, normalized.number ?? card.number].filter(Boolean).join(" ");
+  if (!query.trim()) return [];
+
+  const chaseCards = searchChaseCards(query, card.setName ?? normalized.setName, Math.max(safeLimit * 2, 12));
+  const liveSearch = catalogSource.search(card, Math.max(safeLimit * 2, 12)).catch(() => []);
+  const liveCards = await withOptionalTimeout(liveSearch, options.timeoutMs, []);
+  const ranked = rankCatalogCards(query, [...liveCards, ...chaseCards], {
+    setName: card.setName ?? normalized.setName,
+    limit: Math.max(safeLimit * 3, 16),
+  });
+
+  const candidates: CatalogCard[] = [];
+  const seen = new Set<string>();
+  for (const candidate of ranked) {
+    if (!catalogCardMatchesLookupContext(candidate, card)) continue;
+    const key = catalogIdentityKey(candidate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(candidate);
+    if (candidates.length >= safeLimit) break;
+  }
+  return candidates;
+}
+
+/**
+ * True when the request already pins down an exact printing via an explicit
+ * collector number — either as a separate field or embedded in the typed
+ * name/search text (e.g. "Zapdos 192 151"). An explicit number fully
+ * disambiguates a card, so callers should skip variant-sibling checks here.
+ */
+export function requestHasExplicitCardNumber(card: CardRef): boolean {
+  if (card.number?.trim()) return true;
+  return Boolean(parseCardSearchQuery(card.name ?? "").number);
+}
+
+const VARIANT_SUFFIX_PATTERN = /[\s-](?:VMAX|VSTAR|BREAK|GX|EX|ex|V)$/i;
+
+function variantBaseName(name: string): string {
+  return name.trim().replace(VARIANT_SUFFIX_PATTERN, "").trim().toLowerCase();
+}
+
+/**
+ * Finds sibling printings of the same Pokemon in the same set that a bare
+ * query (no collector number) could plausibly have meant instead of the
+ * card that was actually chosen — e.g. "Umbreon Evolving Skies" resolving to
+ * Umbreon V (#94) while Umbreon VMAX (#95) and the alt-art "Moonbreon" VMAX
+ * (#215) also exist in that set. This lets the app surface "Possible
+ * matches" even when a price WAS found for the chosen card, not only when
+ * the catalog/comp lookup comes back empty.
+ */
+export function findVariantSiblings(resolved: CatalogCard, candidates: CatalogCard[]): CatalogCard[] {
+  const resolvedBase = variantBaseName(resolved.name);
+  if (!resolvedBase) return [];
+  const resolvedSet = resolved.setName.trim().toLowerCase();
+  const seen = new Set<string>([catalogIdentityKey(resolved)]);
+  const siblings: CatalogCard[] = [];
+  for (const candidate of candidates) {
+    if (candidate.setName.trim().toLowerCase() !== resolvedSet) continue;
+    if (candidate.number && resolved.number && candidate.number === resolved.number) continue;
+    if (variantBaseName(candidate.name) !== resolvedBase) continue;
+    const key = catalogIdentityKey(candidate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    siblings.push(candidate);
+  }
+  return siblings;
 }
 
 function withOptionalTimeout<T>(promise: Promise<T>, timeoutMs: number | undefined, fallback: T): Promise<T> {

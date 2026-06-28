@@ -43,6 +43,30 @@ test("readCompLookupRequest accepts cardName alias used by smoke tools", () => {
   });
 });
 
+test("readCompLookupRequest preserves selected catalog ids for locked card lookups", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    name: "Zapdos ex",
+    setName: "151",
+    number: "192/165",
+    grade: "RAW",
+    tcgApiId: "sv3pt5-192",
+    tcgDexId: "tcgdex-zapdos-192",
+  }));
+
+  assert.deepEqual(parsed, {
+    card: {
+      name: "Zapdos ex",
+      setName: "151",
+      number: "192/165",
+      tcgApiId: "sv3pt5-192",
+      tcgDexId: "tcgdex-zapdos-192",
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "RAW",
+  });
+});
+
 test("readCompLookupRequest parses one-box dealer shorthand", () => {
   const parsed = readCompLookupRequest(new URLSearchParams({
     q: "Snivy MEP 049 raw £2",

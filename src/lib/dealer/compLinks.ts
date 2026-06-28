@@ -56,11 +56,29 @@ export function buildManualCompLinks(card: CardRef, grade: Grade, options: Manua
 
 export function cardSearchQuery(card: CardRef, options: { condition?: string } = {}): string {
   const condition = normalizeConditionForSearch(options.condition);
-  const coreParts = [card.name, card.number, card.setName]
+  const coreParts = [card.name, humanizeCollectorNumber(card.number), card.setName]
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part));
   return [...coreParts, ...(coreParts.length > 0 && condition ? [condition] : [])]
     .join(" ");
+}
+
+/**
+ * Modern promo collector numbers (SVP208, MEP0079, XY01, ...) are stored joined
+ * in the catalog, but human dealer search wording — and eBay sold results —
+ * prefer "SVP 208" / "MEP 079". Galarian/Trainer Gallery numbers (GG30, TG06)
+ * are left untouched: that joined form is the standard collector convention.
+ */
+function humanizeCollectorNumber(number: string | undefined): string | undefined {
+  if (!number) return number;
+  return number.replace(
+    /^(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*0*(\d{1,4})$/i,
+    (_, prefix: string, digits: string) => formatPromoCollectorNumber(prefix, digits),
+  );
+}
+
+function formatPromoCollectorNumber(prefix: string, digits: string): string {
+  return `${prefix.toUpperCase()} ${digits.padStart(3, "0")}`;
 }
 
 export function buildManualCompFallbackQuery(
@@ -86,20 +104,25 @@ export function buildManualCompFallbackQuery(
 export function normalizeManualCompSearchText(input: string | undefined): string {
   if (!input?.trim()) return "";
   return input
+      // "208 IR Promo (SVP)" -> "SVP 208" — human wording, not joined.
       .replace(
         /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
-        (_, digits: string, prefix: string) => `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
+        (_, digits: string, prefix: string) => formatPromoCollectorNumber(prefix, digits),
       )
+      // "079 promo" with no explicit prefix defaults to SVP (modern S&V promos).
       .replace(
         /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?promo\b(?=\s|$)/gi,
-        (_, digits: string) => `SVP${digits.padStart(3, "0")}`,
+        (_, digits: string) => formatPromoCollectorNumber("SVP", digits),
       )
       .replace(/[–—-]+/g, " ")
-    .replace(/\b(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s+0?(\d{1,4})\b/gi, (_, prefix: string, digits: string) =>
-      `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
+    // Canonicalize promo prefix + number spacing/padding either way it was typed
+    // ("MEP0079", "mep 79", "SVP208") into standard human wording "MEP 079" / "SVP 208".
+    .replace(/\b(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*0*(\d{1,4})\b/gi, (_, prefix: string, digits: string) =>
+      formatPromoCollectorNumber(prefix, digits),
     )
-    .replace(/\b(?!(?:SET|PSA|BGS|CGC|ACE|SGC|EX|GX)\b)([A-Z]{2,5})\s+(\d{1,4})\b/gi, (match: string, prefix: string, digits: string) =>
-      prefix === prefix.toUpperCase() ? `${prefix}${digits}` : match,
+    // Galarian/Trainer Gallery numbers are the standard-convention exception: keep these joined.
+    .replace(/\b(GG|TG)\s+0*(\d{1,2})\b/gi, (_, prefix: string, digits: string) =>
+      `${prefix.toUpperCase()}${digits.padStart(2, "0")}`,
     )
     .replace(/(?:£\s*)\d+(?:[.,]\d{1,2})?/gi, " ")
     .replace(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?\d+(?:[.,]\d{1,2})?\b/gi, " ")
@@ -124,7 +147,7 @@ export function ebaySoldSearchQuery(rawQuery: string, grade: Grade): string {
   if (grade !== "RAW") {
     return queryMentionsGrade(normalized, grade)
       ? normalized
-      : `${normalized} ${gradeBooleanSearchTerm(grade)}`;
+      : `${normalized} ${gradeSearchTerm(grade)}`;
   }
 
   if (queryMentionsGrade(normalized, "")) return normalized;
@@ -164,10 +187,11 @@ function compactGradeLabel(label: string): string {
   return label.replace(/\s+/g, "");
 }
 
-function gradeBooleanSearchTerm(grade: Grade): string {
-  const label = gradeLabel(grade);
-  const compact = compactGradeLabel(label);
-  return compact === label ? label : `("${label}" OR ${compact})`;
+// eBay sold search results respond better to plain human grade wording
+// ("BGS 9.5", "ACE 10") than to boolean/bracketed OR syntax — the latter
+// measurably hurts match rates, so graded eBay searches use this directly.
+function gradeSearchTerm(grade: Grade): string {
+  return gradeLabel(grade);
 }
 
 function queryMentionsGrade(query: string, grade: Grade | ""): boolean {
