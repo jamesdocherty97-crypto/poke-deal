@@ -5078,7 +5078,7 @@ label {
   left: 10px;
   z-index: 29;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 68px 98px;
+  grid-template-columns: minmax(0, 1fr) minmax(74px, 0.42fr) minmax(104px, 0.58fr);
   gap: 10px;
   align-items: center;
   max-width: 720px;
@@ -5146,6 +5146,9 @@ label {
   min-height: 48px;
   padding: 8px 10px;
   font-size: 13px;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .mobile-buy-action .mobile-skip-button {
@@ -5971,6 +5974,6 @@ label {
 
   .mobile-buy-spacer {
     display: block;
-    min-height: calc(78px + env(safe-area-inset-bottom));
+    min-height: calc(148px + env(safe-area-inset-bottom));
   }
 }

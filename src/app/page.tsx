@@ -5858,7 +5858,9 @@ export default function Home() {
               </div>
             </section>
           )}
-          {headline && <div className="mobile-buy-spacer" aria-hidden="true" />}
+          {(headline || name.trim() || setNameValue.trim() || number.trim() || checkedComp) && (
+            <div className="mobile-buy-spacer" aria-hidden="true" />
+          )}
         </section>
       )}
 
