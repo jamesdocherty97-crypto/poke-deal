@@ -86,11 +86,15 @@ export function buildManualCompFallbackQuery(
 export function normalizeManualCompSearchText(input: string | undefined): string {
   if (!input?.trim()) return "";
   return input
-    .replace(
-      /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
-      (_, digits: string, prefix: string) => `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
-    )
-    .replace(/[–—-]+/g, " ")
+      .replace(
+        /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
+        (_, digits: string, prefix: string) => `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
+      )
+      .replace(
+        /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?promo\b(?=\s|$)/gi,
+        (_, digits: string) => `SVP${digits.padStart(3, "0")}`,
+      )
+      .replace(/[–—-]+/g, " ")
     .replace(/\b(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s+0?(\d{1,4})\b/gi, (_, prefix: string, digits: string) =>
       `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
     )

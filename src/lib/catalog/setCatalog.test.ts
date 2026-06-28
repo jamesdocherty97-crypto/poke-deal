@@ -42,6 +42,8 @@ test("resolveSetId handles other curated nicknames", () => {
 
 test("resolveSetId handles dealer shorthand for current chase sets and subsets", () => {
   assert.equal(resolveSetId("sv 151"), "sv3pt5");
+  assert.equal(resolveSetId("xy evolutions"), "xy12");
+  assert.equal(resolveSetId("evo xy"), "xy12");
   assert.equal(resolveSetId("evo skies"), "swsh7");
   assert.equal(resolveSetId("moonbreon"), "swsh7");
   assert.equal(resolveSetId("prismatic"), "sv8pt5");
@@ -59,6 +61,8 @@ test("resolveSetAliasId only returns curated exact aliases", () => {
   assert.equal(resolveSetAliasId("base set"), "base1");
   assert.equal(resolveSetAliasId("cz gg"), "swsh12pt5gg");
   assert.equal(resolveSetAliasId("moonbreon"), "swsh7");
+  assert.equal(resolveSetAliasId("xy evolutions"), "xy12");
+  assert.equal(resolveSetAliasId("evo xy"), "xy12");
   assert.equal(resolveSetAliasId("set"), undefined);
 });
 

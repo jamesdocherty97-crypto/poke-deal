@@ -291,6 +291,10 @@ const SET_ALIASES: Record<string, string> = {
   "pris evos": "sv8pt5",
   "paldean fate": "sv4pt5",
   "paldean fates shiny": "sv4pt5",
+  "xy evolutions": "xy12",
+  "xy evo": "xy12",
+  "evo xy": "xy12",
+  "evolutions xy": "xy12",
   "destined rivals team rocket": "sv10",
   "team rocket destined rivals": "sv10",
 

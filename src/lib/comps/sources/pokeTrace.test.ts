@@ -91,10 +91,14 @@ test("RAW can use PokeTrace Cardmarket baselines for UK-relevant pricing", () =>
 });
 
 test("PokeTrace search variants strip known promo prefixes for lookup", () => {
-  assert.deepEqual(buildPokeTraceSearchVariants({ name: "Snivy", setName: "MEP", number: "MEP049" }), [
-    "Snivy 049",
-    "Snivy MEP049",
-  ]);
+  const variants = new Set(buildPokeTraceSearchVariants({ name: "Snivy", setName: "MEP", number: "MEP049" }));
+  assert.equal(variants.has("Snivy 049"), true);
+  assert.equal(variants.has("Snivy 79"), false);
+  assert.equal(variants.has("Snivy MEP049"), true);
+  assert.equal(variants.has("Snivy 49"), true);
+  assert.equal(variants.has("Snivy"), true);
+
+  assert.equal(variants.size >= 3, true);
 });
 
 test("PokeTrace chooses the matching promo card from multiple results", () => {
@@ -140,6 +144,65 @@ test("PokeTrace chooses the matching promo card from multiple results", () => {
     game: "POKEMON",
     language: "EN",
   });
+});
+
+test("PokeTrace matches when provider set metadata is missing and set context is present", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Umbreon",
+          cardNumber: "94/203",
+          currency: "USD",
+          prices: {
+            tcgplayer: {
+              NEAR_MINT: { avg: 30, saleCount: 11 },
+            },
+          },
+        },
+      ],
+    },
+    {
+      source: "poketrace",
+      card: { name: "Umbreon", setName: "Evolving Skies", number: "94/203" },
+      grade: "RAW",
+      windowDays: 90,
+    },
+  );
+
+  assert.equal(comp.sampleSize, 11);
+  assert.equal(comp.medianPence, usdToPence(30));
+});
+
+test("PokeTrace matches long set aliases when provider set text is abbreviated", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Victini",
+          cardNumber: "SVP208",
+          set: { name: "Black Star Promos" },
+          market: "US",
+          currency: "USD",
+          prices: {
+            tcgplayer: {
+              NEAR_MINT: { avg: 34, saleCount: 16 },
+            },
+          },
+        },
+      ],
+    },
+    {
+      source: "poketrace",
+      card: { name: "Victini", setName: "Scarlet & Violet Black Star Promos", number: "SVP208" },
+      grade: "RAW",
+      windowDays: 90,
+    },
+  );
+
+  assert.equal(comp.sampleSize, 16);
+  assert.equal(comp.medianPence, usdToPence(34));
+  assert.equal(comp.card.setName, "Scarlet & Violet Black Star Promos");
 });
 
 test("PokeTrace rejects wrong-set cards for unavailable promo sets", () => {

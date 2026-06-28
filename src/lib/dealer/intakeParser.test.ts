@@ -158,6 +158,45 @@ test("parseQuickIntake accepts broader slab grades", () => {
   });
 });
 
+test("parseQuickIntake parses full art, set aliases, and bridge words", () => {
+  assert.deepEqual(parseQuickIntake("Blastoise XY Evolutions"), {
+    name: "Blastoise",
+    setName: "Evolutions",
+  });
+
+  assert.deepEqual(parseQuickIntake("Galarian Gallery Pikachu"), {
+    name: "Pikachu",
+    setName: "Crown Zenith Galarian Gallery",
+  });
+
+  assert.deepEqual(parseQuickIntake("Flittle - Paldean Fates"), {
+    name: "Flittle",
+    setName: "Paldean Fates",
+  });
+
+  assert.deepEqual(parseQuickIntake("Full art Pawmi from Paldean Fates"), {
+    name: "Pawmi",
+    setName: "Paldean Fates",
+  });
+
+  assert.deepEqual(parseQuickIntake("Full art Zapdos from 151"), {
+    name: "Zapdos",
+    setName: "151",
+  });
+
+  assert.deepEqual(parseQuickIntake("SIR Zapdos 151 BGS 9.5"), {
+    name: "Zapdos",
+    setName: "151",
+    grade: "BGS_9_5",
+  });
+
+  assert.deepEqual(parseQuickIntake("SIR Lugia 151 BGS 9.5"), {
+    name: "Lugia",
+    setName: "151",
+    grade: "BGS_9_5",
+  });
+});
+
 test("parseQuickIntake captures fair-flow source, location and condition", () => {
   assert.deepEqual(parseQuickIntake("Gengar lor tg TG06 raw £10 LP vinted binder"), {
     name: "Gengar",

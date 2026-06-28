@@ -27,6 +27,8 @@ export interface ParsedQuickIntake {
 interface SetMatch {
   setName: string;
   phrase: string;
+  start: number;
+  end: number;
   score: number;
 }
 
@@ -38,10 +40,10 @@ interface CostMatch {
 
 const NUMBER_PATTERNS = [
   /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,4}\s*\/\s*(?:TG|GG|SV|MEP)?\s*0?\d{1,4}\b/i,
-  /\b(?!SET\b)[A-Z]{2,5}\s*0?\d{1,4}\s*\/\s*[A-Z]{0,5}\s*0?\d{1,4}\b/i,
+  /\b(?!SET\b)[A-Z]{2,4}\s*0?\d{1,4}\s*\/\s*[A-Z]{0,5}\s*0?\d{1,4}\b/,
   /\b\d{1,3}\s*\/\s*\d{1,3}\b/i,
   /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS|SV)\s*0?\d{1,4}\b/i,
-  /\b(?!SET\b)[A-Z]{2,5}\s*0?\d{1,4}\b/i,
+  /\b(?!SET\b)[A-Z]{2,4}\s*0?\d{1,4}\b/,
 ];
 
 const SUPPORTED_QUICK_GRADES = new Set<ParsedQuickIntakeGrade>(GRADE_VALUES);
@@ -73,13 +75,14 @@ const STRONG_SET_ALIASES = new Set([
   "prismatic evos",
   "mep",
   "mega evolution promos",
+  "galarian gallery",
   "sv promos",
   "swsh promos",
   "wotc promos",
 ]);
 
 export function parseQuickIntake(input: string): ParsedQuickIntake {
-  let working = normalizeSpacing(normalizeParentheticalPromoNumbers(input));
+  let working = normalizeQuickIntakeInput(input);
   const parsed: ParsedQuickIntake = {};
 
   const quantity = extractQuantity(working);
@@ -151,7 +154,14 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
   const setMatch = findSetMatch(working, parsed.number);
   if (setMatch) {
     parsed.setName = setMatch.setName;
-    working = removePhrase(working, setMatch.phrase);
+    const tokens = working.split(/\s+/).filter(Boolean);
+    const trimmedLeft = setMatch.start > 0 && isDetachedSetPrefixToken(tokens[setMatch.start - 1] ?? "", setMatch.setName)
+      ? setMatch.start - 1
+      : setMatch.start;
+    const trimmedRight = setMatch.end < tokens.length && isDetachedSetSuffixToken(tokens[setMatch.end] ?? "", setMatch.setName)
+      ? setMatch.end + 1
+      : setMatch.end;
+    working = [...tokens.slice(0, trimmedLeft), ...tokens.slice(trimmedRight)].join(" ");
   } else if (parsed.number) {
     const inferredSetName = inferSetNameFromCollectorNumber(parsed.number);
     if (inferredSetName) {
@@ -166,10 +176,30 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
 }
 
 function normalizeParentheticalPromoNumbers(input: string): string {
-  return input.replace(
+  const withParenthetical = input.replace(
     /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
     (_, digits: string, prefix: string) => `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
   );
+  return withParenthetical.replace(
+    /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?promo\b(?=\s|$)/gi,
+    (_, digits: string) => `SVP${digits.padStart(3, "0")}`,
+  );
+}
+
+function normalizeQuickIntakeInput(input: string): string {
+  return normalizeSpacing(
+    removeLeadingIntakeNoise(
+      normalizeParentheticalPromoNumbers(input).replace(/\bfrom\s+(?=\d{1,4}(?:\s*\/\s*[A-Za-z]{0,5}\s*\d{1,4})?\b)/gi, ""),
+    ),
+  );
+}
+
+function removeLeadingIntakeNoise(input: string): string {
+  return input
+    .replace(/\b(?:full[-\s]?art)\b/gi, " ")
+    .replace(/^(?:SIR|IR|AR|SAR)\b\s*/gi, "")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function extractCost(input: string): CostMatch | null {
@@ -313,7 +343,7 @@ function findSetMatch(input: string, number: string | undefined): SetMatch | nul
       const score = scoreSetPhrase(phrase, set);
       if (score <= 0) continue;
       if (!best || score > best.score) {
-        best = { setName: resolved.name, phrase, score };
+        best = { setName: resolved.name, phrase, score, start, end };
       }
     }
   }
@@ -341,17 +371,42 @@ function scoreSetPhrase(phrase: string, set: { id: string; name: string; ptcgoCo
 
   const phraseTokens = tokenizeSearchText(phrase);
   const setTokens = tokenizeSearchText(set.name);
-  const matchedSet = setTokens.every((setToken) =>
-    phraseTokens.some((phraseToken) => tokenMatches(phraseToken, setToken)),
+  const matchedSet = phraseTokens.every((phraseToken) =>
+    setTokens.some((setToken) => tokenMatches(phraseToken, setToken)),
+  );
+  const detachedTokens = phraseTokens.filter(
+    (phraseToken) => !setTokens.some((setToken) => tokenMatches(phraseToken, setToken)),
   );
   if (matchedSet) {
-    const extraTokens = phraseTokens.filter(
-      (phraseToken) => !setTokens.some((setToken) => tokenMatches(phraseToken, setToken)),
-    ).length;
-    return 850 + setTokens.length * 10 - extraTokens * 220;
+    if (phraseTokens.length === 1 && !STRONG_SET_ALIASES.has(normalizedPhrase)) return 0;
+    const extraTokens = detachedTokens.filter((token) => !isDetachedSetToken(token, set)).length;
+    return 950 + setTokens.length * 10 - extraTokens * 90;
   }
 
   return 0;
+}
+
+function isDetachedSetToken(token: string, set: { id: string; ptcgoCode?: string; }): boolean {
+  const normalized = normalizeSearchText(token);
+  if (!normalized || normalized.length < 2 || normalized.length > 5) return false;
+  const setCode = set.id.replace(/\d+/g, "").toLowerCase();
+  const ptcgoCode = set.ptcgoCode?.toLowerCase() ?? "";
+  return normalized === setCode || (normalized === ptcgoCode && ptcgoCode.length > 0);
+}
+
+function isDetachedSetPrefixToken(token: string, setName: string): boolean {
+  const candidate = normalizeSearchText(token);
+  if (!candidate || candidate.length < 2 || candidate.length > 5) return false;
+  const resolvedSetId = resolveSetIdForCard(setName, undefined) ?? resolveExactSetId(candidate);
+  if (!resolvedSetId) return false;
+  const setMeta = getSetById(resolvedSetId);
+  const setCode = resolvedSetId.replace(/\d+/g, "").toLowerCase();
+  const ptcgoCode = setMeta?.ptcgoCode?.toLowerCase() ?? "";
+  return candidate === setCode || (candidate === ptcgoCode && ptcgoCode.length > 0);
+}
+
+function isDetachedSetSuffixToken(token: string, setName: string): boolean {
+  return isDetachedSetPrefixToken(token, setName);
 }
 
 function normalizeCollectorNumber(value: string): string {
@@ -398,6 +453,9 @@ function cleanupName(input: string): string {
   const cleaned = normalizeSpacing(
     input
       .replace(/[()|,;]+/g, " ")
+      .replace(/\bfrom\b/gi, " ")
+      .replace(/\bfull[-\s]?art\b/gi, " ")
+      .replace(/^(?:SIR|IR|AR|SAR)\b\s*/gi, "")
       .replace(/\b(?:bought|buy|paid|for|each|per|copy|copies|card|pokemon|pokémon)\b/gi, " ")
       .replace(/\b1st\s+ed(?:ition)?\b/gi, "1st Edition"),
   );

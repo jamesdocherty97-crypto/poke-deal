@@ -187,14 +187,27 @@ export function mapPokeTraceCardsToComp(
 
 export function buildPokeTraceSearchVariants(card: CardRef): string[] {
   const name = card.name.trim();
-  const number = card.number?.trim().replace(/\s+/g, "");
+  const rawNumber = card.number?.trim().replace(/\s+/g, "");
+  const number = rawNumber ? (stripLeadingZeros(rawNumber) ?? rawNumber) : undefined;
   if (!name) return [];
 
   const variants = new Set<string>();
   const strippedPromo = stripPromoCollectorPrefix(number);
-  if (strippedPromo) variants.add([name, strippedPromo].join(" "));
-  if (number) variants.add([name, number].join(" "));
-  if (!number) variants.add(name);
+  const hasSlash = number?.includes("/") === true;
+
+  if (number) {
+    variants.add([name, number].join(" "));
+    if (!hasSlash) {
+      if (strippedPromo) {
+        variants.add([name, strippedPromo].join(" "));
+        const strippedDigits = stripLeadingZeros(strippedPromo);
+        if (strippedDigits) variants.add([name, strippedDigits].join(" "));
+      }
+      const unpadded = stripLeadingZeros(number);
+      if (unpadded && unpadded !== number) variants.add([name, unpadded].join(" "));
+    }
+  }
+  if (!hasSlash) variants.add(name);
   return [...variants];
 }
 
@@ -273,7 +286,11 @@ function shouldKeepRequestedPromoIdentity(input: CardRef, providerNumber: string
 }
 
 function findMatchingPokeTraceCard(json: unknown, request: CardRef): PokeTraceCard | null {
-  return readPokeTraceCards(json).find((card) => pokeTraceCardMatchesRequest(card, request)) ?? null;
+  const matchProfiles = buildPokeTraceMatchProfiles(request);
+  return (
+    readPokeTraceCards(json).find((card) => matchProfiles.some((matchRequest) => pokeTraceCardMatchesRequest(card, matchRequest))) ??
+    null
+  );
 }
 
 function readPokeTraceCards(json: unknown): PokeTraceCard[] {
@@ -281,6 +298,28 @@ function readPokeTraceCards(json: unknown): PokeTraceCard[] {
   const data = payload?.data;
   if (Array.isArray(data)) return data;
   return data ? [data] : [];
+}
+
+function buildPokeTraceMatchProfiles(request: CardRef): CardRef[] {
+  const profiles: CardRef[] = [{ ...request }];
+  if (request.setName) profiles.push({ ...request, setName: undefined });
+  const leftNumber = request.number?.trim().split("/")[0]?.trim();
+  if (leftNumber && request.number && leftNumber !== request.number.trim()) {
+    profiles.push({ ...request, number: leftNumber });
+    if (request.setName) profiles.push({ ...request, setName: undefined, number: leftNumber });
+  }
+
+  const deduped = new Map<string, CardRef>();
+  for (const profile of profiles) {
+    const key = JSON.stringify({
+      name: profile.name.trim(),
+      setName: profile.setName?.trim() ?? "",
+      number: profile.number?.trim() ?? "",
+    });
+    deduped.set(key, profile);
+  }
+
+  return [...deduped.values()];
 }
 
 function pokeTraceCardMatchesRequest(card: PokeTraceCard, request: CardRef): boolean {
@@ -304,13 +343,26 @@ function pokeTraceProviderMentionsFirstEdition(card: PokeTraceCard): boolean {
 }
 
 function setMatchesRequest(providerSet: string, requestedSet: string): boolean {
+  const requestedTokens = tokenizeSearchText(requestedSet)
+    .map((token) => token.toLowerCase())
+    .filter((token) => token.length >= 3 && !["set", "promo", "promos", "pokemon", "card"].includes(token));
+  const providerTokens = tokenizeSearchText(providerSet).map((token) => token.toLowerCase());
+  if (requestedTokens.length === 0 || providerTokens.length === 0) return true;
+
+  const matchingTokens = requestedTokens.filter((token) =>
+    providerTokens.some((candidate) => tokenMatches(token, candidate)),
+  );
+  if (requestedTokens.length <= 2) {
+    return matchingTokens.length === requestedTokens.length;
+  }
+
   const candidates = [requestedSet];
   const resolvedSetId = resolveSetId(requestedSet);
   const resolvedSet = resolvedSetId ? getSetById(resolvedSetId) : undefined;
   if (resolvedSet?.name) candidates.push(resolvedSet.name);
   if (resolvedSet?.ptcgoCode) candidates.push(resolvedSet.ptcgoCode);
 
-  return candidates.some((candidate) => tokensMatch(candidate, providerSet));
+  return matchingTokens.length >= Math.ceil(requestedTokens.length * 0.6) || candidates.some((candidate) => tokensMatch(candidate, providerSet));
 }
 
 function tokensMatch(needle: string, haystack: string): boolean {
@@ -333,8 +385,9 @@ function collectorNumberForms(number: string): Set<string> {
   const normalized = normalizeComparableCollectorNumber(number);
   const left = normalized.split("/")[0] ?? normalized;
   const stripped = stripPromoCollectorPrefix(left);
+  const strippedLeading = stripLeadingZeros(left);
   return new Set(
-    [normalized, left, stripped, stripped ? normalizeComparableCollectorNumber(stripped) : null].filter(
+    [normalized, left, stripped, stripped ? normalizeComparableCollectorNumber(stripped) : null, strippedLeading].filter(
       (value): value is string => Boolean(value),
     ),
   );
@@ -355,6 +408,14 @@ function stripPromoCollectorPrefix(number: string | undefined): string | null {
   const match = normalized?.match(/^(?:SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)(\d{1,4})$/);
   if (!match) return null;
   return match[1]!;
+}
+
+function stripLeadingZeros(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = value.match(/^\d+$/);
+  if (!match) return null;
+  const normalized = String(Number.parseInt(match[0], 10));
+  return normalized !== "NaN" ? normalized : null;
 }
 
 function singularizeToken(token: string): string {

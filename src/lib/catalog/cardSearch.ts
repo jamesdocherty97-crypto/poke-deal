@@ -129,11 +129,11 @@ export function shouldOfferTypedCardFallback(
 }
 
 export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
-  const trimmed = stripLookupNoise(query).trim().replace(/\s+/g, " ");
+  const trimmed = normalizeCatalogLookupInput(query).trim().replace(/\s+/g, " ");
   if (!trimmed) return { name: "" };
 
   const wholeNumber = readCollectorNumber(trimmed);
-  if (wholeNumber) return { name: "", number: wholeNumber };
+  if (wholeNumber && isWholeCollectorInput(trimmed)) return { name: "", number: wholeNumber };
 
   const trailingParenthesizedNumber = trimmed.match(/^(.+?)\s+\(([^()]{1,16})\)$/i);
   const parenthesizedName = trailingParenthesizedNumber?.[1]?.trim();
@@ -157,7 +157,7 @@ export function normalizeCatalogCardSearchInput(
   query: string,
   explicitSetName?: string,
 ): NormalizedCatalogCardSearchInput {
-  const cleaned = stripLookupNoise(normalizeParentheticalPromoNumbers(query));
+  const cleaned = normalizeCatalogLookupInput(query);
   const parsed = parseCardSearchQuery(cleaned);
   let name = parsed.name || cleaned.trim();
   let number = parsed.number;
@@ -204,9 +204,20 @@ export function normalizeCatalogCardSearchInput(
 }
 
 function normalizeParentheticalPromoNumbers(input: string): string {
-  return input.replace(
+  const withParenthetical = input.replace(
     /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
     (_, digits: string, prefix: string) => `${prefix.toUpperCase()}${digits.padStart(3, "0")}`,
+  );
+  return withParenthetical.replace(
+    /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?promo\b(?=\s|$)/gi,
+    (_, digits: string) => `SVP${digits.padStart(3, "0")}`,
+  );
+}
+
+function normalizeCatalogLookupInput(query: string): string {
+  return removeLeadingCatalogNoise(
+    stripLookupNoise(normalizeParentheticalPromoNumbers(query))
+      .replace(/\bfrom\s+(?=\d{1,4}(?:\s*\/\s*[A-Za-z]{0,5}\s*\d{1,4})?\b)/gi, ""),
   );
 }
 
@@ -281,6 +292,14 @@ function stripLookupNoise(input: string): string {
     .replace(/\s+/g, " ");
 }
 
+function removeLeadingCatalogNoise(input: string): string {
+  return input
+    .replace(/^(?:SIR|IR|AR|SAR)\b\s*/gi, "")
+    .replace(/\bfull[-\s]?art\b/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 function findSetPhraseInName(name: string, number: string | undefined): SetPhraseMatch | null {
   const words = name.split(/\s+/).filter(Boolean);
   let best: SetPhraseMatch | null = null;
@@ -334,6 +353,9 @@ function removePhrase(input: string, phrase: string): string {
 function normalizeNameForSearch(input: string): string {
   return input
     .replace(/[()|,;]+/g, " ")
+    .replace(/^(?:SIR|IR|AR|SAR)\b\s*/gi, "")
+    .replace(/\bfull[-\s]?art\b/gi, " ")
+    .replace(/\bfrom\b/gi, " ")
     .trim()
     .replace(/\s+/g, " ");
 }
@@ -446,6 +468,21 @@ function readCollectorNumber(value: string | undefined): string | undefined {
   return new RegExp(`^${COLLECTOR_NUMBER_TEXT}$`, "i").test(trimmed)
     ? normalizeCollectorNumberText(trimmed)
     : undefined;
+}
+
+function isWholeCollectorInput(value: string): boolean {
+  if (!/\s/.test(value)) return true;
+  const tokens = value.trim().split(/\s+/);
+  if (tokens.length !== 2) return false;
+  const prefix = tokens[0] ?? "";
+  const rawNumber = tokens[1];
+  if (!rawNumber) return false;
+  return isLikelySetPrefixToken(prefix) && /^0?\d{1,4}(?:\s*\/\s*[A-Za-z]{0,5}\s*\d{1,4})?$/.test(rawNumber);
+}
+
+function isLikelySetPrefixToken(token: string): boolean {
+  if (!/^[A-Za-z]{2,5}$/.test(token.trim())) return false;
+  return Boolean(resolveSetId(token) || resolveSetAliasId(token));
 }
 
 function normalizeCollectorNumberText(value: string): string {

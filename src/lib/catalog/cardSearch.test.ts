@@ -51,6 +51,18 @@ test("rankCatalogCards understands collector numbers typed alongside names", () 
   assert.equal(scoreCatalogCardForSearch("TG06", mixed[1]!), 1100);
 });
 
+test("parseCardSearchQuery removes bridge noise that breaks number parsing", () => {
+  assert.deepEqual(parseCardSearchQuery("Full art Zapdos from 151"), {
+    name: "Zapdos",
+    number: "151",
+  });
+
+  assert.deepEqual(parseCardSearchQuery("SIR Lugia 199/165"), {
+    name: "Lugia",
+    number: "199/165",
+  });
+});
+
 test("normalizeCatalogCardSearchInput splits dealer shorthand into card, set and number", () => {
   assert.deepEqual(normalizeCatalogCardSearchInput("Gengar Lost Origin TG06 raw £10"), {
     query: "Gengar TG06",
@@ -136,6 +148,13 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     number: "MEP0079",
   });
 
+  assert.deepEqual(normalizeCatalogCardSearchInput("Galarian Gallery Pikachu"), {
+    query: "Pikachu",
+    name: "Pikachu",
+    setName: "Crown Zenith Galarian Gallery",
+    number: undefined,
+  });
+
   assert.deepEqual(normalizeCatalogCardSearchInput("Victini 208 IR Promo (SVP) ACE 10"), {
     query: "Victini SVP208",
     name: "Victini",
@@ -197,6 +216,75 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     name: "Hitmontop",
     setName: "Neo Genesis",
     number: undefined,
+  });
+  assert.deepEqual(normalizeCatalogCardSearchInput("Blastoise XY Evolutions"), {
+    query: "Blastoise",
+    name: "Blastoise",
+    setName: "Evolutions",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Umbreon evolving skies"), {
+    query: "Umbreon",
+    name: "Umbreon",
+    setName: "Evolving Skies",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Blastoise XY Evolutions RAW"), {
+    query: "Blastoise",
+    name: "Blastoise",
+    setName: "Evolutions",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Flittle - Paldean Fates"), {
+    query: "Flittle",
+    name: "Flittle",
+    setName: "Paldean Fates",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Full art Pawmi from Paldean Fates"), {
+    query: "Pawmi",
+    name: "Pawmi",
+    setName: "Paldean Fates",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Full art Zapdos from 151"), {
+    query: "Zapdos",
+    name: "Zapdos",
+    setName: "151",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("SIR Zapdos 151 BGS 9.5"), {
+    query: "Zapdos",
+    name: "Zapdos",
+    setName: "151",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Galarian Gallery  Pikachu"), {
+    query: "Pikachu",
+    name: "Pikachu",
+    setName: "Crown Zenith Galarian Gallery",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("SIR Lugia 151 BGS 9.5"), {
+    query: "Lugia",
+    name: "Lugia",
+    setName: "151",
+    number: undefined,
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Alakazam MEP0079"), {
+    query: "Alakazam MEP0079",
+    name: "Alakazam",
+    setName: "Mega Evolution Promos",
+    number: "MEP0079",
   });
 });
 

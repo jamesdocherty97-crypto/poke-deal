@@ -122,6 +122,14 @@ test("buildPokemonPriceTrackerSearchVariants fall back to collector number witho
     }),
     ["Mew ex 232/091", "Mew ex 232", "Mew ex"],
   );
+  assert.deepEqual(
+    buildPokemonPriceTrackerSearchVariants({
+      name: "Umbreon V",
+      setName: "Evolving Skies",
+      number: "94/203",
+    }),
+    ["Umbreon V 94/203", "Umbreon V 94", "Umbreon V 094/203", "Umbreon V 094", "Umbreon V"],
+  );
 });
 
 test("PokemonPriceTrackerSource live requests use provider-style prefixed numbers", async () => {
@@ -223,6 +231,57 @@ test("providerPayloadMatchesRequest validates fallback provider cards", () => {
     }),
     true,
   );
+
+  assert.equal(
+    providerPayloadMatchesRequest(
+      {
+        data: [
+          {
+            name: "Umbreon V",
+            setName: "Evolving Skies",
+            cardNumber: "94/203",
+          },
+        ],
+      },
+      { name: "Umbreon", setName: "Evolving Skies", number: "94/203" },
+    ),
+    true,
+  );
+
+  assert.equal(
+    providerPayloadMatchesRequest(
+      {
+        data: [
+          {
+            name: "Umbreon V",
+            cardNumber: "94/203",
+          },
+        ],
+      },
+      { name: "Umbreon", setName: "Evolving Skies", number: "94/203" },
+    ),
+    true,
+  );
+
+  assert.equal(
+    providerPayloadMatchesRequest(
+      {
+        data: [
+          {
+            name: "Victini",
+            setName: "Black Star Promos",
+            cardNumber: "SVP208",
+          },
+        ],
+      },
+      {
+        name: "Victini",
+        setName: "Scarlet & Violet Black Star Promos",
+        number: "SVP208",
+      },
+    ),
+    true,
+  );
 });
 
 test("PokemonPriceTrackerSource retries without a restrictive set filter", async () => {
@@ -315,6 +374,145 @@ test("PokemonPriceTrackerSource retries with collector number only before giving
   assert.equal(new URL(requestedUrls[2]!).searchParams.get("set"), "Paldean Fates");
   assert.equal(comp.sampleSize, 9);
   assert.equal(comp.medianPence, usdToPence(96));
+});
+
+test("PokemonPriceTrackerSource uses matching card returned alongside non-matching results", async () => {
+  const payloads = {
+    requested: {
+      data: [
+        {
+          name: "Umbreon VMAX",
+          setName: "Evolving Skies",
+          cardNumber: "99/203",
+          ebay: {
+            salesByGrade: {
+              ungraded: {
+                count: 2,
+                averagePrice: 20,
+                medianPrice: 19,
+                minPrice: 18,
+                maxPrice: 22,
+                smartMarketPrice: { price: 18, confidence: "low", method: "filtered", daysUsed: 30 },
+                lastMarketUpdate: "2026-06-22T12:00:00.000Z",
+              },
+            },
+          },
+        },
+        {
+          name: "Umbreon",
+          setName: "Evolving Skies",
+          cardNumber: "94/203",
+          ebay: {
+            salesByGrade: {
+              ungraded: {
+                count: 7,
+                averagePrice: 105,
+                medianPrice: 100,
+                minPrice: 90,
+                maxPrice: 120,
+                smartMarketPrice: { price: 98, confidence: "medium", method: "filtered", daysUsed: 30 },
+                lastMarketUpdate: "2026-06-22T12:00:00.000Z",
+              },
+            },
+          },
+        },
+      ],
+    },
+  };
+
+  const fetchImpl = (async (_url: string | URL | Request) =>
+    new Response(JSON.stringify(payloads.requested), { status: 200, headers: { "content-type": "application/json" } })) as typeof fetch;
+
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
+  const comp = await source.lookup({ name: "Umbreon", setName: "Evolving Skies", number: "94/203" }, { grade: "RAW" });
+
+  assert.equal(comp.sampleSize, 7);
+  assert.equal(comp.medianPence, usdToPence(98));
+});
+
+test("providerPayloadMatchesRequest supports matching any returned card, not just first", () => {
+  const payload = {
+    data: [
+      {
+        name: "Umbreon VMAX",
+        setName: "Evolving Skies",
+        cardNumber: "99/203",
+      },
+      {
+        name: "Umbreon",
+        setName: "Evolving Skies",
+        cardNumber: "94/203",
+      },
+    ],
+  };
+  assert.equal(
+    providerPayloadMatchesRequest(payload, { name: "Umbreon", setName: "Evolving Skies", number: "94/203", game: "POKEMON", language: "EN" }),
+    true,
+  );
+});
+
+test("mapCardAggregateToComp accepts a direct provider card object", () => {
+  const directCard = {
+    name: "Umbreon",
+    setName: "Evolving Skies",
+    cardNumber: "94/203",
+    ebay: {
+      salesByGrade: {
+        ungraded: {
+          count: 7,
+          averagePrice: 105,
+          medianPrice: 100,
+          minPrice: 90,
+          maxPrice: 120,
+          smartMarketPrice: { price: 98, confidence: "medium", method: "filtered", daysUsed: 30 },
+          lastMarketUpdate: "2026-06-22T12:00:00.000Z",
+        },
+      },
+    },
+  };
+  const directResult = mapCardAggregateToComp(directCard, ctx("RAW"));
+  assert.equal(directResult.sampleSize, 7);
+  assert.equal(directResult.medianPence, usdToPence(98));
+});
+
+test("PokemonPriceTrackerSource accepts payload without set metadata when set context is present", async () => {
+  const requestedUrls: string[] = [];
+  const fallbackPayload = {
+    data: [
+      {
+        name: "Umbreon",
+        cardNumber: "94/203",
+        ebay: {
+          salesByGrade: {
+            ungraded: {
+              count: 7,
+              averagePrice: 105,
+              medianPrice: 100,
+              minPrice: 90,
+              maxPrice: 120,
+              smartMarketPrice: { price: 98, confidence: "medium", method: "filtered", daysUsed: 30 },
+              lastMarketUpdate: "2026-06-22T12:00:00.000Z",
+            },
+          },
+        },
+      },
+    ],
+  };
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const urlString = String(url);
+    requestedUrls.push(urlString);
+    const requestedUrl = new URL(urlString);
+    const payload = requestedUrl.searchParams.has("set") ? { data: [] } : fallbackPayload;
+    return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
+  const comp = await source.lookup({ name: "Umbreon", setName: "Evolving Skies", number: "94/203" }, { grade: "RAW" });
+
+  assert.equal(requestedUrls.length, 2);
+  assert.equal(new URL(requestedUrls[0]!).searchParams.get("set"), "Evolving Skies");
+  assert.equal(new URL(requestedUrls[1]!).searchParams.has("set"), false);
+  assert.equal(comp.sampleSize, 7);
 });
 
 test("PSA_10 maps from 'psa10' aggregate", () => {

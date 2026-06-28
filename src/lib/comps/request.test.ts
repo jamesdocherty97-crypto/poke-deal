@@ -115,6 +115,121 @@ test("readCompLookupRequest can recover set and number from direct cardName shor
   });
 });
 
+test("readCompLookupRequest handles common real-world raw comp prompts", () => {
+  const cases = [
+    { q: "Umbreon Evolving Skies", name: "Umbreon", setName: "Evolving Skies", number: undefined },
+    { q: "Blastoise XY Evolutions", name: "Blastoise", setName: "Evolutions", number: undefined },
+    { q: "Galarian Gallery Pikachu", name: "Pikachu", setName: "Crown Zenith Galarian Gallery", number: undefined },
+    { q: "Flittle - Paldean Fates", name: "Flittle", setName: "Paldean Fates", number: undefined },
+    { q: "Full art Pawmi from Paldean Fates", name: "Pawmi", setName: "Paldean Fates", number: undefined },
+    { q: "Full art Zapdos from 151", name: "Zapdos", setName: "151", number: undefined },
+    { q: "SIR Lugia 151 BGS 9.5", name: "Lugia", setName: "151", number: undefined, grade: "BGS_9_5" },
+  ];
+
+  for (const testCase of cases) {
+    const parsed = readCompLookupRequest(new URLSearchParams({ q: testCase.q, grade: testCase.grade ?? "RAW" }));
+    assert.deepEqual(
+      "card" in parsed
+        ? {
+            name: parsed.card.name,
+            setName: parsed.card.setName,
+            number: parsed.card.number,
+            grade: parsed.grade,
+          }
+        : { name: "error", setName: "error", number: "error", grade: "error" },
+      {
+        name: testCase.name,
+        setName: testCase.setName,
+        number: testCase.number,
+        grade: testCase.grade ?? "RAW",
+      },
+    );
+  }
+});
+
+test("readCompLookupRequest parses common promo shorthand from free text", () => {
+  const parsed = readCompLookupRequest(
+    new URLSearchParams({ q: "Victini 208 IR Promo (SVP) ACE 10" }),
+  );
+  assert.deepEqual(parsed, {
+    card: {
+      name: "Victini",
+      setName: "Scarlet & Violet Black Star Promos",
+      number: "SVP208",
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "ACE_10",
+  });
+
+  const alakazam = readCompLookupRequest(new URLSearchParams({ q: "Alakazam MEP0079" }));
+  assert.deepEqual(alakazam, {
+    card: {
+      name: "Alakazam",
+      setName: "Mega Evolution Promos",
+      number: "MEP0079",
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "RAW",
+  });
+
+  const rawLugia = readCompLookupRequest(new URLSearchParams({ q: "Lugia Neo Genesis BGS 7.5" }));
+  assert.deepEqual(rawLugia, {
+    card: {
+      name: "Lugia",
+      setName: "Neo Genesis",
+      number: undefined,
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "BGS_7_5",
+  });
+
+  const cgclogy = readCompLookupRequest(new URLSearchParams({ q: "Lugia Neo Genesis CGC 1.5" }));
+  assert.deepEqual(cgclogy, {
+    card: {
+      name: "Lugia",
+      setName: "Neo Genesis",
+      number: undefined,
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "CGC_1_5",
+  });
+});
+
+test("readCompLookupRequest ignores encoded undefined/null-like number values", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    name: "Umbreon",
+    set: "Evolving Skies",
+    number: "undefined",
+    grade: "RAW",
+  }));
+
+  assert.deepEqual(parsed, {
+    card: {
+      name: "Umbreon",
+      setName: "Evolving Skies",
+      number: undefined,
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "RAW",
+  });
+});
+
+test("readCompLookupRequest ignores n/a as a missing number", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    cardName: "Lugia",
+    setName: "Neo Genesis",
+    number: "N/A",
+    grade: "RAW",
+  }));
+
+  assert.equal("error" in parsed ? null : parsed.card.number, undefined);
+});
+
 test("readCompLookupRequest normalizes typed slab grades", () => {
   const parsed = readCompLookupRequest(new URLSearchParams({
     name: "Gengar",

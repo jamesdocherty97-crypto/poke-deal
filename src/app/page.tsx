@@ -1971,6 +1971,11 @@ export default function Home() {
     void lookupComp({ name, setName: setNameValue, number, grade });
   }
 
+  function runFieldComp() {
+    if (!name.trim() && !setNameValue.trim() && !number.trim()) return;
+    void lookupComp({ name, setName: setNameValue, number, grade });
+  }
+
   async function lookup(event?: FormEvent) {
     event?.preventDefault();
     await lookupComp({ name, setName: setNameValue, number, grade });
@@ -2008,12 +2013,9 @@ export default function Home() {
     setSuggestion(null);
     clearCheckedComp();
     try {
-      const qs = new URLSearchParams({
-        name: normalizedInput.name,
-        set: normalizedInput.setName,
-        number: normalizedInput.number,
-        grade: normalizedInput.grade,
-      });
+      const qs = new URLSearchParams({ name: normalizedInput.name, grade: normalizedInput.grade });
+      if (normalizedInput.setName) qs.set("set", normalizedInput.setName);
+      if (normalizedInput.number?.trim()) qs.set("number", normalizedInput.number.trim());
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "lookup failed");
@@ -2659,7 +2661,7 @@ export default function Home() {
     pinRecentSet(set.id);
   }
 
-  function chooseCard(card: CatalogCard) {
+  function chooseCard(card: CatalogCard, options: { lookupAfter?: boolean } = {}) {
     const typedText = quickIntake.trim();
     const parsed = typedText ? parseQuickIntake(typedText) : null;
     const firstEditionRequested =
@@ -2674,6 +2676,13 @@ export default function Home() {
     const nextGrade = parsed?.grade ?? grade;
     const conditionSearchTerm = parsed?.condition && parsed.condition.toUpperCase() !== "NM" ? parsed.condition : undefined;
     const manualSearch = normalizeManualCompSearchText(typedText);
+    const shouldLookupAfter = options.lookupAfter ?? true;
+    const nextLookup = {
+      name: lookupName,
+      setName: card.setName,
+      number: card.number ?? "",
+      grade: nextGrade,
+    } satisfies LookupInput;
 
     clearCompEvidence();
     setQuickIntake(cardIdentitySearchText({ name: lookupName, setName: card.setName, number: card.number }, nextGrade, conditionSearchTerm));
@@ -2696,6 +2705,12 @@ export default function Home() {
     setCardSuggestionsOpen(false);
     setManualCompQuery(manualSearch);
     setError(null);
+    if (!shouldLookupAfter) {
+      setNotice(`Filled ${lookupName}`);
+      return;
+    }
+    setNotice(`Rechecking ${lookupName}...`);
+    void lookupComp(nextLookup);
   }
 
   function handleCardNameChange(value: string) {
@@ -4659,26 +4674,25 @@ export default function Home() {
               {cardSuggestionsOpen && quickIntake.trim() && (cardSuggestions.length > 0 || typedFallbackSuggestion) && (
                 <div className="smart-card-suggestions" role="listbox" aria-label="Card suggestions">
                   {cardSuggestions.map((card) => (
-                    <button
+                    <article
                       key={card.tcgApiId ?? card.tcgDexId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
-                      type="button"
-                      className="suggestion-item card-option"
-                      onClick={() => chooseCard(card)}
+                      className="suggestion-item card-option smart-card-suggestion-card"
                     >
                       <CardImage src={card.imageUrl ?? null} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
                       <span>{card.name}</span>
                       <small>{catalogSuggestionMeta(card)}</small>
-                    </button>
+                      <div className="smart-suggestion-actions">
+                        <button type="button" onClick={() => chooseCard(card, { lookupAfter: false })}>
+                          Fill
+                        </button>
+                        <button type="button" onClick={() => chooseCard(card)}>
+                          Comp
+                        </button>
+                      </div>
+                    </article>
                   ))}
                   {typedFallbackSuggestion && (
-                    <button
-                      type="button"
-                      className="suggestion-item card-option typed-fallback-option"
-                      onClick={() => {
-                        applyQuickIntake();
-                        setCardSuggestionsOpen(false);
-                      }}
-                    >
+                    <article className="suggestion-item card-option typed-fallback-option smart-card-suggestion-card" role="presentation">
                       <span className="suggestion-card-art blank" aria-hidden="true" />
                       <span>{typedFallbackSuggestion.name}</span>
                       <small>
@@ -4686,7 +4700,27 @@ export default function Home() {
                         {typedFallbackSuggestion.number ? ` #${typedFallbackSuggestion.number}` : " · manual identity"} ·{" "}
                         {typedFallbackSuggestion.grade.replace(/_/g, " ")}
                       </small>
-                    </button>
+                      <div className="smart-suggestion-actions">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            applyQuickIntake({ lookupAfter: false });
+                            setCardSuggestionsOpen(false);
+                          }}
+                        >
+                          Fill
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCardSuggestionsOpen(false);
+                            runSmartComp();
+                          }}
+                        >
+                          Comp
+                        </button>
+                      </div>
+                    </article>
                   )}
                 </div>
               )}
@@ -4814,8 +4848,7 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <details className="buy-advanced-details identity-details">
-              <summary>Advanced card, slab and buying details</summary>
+            <section className="buy-advanced-details identity-details">
             <IntakeSessionCard
               source={source}
               location={location}
@@ -4967,18 +5000,36 @@ export default function Home() {
                     </button>
                   ))}
                   {popularSets.length > VISIBLE_POPULAR_SET_LIMIT && (
-                    <button
-                      className="set-chip-more"
-                      type="button"
-                      onClick={() => setShowAllPopularSets((current) => !current)}
-                    >
-                      {showAllPopularSets ? "Fewer sets" : `${popularSets.length - VISIBLE_POPULAR_SET_LIMIT} more`}
-                    </button>
-                  )}
+                  <button
+                    className="set-chip-more"
+                    type="button"
+                    onClick={() => setShowAllPopularSets((current) => !current)}
+                  >
+                    {showAllPopularSets ? "Fewer sets" : `${popularSets.length - VISIBLE_POPULAR_SET_LIMIT} more`}
+                  </button>
+                )}
                 </div>
               </div>
             )}
-            </details>
+            <div className="quick-buy-actions">
+              <button
+                type="button"
+                onClick={() => runSmartComp()}
+                disabled={!canRunSmartComp || busy === "lookup"}
+                aria-label="Comp from smart search"
+              >
+                {busy === "lookup" ? "..." : "Comp"}
+              </button>
+              <button
+                type="button"
+                onClick={() => runFieldComp()}
+                disabled={busy === "lookup" || (!name.trim() && !setNameValue.trim() && !number.trim())}
+                aria-label="Comp from typed fields"
+              >
+                {busy === "lookup" ? "..." : "Comp"}
+              </button>
+            </div>
+            </section>
             {!headline && hasBuyContext && renderManualCompLinks("compact")}
             {!headline && hasBuyContext && (
               <details className="panel optional-tool-panel manual-check-panel">

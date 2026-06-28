@@ -26,7 +26,10 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
 
   const setName = explicitSetName ?? parsed?.setName ?? parsedNameParam?.setName;
   const number = explicitNumber ?? parsed?.number ?? parsedNameParam?.number;
-  const grade = normalizeGradeLabel(readFirst(searchParams, "grade")) ?? "RAW";
+  const explicitGradeText = readFirst(searchParams, "grade");
+  const explicitGrade = explicitGradeText ? normalizeGradeLabel(explicitGradeText) ?? undefined : undefined;
+  const parsedFreeGrade = parseGradeFromText(readFirst(searchParams, "q", "query", "search") ?? readFirst(searchParams, "name", "cardName", "card"));
+  const grade = explicitGrade ?? parsedFreeGrade ?? "RAW";
 
   return {
     card: {
@@ -40,10 +43,26 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
   };
 }
 
+function parseGradeFromText(input: string | undefined): Grade | undefined {
+  if (!input) return undefined;
+
+  const rawMatch = input.match(/\b(?:RAW|UNGRADED|NM|NEAR\s+MINT)\b/i);
+  if (rawMatch) return "RAW";
+
+  const match = input.match(/\b(?:PSA|BGS|CGC|ACE)\s*(?:10|[1-9](?:[.,][0-9])?)(?:\s*\/\s*5)?/i);
+  if (!match?.[0]) return undefined;
+
+  const normalizedMatch = match[0].trim().replace(/\//g, ".");
+  return normalizeGradeLabel(normalizedMatch) ?? undefined;
+}
+
 function readFirst(searchParams: URLSearchParams, ...keys: string[]): string | undefined {
   for (const key of keys) {
-    const value = searchParams.get(key)?.trim();
-    if (value) return value;
+    const raw = searchParams.get(key)?.trim();
+    if (!raw) continue;
+    const normalized = raw.toLowerCase();
+    if (normalized === "undefined" || normalized === "null" || normalized === "none" || normalized === "n/a") continue;
+    return raw;
   }
   return undefined;
 }

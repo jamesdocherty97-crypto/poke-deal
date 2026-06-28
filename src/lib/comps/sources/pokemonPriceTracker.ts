@@ -13,7 +13,7 @@
 
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
 import { getSetById, resolveSetIdForCard } from "../../catalog/setCatalog.js";
-import { normalizeSearchText, tokenizeSearchText } from "../../catalog/fuzzy.js";
+import { normalizeSearchText, tokenMatches, tokenizeSearchText } from "../../catalog/fuzzy.js";
 import type { CompSource } from "../CompSource.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
@@ -51,11 +51,11 @@ export class PokemonPriceTrackerSource implements CompSource {
       });
     }
 
-    const json = await this.fetchCard(card, windowDays);
-    if (json == null) {
+    const matchedCard = await this.fetchCard(card, windowDays);
+    if (matchedCard == null) {
       return emptyComp({ source: this.name, card, grade, windowDays }, "Price Tracker lookup failed or returned no response");
     }
-    return mapCardAggregateToComp(json, { source: this.name, card, grade, windowDays });
+    return mapCardAggregateToComp(matchedCard, { source: this.name, card, grade, windowDays });
   }
 
   /** Fetch one card with eBay graded-sales aggregates. Returns null on any failure. */
@@ -76,7 +76,8 @@ export class PokemonPriceTrackerSource implements CompSource {
           continue;
         }
         const json = (await res.json()) as unknown;
-        if (providerPayloadMatchesRequest(json, card)) return json;
+        const match = selectMatchingPptCard(json, card);
+        if (match) return match;
         console.warn(`[${this.name}] returned a different card for ${search} — retrying/falling back`);
       } catch (err) {
         // Degrade, don't explode: a dead provider must not break a lookup.
@@ -99,6 +100,17 @@ interface MapContext {
   card: CardRef;
   grade: Grade;
   windowDays: number;
+}
+
+interface PptProviderCard {
+  ebay?: { salesByGrade?: Record<string, unknown>; updatedAt?: string };
+  name?: unknown;
+  number?: unknown;
+  cardNumber?: unknown;
+  collectorNumber?: unknown;
+  setName?: unknown;
+  set?: unknown;
+  [key: string]: unknown;
 }
 
 /** Map our Grade to the provider's salesByGrade key. RAW → "ungraded". */
@@ -169,11 +181,57 @@ export function normalizeProviderCollectorNumber(
 
 export function buildPokemonPriceTrackerSearchVariants(card: CardRef): string[] {
   const variants = [buildPokemonPriceTrackerSearch(card)];
-  const number = normalizeProviderCollectorNumber(card.number, card.setName);
-  const leftNumber = number?.split("/")[0]?.trim();
-  if (leftNumber) variants.push([card.name, leftNumber].filter(Boolean).join(" "));
+  const variantNumbers = buildProviderCollectorNumberVariants(card.number, card.setName);
+  for (const variant of variantNumbers) {
+    const variantWithName = [card.name, variant].filter(Boolean).join(" ");
+    if (variantWithName) variants.push(variantWithName);
+    const left = variant.split("/")[0]?.trim();
+    if (left) variants.push([card.name, left].filter(Boolean).join(" "));
+  }
   variants.push(card.name.trim());
   return [...new Set(variants.filter((variant) => variant.trim().length > 0))];
+}
+
+function buildProviderCollectorNumberVariants(number: string | undefined, setName: string | undefined): string[] {
+  const normalized = normalizeProviderCollectorNumber(number, setName);
+  if (!normalized) return [];
+
+  const variants = [normalized];
+  const [leftPart, rightPart] = normalized.split("/");
+  const trimmedLeft = leftPart?.trim();
+  if (trimmedLeft) {
+    const unpaddedLeft = stripLeadingZeros(trimmedLeft);
+    if (unpaddedLeft && unpaddedLeft !== trimmedLeft) {
+      const strippedPrefix = /^([A-Za-z]{2,5})(\d+)$/.exec(trimmedLeft);
+      if (strippedPrefix?.[1]) {
+        variants.push(`${strippedPrefix[1]}${unpaddedLeft}`);
+      } else {
+        variants.push(unpaddedLeft);
+      }
+      if (rightPart) variants.push(`${unpaddedLeft}/${rightPart}`);
+    }
+  }
+
+  if (!trimmedLeft || !rightPart?.trim()) return variants;
+
+  const paddedLeft = padWithLeadingZeros(trimmedLeft, 3);
+  if (paddedLeft && paddedLeft !== trimmedLeft) {
+    variants.push(`${paddedLeft}/${rightPart}`);
+  }
+
+  const extraPadded = padWithLeadingZeros(trimmedLeft, rightPart.length);
+  if (extraPadded && extraPadded !== paddedLeft && extraPadded !== trimmedLeft) {
+    variants.push(`${extraPadded}/${rightPart}`);
+  }
+
+  return [...new Set(variants)];
+}
+
+function padWithLeadingZeros(value: string, minLength: number): string {
+  if (!/^\d+$/.test(value)) return value;
+  const targetLength = Math.max(3, minLength);
+  const withPad = value.padStart(targetLength, "0");
+  return withPad !== value ? withPad : value;
 }
 
 function shouldMirrorProviderPrefix(prefix: string, setName: string | undefined): boolean {
@@ -222,10 +280,7 @@ export function mapCardAggregateToComp(
   ctx: MapContext,
   rates: FxRates = STATIC_RATES,
 ): CompResult {
-  const root = json as { data?: unknown } | null;
-  const card = (Array.isArray(root?.data) ? root!.data[0] : root?.data) as
-    | { ebay?: { salesByGrade?: Record<string, unknown>; updatedAt?: string } }
-    | undefined;
+  const card = readProviderCard(json);
 
   const byGrade = card?.ebay?.salesByGrade;
   if (!byGrade) return emptyComp(ctx, "no eBay grade aggregate returned");
@@ -282,9 +337,48 @@ export function mapCardAggregateToComp(
 }
 
 export function providerPayloadMatchesRequest(json: unknown, request: CardRef): boolean {
-  const providerCard = firstProviderCard(json);
-  if (!providerCard) return false;
+  const strictMatch = selectMatchingPptCard(json, request, { allowSetless: false });
+  if (strictMatch) return true;
 
+  const fallbackMatch = selectMatchingPptCard(json, request, { allowSetless: true });
+  if (!fallbackMatch) return false;
+
+  const hasProviderSet = listProviderCards(json).some((card) => Boolean(normalizeSearchText(readProviderSetName(card) ?? "").trim()));
+  if (hasProviderSet) return false;
+  return true;
+}
+
+export function selectMatchingPptCard(
+  json: unknown,
+  request: CardRef,
+  options: { allowSetless: boolean } = { allowSetless: false },
+): Record<string, unknown> | null {
+  const profiles = buildRequestMatchProfiles(request, options);
+  for (const candidate of listProviderCards(json)) {
+    for (const profile of profiles) {
+      if (providerPayloadMatchesRequestProfile(candidate, profile)) return candidate;
+    }
+  }
+  return null;
+}
+
+function readProviderCard(json: unknown): PptProviderCard | null {
+  const cards = listProviderCards(json);
+  return cards[0] ?? null;
+}
+
+function listProviderCards(json: unknown): PptProviderCard[] {
+  const root = json as { data?: unknown } | null;
+  const data = root?.data;
+  if (Array.isArray(data)) {
+    return data.filter(isPptProviderCard);
+  }
+  if (data && isPptProviderCard(data)) return [data];
+  if (isPptProviderCard(root)) return [root];
+  return [];
+}
+
+function providerPayloadMatchesRequestProfile(providerCard: Record<string, unknown>, request: CardRef): boolean {
   if (requestsFirstEdition(request) && !providerPayloadMentionsFirstEdition(providerCard)) return false;
 
   const providerName = normalizeSearchText(readProviderString(providerCard, "name") ?? "");
@@ -305,13 +399,80 @@ export function providerPayloadMatchesRequest(json: unknown, request: CardRef): 
 
   const providerSet = normalizeSearchText(readProviderSetName(providerCard) ?? "");
   if (request.setName && providerSet) {
-    const requestedSetTokens = tokenizeSearchText(request.setName).filter((token) => !["set", "sv", "swsh"].includes(token));
-    if (requestedSetTokens.length > 0 && !requestedSetTokens.every((token) => providerSet.includes(token))) {
+    if (!providerSetMatchesRequest(request.setName, providerSet)) {
       return false;
     }
   }
 
   return true;
+}
+
+const ignoredSetTokens = new Set(["set", "promo", "pokemon", "card"]);
+
+function providerSetMatchesRequest(requestedSetName: string, providerSet: string): boolean {
+  const requestedTokens = tokenizeSearchText(requestedSetName)
+    .map((token) => token.toLowerCase())
+    .filter(
+      (token) =>
+        token.length >= 3 &&
+        !ignoredSetTokens.has(token) &&
+        !/^(?:sv|swsh|xy|sws|sm|bw|dp|hgss|svp|mep|xyp)$/.test(token),
+    );
+  if (requestedTokens.length === 0) return true;
+
+  const providerTokens = tokenizeSearchText(providerSet).map((token) => token.toLowerCase());
+  if (providerTokens.length === 0) return true;
+
+  const providerSubsetMatchesRequested = providerTokens.every((providerToken) =>
+    requestedTokens.some((requestedToken) => tokenMatches(requestedToken, providerToken)),
+  );
+  if (requestedTokens.length > 2 && providerSubsetMatchesRequested) {
+    return true;
+  }
+
+  const matchingTokens = requestedTokens.filter((token) =>
+    providerTokens.some((candidate) => tokenMatches(token, candidate)),
+  );
+  if (requestedTokens.length <= 2) {
+    return matchingTokens.length === requestedTokens.length;
+  }
+
+  return matchingTokens.length >= Math.ceil(requestedTokens.length * 0.6);
+}
+
+function buildRequestMatchProfiles(request: CardRef, options: { allowSetless: boolean } = { allowSetless: false }): CardRef[] {
+  const number = request.number?.trim();
+  const normalizedSetName = request.setName?.trim();
+  const requestedNumber = normalizeComparableCollectorNumber(normalizeProviderCollectorNumber(number, request.setName));
+  const leftNumber = requestedNumber?.split("/")[0];
+
+  const profiles: CardRef[] = [{ ...request }];
+  if (options.allowSetless && normalizedSetName) {
+    profiles.push({ ...request, setName: undefined });
+  }
+
+  if (leftNumber && leftNumber !== requestedNumber) {
+    profiles.push({ ...request, number: leftNumber, setName: request.setName });
+    if (options.allowSetless && normalizedSetName) {
+      profiles.push({ ...request, number: leftNumber, setName: undefined });
+    }
+  }
+
+  const deduped = new Map<string, CardRef>();
+  for (const profile of profiles) {
+    const key = JSON.stringify({
+      name: profile.name.trim(),
+      setName: profile.setName?.trim() ?? "",
+      number: normalizeComparableCollectorNumber(normalizeProviderCollectorNumber(profile.number, profile.setName)) ?? profile.number,
+    });
+    deduped.set(key, profile);
+  }
+
+  return [...deduped.values()];
+}
+
+function isPptProviderCard(value: unknown): value is PptProviderCard {
+  return value != null && typeof value === "object";
 }
 
 function providerPayloadMentionsFirstEdition(card: Record<string, unknown>): boolean {
@@ -322,12 +483,6 @@ function providerPayloadMentionsFirstEdition(card: Record<string, unknown>): boo
     readProviderString(card, "edition"),
     readProviderSetName(card),
   ].some((value) => textMentionsFirstEdition(value));
-}
-
-function firstProviderCard(json: unknown): Record<string, unknown> | null {
-  const root = json as { data?: unknown } | null;
-  const card = Array.isArray(root?.data) ? root!.data[0] : root?.data;
-  return card && typeof card === "object" ? (card as Record<string, unknown>) : null;
 }
 
 function readProviderString(card: Record<string, unknown>, key: string): string | null {
@@ -369,8 +524,33 @@ function normalizeCollectorPartForCompare(value: string): string {
 }
 
 function collectorNumbersMatch(providerNumber: string, requestedNumber: string): boolean {
-  if (providerNumber === requestedNumber) return true;
-  const providerLeft = providerNumber.split("/")[0];
-  const requestedLeft = requestedNumber.split("/")[0];
-  return Boolean(providerLeft && requestedLeft && providerLeft === requestedLeft);
+  const providerForms = collectorNumberForms(providerNumber);
+  const requestedForms = collectorNumberForms(requestedNumber);
+  return [...requestedForms].some((requested) => providerForms.has(requested));
+}
+
+function collectorNumberForms(number: string): Set<string> {
+  const normalized = number.trim().toUpperCase();
+  const left = normalized.split("/")[0] ?? normalized;
+  const strippedLeading = stripLeadingZeros(left);
+  const prefixless = stripPromoCollectorPrefix(left);
+  return new Set(
+    [normalized, left, prefixless, strippedLeading, prefixless ? stripLeadingZeros(prefixless) : null].filter(
+      (value): value is string => Boolean(value),
+    ),
+  );
+}
+
+function stripLeadingZeros(value: string): string | null {
+  const match = value.match(/^\d+$/);
+  if (!match) return null;
+  const normalized = Number.parseInt(match[0], 10);
+  if (!Number.isFinite(normalized)) return null;
+  return String(normalized);
+}
+
+function stripPromoCollectorPrefix(value: string): string | null {
+  const match = value.match(/^[A-Za-z]{2,5}(\d+)$/);
+  if (!match) return null;
+  return match[1]!;
 }
