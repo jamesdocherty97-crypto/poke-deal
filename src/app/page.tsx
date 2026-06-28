@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   conditionAdjustedPricePence,
   rawConditionPriceFactor,
@@ -633,6 +633,7 @@ export default function Home() {
   const compPanelRef = useRef<HTMLElement | null>(null);
   const checkedCompRef = useRef<HTMLDivElement | null>(null);
   const quickIntakeRef = useRef<HTMLInputElement | null>(null);
+  const costInputRef = useRef<HTMLInputElement | null>(null);
   const stockImportDetailsRef = useRef<HTMLDetailsElement | null>(null);
   const stockImportRef = useRef<HTMLFormElement | null>(null);
   const stockImportTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -3964,6 +3965,23 @@ export default function Home() {
     checkedCompRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  function jumpToCostEntry() {
+    costInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.requestAnimationFrame(() => costInputRef.current?.focus());
+  }
+
+  function runStockAction() {
+    if (!quickStockReady) {
+      jumpToCostEntry();
+      return;
+    }
+    if (requiresCheckedCompBeforeStock) {
+      jumpToCheckedComp();
+      return;
+    }
+    void acquire();
+  }
+
   function renderManualCompLinks(variant: "compact" | "full" | "priority" = "full") {
     const ebayQuery = manualCompLinks.find((link) => link.kind === "EBAY_UK_SOLD")?.query ?? manualCompFallbackQuery;
     return (
@@ -4157,7 +4175,7 @@ export default function Home() {
         <div className="quick-stock-grid">
           <label>
             Cost
-            <MoneyInput value={cost} onChange={setCost} />
+            <MoneyInput ref={costInputRef} value={cost} onChange={setCost} />
           </label>
           <label>
             Qty
@@ -4273,8 +4291,8 @@ export default function Home() {
         <button
           className="primary-action"
           type="button"
-          onClick={() => void acquire()}
-          disabled={busy === "acquire" || !quickStockCanSubmit}
+          onClick={runStockAction}
+          disabled={busy === "acquire" || (quickStockReady && !quickStockCanSubmit)}
         >
           {busy === "acquire"
             ? "Stocking..."
@@ -5476,7 +5494,7 @@ export default function Home() {
             <div className="form-grid">
               <label>
                 Cost
-                <MoneyInput value={cost} onChange={setCost} />
+                <MoneyInput ref={costInputRef} value={cost} onChange={setCost} />
               </label>
               <label>
                 Qty
@@ -7069,8 +7087,13 @@ export default function Home() {
           <button
             className="primary-action"
             type="button"
-            onClick={!headline ? (manualStockReady ? () => void stockWithoutComp() : () => openManualCompLink("EBAY_UK_SOLD")) : needsManualComp ? () => openManualCompLink("EBAY_UK_SOLD") : () => void acquire()}
-            disabled={busy === "acquire" || busy === "manual-stock" || (headline ? !needsManualComp && !quickStockCanSubmit : !manualStockReady && !manualCompFallbackQuery.trim())}
+            onClick={!headline ? (manualStockReady ? () => void stockWithoutComp() : () => openManualCompLink("EBAY_UK_SOLD")) : needsManualComp ? () => openManualCompLink("EBAY_UK_SOLD") : runStockAction}
+            disabled={
+              busy === "acquire" ||
+              busy === "manual-stock" ||
+              (!headline && !manualStockReady && !manualCompFallbackQuery.trim()) ||
+              Boolean(headline && !needsManualComp && quickStockReady && !quickStockCanSubmit)
+            }
           >
             {!headline
               ? manualStockReady
@@ -8472,21 +8495,22 @@ function EmptyState({ text }: { text: string }) {
   return <p className="empty-state">{text}</p>;
 }
 
-function MoneyInput({
-  value,
-  onChange,
-  disabled = false,
-  placeholder,
-}: {
+const MoneyInput = forwardRef<HTMLInputElement, {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
-}) {
+}>(function MoneyInput({
+  value,
+  onChange,
+  disabled = false,
+  placeholder,
+}, ref) {
   return (
     <span className="money-input">
       <span aria-hidden="true">£</span>
       <input
+        ref={ref}
         inputMode="decimal"
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -8495,7 +8519,7 @@ function MoneyInput({
       />
     </span>
   );
-}
+});
 
 function CardImage({
   src,
