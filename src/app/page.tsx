@@ -1062,6 +1062,7 @@ export default function Home() {
       card.number.trim().toLowerCase() === number.trim().toLowerCase(),
   );
   const hasActiveCardIdentity = Boolean(name.trim() || setNameValue.trim() || number.trim() || comp);
+  const hasBuyContext = Boolean(hasActiveCardIdentity || quickIntake.trim() || parsedQuickIntake?.name || checkedComp);
   const canClearCurrentComp = Boolean(
     hasActiveCardIdentity ||
       quickIntake.trim() ||
@@ -1278,7 +1279,7 @@ export default function Home() {
     [deal?.targetBuyPence, headline, watchTarget],
   );
   const buyFlowSteps = useMemo<BuyFlowStep[]>(() => {
-    const cardReady = Boolean(name.trim() && setNameValue.trim());
+    const cardReady = Boolean(name.trim() && (setNameValue.trim() || number.trim()));
     const compReady = Boolean(headline);
     const costPence = poundsToPence(cost);
     const qty = parseIntakeQuantity(quantity) ?? 0;
@@ -1290,7 +1291,7 @@ export default function Home() {
         label: "Card",
         detail: cardReady
           ? [displaySetName, displayNumber ? `#${displayNumber}` : null].filter(Boolean).join(" ")
-          : "card + set",
+          : "card + set/number",
         state: cardReady ? "done" : "current",
       },
       {
@@ -1318,6 +1319,7 @@ export default function Home() {
     displaySetName,
     headline,
     name,
+    number,
     quantity,
     setNameValue,
   ]);
@@ -4958,8 +4960,8 @@ export default function Home() {
               </div>
             )}
             </details>
-            {!headline && renderManualCompLinks("compact")}
-            {!headline && (
+            {!headline && hasBuyContext && renderManualCompLinks("compact")}
+            {!headline && hasBuyContext && (
               <details className="panel optional-tool-panel manual-check-panel">
                 <summary>
                   <span>Optional</span>
@@ -5459,7 +5461,7 @@ export default function Home() {
             </details>
           )}
 
-          {(!headline || needsManualComp) && (
+          {hasBuyContext && (!headline || needsManualComp) && (
           <form
             className="panel fallback-stock-panel"
             onSubmit={(event) => {
