@@ -11,12 +11,16 @@ import { buildPromoCatalogFallback } from "@/lib/catalog/promoFallback";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { toCardData } from "@/lib/catalog/prismaCardCache";
 import { TcgDexCatalogSource } from "@/lib/catalog/tcgDex";
+import { settleTypeaheadSource } from "@/lib/catalog/typeahead";
 import type { CatalogCard } from "@/lib/catalog/types";
 import { getPrisma } from "@/lib/db/prisma";
 import type { Game, Language } from "@/lib/domain/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const TYPEAHEAD_POKEMON_TCG_TIMEOUT_MS = 1200;
+const TYPEAHEAD_TCGDEX_TIMEOUT_MS = 1400;
 
 type DbCard = {
   id: string;
@@ -50,25 +54,30 @@ export async function GET(request: Request) {
 
   let liveCards: CatalogCard[] = [];
   if (localRanked.length < limit) {
-    const source = new PokemonTcgApiCatalogSource();
+    const source = new PokemonTcgApiCatalogSource(
+      undefined,
+      fetch,
+      undefined,
+      TYPEAHEAD_POKEMON_TCG_TIMEOUT_MS,
+    );
     const liveName = lookup.name || parsedQuery.name || q;
-    liveCards = await source
-      .search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit)
-      .catch(() => []);
-    await cacheCatalogCards(liveCards).catch((err) => {
-      console.warn("[catalog/cards] live card cache skipped:", err instanceof Error ? err.message : "unknown error");
-    });
+    liveCards = await settleTypeaheadSource(
+      source.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit),
+      [],
+      TYPEAHEAD_POKEMON_TCG_TIMEOUT_MS,
+    );
+    cacheCatalogCardsInBackground(liveCards, "live");
   }
   let tcgDexCards: CatalogCard[] = [];
   if (localRanked.length + liveCards.length < limit) {
-    const source = new TcgDexCatalogSource();
+    const source = new TcgDexCatalogSource(fetch, undefined, TYPEAHEAD_TCGDEX_TIMEOUT_MS);
     const liveName = lookup.name || parsedQuery.name || q;
-    tcgDexCards = await source
-      .search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit)
-      .catch(() => []);
-    await cacheCatalogCards(tcgDexCards).catch((err) => {
-      console.warn("[catalog/cards] tcgdex card cache skipped:", err instanceof Error ? err.message : "unknown error");
-    });
+    tcgDexCards = await settleTypeaheadSource(
+      source.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit),
+      [],
+      TYPEAHEAD_TCGDEX_TIMEOUT_MS,
+    );
+    cacheCatalogCardsInBackground(tcgDexCards, "tcgdex");
   }
 
   const chaseCards = searchChaseCards(lookup.query, lookup.setName, limit);
@@ -160,6 +169,13 @@ async function cacheCatalogCards(cards: CatalogCard[]): Promise<void> {
       });
     }
   }
+}
+
+function cacheCatalogCardsInBackground(cards: CatalogCard[], sourceName: string): void {
+  if (cards.length === 0) return;
+  void cacheCatalogCards(cards).catch((err) => {
+    console.warn(`[catalog/cards] ${sourceName} card cache skipped:`, err instanceof Error ? err.message : "unknown error");
+  });
 }
 
 function dbCardToCatalogCard(card: DbCard): CatalogCard {
