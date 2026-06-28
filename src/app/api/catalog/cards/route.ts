@@ -53,31 +53,33 @@ export async function GET(request: Request) {
   const localRanked = rankCatalogCards(lookup.query, localCards, { setName: lookup.setName, limit: rankingPoolLimit });
 
   let liveCards: CatalogCard[] = [];
+  let tcgDexCards: CatalogCard[] = [];
   if (localRanked.length < limit) {
-    const source = new PokemonTcgApiCatalogSource(
+    const liveName = lookup.name || parsedQuery.name || q;
+    const pokemonTcgSource = new PokemonTcgApiCatalogSource(
       undefined,
       fetch,
       undefined,
       TYPEAHEAD_POKEMON_TCG_TIMEOUT_MS,
     );
-    const liveName = lookup.name || parsedQuery.name || q;
-    liveCards = await settleTypeaheadSource(
-      source.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit),
-      [],
-      TYPEAHEAD_POKEMON_TCG_TIMEOUT_MS,
-    );
+    const tcgDexSource = new TcgDexCatalogSource(fetch, undefined, TYPEAHEAD_TCGDEX_TIMEOUT_MS);
+    const [pokemonTcgCards, allTcgDexCards] = await Promise.all([
+      settleTypeaheadSource(
+        pokemonTcgSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit),
+        [],
+        TYPEAHEAD_POKEMON_TCG_TIMEOUT_MS,
+      ),
+      settleTypeaheadSource(
+        tcgDexSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit),
+        [],
+        TYPEAHEAD_TCGDEX_TIMEOUT_MS,
+      ),
+    ]);
+
+    liveCards = pokemonTcgCards;
+    tcgDexCards = localRanked.length + liveCards.length < limit ? allTcgDexCards : [];
     cacheCatalogCardsInBackground(liveCards, "live");
-  }
-  let tcgDexCards: CatalogCard[] = [];
-  if (localRanked.length + liveCards.length < limit) {
-    const source = new TcgDexCatalogSource(fetch, undefined, TYPEAHEAD_TCGDEX_TIMEOUT_MS);
-    const liveName = lookup.name || parsedQuery.name || q;
-    tcgDexCards = await settleTypeaheadSource(
-      source.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit),
-      [],
-      TYPEAHEAD_TCGDEX_TIMEOUT_MS,
-    );
-    cacheCatalogCardsInBackground(tcgDexCards, "tcgdex");
+    cacheCatalogCardsInBackground(allTcgDexCards, "tcgdex");
   }
 
   const chaseCards = searchChaseCards(lookup.query, lookup.setName, limit);
