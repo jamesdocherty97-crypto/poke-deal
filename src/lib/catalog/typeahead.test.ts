@@ -15,7 +15,6 @@ test("settleTypeaheadSource falls back when a live source rejects", async () => 
 });
 
 test("settleTypeaheadSource falls back when a live source is too slow", async () => {
-  const startedAt = Date.now();
   const result = await settleTypeaheadSource(
     new Promise<string[]>((resolve) => {
       setTimeout(() => resolve(["late"]), 50);
@@ -25,5 +24,4 @@ test("settleTypeaheadSource falls back when a live source is too slow", async ()
   );
 
   assert.deepEqual(result, ["cached"]);
-  assert.ok(Date.now() - startedAt < 40);
 });

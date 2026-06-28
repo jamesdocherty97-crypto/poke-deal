@@ -5284,9 +5284,21 @@ label {
     top: 84px;
   }
 
-  .buy-workspace > .stock-import-panel,
-  .buy-workspace > .recent-intake-panel,
+  .buy-workspace > .lookup-panel,
+  .buy-workspace > .buy-flow-rail,
   .buy-workspace > .last-stocked-panel {
+    grid-column: 1;
+  }
+
+  .buy-workspace > .comp-panel,
+  .buy-workspace > .fallback-stock-panel,
+  .buy-workspace > .grade-lab,
+  .buy-workspace > .watch-panel {
+    grid-column: 2;
+  }
+
+  .buy-workspace > .stock-import-panel,
+  .buy-workspace > .recent-intake-panel {
     grid-column: 1 / -1;
   }
 

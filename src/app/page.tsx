@@ -4598,16 +4598,6 @@ export default function Home() {
 
       {view === "acquire" && (
         <section className="workspace buy-workspace">
-          <BuyFlowRail steps={buyFlowSteps} />
-          {lastStocked && (
-            <LastStockedPanel
-              card={lastStocked}
-              onPack={openLastStockedPack}
-              onSell={sellLastStocked}
-              onNext={compNextFromLastStocked}
-              onDismiss={() => setLastStocked(null)}
-            />
-          )}
           <form className="panel lookup-panel" onSubmit={lookup}>
             <div className="panel-heading">
               <h2>Comp, buy, stock</h2>
@@ -5053,6 +5043,16 @@ export default function Home() {
               </details>
             )}
           </form>
+          <BuyFlowRail steps={buyFlowSteps} />
+          {lastStocked && (
+            <LastStockedPanel
+              card={lastStocked}
+              onPack={openLastStockedPack}
+              onSell={sellLastStocked}
+              onNext={compNextFromLastStocked}
+              onDismiss={() => setLastStocked(null)}
+            />
+          )}
 
           {headline && (
             <section className="panel comp-panel" ref={compPanelRef}>
