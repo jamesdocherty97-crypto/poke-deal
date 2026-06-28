@@ -472,7 +472,21 @@ type SystemSource = {
   setupHint?: string;
 };
 
-const quickGrades: Grade[] = ["RAW", "PSA_8", "PSA_9", "PSA_10", "CGC_1_5", "ACE_9", "ACE_10", "BGS_9_5", "CGC_10"];
+const quickGrades: Grade[] = [
+  "RAW",
+  "PSA_8",
+  "PSA_9",
+  "PSA_10",
+  "ACE_9",
+  "ACE_10",
+  "BGS_7_5",
+  "BGS_8_5",
+  "BGS_9_5",
+  "CGC_1_5",
+  "CGC_8_5",
+  "CGC_9_5",
+  "CGC_10",
+];
 const gradeOptions: Grade[] = [...GRADE_VALUES];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCGPLAYER", "OTHER"];
