@@ -1788,6 +1788,7 @@ export default function Home() {
 
   function editCompIdentity() {
     clearCompEvidence();
+    setQuickIntake("");
     setManualCompQuery("");
   }
 
@@ -2529,6 +2530,7 @@ export default function Home() {
       grade,
     };
     clearCompEvidence();
+    setQuickIntake(cardIdentitySearchText({ name: card.name, setName: card.setName, number: card.number }, grade));
     setName(card.name);
     setSetNameValue(card.setName);
     setNumber(card.number);
@@ -2553,6 +2555,7 @@ export default function Home() {
 
     setView("acquire");
     clearCompEvidence();
+    setQuickIntake(cardIdentitySearchText({ name: entry.name, setName: entry.setName, number: entry.number }, nextGrade));
     setName(entry.name);
     setSetNameValue(entry.setName);
     setNumber(entry.number ?? "");
@@ -2604,6 +2607,7 @@ export default function Home() {
     };
 
     clearCompEvidence();
+    setQuickIntake(cardIdentitySearchText({ name: lookupName, setName: card.setName, number: card.number }, grade, conditionSearchTerm));
     setName(lookupName);
     setSetNameValue(card.setName);
     pinRecentSetName(card.setName);
@@ -2664,14 +2668,41 @@ export default function Home() {
   }
 
   function chooseCard(card: CatalogCard) {
+    const typedText = quickIntake.trim();
+    const parsed = typedText ? parseQuickIntake(typedText) : null;
+    const firstEditionRequested =
+      textMentionsFirstEdition(typedText) ||
+      textMentionsFirstEdition(name) ||
+      textMentionsFirstEdition(setNameValue) ||
+      textMentionsFirstEdition(number);
+    const lookupName =
+      firstEditionRequested && !textMentionsFirstEdition(card.name)
+        ? `${card.name} 1st Edition`
+        : card.name;
+    const nextGrade = parsed?.grade ?? grade;
+    const conditionSearchTerm = parsed?.condition && parsed.condition.toUpperCase() !== "NM" ? parsed.condition : undefined;
+    const manualSearch = normalizeManualCompSearchText(typedText);
+
     clearCompEvidence();
-    setName(card.name);
+    setQuickIntake(cardIdentitySearchText({ name: lookupName, setName: card.setName, number: card.number }, nextGrade, conditionSearchTerm));
+    setName(lookupName);
     setSetNameValue(card.setName);
     pinRecentSetName(card.setName);
     setNumber(card.number ?? "");
+    if (parsed?.grade) setGrade(parsed.grade);
+    if (parsed?.condition) setCondition(parsed.condition);
+    if (parsed?.cost) setCost(parsed.cost);
+    if (parsed?.quantity) setQuantity(parsed.quantity);
+    if (parsed?.source) setSource(parsed.source);
+    if (parsed?.location) setLocation(parsed.location);
+    if (parsed?.channel) setChannel(parsed.channel as Channel);
+    if (parsed?.listingState) {
+      setAcquireListingState(parsed.listingState);
+      setShouldCreateListing(true);
+    }
     if (card.imageUrl) setCardArtUrl(card.imageUrl);
     setCardSuggestionsOpen(false);
-    setManualCompQuery("");
+    setManualCompQuery(manualSearch);
     setError(null);
   }
 
@@ -2712,6 +2743,7 @@ export default function Home() {
 
     setView("acquire");
     clearCompEvidence();
+    setQuickIntake(cardIdentitySearchText({ name: item.card.name, setName: item.card.setName, number: item.card.number }, nextGrade));
     setName(item.card.name);
     setSetNameValue(item.card.setName);
     setNumber(item.card.number ?? "");
@@ -8808,6 +8840,24 @@ function setMetaLabel(set: CatalogSet): string {
 
 function catalogSuggestionMeta(card: CatalogCard): string {
   return `${card.setName}${card.number ? ` #${card.number}` : " · manual identity"}`;
+}
+
+function cardIdentitySearchText(
+  card: { name: string; setName: string; number?: string | null },
+  grade: Grade,
+  condition?: string,
+): string {
+  const gradeText = grade === "RAW" ? "raw" : grade.replace(/_/g, " ");
+  const cleanCondition = condition?.trim();
+  return [
+    card.name,
+    card.setName,
+    card.number ?? "",
+    gradeText,
+    cleanCondition && cleanCondition.toUpperCase() !== "NM" ? cleanCondition : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function buildDefaultSetSuggestions(popularSets: CatalogSet[], allSets: CatalogSet[], limit = 48): CatalogSet[] {
