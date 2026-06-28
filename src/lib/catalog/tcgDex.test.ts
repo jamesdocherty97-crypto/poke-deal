@@ -48,6 +48,7 @@ test("TcgDexCatalogSource resolves by set and local promo number before name sea
 
   assert.equal(card?.tcgDexId, "svp-208");
   assert.equal(card?.number, "SVP208");
+  assert.equal(card?.imageUrl, "https://images.scrydex.com/pokemon/svp-208/large");
   assert.deepEqual(requested, ["https://api.example.test/v2/en/sets/svp/208"]);
 });
 

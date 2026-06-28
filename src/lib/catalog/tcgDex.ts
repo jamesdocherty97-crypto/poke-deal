@@ -207,7 +207,7 @@ export function mapTcgDexCard(card: unknown): CatalogCard | null {
     setCode: setId,
     number: displayCardNumber(setId, localId),
     rarity: readString(payload?.rarity),
-    imageUrl: assetUrl(readString(payload?.image), "card"),
+    imageUrl: assetUrl(readString(payload?.image), "card") ?? scrydexFallbackImageUrl(id),
     setLogoUrl: assetUrl(readString(payload?.set?.logo), "set"),
     setSymbolUrl: assetUrl(readString(payload?.set?.symbol), "set"),
     tcgDexId: id,
@@ -278,6 +278,10 @@ function displayCardNumber(setId: string, localId: string | undefined): string |
 function assetUrl(base: string | undefined, kind: "card" | "set"): string | undefined {
   if (!base) return undefined;
   return kind === "card" ? `${base}/high.webp` : `${base}.webp`;
+}
+
+function scrydexFallbackImageUrl(id: string): string | undefined {
+  return /^(?:svp|mep)-\d{1,4}$/i.test(id) ? `https://images.scrydex.com/pokemon/${id.toLowerCase()}/large` : undefined;
 }
 
 function isPhysicalPokemonSet(set: TcgDexSetPayload): boolean {

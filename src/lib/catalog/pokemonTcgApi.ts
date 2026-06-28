@@ -312,12 +312,16 @@ export function mapPokemonTcgCard(card: unknown): CatalogCard | null {
     setCode: readString(payload?.set?.id),
     number,
     rarity: readString(payload?.rarity),
-    imageUrl: readString(payload?.images?.large) ?? readString(payload?.images?.small),
+    imageUrl: readString(payload?.images?.large) ?? readString(payload?.images?.small) ?? scrydexFallbackImageUrl(id),
     setLogoUrl: readString(payload?.set?.images?.logo),
     setSymbolUrl: readString(payload?.set?.images?.symbol),
     tcgApiId: id,
     priceSignals: readCatalogPriceSignals(payload),
   };
+}
+
+function scrydexFallbackImageUrl(id: string): string | undefined {
+  return /^(?:svp|mep)-\d{1,4}$/i.test(id) ? `https://images.scrydex.com/pokemon/${id.toLowerCase()}/large` : undefined;
 }
 
 export function pickCatalogPriceSignal(signals: CatalogPriceSignal[] | undefined): CatalogPriceSignal | null {

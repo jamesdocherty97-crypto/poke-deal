@@ -164,6 +164,7 @@ const CHASE_CARDS: CatalogCard[] = [
     setCode: "mep",
     number: "MEP049",
     rarity: "Promo",
+    imageUrl: "https://images.scrydex.com/pokemon/mep-49/large",
     tcgApiId: "mep-49",
   },
 ];

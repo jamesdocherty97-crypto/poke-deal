@@ -253,7 +253,7 @@ test("resolveCatalogCard can fall back to modern promo metadata before live cata
   assert.equal(resolved?.setCode, "mep");
   assert.equal(resolved?.number, "MEP049");
   assert.equal(resolved?.tcgApiId, "mep-49");
-  assert.equal(resolved?.imageUrl, undefined);
+  assert.equal(resolved?.imageUrl, "https://images.scrydex.com/pokemon/mep-49/large");
 });
 
 test("resolveCatalogCard creates a future promo identity when the live catalog has not caught up", async () => {
@@ -276,7 +276,7 @@ test("resolveCatalogCard creates a future promo identity when the live catalog h
   assert.equal(resolved?.setCode, "svp");
   assert.equal(resolved?.number, "SVP208");
   assert.equal(resolved?.tcgApiId, "svp-208");
-  assert.equal(resolved?.imageUrl, undefined);
+  assert.equal(resolved?.imageUrl, "https://images.scrydex.com/pokemon/svp-208/large");
 });
 
 test("resolveCatalogCard preserves typed future promo padding", async () => {
