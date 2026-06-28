@@ -61,8 +61,7 @@ export async function GET() {
       policies,
       locationSetup,
       connectedAccount: {
-        userId: identity.userId,
-        email: identity.email,
+        verified: Boolean(identity.userId),
         registrationDate: identity.registrationDate,
         sellerLevel: identity.sellerInfo?.sellerLevel ?? null,
         identityCheckError: "error" in identity ? identity.error : undefined,
