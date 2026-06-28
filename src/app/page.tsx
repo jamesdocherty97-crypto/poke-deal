@@ -1052,7 +1052,7 @@ export default function Home() {
   const displayNumber = catalogCard?.number ?? number;
   const selectedCardTitle = displayCardName.trim() || "Next card";
   const selectedCardMeta = [
-    displaySetName.trim() || null,
+    displayCardName.trim() || displayNumber ? displaySetName.trim() || null : null,
     displayNumber ? `#${displayNumber}` : displayCardName.trim() && displaySetName.trim() ? "manual identity" : null,
     grade.replace(/_/g, " "),
   ].filter(Boolean).join(" · ");
@@ -1062,10 +1062,11 @@ export default function Home() {
       card.setName.trim().toLowerCase() === setNameValue.trim().toLowerCase() &&
       card.number.trim().toLowerCase() === number.trim().toLowerCase(),
   );
-  const hasActiveCardIdentity = Boolean(name.trim() || setNameValue.trim() || number.trim() || comp);
+  const hasActiveCardIdentity = Boolean(name.trim() || number.trim() || comp);
   const hasBuyContext = Boolean(hasActiveCardIdentity || quickIntake.trim() || parsedQuickIntake?.name || checkedComp);
   const canClearCurrentComp = Boolean(
     hasActiveCardIdentity ||
+      setNameValue.trim() ||
       quickIntake.trim() ||
       cost.trim() ||
       manualCompQuery.trim() ||
@@ -7053,7 +7054,7 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && (headline || name.trim() || setNameValue.trim() || number.trim() || checkedComp) && (
+      {view === "acquire" && (headline || name.trim() || number.trim() || checkedComp) && (
         <section className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`} aria-label="Current buy action">
           <div>
             <span>{headline ? confidenceLabel?.label ?? "Comp" : "Manual card"}</span>
