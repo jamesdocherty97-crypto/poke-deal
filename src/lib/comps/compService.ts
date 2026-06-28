@@ -9,6 +9,7 @@ import { DEFAULT_WINDOW_DAYS, isConfident } from "./cleaning.js";
 import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
 import { PokeTraceSource } from "./sources/pokeTrace.js";
+import { EbayMarketplaceInsightsSource } from "./sources/ebayMarketplaceInsights.js";
 
 const DEFAULT_SOURCE_TIMEOUT_MS = 8000;
 
@@ -29,7 +30,12 @@ export class CompService {
 
   /** Default wiring. Add PokeTrace etc. here as adapters are built. */
   static default(): CompService {
-    return new CompService([new PokemonPriceTrackerSource(), new PokeTraceSource(), new PokemonTcgMarketSource()]);
+    return new CompService([
+      new PokemonPriceTrackerSource(),
+      new EbayMarketplaceInsightsSource(),
+      new PokeTraceSource(),
+      new PokemonTcgMarketSource(),
+    ]);
   }
 
   /** Names + live status of configured sources (for diagnostics / UI). */

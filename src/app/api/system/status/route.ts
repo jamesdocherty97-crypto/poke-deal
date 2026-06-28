@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { PokeTraceSource } from "@/lib/comps/sources/pokeTrace";
+import { EbayMarketplaceInsightsSource } from "@/lib/comps/sources/ebayMarketplaceInsights";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
+import { getEbayConfig, hasEbayRefreshToken } from "@/lib/ebay/config";
 import { PsaCertLookup } from "@/lib/psa/psaCert";
 
 export const runtime = "nodejs";
@@ -20,7 +22,11 @@ export async function GET() {
   const priceTracker = new PokemonPriceTrackerSource();
   const catalog = new PokemonTcgApiCatalogSource();
   const pokeTrace = new PokeTraceSource();
+  const ebayMi = new EbayMarketplaceInsightsSource();
   const psa = new PsaCertLookup();
+  const ebayConfigured = Boolean(getEbayConfig());
+  const ebayConnected = hasEbayRefreshToken();
+  const ebayMiEnabled = process.env.EBAY_MARKETPLACE_INSIGHTS_ENABLED?.trim().toLowerCase() === "true";
 
   const sources: SystemSource[] = [
     {
@@ -52,6 +58,18 @@ export async function GET() {
       setupHint: pokeTrace.live
         ? "PokeTrace is configured for RAW cross-checks. Graded coverage depends on account tier and source data."
         : "Add POKETRACE_API_KEY in Vercel for EU/Cardmarket and US cross-checks.",
+    },
+    {
+      id: "ebay-marketplace-insights",
+      label: "eBay Marketplace Insights",
+      role: "UK eBay sold comps",
+      status: ebayMi.live ? "ready" : ebayMiEnabled && ebayConfigured && ebayConnected ? "building" : "missing",
+      required: false,
+      setupHint: ebayMi.live
+        ? "Programmatic UK eBay sold comps are enabled. If lookups still return authorization errors, eBay has not granted the restricted MI access yet."
+        : ebayMiEnabled
+          ? "MI is enabled but needs eBay credentials, OAuth connection, and restricted Marketplace Insights approval before it can return live sold comps."
+          : "Restricted eBay MI code is deployed but disabled. Set EBAY_MARKETPLACE_INSIGHTS_ENABLED=true after approval.",
     },
     {
       id: "psa-public-api",
@@ -91,6 +109,7 @@ export async function GET() {
       livePrimaryComps: priceTracker.live,
       liveCatalogKey: catalog.live,
       secondaryCrossCheck: pokeTrace.live,
+      ebayMarketplaceInsights: ebayMi.live,
       psaCertLookup: psa.live,
       alertDelivery: Boolean(process.env.DISCORD_WEBHOOK_URL?.trim()),
       storedSales: Boolean(process.env.DATABASE_URL?.trim()),

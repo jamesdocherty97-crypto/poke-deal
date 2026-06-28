@@ -22,6 +22,14 @@ import { sampleRawSales } from "./fixtures.js";
 
 const BASE_URL = "https://www.pokemonpricetracker.com/api/v2";
 const DEFAULT_FETCH_TIMEOUT_MS = 6500;
+const LOOKUP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+type CachedPptLookup = {
+  value: unknown;
+  expiresAt: number;
+};
+
+const lookupCache = new Map<string, CachedPptLookup>();
 
 export class PokemonPriceTrackerSource implements CompSource {
   readonly name = "pokemon-price-tracker";
@@ -64,6 +72,11 @@ export class PokemonPriceTrackerSource implements CompSource {
     const days = Math.min(Math.max(windowDays, 1), 180); // Pro plan caps history at 180d
     const search = buildPokemonPriceTrackerSearch(card);
     const attempts = buildFetchAttempts(card, search, days);
+    const cacheKey = buildLookupCacheKey(card, days);
+    const cached = readLookupCache(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
 
     for (const params of attempts) {
       try {
@@ -77,7 +90,10 @@ export class PokemonPriceTrackerSource implements CompSource {
         }
         const json = (await res.json()) as unknown;
         const match = selectMatchingPptCard(json, card);
-        if (match) return match;
+        if (match) {
+          writeLookupCache(cacheKey, match);
+          return match;
+        }
         console.warn(`[${this.name}] returned a different card for ${search} — retrying/falling back`);
       } catch (err) {
         // Degrade, don't explode: a dead provider must not break a lookup.
@@ -87,6 +103,26 @@ export class PokemonPriceTrackerSource implements CompSource {
 
     return null;
   }
+}
+
+function buildLookupCacheKey(card: CardRef, days: number): string {
+  const setName = normalizeSearchText(card.setName ?? "");
+  const number = normalizeProviderCollectorNumber(card.number, card.setName) ?? "";
+  return `${normalizeSearchText(card.name)}|${setName}|${number}|${days}`;
+}
+
+function readLookupCache(key: string): unknown | null {
+  const cached = lookupCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    lookupCache.delete(key);
+    return null;
+  }
+  return cached.value;
+}
+
+function writeLookupCache(key: string, value: unknown): void {
+  lookupCache.set(key, { value, expiresAt: Date.now() + LOOKUP_CACHE_TTL_MS });
 }
 
 function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
@@ -104,6 +140,7 @@ interface MapContext {
 
 interface PptProviderCard {
   ebay?: { salesByGrade?: Record<string, unknown>; updatedAt?: string };
+  prices?: Record<string, unknown>;
   name?: unknown;
   number?: unknown;
   cardNumber?: unknown;
@@ -293,6 +330,8 @@ export function mapCardAggregateToComp(
         minPrice?: number;
         maxPrice?: number;
         smartMarketPrice?: { price?: number; confidence?: string; method?: string; daysUsed?: number };
+        marketPrice7Day?: number | null;
+        marketPriceMedian7Day?: number | null;
         lastMarketUpdate?: string;
       }
     | undefined;
@@ -312,6 +351,7 @@ export function mapCardAggregateToComp(
       ? Number(agg.smartMarketPrice?.price)
       : null;
   const chosenMedianUsd = smartRawPrice && smartRawPrice > 0 ? smartRawPrice : agg.medianPrice;
+  const trendPct = estimateTrendPct(card?.prices, agg);
 
   return {
     source: ctx.source,
@@ -324,16 +364,42 @@ export function mapCardAggregateToComp(
     highPence: usdToPence(agg.maxPrice),
     sampleSize: Math.round(count),
     windowDays: ctx.windowDays,
-    // Provider only exposes a "up"/"down" marketTrend, not a %. Kept honest as null;
-    // a real % can be derived from ebay.priceHistory later.
-    trendPct: null,
+    trendPct,
     outliersRemoved: 0, // provider applies its own filtering (smartMarketPrice)
     asOf: String(agg.lastMarketUpdate ?? card?.ebay?.updatedAt ?? new Date().toISOString()),
     raw: {
       ...agg,
+      prices: card?.prices,
       chosenPriceSource: smartRawPrice ? "smartMarketPrice" : "medianPrice",
     },
   };
+}
+
+function estimateTrendPct(
+  prices: Record<string, unknown> | undefined,
+  agg: {
+    marketPrice7Day?: number | null;
+    marketPriceMedian7Day?: number | null;
+  } | undefined,
+): number | null {
+  if (!prices) return null;
+  const marketNow = readNumber(prices.market);
+  const market7 = readNumber(agg?.marketPrice7Day);
+  if (marketNow && market7) {
+    return Math.round(((market7 - marketNow) / marketNow) * 1000) / 10;
+  }
+
+  const marketMedian7 = readNumber(agg?.marketPriceMedian7Day);
+  if (marketNow && marketMedian7) {
+    return Math.round(((marketMedian7 - marketNow) / marketNow) * 1000) / 10;
+  }
+
+  return null;
+}
+
+function readNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function providerPayloadMatchesRequest(json: unknown, request: CardRef): boolean {

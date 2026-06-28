@@ -475,13 +475,40 @@ test("mapCardAggregateToComp accepts a direct provider card object", () => {
   assert.equal(directResult.medianPence, usdToPence(98));
 });
 
+test("mapCardAggregateToComp derives trend from provider blended prices", () => {
+  const directCard = {
+    name: "Pikachu",
+    setName: "Base Set",
+    prices: {
+      market: 100,
+      trend: 120,
+    },
+    ebay: {
+      salesByGrade: {
+        ungraded: {
+          count: 12,
+          averagePrice: 120,
+          medianPrice: 100,
+          minPrice: 80,
+          maxPrice: 160,
+          lastMarketUpdate: "2026-06-22T12:00:00.000Z",
+          marketPrice7Day: 111,
+        },
+      },
+    },
+  };
+
+  const comp = mapCardAggregateToComp(directCard, ctx("RAW"));
+  assert.equal(comp.trendPct, 11);
+});
+
 test("PokemonPriceTrackerSource accepts payload without set metadata when set context is present", async () => {
   const requestedUrls: string[] = [];
   const fallbackPayload = {
     data: [
       {
         name: "Umbreon",
-        cardNumber: "94/203",
+        cardNumber: "94/204",
         ebay: {
           salesByGrade: {
             ungraded: {
@@ -507,7 +534,7 @@ test("PokemonPriceTrackerSource accepts payload without set metadata when set co
   }) as typeof fetch;
 
   const source = new PokemonPriceTrackerSource("secret", fetchImpl, 5);
-  const comp = await source.lookup({ name: "Umbreon", setName: "Evolving Skies", number: "94/203" }, { grade: "RAW" });
+  const comp = await source.lookup({ name: "Umbreon", setName: "Evolving Skies", number: "94/204" }, { grade: "RAW" });
 
   assert.equal(requestedUrls.length, 2);
   assert.equal(new URL(requestedUrls[0]!).searchParams.get("set"), "Evolving Skies");

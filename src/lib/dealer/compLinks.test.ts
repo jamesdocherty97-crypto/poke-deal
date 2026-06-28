@@ -147,6 +147,7 @@ test("normalizeManualCompSearchText spaces modern promo codes into human wording
   assert.equal(normalizeManualCompSearchText("Pikachu SVP 085 LP"), "Pikachu SVP 085 LP");
   assert.equal(normalizeManualCompSearchText("Victini 208 IR Promo (SVP) ACE 10"), "Victini SVP 208 ACE 10");
   assert.equal(normalizeManualCompSearchText("Victini SVP208 ACE 10"), "Victini SVP 208 ACE 10");
+  assert.equal(normalizeManualCompSearchText("Charizard VSTAR SWSH262 raw £10"), "Charizard VSTAR SWSH262");
   // Unrecognized prefixes aren't a real collector-number convention, so leave them as typed.
   assert.equal(normalizeManualCompSearchText("Snivy XYZ 001 raw £2"), "Snivy XYZ 001");
 });
@@ -154,6 +155,7 @@ test("normalizeManualCompSearchText spaces modern promo codes into human wording
 test("cardSearchQuery humanizes joined promo catalog numbers for user-facing search text", () => {
   assert.equal(cardSearchQuery({ name: "Victini", setName: "Scarlet & Violet Promos", number: "SVP208" }), "Victini SVP 208 Scarlet & Violet Promos");
   assert.equal(cardSearchQuery({ name: "Alakazam", setName: "McDonald's Promos", number: "MEP0079" }), "Alakazam MEP 079 McDonald's Promos");
+  assert.equal(cardSearchQuery({ name: "Charizard VSTAR", setName: "SWSH Black Star Promos", number: "SWSH262" }), "Charizard VSTAR SWSH262 SWSH Black Star Promos");
   // Galarian/Trainer Gallery joined numbers are the standard convention — left untouched.
   assert.equal(cardSearchQuery({ name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" }), "Gengar TG06/TG30 Lost Origin Trainer Gallery");
 });

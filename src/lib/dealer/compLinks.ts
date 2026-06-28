@@ -64,15 +64,15 @@ export function cardSearchQuery(card: CardRef, options: { condition?: string } =
 }
 
 /**
- * Modern promo collector numbers (SVP208, MEP0079, XY01, ...) are stored joined
- * in the catalog, but human dealer search wording — and eBay sold results —
- * prefer "SVP 208" / "MEP 079". Galarian/Trainer Gallery numbers (GG30, TG06)
- * are left untouched: that joined form is the standard collector convention.
+ * Modern promo collector numbers (SVP208, MEP0079) are stored joined in the
+ * catalog, but human dealer search wording — and eBay sold results — prefer
+ * "SVP 208" / "MEP 079". Galarian/Trainer Gallery numbers (GG30, TG06) are
+ * left untouched: that joined form is the standard collector convention.
  */
 function humanizeCollectorNumber(number: string | undefined): string | undefined {
   if (!number) return number;
   return number.replace(
-    /^(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*0*(\d{1,4})$/i,
+    /^(SVP|MEP)\s*0*(\d{1,4})$/i,
     (_, prefix: string, digits: string) => formatPromoCollectorNumber(prefix, digits),
   );
 }
@@ -106,7 +106,7 @@ export function normalizeManualCompSearchText(input: string | undefined): string
   return input
       // "208 IR Promo (SVP)" -> "SVP 208" — human wording, not joined.
       .replace(
-        /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\)(?=\s|$)/gi,
+        /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?(?:promo\s*)?\(\s*(SVP|MEP)\s*\)(?=\s|$)/gi,
         (_, digits: string, prefix: string) => formatPromoCollectorNumber(prefix, digits),
       )
       // "079 promo" with no explicit prefix defaults to SVP (modern S&V promos).
@@ -117,7 +117,7 @@ export function normalizeManualCompSearchText(input: string | undefined): string
       .replace(/[–—-]+/g, " ")
     // Canonicalize promo prefix + number spacing/padding either way it was typed
     // ("MEP0079", "mep 79", "SVP208") into standard human wording "MEP 079" / "SVP 208".
-    .replace(/\b(SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*0*(\d{1,4})\b/gi, (_, prefix: string, digits: string) =>
+    .replace(/\b(SVP|MEP)\s*0*(\d{1,4})\b/gi, (_, prefix: string, digits: string) =>
       formatPromoCollectorNumber(prefix, digits),
     )
     // Galarian/Trainer Gallery numbers are the standard-convention exception: keep these joined.

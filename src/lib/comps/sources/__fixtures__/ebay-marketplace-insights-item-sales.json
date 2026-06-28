@@ -1,0 +1,26 @@
+{
+  "href": "https://api.ebay.com/buy/marketplace_insights/v1_beta/item_sales/search?q=Victini%20SVP%20208%20ACE%2010",
+  "total": 3,
+  "limit": 50,
+  "offset": 0,
+  "itemSales": [
+    {
+      "itemId": "v1|100000000001|0",
+      "title": "Victini SVP 208 Black Star Promo ACE 10",
+      "price": { "value": "42.00", "currency": "GBP" },
+      "itemSoldDate": "2026-06-20T10:00:00.000Z"
+    },
+    {
+      "itemId": "v1|100000000002|0",
+      "title": "Victini 208 Promo SVP ACE 10 Pokemon Card",
+      "price": { "value": "45.00", "currency": "GBP" },
+      "itemSoldDate": "2026-06-21T10:00:00.000Z"
+    },
+    {
+      "itemId": "v1|100000000003|0",
+      "title": "Victini SVP208 ACE10 Gem Mint",
+      "price": { "value": "48.00", "currency": "GBP" },
+      "itemSoldDate": "2026-06-22T10:00:00.000Z"
+    }
+  ]
+}

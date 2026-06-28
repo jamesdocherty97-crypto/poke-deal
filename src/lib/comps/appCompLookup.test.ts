@@ -83,6 +83,43 @@ test("catalogToCardRef preserves first-edition intent after catalog canonicaliza
   assert.equal(card.tcgApiId, "neo1-9");
 });
 
+test("catalogToCardRef preserves reverse holo intent after catalog canonicalization", () => {
+  const catalog: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Gengar",
+    setName: "Lost Origin",
+    setCode: "lot",
+    number: "TG06/TG30",
+    tcgApiId: "lot-6",
+  };
+
+  const card = catalogToCardRef(catalog, { name: "Gengar Reverse Holo", setName: "Lost Origin" });
+
+  assert.equal(card.name, "Gengar Reverse Holo");
+  assert.equal(card.setName, "Lost Origin");
+  assert.equal(card.number, "TG06/TG30");
+  assert.equal(card.tcgApiId, "lot-6");
+});
+
+test("catalogToCardRef preserves normal intent after catalog canonicalization", () => {
+  const catalog: CatalogCard = {
+    game: "POKEMON",
+    language: "EN",
+    name: "Gengar",
+    setName: "Lost Origin",
+    setCode: "lot",
+    number: "TG06/TG30",
+    tcgApiId: "lot-6",
+  };
+
+  const card = catalogToCardRef(catalog, { name: "Gengar Normal", setName: "Lost Origin" });
+
+  assert.equal(card.name, "Gengar Normal");
+  assert.equal(card.setName, "Lost Origin");
+  assert.equal(card.number, "TG06/TG30");
+});
+
 test("resolveCatalogCard falls back to known chase-card metadata when live catalog misses", async () => {
   const calls: string[] = [];
   const source = {

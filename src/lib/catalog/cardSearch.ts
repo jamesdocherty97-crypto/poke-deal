@@ -93,10 +93,12 @@ export function catalogCardMatchesSetContext(
   const resolvedSetId = resolveSetId(setName);
   if (resolvedSetId) {
     const resolvedSet = getSetById(resolvedSetId);
+    const matchedBySetName = normalizeSetTextForContext(card.setName) === normalizeSetTextForContext(resolvedSet?.name ?? "");
+    const matchedBySetAlias = card.setCode === resolvedSetId;
+    const matchedByPtcgo = normalizeSetTextForContext(card.setCode ?? "") ===
+      normalizeSetTextForContext(resolvedSet?.ptcgoCode ?? "");
     return (
-      card.setCode === resolvedSetId ||
-      normalizeSearchText(card.setName) === normalizeSearchText(resolvedSet?.name ?? "") ||
-      normalizeSearchText(card.setCode ?? "") === normalizeSearchText(resolvedSet?.ptcgoCode ?? "")
+      matchedBySetAlias || matchedBySetName || matchedByPtcgo
     );
   }
 
@@ -110,13 +112,28 @@ export function catalogCardMatchesLookupContext(
   if (!card) return false;
   if (!catalogCardMatchesSetContext(card, request.setName)) return false;
 
-  const requestedName = normalizeNameForSearch(stripLookupNoise(request.name ?? ""));
+  const requestedName = normalizeNameForSearch(stripLookupNoise(stripVariantLookupNoise(request.name ?? "")));
   if (requestedName && scoreSearchText(requestedName, card.name) === 0) return false;
 
   const requestedNumber = request.number?.trim();
   if (requestedNumber && card.number && !sameCollectorNumberForCard(requestedNumber, card)) return false;
 
   return true;
+}
+
+function stripVariantLookupNoise(input: string): string {
+  return input
+    .replace(/\breverse[\s-]?holo(?:foil)?\b/gi, " ")
+    .replace(/\bholofoil\b/gi, " ")
+    .replace(/\bholo\b/gi, " ")
+    .replace(/\bnormal\b/gi, " ")
+    .replace(/\b1st\b\s*(?:edition|ed)\b/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeSetTextForContext(value: string): string {
+  return normalizeSearchText(value).replace(/\bset\b/g, "").replace(/\s+/g, " ").trim();
 }
 
 export function shouldOfferTypedCardFallback(

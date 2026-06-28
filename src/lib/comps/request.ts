@@ -1,7 +1,7 @@
 import { normalizeCatalogCardSearchInput } from "../catalog/cardSearch.js";
 import type { CardRef, Grade } from "../domain/types.js";
 import { normalizeGradeLabel } from "./cleaning.js";
-import { textMentionsFirstEdition } from "./variants.js";
+import { addRequestedVariantHint } from "./variants.js";
 
 export interface CompLookupRequest {
   card: CardRef;
@@ -22,7 +22,8 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
   const explicitTcgDexId = readFirst(searchParams, "tcgDexId");
   const parsedNameParam = rawNameParam ? normalizeCatalogCardSearchInput(rawNameParam, explicitSetName) : null;
   const rawName = cleanCompRequestName(parsedNameParam?.name ?? parsed?.name);
-  const name = cleanCompRequestName(preserveVariantText(rawName, [freeText, rawNameParam].filter(Boolean).join(" ")));
+  const variantAwareNameSource = [freeText, rawNameParam].filter(Boolean).join(" ");
+  const name = cleanCompRequestName(addRequestedVariantHint(rawName ?? "", variantAwareNameSource));
 
   if (!name?.trim()) return { error: "name is required" };
 
@@ -69,12 +70,6 @@ function readFirst(searchParams: URLSearchParams, ...keys: string[]): string | u
     return raw;
   }
   return undefined;
-}
-
-function preserveVariantText(name: string | undefined, freeText: string | undefined): string | undefined {
-  if (!name?.trim()) return name;
-  if (!textMentionsFirstEdition(freeText) || textMentionsFirstEdition(name)) return name;
-  return `${name.trim()} 1st Edition`;
 }
 
 function cleanCompRequestName(name: string | undefined): string | undefined {

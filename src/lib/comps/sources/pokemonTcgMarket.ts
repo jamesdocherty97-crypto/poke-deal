@@ -4,7 +4,13 @@ import { PokemonTcgApiCatalogSource, pickCatalogPriceSignal } from "../../catalo
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
-import { requestsFirstEdition } from "../variants.js";
+import {
+  addRequestedVariantHint,
+  requestsFirstEdition,
+  requestsHolo,
+  requestsNormal,
+  requestsReverseHolo,
+} from "../variants.js";
 
 const MARKET_WINDOW_DAYS = 30;
 
@@ -65,7 +71,7 @@ export function mapCatalogCardToMarketComp(
 
   const canonicalCard: CardRef = {
     ...ctx.card,
-    name: catalogCard.name,
+    name: addRequestedVariantHint(catalogCard.name, ctx.card.name),
     setName: catalogCard.setName,
     number: catalogCard.number,
     tcgApiId: catalogCard.tcgApiId,
@@ -84,7 +90,7 @@ export function mapCatalogCardToMarketComp(
     highPence: bestSignal.pricePence,
     sampleSize: 1,
     windowDays: MARKET_WINDOW_DAYS,
-    trendPct: null,
+    trendPct: extractCatalogSignalTrendPct(catalogCard.priceSignals),
     outliersRemoved: 0,
     asOf: parseMarketDate(bestSignal.updatedAt),
     raw: {
@@ -100,9 +106,64 @@ export function pickCatalogPriceSignalForRequest(
   signals: CatalogPriceSignal[] | undefined,
   card: CardRef,
 ): CatalogPriceSignal | null {
+  if (!signals || signals.length === 0) return null;
+
+  if (requestsReverseHolo(card)) {
+    const reverse = signals.filter((signal) => normalizeSignalVariant(signal.variant).startsWith("reverseholo"));
+    if (reverse.length > 0) return pickCatalogPriceSignal(reverse);
+  }
+
+  if (requestsHolo(card)) {
+    const holo = signals.filter((signal) => {
+      const variant = normalizeSignalVariant(signal.variant);
+      return variant.includes("holo") && !variant.includes("reverse");
+    });
+    if (holo.length > 0) return pickCatalogPriceSignal(holo);
+  }
+
+  if (requestsNormal(card)) {
+    const normal = signals.filter((signal) => normalizeSignalVariant(signal.variant) === "normal");
+    if (normal.length > 0) return pickCatalogPriceSignal(normal);
+  }
+
   if (!requestsFirstEdition(card)) return pickCatalogPriceSignal(signals);
-  const firstEditionSignals = signals?.filter((signal) => signal.variant?.startsWith("1stEdition"));
+
+  const firstEditionSignals = signals.filter((signal) =>
+    normalizeSignalVariant(signal.variant).startsWith("1stedition"),
+  );
+  if (firstEditionSignals.length === 0) return null;
+
+  if (requestsHolo(card)) {
+    const firstEditionHolo = firstEditionSignals.filter((signal) => {
+      const variant = normalizeSignalVariant(signal.variant);
+      return variant.includes("holo") && !variant.includes("reverse");
+    });
+    if (firstEditionHolo.length > 0) return pickCatalogPriceSignal(firstEditionHolo);
+  }
+
+  if (requestsNormal(card)) {
+    const firstEditionNormal = firstEditionSignals.filter((signal) => normalizeSignalVariant(signal.variant) === "1steditionnormal");
+    if (firstEditionNormal.length > 0) return pickCatalogPriceSignal(firstEditionNormal);
+  }
+
   return pickCatalogPriceSignal(firstEditionSignals);
+}
+
+function extractCatalogSignalTrendPct(signals: CatalogPriceSignal[] | undefined): number | null {
+  if (!signals || signals.length === 0) return null;
+  const avg30 = readSignalAmount(signals, "cardmarket", "avg30");
+  const avg7 = readSignalAmount(signals, "cardmarket", "avg7");
+  if (!avg30 || avg30 <= 0 || !avg7) return null;
+  return Math.round(((avg7 - avg30) / avg30) * 1000) / 10;
+}
+
+function readSignalAmount(signals: CatalogPriceSignal[], source: "cardmarket" | "tcgplayer", kind: string): number | null {
+  const match = signals.find((signal) => signal.source === source && signal.kind === kind);
+  return match ? Number(match.pricePence) : null;
+}
+
+function normalizeSignalVariant(value: string | undefined): string {
+  return (value ?? "").toLowerCase();
 }
 
 function emptyMarketComp(ctx: MarketContext, reason: string): CompResult {

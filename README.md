@@ -70,13 +70,15 @@ The frame runs without any of these (fixture mode). Add them to `.env` (copy fro
 | **Pokémon TCG API** | Catalog, images, baseline price | Free | https://dev.pokemontcg.io |
 | **PSA Public API** | Cert lookup / slab verification | Free | https://www.psacard.com/publicapi |
 | **PokeTrace** | Secondary comps / EU-first raw cross-check | Free tier → Pro | https://poketrace.com/developers |
-| **eBay Developer** (Phase 3) | Push your *own* listings via Sell API | Free | https://developer.ebay.com |
+| **eBay Developer** | Push your *own* listings via Sell API; restricted MI adds UK sold comps | Free, MI approval-gated | https://developer.ebay.com |
 | **Discord webhook** | Price/repricing alerts | Free | Server Settings → Integrations → Webhooks |
 | **Postgres** | Storage | Free local / Neon free tier | docker or https://neon.tech |
 
 **Pokemon Price Tracker live path:** set `POKEMON_PRICE_TRACKER_API_KEY` to use the live v2 adapter. The response shape is pinned in `src/lib/comps/sources/__fixtures__/ppt-cards-ebay.json`; the adapter requests `limit=1` to keep credit usage low and maps provider aggregates into GBP `CompResult`s without caching stale prices as truth.
 
 **PokeTrace cross-check path:** set `POKETRACE_API_KEY` in Vercel before relying on bigger raw-card buys. The adapter asks PokeTrace for EU market data first, then falls back to US, and maps Cardmarket/TCGPlayer/eBay tiers into GBP `CompResult`s so noisy RAW buckets can be challenged by a second source.
+
+**eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and refresh token. Until then the source degrades to a zero-sample comp and the manual UK sold link remains the reliable fallback.
 
 ---
 
@@ -111,5 +113,6 @@ Money is stored as **GBP pence (Int)** throughout to avoid float drift.
 - [x] Listing lifecycle controls for DRAFT/ACTIVE/ENDED
 - [x] RAW comps prefer provider smartMarketPrice when available
 - [x] Optional PokeTrace source for secondary raw/graded cross-checks
+- [x] eBay Marketplace Insights adapter wired behind approval gate
 - [x] Repricing recommendations + Discord notifier interface
 - [ ] Everything in `CODEX_BACKLOG.md`

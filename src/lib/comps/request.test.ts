@@ -101,6 +101,40 @@ test("readCompLookupRequest preserves 1st Edition variant text for pricing", () 
   });
 });
 
+test("readCompLookupRequest preserves reverse holo text for pricing", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    q: "Umbreon VMAX reverse holo raw",
+  }));
+
+  assert.deepEqual(parsed, {
+    card: {
+      name: "Umbreon VMAX Reverse Holo",
+      setName: undefined,
+      number: undefined,
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "RAW",
+  });
+});
+
+test("readCompLookupRequest preserves normal text for pricing", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    q: "Gardevoir Full Art normal raw",
+  }));
+
+  assert.deepEqual(parsed, {
+    card: {
+      name: "Gardevoir Normal",
+      setName: undefined,
+      number: undefined,
+      game: "POKEMON",
+      language: "EN",
+    },
+    grade: "RAW",
+  });
+});
+
 test("readCompLookupRequest cleans direct cardName condition noise but keeps first edition", () => {
   const parsed = readCompLookupRequest(new URLSearchParams({
     cardName: "Hitmontop - 1st Edition - LP",

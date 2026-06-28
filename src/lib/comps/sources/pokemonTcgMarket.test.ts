@@ -103,6 +103,146 @@ test("PokemonTcgMarketSource prefers first-edition catalog prices when requested
   assert.equal((comp.raw as { chosenSignal?: { variant?: string } }).chosenSignal?.variant, "1stEditionNormal");
 });
 
+test("PokemonTcgMarketSource uses reverse-holo signals when requested", async () => {
+  const catalog: CatalogSource = {
+    name: "fake-catalog",
+    live: true,
+    async resolve() {
+      return {
+        ...catalogCard,
+        name: "Gengar",
+        setName: "Lost Origin",
+        number: "TG06/TG30",
+        tcgApiId: "lot-6",
+        priceSignals: [
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer Holofoil Market",
+            pricePence: 1200,
+            originalAmount: 15,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "holofoil",
+            updatedAt: "2026/06/20",
+          },
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer Reverse Holofoil Market",
+            pricePence: 2500,
+            originalAmount: 31,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "reverseHolofoil",
+            updatedAt: "2026/06/20",
+          },
+        ],
+      };
+    },
+  };
+  const source = new PokemonTcgMarketSource(catalog);
+  const comp = await source.lookup(
+    { name: "Gengar Reverse Holo", setName: "Lost Origin", number: "TG06/TG30" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(comp.medianPence, 2500);
+  assert.equal((comp.raw as { chosenSignal?: { variant?: string } }).chosenSignal?.variant, "reverseHolofoil");
+});
+
+test("PokemonTcgMarketSource uses normal signals when requested", async () => {
+  const catalog: CatalogSource = {
+    name: "fake-catalog",
+    live: true,
+    async resolve() {
+      return {
+        ...catalogCard,
+        name: "Gengar",
+        setName: "Lost Origin",
+        number: "TG06/TG30",
+        tcgApiId: "lot-6",
+        priceSignals: [
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer Holofoil Market",
+            pricePence: 1200,
+            originalAmount: 15,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "holofoil",
+            updatedAt: "2026/06/20",
+          },
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer Reverse Holofoil Market",
+            pricePence: 2500,
+            originalAmount: 31,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "reverseHolofoil",
+            updatedAt: "2026/06/20",
+          },
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer Normal Market",
+            pricePence: 900,
+            originalAmount: 11,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "normal",
+            updatedAt: "2026/06/20",
+          },
+        ],
+      };
+    },
+  };
+  const source = new PokemonTcgMarketSource(catalog);
+  const comp = await source.lookup(
+    { name: "Gengar Normal", setName: "Lost Origin", number: "TG06/TG30" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(comp.medianPence, 900);
+  assert.equal((comp.raw as { chosenSignal?: { variant?: string } }).chosenSignal?.variant, "normal");
+});
+
+test("PokemonTcgMarketSource computes trend from cardmarket averages", async () => {
+  const catalog: CatalogSource = {
+    name: "fake-catalog",
+    live: true,
+    async resolve() {
+      return {
+        ...catalogCard,
+        name: "Pikachu",
+        setName: "Base Set",
+        priceSignals: [
+          {
+            source: "cardmarket" as const,
+            label: "Cardmarket Avg30",
+            pricePence: 1000,
+            originalAmount: 10.5,
+            originalCurrency: "EUR" as const,
+            kind: "avg30",
+            updatedAt: "2026/06/20",
+          },
+          {
+            source: "cardmarket" as const,
+            label: "Cardmarket Avg7",
+            pricePence: 1120,
+            originalAmount: 11.5,
+            originalCurrency: "EUR" as const,
+            kind: "avg7",
+            updatedAt: "2026/06/20",
+          },
+        ],
+      };
+    },
+  };
+  const source = new PokemonTcgMarketSource(catalog);
+  const comp = await source.lookup({ name: "Pikachu", setName: "Base" }, { grade: "RAW" });
+
+  assert.equal(comp.trendPct, 12);
+});
+
 test("PokemonTcgMarketSource refuses regular market prices for first-edition requests", async () => {
   const catalog: CatalogSource = {
     name: "fake-catalog",
