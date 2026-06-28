@@ -1,6 +1,6 @@
 # Codex Backlog
 
-Ordered build plan for Pokémon Dealer OS. The **frame is done**: domain model, the `CompSource` contract, the comp-cleaning engine, currency boundary, pricing engine, one reference adapter, the comp→inventory spine, and a vertical-slice UI — all type-clean with 22 passing tests.
+Ordered build plan for Poke Deal. The **frame is done**: domain model, the `CompSource` contract, the comp-cleaning engine, currency boundary, pricing engine, one reference adapter, the comp→inventory spine, and a vertical-slice UI — all type-clean with 22 passing tests.
 
 ## Handover rule (read first)
 - Build **against** the existing contracts (`CompSource`, `cleaning.ts`, `pricing.ts`, `InventoryRepo`). Do **not** redesign them. If you think they need changing, stop and flag it — that's a planning decision, not a mid-grind one.

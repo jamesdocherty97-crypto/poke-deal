@@ -613,7 +613,7 @@ export default function Home() {
   const [ebayStatus, setEbayStatus] = useState<EbayStatus | null>(null);
   const [ebayPreflight, setEbayPreflight] = useState<EbayPreflight | null>(null);
   const [ebayPublishTarget, setEbayPublishTarget] = useState<string | null>(null);
-  const [ebayLocationName, setEbayLocationName] = useState("Pokemon Dealer OS");
+  const [ebayLocationName, setEbayLocationName] = useState("Poke Deal");
   const [ebayLocationAddress1, setEbayLocationAddress1] = useState("");
   const [ebayLocationAddress2, setEbayLocationAddress2] = useState("");
   const [ebayLocationCity, setEbayLocationCity] = useState("");
@@ -4419,7 +4419,7 @@ export default function Home() {
             <span className="app-mark" aria-hidden="true" />
           )}
           <div>
-            <p className="eyebrow">Pokémon Dealer OS</p>
+            <p className="eyebrow">Poke Deal</p>
             <h1>{viewTitle(view)}</h1>
           </div>
           {selectedCardMarkUrl && (

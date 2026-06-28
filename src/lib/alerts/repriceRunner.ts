@@ -68,7 +68,7 @@ export async function runRepriceCheck({
   let notified = false;
   if (notify && recommendations.length > 0) {
     await notifierFromEnv().notify({
-      title: "Pokémon Dealer OS repricing",
+      title: "Poke Deal repricing",
       body: formatRepriceDigest(recommendations),
     });
     notified = notifierConfigured;

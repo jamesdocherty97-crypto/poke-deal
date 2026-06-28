@@ -1,5 +1,5 @@
 {
-  "name": "pokemon-dealer-os",
+  "name": "poke-deal",
   "version": "0.1.0",
   "private": true,
   "description": "Command centre for running a Pokémon card dealing business: value, stock, price, list, sell, book profit.",

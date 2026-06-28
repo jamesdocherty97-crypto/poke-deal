@@ -108,7 +108,7 @@ Once §1–2 are mined, one lookup has the data to show a **full grade/printing 
 ## Status tracker — eBay Marketplace Insights access (added 2026-06-28)
 
 **Submitted.** Application Growth Check request filed on the eBay Developers Program.
-- **Ticket ref:** `260628-000019` — Subject "Pokemon Dealer OS — Marketplace Insights API access for UK sold-price valuation"
+- **Ticket ref:** `260628-000019` — Subject "Poke Deal — Marketplace Insights API access for UK sold-price valuation"
 - **Type:** App Check · **Status at submit:** Updated · **Created:** 2026-06-28
 - **Track it:** developer.ebay.com → Support → Developer Technical Support → **My Tickets**. eBay replies on this ticket; reviews run on a backlog (days–weeks).
 - **Why it matters:** this is the only route to programmatic UK eBay *sold* comps (last 90 days, `getItemSales`). It would turn the manual eBay fallback into a real automated `CompSource` (§6). Approval not guaranteed — eBay reserves MI for vetted/active apps.

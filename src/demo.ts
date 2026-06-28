@@ -28,7 +28,7 @@ function line() {
 
 async function main() {
   const comps = CompService.default();
-  console.log(`Pokémon Dealer OS — spine demo`);
+  console.log(`Poke Deal - spine demo`);
   console.log(`Source live? ${comps.sourceSummaries[0]?.live ? "yes (API key)" : "no (fixture mode)"}`);
   line();
 

@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>eBay Connected — Pokémon Dealer OS</title>
+  <title>eBay Connected - Poke Deal</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 1rem; }
     h1 { color: #1a1a1a; }

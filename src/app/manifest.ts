@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Pokémon Dealer OS",
-    short_name: "Dealer OS",
+    name: "Poke Deal",
+    short_name: "Poke Deal",
     description: "GBP-native command centre for Pokémon card dealing.",
     start_url: "/",
     scope: "/",

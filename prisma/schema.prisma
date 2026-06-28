@@ -1,4 +1,4 @@
-// Pokémon Dealer OS — data model
+// Poke Deal - data model
 // The dealer loop: value -> buy -> stock -> price -> list -> sell -> book profit.
 // All monetary values are stored in GBP pence (integers) to avoid float drift.
 

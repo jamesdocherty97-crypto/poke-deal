@@ -486,7 +486,7 @@ test("buildInventoryLocationPayload creates an enabled warehouse location", () =
   })!;
 
   assert.deepEqual(buildInventoryLocationPayload(setup), {
-    name: "Pokemon Dealer OS",
+    name: "Poke Deal",
     merchantLocationStatus: "ENABLED",
     locationTypes: ["WAREHOUSE"],
     location: {

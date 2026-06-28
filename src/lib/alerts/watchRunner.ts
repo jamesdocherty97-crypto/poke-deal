@@ -68,7 +68,7 @@ export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: b
   let notified = false;
   if (notify && notifierConfigured && alertHits.length > 0) {
     await notifierFromEnv().notify({
-      title: "Pokémon Dealer OS sourcing targets",
+      title: "Poke Deal sourcing targets",
       body: formatWatchDigest(alertHits),
     });
     notified = true;

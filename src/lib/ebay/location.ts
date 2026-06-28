@@ -63,7 +63,7 @@ export function readEbayLocationSetup(env: LocationEnv = process.env): EbayLocat
 
   return {
     merchantLocationKey: env.EBAY_MERCHANT_LOCATION_KEY!.trim(),
-    name: env.EBAY_LOCATION_NAME?.trim() || "Pokemon Dealer OS",
+    name: env.EBAY_LOCATION_NAME?.trim() || "Poke Deal",
     address: {
       addressLine1: env.EBAY_LOCATION_ADDRESS_LINE1!.trim(),
       ...(env.EBAY_LOCATION_ADDRESS_LINE2?.trim()
@@ -93,7 +93,7 @@ export function readEbayLocationSetupInput(input: EbayLocationSetupInput): EbayL
   if (missingFields.length > 0) return { setup: null, missingFields };
 
   const merchantLocationKey = normalizeMerchantLocationKey(input.merchantLocationKey) || "pdos-main";
-  const name = cleanLocationText(input.name) || "Pokemon Dealer OS";
+  const name = cleanLocationText(input.name) || "Poke Deal";
   const addressLine2 = cleanLocationText(input.addressLine2);
   const stateOrProvince = cleanLocationText(input.stateOrProvince);
 

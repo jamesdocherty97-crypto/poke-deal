@@ -3,14 +3,14 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: "Pokémon Dealer OS",
-  title: "Pokémon Dealer OS",
+  applicationName: "Poke Deal",
+  title: "Poke Deal",
   description: "Value, stock, price, list, sell.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Dealer OS",
+    title: "Poke Deal",
   },
   icons: {
     icon: "/icon.svg",

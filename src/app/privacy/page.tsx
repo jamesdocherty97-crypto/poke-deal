@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy - Pokemon Dealer OS",
-  description: "Privacy notice for Pokemon Dealer OS.",
+  title: "Privacy - Poke Deal",
+  description: "Privacy notice for Poke Deal.",
 };
 
 export default function PrivacyPage() {
   return (
     <main className="legal-page">
       <section className="legal-panel">
-        <p className="eyebrow">Pokemon Dealer OS</p>
+        <p className="eyebrow">Poke Deal</p>
         <h1>Privacy Notice</h1>
         <p>
-          Pokemon Dealer OS is a private stock, pricing and selling tool for a single card dealing business.
+          Poke Deal is a private stock, pricing and selling tool for a single card dealing business.
           It is used to manage inventory, comps, listings, sales and profit records.
         </p>
 

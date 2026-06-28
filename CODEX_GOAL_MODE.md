@@ -8,7 +8,7 @@ This is a refresh of an earlier goal-mode handover after a Claude pass focused o
 
 ## The goal
 
-Turn Pokémon Dealer OS into a tool James actually uses every day to run his Pokémon card dealing business — on **Mac, iPhone and iPad** — covering the full loop: **value → buy → stock → price → list → sell → book profit → reprice**. Make the highest-leverage improvements you can, autonomously, until it's genuinely useful and pleasant on a phone. Everything is GBP, UK-relevant.
+Turn Poke Deal into a tool James actually uses every day to run his Pokémon card dealing business — on **Mac, iPhone and iPad** — covering the full loop: **value → buy → stock → price → list → sell → book profit → reprice**. Make the highest-leverage improvements you can, autonomously, until it's genuinely useful and pleasant on a phone. Everything is GBP, UK-relevant.
 
 You are the senior engineer continuing a well-architected codebase. Build breadth on top of the existing contracts — don't redesign the foundations. Where this doc gives concrete suggestions, treat them as a starting point, not a spec — see "Creative freedom" below.
 

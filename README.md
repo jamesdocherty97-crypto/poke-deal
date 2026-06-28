@@ -1,4 +1,4 @@
-# Pokémon Dealer OS
+# Poke Deal
 
 Command centre for running a Pokémon card dealing business: **value → buy → stock → price → list → sell → book profit → reprice**. UK-relevant, GBP-native, built to be extended for months.
 

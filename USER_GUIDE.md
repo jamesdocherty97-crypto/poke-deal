@@ -1,10 +1,10 @@
-# Pokemon Dealer OS User Guide
+# Poke Deal User Guide
 
 Simple guide to what the platform does today, how each part is meant to be used, what is planned, and what still needs action.
 
 ## The Big Idea
 
-Pokemon Dealer OS is the daily operating system for a UK Pokemon card side hustle.
+Poke Deal is the daily operating system for a UK Pokemon card side hustle.
 
 It is meant to cover the full loop:
 
