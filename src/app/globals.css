@@ -681,6 +681,82 @@ label {
   gap: 6px;
 }
 
+.buy-optional-drawer {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0;
+}
+
+.buy-optional-drawer summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 28px;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.buy-optional-drawer summary::-webkit-details-marker {
+  display: none;
+}
+
+.buy-optional-drawer summary::after {
+  content: "+";
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--yellow);
+  font-size: 17px;
+  font-weight: 1000;
+}
+
+.buy-optional-drawer[open] {
+  padding-bottom: 9px;
+}
+
+.buy-optional-drawer[open] summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.buy-optional-drawer[open] summary::after {
+  content: "-";
+}
+
+.buy-optional-drawer summary span,
+.buy-optional-drawer summary small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buy-optional-drawer summary span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.buy-optional-drawer summary small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.buy-optional-drawer > :not(summary) {
+  margin-right: 9px;
+  margin-left: 9px;
+}
+
 .recent-comp-strip {
   display: grid;
   gap: 6px;
@@ -5742,6 +5818,30 @@ label {
   .listings-workspace,
   .pnl-workspace {
     gap: 10px;
+  }
+
+  .inventory-workspace .row-actions,
+  .listings-workspace .row-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .inventory-workspace .row-actions button,
+  .listings-workspace .row-actions button {
+    flex: 0 0 auto;
+    min-width: 72px;
+    white-space: nowrap;
+  }
+
+  .next-action-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .next-action-button {
+    width: 100%;
   }
 
   .ebay-setup-banner {

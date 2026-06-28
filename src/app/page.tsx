@@ -4712,53 +4712,58 @@ export default function Home() {
               </div>
             </div>
             {recentComps.length > 0 && (
-              <div className="recent-comp-strip" aria-label="Recent comps">
-                <div className="recent-comp-heading">
+              <details className="buy-optional-drawer recent-comp-drawer">
+                <summary>
                   <span>Recent comps</span>
-                  <button className="ghost-button" type="button" onClick={clearRecentComps}>
-                    Clear
-                  </button>
+                  <small>{recentComps.length} saved</small>
+                </summary>
+                <div className="recent-comp-strip" aria-label="Recent comps">
+                  <div className="recent-comp-heading">
+                    <span>Tap to recheck live</span>
+                    <button className="ghost-button" type="button" onClick={clearRecentComps}>
+                      Clear
+                    </button>
+                  </div>
+                  <div className="recent-comp-row">
+                    {recentComps.map((entry) => (
+                      <article className={`recent-comp-card ${entry.confidenceTone}`} key={recentCompKey(entry)}>
+                        <button
+                          className="recent-comp-pick"
+                          type="button"
+                          onClick={() => chooseRecentComp(entry, { lookupAfter: true })}
+                          disabled={busy === "lookup"}
+                        >
+                          <CardImage
+                            src={entry.imageUrl}
+                            className="recent-comp-art"
+                            fallbackClassName="recent-comp-art blank"
+                            alt=""
+                          />
+                          <span className="recent-comp-copy">
+                            <strong>{entry.name}</strong>
+                            <small>
+                              {entry.setName}
+                              {entry.number ? ` #${entry.number}` : ""} · {entry.grade.replace(/_/g, " ")}
+                            </small>
+                            <em>
+                              {entry.pricePence > 0 ? `Last ${gbp(entry.pricePence)}` : "No price"} · {entry.confidenceLabel}
+                            </em>
+                            <small className="recent-comp-meta">{recentCompMeta(entry)}</small>
+                          </span>
+                        </button>
+                        <button
+                          className="recent-comp-remove danger-button"
+                          type="button"
+                          onClick={() => removeRecentCompEntry(entry)}
+                          aria-label={`Remove ${entry.name} recent comp`}
+                        >
+                          x
+                        </button>
+                      </article>
+                    ))}
+                  </div>
                 </div>
-                <div className="recent-comp-row">
-                  {recentComps.map((entry) => (
-                    <article className={`recent-comp-card ${entry.confidenceTone}`} key={recentCompKey(entry)}>
-                      <button
-                        className="recent-comp-pick"
-                        type="button"
-                        onClick={() => chooseRecentComp(entry, { lookupAfter: true })}
-                        disabled={busy === "lookup"}
-                      >
-                        <CardImage
-                          src={entry.imageUrl}
-                          className="recent-comp-art"
-                          fallbackClassName="recent-comp-art blank"
-                          alt=""
-                        />
-                        <span className="recent-comp-copy">
-                          <strong>{entry.name}</strong>
-                          <small>
-                            {entry.setName}
-                            {entry.number ? ` #${entry.number}` : ""} · {entry.grade.replace(/_/g, " ")}
-                          </small>
-                          <em>
-                            {entry.pricePence > 0 ? `Last ${gbp(entry.pricePence)}` : "No price"} · {entry.confidenceLabel}
-                          </em>
-                          <small className="recent-comp-meta">{recentCompMeta(entry)}</small>
-                          <small className="recent-comp-recheck">Tap to recheck live</small>
-                        </span>
-                      </button>
-                      <button
-                        className="recent-comp-remove danger-button"
-                        type="button"
-                        onClick={() => removeRecentCompEntry(entry)}
-                        aria-label={`Remove ${entry.name} recent comp`}
-                      >
-                        x
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              </div>
+              </details>
             )}
             <div className="smart-grade-strip" aria-label="Quick grade">
               {quickGrades.map((g) => (
@@ -4952,7 +4957,11 @@ export default function Home() {
               </details>
             )}
             {!headline && (
-              <>
+              <details className="buy-optional-drawer quick-picks-drawer">
+                <summary>
+                  <span>Quick picks</span>
+                  <small>{quickHunts.length} cards</small>
+                </summary>
                 <div className="quick-hunt-toolbar" aria-label="Quick hunt controls">
                   <button
                     className="ghost-button"
@@ -5006,7 +5015,7 @@ export default function Home() {
                     </button>
                   )}
                 </div>
-              </>
+              </details>
             )}
           </form>
 
