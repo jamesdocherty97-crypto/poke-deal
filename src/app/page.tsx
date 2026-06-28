@@ -1050,7 +1050,7 @@ export default function Home() {
   const selectedCardTitle = displayCardName.trim() || "Next card";
   const selectedCardMeta = [
     displaySetName.trim() || null,
-    displayNumber ? `#${displayNumber}` : null,
+    displayNumber ? `#${displayNumber}` : displayCardName.trim() && displaySetName.trim() ? "manual identity" : null,
     grade.replace(/_/g, " "),
   ].filter(Boolean).join(" · ");
   const matchingQuickHunt = quickHunts.find(
@@ -4600,10 +4600,7 @@ export default function Home() {
                     >
                       <CardImage src={card.imageUrl ?? null} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
                       <span>{card.name}</span>
-                      <small>
-                        {card.setName}
-                        {card.number ? ` #${card.number}` : ""}
-                      </small>
+                      <small>{catalogSuggestionMeta(card)}</small>
                     </button>
                   ))}
                   {typedFallbackSuggestion && (
@@ -4619,7 +4616,7 @@ export default function Home() {
                       <span>{typedFallbackSuggestion.name}</span>
                       <small>
                         {typedFallbackSuggestion.setName || "Manual card"}
-                        {typedFallbackSuggestion.number ? ` #${typedFallbackSuggestion.number}` : ""} ·{" "}
+                        {typedFallbackSuggestion.number ? ` #${typedFallbackSuggestion.number}` : " · manual identity"} ·{" "}
                         {typedFallbackSuggestion.grade.replace(/_/g, " ")}
                       </small>
                     </button>
@@ -4789,10 +4786,7 @@ export default function Home() {
                         <CardImage src={card.imageUrl} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
                       ) : null}
                       <span>{card.name}</span>
-                      <small>
-                        {card.setName}
-                        {card.number ? ` #${card.number}` : ""}
-                      </small>
+                      <small>{catalogSuggestionMeta(card)}</small>
                     </button>
                   ))}
                 </div>
@@ -8756,6 +8750,10 @@ function soldAtIso(value: string): string | undefined {
 function setMetaLabel(set: CatalogSet): string {
   const year = set.releaseDate?.slice(0, 4);
   return [set.ptcgoCode, year].filter(Boolean).join(" · ") || set.series || "set";
+}
+
+function catalogSuggestionMeta(card: CatalogCard): string {
+  return `${card.setName}${card.number ? ` #${card.number}` : " · manual identity"}`;
 }
 
 function buildDefaultSetSuggestions(popularSets: CatalogSet[], allSets: CatalogSet[], limit = 48): CatalogSet[] {
