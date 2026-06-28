@@ -47,6 +47,22 @@ type PokemonTcgCardPayload = {
   };
 };
 
+type PokemonTcgCardsPagePayload = {
+  data?: unknown[];
+  page?: unknown;
+  pageSize?: unknown;
+  count?: unknown;
+  totalCount?: unknown;
+};
+
+export type PokemonTcgCatalogPage = {
+  page: number;
+  pageSize: number;
+  count: number;
+  totalCount?: number;
+  cards: CatalogCard[];
+};
+
 export class PokemonTcgApiCatalogSource implements CatalogSource {
   readonly name = "pokemon-tcg-api";
   readonly live: boolean;
@@ -125,6 +141,27 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       if (cards.length > 0) return cards.slice(0, limit);
     }
     return [];
+  }
+
+  async listCardsPage(page: number, pageSize = 250): Promise<PokemonTcgCatalogPage> {
+    const safePage = Number.isInteger(page) && page > 0 ? page : 1;
+    const safePageSize = Number.isInteger(pageSize) && pageSize > 0 ? Math.min(pageSize, 250) : 250;
+    const json = await this.request("/cards", {
+      page: String(safePage),
+      pageSize: String(safePageSize),
+      select: CARD_IDENTITY_FIELDS,
+    });
+    const payload = json as PokemonTcgCardsPagePayload | null;
+    const cards = readDataArray(json)
+      .map(mapPokemonTcgCard)
+      .filter((card): card is CatalogCard => card != null);
+    return {
+      page: readPositiveInt(payload?.page) ?? safePage,
+      pageSize: readPositiveInt(payload?.pageSize) ?? safePageSize,
+      count: readPositiveInt(payload?.count) ?? cards.length,
+      totalCount: readPositiveInt(payload?.totalCount) ?? undefined,
+      cards,
+    };
   }
 
   private async request(path: string, params: Record<string, string>): Promise<unknown> {

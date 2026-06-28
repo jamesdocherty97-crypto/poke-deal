@@ -1152,8 +1152,32 @@ label {
   gap: 8px;
 }
 
+.smart-suggestion-main {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
 .smart-card-suggestion-card small {
   margin-left: 0;
+}
+
+.suggestion-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.suggestion-badges em {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #cfe6ff;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.2;
 }
 
 .smart-suggestion-actions {
@@ -3495,6 +3519,47 @@ label {
 
 .receipt-row.danger strong {
   color: var(--danger);
+}
+
+.poketrace-signal-list {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(136, 200, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(42, 117, 187, 0.09);
+  padding: 10px;
+}
+
+.poketrace-signal-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 7px;
+}
+
+.poketrace-signal-row div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.poketrace-signal-row div:last-child {
+  justify-items: end;
+  text-align: right;
+}
+
+.poketrace-signal-row strong {
+  overflow-wrap: anywhere;
+  color: #cfe6ff;
+  font-size: 13px;
+}
+
+.poketrace-signal-row span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
 }
 
 .manual-comp-links {

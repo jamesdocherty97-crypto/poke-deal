@@ -88,6 +88,13 @@ test("RAW can use PokeTrace Cardmarket baselines for UK-relevant pricing", () =>
   assert.equal(comp.sampleSize, 31);
   assert.equal((comp.raw as { priceSource?: string }).priceSource, "cardmarket");
   assert.equal((comp.raw as { market?: string }).market, "EU");
+  const signals = (comp.raw as { signals?: Array<{ priceSource: string; medianPence: number; sampleSize: number }> }).signals ?? [];
+  assert.deepEqual(
+    signals.map((signal) => signal.priceSource),
+    ["cardmarket", "tcgplayer"],
+  );
+  assert.equal(signals[0]?.medianPence, eurToPence(44));
+  assert.equal(signals[1]?.sampleSize, 42);
 });
 
 test("PokeTrace search variants strip known promo prefixes for lookup", () => {

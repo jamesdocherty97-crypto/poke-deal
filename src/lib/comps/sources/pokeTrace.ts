@@ -53,6 +53,20 @@ type PokeTraceTierChoice = {
   kind: "market-baseline" | "sold-aggregate";
 };
 
+type PokeTraceSignal = {
+  priceSource: string;
+  tier: string;
+  kind: "market-baseline" | "sold-aggregate";
+  market?: string;
+  currency: Exclude<ReturnType<typeof readCurrency>, null>;
+  medianPence: number;
+  lowPence: number;
+  highPence: number;
+  sampleSize: number;
+  trendPct: number | null;
+  approxSaleCount: boolean;
+};
+
 type MapContext = {
   source: string;
   card: CardRef;
@@ -157,6 +171,7 @@ export function mapPokeTraceCardsToComp(
   const highPence = priceToGbpPence(choice.tier.high, currency, rates) || avgPence;
   const sampleSize = readPositiveInt(choice.tier.saleCount) ?? readPositiveInt(card.totalSaleCount) ?? 1;
   const canonicalCard = canonicalCardRef(ctx.card, card);
+  const signals = collectPokeTraceSignals(card, ctx.grade, currency, rates);
 
   return {
     source: ctx.source,
@@ -180,6 +195,7 @@ export function mapPokeTraceCardsToComp(
       currency,
       providerCard: providerCardRef(card),
       approxSaleCount: Boolean(choice.tier.approxSaleCount),
+      signals,
       ...choice.tier,
     },
   };
@@ -228,6 +244,51 @@ function chooseTier(card: PokeTraceCard, grade: Grade): PokeTraceTierChoice | nu
   const cardmarket = card.prices?.cardmarket_unsold?.[tierKey];
   if (cardmarket) return { tier: cardmarket, tierKey, priceSource: "cardmarket_unsold", kind: "market-baseline" };
   return null;
+}
+
+function collectPokeTraceSignals(
+  card: PokeTraceCard,
+  grade: Grade,
+  currency: PokeTraceSignal["currency"],
+  rates: FxRates,
+): PokeTraceSignal[] {
+  const tierKey = gradeToPokeTraceTier(grade);
+  const market = readString(card.market) ?? undefined;
+  const signals: PokeTraceSignal[] = [];
+  for (const [priceSource, tiers] of Object.entries(card.prices ?? {})) {
+    const tier = tiers?.[tierKey];
+    if (!tier) continue;
+    const medianPence = priceToGbpPence(tier.avg, currency, rates);
+    if (medianPence <= 0) continue;
+    signals.push({
+      priceSource,
+      tier: tierKey,
+      kind: priceSource === "ebay" ? "sold-aggregate" : "market-baseline",
+      market,
+      currency,
+      medianPence,
+      lowPence: priceToGbpPence(tier.low, currency, rates) || medianPence,
+      highPence: priceToGbpPence(tier.high, currency, rates) || medianPence,
+      sampleSize: readPositiveInt(tier.saleCount) ?? readPositiveInt(card.totalSaleCount) ?? 1,
+      trendPct: trendPct(tier),
+      approxSaleCount: Boolean(tier.approxSaleCount),
+    });
+  }
+  return signals.sort((a, b) => pokeTraceSignalPriority(b) - pokeTraceSignalPriority(a));
+}
+
+function pokeTraceSignalPriority(signal: PokeTraceSignal): number {
+  const sourcePriority =
+    signal.priceSource === "cardmarket"
+      ? 90
+      : signal.priceSource === "tcgplayer"
+        ? 60
+        : signal.priceSource === "ebay"
+          ? 50
+          : signal.priceSource === "cardmarket_unsold"
+            ? 40
+            : 20;
+  return sourcePriority + Math.min(signal.sampleSize, 50);
 }
 
 function emptyComp(ctx: MapContext, reason = "no PokeTrace data"): CompResult {

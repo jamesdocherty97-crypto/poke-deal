@@ -36,12 +36,18 @@ type DbCard = {
   tcgDexId: string | null;
 };
 
+type CatalogCardSuggestion = CatalogCard & {
+  sourceLabel: string;
+  matchLabel: string;
+  variantLabel: string;
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") ?? "";
   const setName = searchParams.get("set") ?? undefined;
   const limitParam = Number(searchParams.get("limit"));
-  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 20) : 8;
+  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 24) : 12;
 
   if (!q.trim()) return NextResponse.json({ cards: [] });
 
@@ -65,12 +71,12 @@ export async function GET(request: Request) {
     const tcgDexSource = new TcgDexCatalogSource(fetch, undefined, TYPEAHEAD_TCGDEX_TIMEOUT_MS);
     const [pokemonTcgCards, allTcgDexCards] = await Promise.all([
       settleTypeaheadSource(
-        pokemonTcgSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit),
+        pokemonTcgSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, Math.max(limit, 12)),
         [],
         TYPEAHEAD_POKEMON_TCG_TIMEOUT_MS,
       ),
       settleTypeaheadSource(
-        tcgDexSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, limit),
+        tcgDexSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, Math.max(limit, 12)),
         [],
         TYPEAHEAD_TCGDEX_TIMEOUT_MS,
       ),
@@ -98,8 +104,10 @@ export async function GET(request: Request) {
   const setMatchedCards = lookup.setName
     ? rankedCards.filter((card) => catalogCardMatchesSetContext(card, lookup.setName))
     : [];
-  const cards = setMatchedCards.length > 0 ? setMatchedCards.slice(0, limit) : rankedCards;
-  return NextResponse.json({ cards });
+  const cards = (setMatchedCards.length > 0 ? setMatchedCards.slice(0, limit) : rankedCards.slice(0, limit)).map((card) =>
+    toCatalogCardSuggestion(card, lookup),
+  );
+  return NextResponse.json({ cards, parsed: lookup });
 }
 
 function isGenericPromoSetContext(setName: string | undefined): boolean {
@@ -193,6 +201,44 @@ function dbCardToCatalogCard(card: DbCard): CatalogCard {
     tcgApiId: card.tcgApiId ?? undefined,
     tcgDexId: card.tcgDexId ?? undefined,
   };
+}
+
+function toCatalogCardSuggestion(
+  card: CatalogCard,
+  lookup: { name: string; setName?: string; number?: string },
+): CatalogCardSuggestion {
+  return {
+    ...card,
+    sourceLabel: catalogSourceLabel(card),
+    matchLabel: catalogMatchLabel(card, lookup),
+    variantLabel: catalogVariantLabel(card),
+  };
+}
+
+function catalogSourceLabel(card: CatalogCard): string {
+  if (card.tcgApiId && card.tcgDexId) return "Pokemon TCG + TCGdex";
+  if (card.tcgApiId) return "Pokemon TCG API";
+  if (card.tcgDexId) return "TCGdex";
+  return "Curated/manual";
+}
+
+function catalogMatchLabel(card: CatalogCard, lookup: { name: string; setName?: string; number?: string }): string {
+  if (lookup.number && card.number && normalizePreviewNumber(lookup.number) === normalizePreviewNumber(card.number)) {
+    return "Exact number";
+  }
+  if (lookup.setName && catalogCardMatchesSetContext(card, lookup.setName)) {
+    return "Set match";
+  }
+  if (card.imageUrl) return "Image match";
+  return "Manual candidate";
+}
+
+function catalogVariantLabel(card: CatalogCard): string {
+  return [card.rarity, card.number ? `#${card.number}` : null].filter(Boolean).join(" · ") || "variant";
+}
+
+function normalizePreviewNumber(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^0+(?=\d)/, "");
 }
 
 function normalizeCachedCardNumber(card: DbCard): string | undefined {

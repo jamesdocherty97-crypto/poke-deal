@@ -181,6 +181,25 @@ type CatalogSet = {
   logoUrl?: string;
 };
 
+type CatalogSuggestion = CatalogCard & {
+  sourceLabel?: string;
+  matchLabel?: string;
+  variantLabel?: string;
+};
+
+type PokeTraceSignalView = {
+  priceSource: string;
+  tier: string;
+  kind: string;
+  market?: string;
+  medianPence: number;
+  lowPence?: number;
+  highPence?: number;
+  sampleSize: number;
+  trendPct?: number | null;
+  approxSaleCount?: boolean;
+};
+
 type CompResult = Omit<DomainCompResult, "raw"> & {
   raw?: {
     smartMarketPrice?: { confidence?: string; daysUsed?: number; method?: string };
@@ -196,6 +215,7 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
     source?: CheckedCompSource;
     sourceLabel?: string;
     note?: string;
+    signals?: PokeTraceSignalView[];
   };
 };
 
@@ -631,7 +651,7 @@ export default function Home() {
   const [scrollToStockImport, setScrollToStockImport] = useState(false);
   const [setSuggestions, setSetSuggestions] = useState<CatalogSet[]>([]);
   const [setSuggestionsOpen, setSetSuggestionsOpen] = useState(false);
-  const [cardSuggestions, setCardSuggestions] = useState<CatalogCard[]>([]);
+  const [cardSuggestions, setCardSuggestions] = useState<CatalogSuggestion[]>([]);
   const [cardSuggestionsOpen, setCardSuggestionsOpen] = useState(false);
   const [cardSuggestionsLoading, setCardSuggestionsLoading] = useState(false);
   const [inventoryQuery, setInventoryQuery] = useState("");
@@ -786,7 +806,7 @@ export default function Home() {
     setCardSuggestionsLoading(true);
     let cancelled = false;
     const handle = setTimeout(() => {
-      const qs = new URLSearchParams({ q: query, limit: "8" });
+      const qs = new URLSearchParams({ q: query, limit: "12" });
       if (parsed.setName ?? setNameValue.trim()) qs.set("set", parsed.setName ?? setNameValue.trim());
       fetch(`/api/catalog/cards?${qs}`)
         .then(readJson)
@@ -1104,6 +1124,8 @@ export default function Home() {
     comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
   const ownedSalesComp =
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
+  const pokeTraceSignals =
+    comp?.all.find((result) => result.source === "poketrace" && result.raw?.signals?.length)?.raw?.signals ?? [];
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
   const compLimitations = useMemo(() => (compForReceipt ? buildCompLimitations(compForReceipt) : []), [compForReceipt]);
   const needsManualComp = Boolean(
@@ -4746,8 +4768,15 @@ export default function Home() {
                       className="suggestion-item card-option smart-card-suggestion-card"
                     >
                       <CardImage src={card.imageUrl ?? null} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
-                      <span>{card.name}</span>
-                      <small>{catalogSuggestionMeta(card)}</small>
+                      <div className="smart-suggestion-main">
+                        <span>{card.name}</span>
+                        <small>{catalogSuggestionMeta(card)}</small>
+                        <div className="suggestion-badges" aria-label="Candidate details">
+                          {catalogSuggestionBadges(card).map((badge) => (
+                            <em key={badge}>{badge}</em>
+                          ))}
+                        </div>
+                      </div>
                       <div className="smart-suggestion-actions">
                         <button type="button" onClick={() => chooseCard(card, { lookupAfter: false })}>
                           Fill
@@ -4761,12 +4790,18 @@ export default function Home() {
                   {typedFallbackSuggestion && (
                     <article className="suggestion-item card-option typed-fallback-option smart-card-suggestion-card" role="presentation">
                       <span className="suggestion-card-art blank" aria-hidden="true" />
-                      <span>{typedFallbackSuggestion.name}</span>
-                      <small>
-                        {typedFallbackSuggestion.setName || "Manual card"}
-                        {typedFallbackSuggestion.number ? ` #${typedFallbackSuggestion.number}` : " · manual identity"} ·{" "}
-                        {typedFallbackSuggestion.grade.replace(/_/g, " ")}
-                      </small>
+                      <div className="smart-suggestion-main">
+                        <span>{typedFallbackSuggestion.name}</span>
+                        <small>
+                          {typedFallbackSuggestion.setName || "Manual card"}
+                          {typedFallbackSuggestion.number ? ` #${typedFallbackSuggestion.number}` : " · manual identity"} ·{" "}
+                          {typedFallbackSuggestion.grade.replace(/_/g, " ")}
+                        </small>
+                        <div className="suggestion-badges" aria-label="Candidate details">
+                          <em>Manual entry</em>
+                          <em>Can stock</em>
+                        </div>
+                      </div>
                       <div className="smart-suggestion-actions">
                         <button
                           type="button"
@@ -4958,7 +4993,10 @@ export default function Home() {
                         <CardImage src={card.imageUrl} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
                       ) : null}
                       <span>{card.name}</span>
-                      <small>{catalogSuggestionMeta(card)}</small>
+                      <small>
+                        {catalogSuggestionMeta(card)}
+                        {card.sourceLabel ? ` · ${card.sourceLabel}` : ""}
+                      </small>
                     </button>
                   ))}
                 </div>
@@ -5415,6 +5453,32 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+              {pokeTraceSignals.length > 0 && (
+                <div className="poketrace-signal-list" aria-label="PokeTrace returned signals">
+                  <div className="receipt-heading">
+                    <span>PokeTrace signals</span>
+                    <strong>{pokeTraceSignals.length} checked</strong>
+                  </div>
+                  {pokeTraceSignals.slice(0, 4).map((signal) => (
+                    <div className="poketrace-signal-row" key={`${signal.priceSource}-${signal.tier}-${signal.market ?? ""}`}>
+                      <div>
+                        <strong>{pokeTraceSignalLabel(signal)}</strong>
+                        <span>
+                          {signal.sampleSize} sample{signal.sampleSize === 1 ? "" : "s"}
+                          {signal.trendPct == null ? "" : ` · ${formatPct(signal.trendPct)} trend`}
+                          {signal.approxSaleCount ? " · approx" : ""}
+                        </span>
+                      </div>
+                      <div>
+                        <strong>{gbp(signal.medianPence)}</strong>
+                        <span>
+                          {gbp(signal.lowPence ?? signal.medianPence)}-{gbp(signal.highPence ?? signal.medianPence)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               {!needsManualComp && !shouldOfferManualComp && renderManualCompLinks()}
@@ -8885,6 +8949,22 @@ function compBasis(result: CompResult): string {
   return `${result.grade.replace(/_/g, " ")} sold aggregate`;
 }
 
+function pokeTraceSignalLabel(signal: PokeTraceSignalView): string {
+  const source =
+    signal.priceSource === "tcgplayer"
+      ? "TCGPlayer"
+      : signal.priceSource === "cardmarket"
+        ? "Cardmarket"
+        : signal.priceSource === "cardmarket_unsold"
+          ? "Cardmarket ask"
+          : signal.priceSource === "ebay"
+            ? "eBay"
+            : signal.priceSource.replace(/_/g, " ");
+  const market = signal.market ? ` ${signal.market}` : "";
+  const tier = signal.tier.replace(/_/g, " ");
+  return `${source}${market} ${tier}`;
+}
+
 function compMeta(result: CompResult): string {
   const reason = rawReason(result);
   if ((result.sampleSize === 0 || result.medianPence <= 0) && reason) return reason;
@@ -9113,7 +9193,12 @@ function setMetaLabel(set: CatalogSet): string {
 }
 
 function catalogSuggestionMeta(card: CatalogCard): string {
-  return `${card.setName}${card.number ? ` #${card.number}` : " · manual identity"}`;
+  const variant = "variantLabel" in card && typeof card.variantLabel === "string" ? card.variantLabel : null;
+  return [card.setName, variant ?? (card.number ? `#${card.number}` : "manual identity")].filter(Boolean).join(" · ");
+}
+
+function catalogSuggestionBadges(card: CatalogSuggestion): string[] {
+  return [card.matchLabel, card.sourceLabel, card.rarity].filter((badge): badge is string => Boolean(badge?.trim())).slice(0, 3);
 }
 
 function cardIdentitySearchText(
