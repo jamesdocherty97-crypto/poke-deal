@@ -102,7 +102,8 @@ import {
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayAction, type TodayActionTarget } from "@/lib/dealer/today";
 import { textMentionsFirstEdition } from "@/lib/comps/variants";
-import { normalizeCatalogCardSearchInput } from "@/lib/catalog/cardSearch";
+import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@/lib/catalog/cardSearch";
+import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
 
 type View = "today" | "acquire" | "inventory" | "listings" | "pnl";
 type Grade = DomainGrade;
@@ -152,31 +153,6 @@ type LastStockedCard = {
   channel: Channel;
   listingState: ListingState;
   imageUrl: string | null;
-};
-
-type CatalogCard = {
-  name: string;
-  setName: string;
-  number?: string;
-  rarity?: string;
-  imageUrl?: string;
-  setLogoUrl?: string;
-  setSymbolUrl?: string;
-  tcgApiId?: string;
-  tcgDexId?: string;
-  priceSignals?: CatalogPriceSignal[];
-};
-
-type CatalogPriceSignal = {
-  source: "tcgplayer" | "cardmarket";
-  label: string;
-  pricePence: number;
-  originalAmount: number;
-  originalCurrency: "USD" | "EUR";
-  kind: string;
-  variant?: string;
-  updatedAt?: string;
-  url?: string;
 };
 
 type OwnedSaleCompRow = {
@@ -1042,14 +1018,26 @@ export default function Home() {
     [acquireListingState, channel, condition, cost, grade, location, name, number, parsedQuickIntake, quantity, setNameValue, source],
   );
   const typedFallbackSuggestion = useMemo(() => {
-    if (!quickIntake.trim() || !parsedQuickIntake?.name || cardSuggestionsLoading || cardSuggestions.length > 0) return null;
+    if (!quickIntake.trim() || !parsedQuickIntake?.name || cardSuggestionsLoading) return null;
+    if (
+      !shouldOfferTypedCardFallback(
+        {
+          name: parsedQuickIntake.name,
+          setName: parsedQuickIntake.setName ?? setNameValue.trim(),
+          number: parsedQuickIntake.number,
+        },
+        cardSuggestions,
+      )
+    ) {
+      return null;
+    }
     return {
       name: parsedQuickIntake.name,
       setName: parsedQuickIntake.setName ?? setNameValue.trim(),
       number: parsedQuickIntake.number,
       grade: parsedQuickIntake.grade ?? grade,
     };
-  }, [cardSuggestions.length, cardSuggestionsLoading, grade, parsedQuickIntake, quickIntake, setNameValue]);
+  }, [cardSuggestions, cardSuggestionsLoading, grade, parsedQuickIntake, quickIntake, setNameValue]);
   const recentSets = useMemo(() => {
     const byId = new Map([...allSets, ...popularSets, ...setSuggestions].map((set) => [set.id, set]));
     return recentSetIds

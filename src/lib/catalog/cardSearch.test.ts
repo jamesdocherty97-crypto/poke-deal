@@ -6,6 +6,7 @@ import {
   parseCardSearchQuery,
   rankCatalogCards,
   scoreCatalogCardForSearch,
+  shouldOfferTypedCardFallback,
 } from "./cardSearch.js";
 import { searchChaseCards } from "./chaseCards.js";
 import type { CatalogCard } from "./types.js";
@@ -310,6 +311,29 @@ test("rankCatalogCards keeps future promo numbers from borrowing same-name art",
 
   assert.deepEqual(parseCardSearchQuery("Snivy XYZ001"), { name: "Snivy", number: "XYZ001" });
   assert.deepEqual(rankCatalogCards("Snivy XYZ001", mixed), []);
+});
+
+test("shouldOfferTypedCardFallback stays available when suggestions are only loose matches", () => {
+  const suggestions: CatalogCard[] = [
+    { game: "POKEMON", language: "EN", name: "Snivy", setName: "Black & White", setCode: "bw1", number: "1/114" },
+    { game: "POKEMON", language: "EN", name: "Snivy", setName: "McDonald's Collection 2011", setCode: "mcd11", number: "1/12" },
+  ];
+
+  assert.equal(
+    shouldOfferTypedCardFallback({ name: "Snivy", setName: undefined, number: "XYZ001" }, suggestions),
+    true,
+  );
+});
+
+test("shouldOfferTypedCardFallback hides when suggestions include the typed identity", () => {
+  const suggestions: CatalogCard[] = [
+    { game: "POKEMON", language: "EN", name: "Alakazam", setName: "Mega Evolution Promos", setCode: "mep", number: "MEP0079" },
+  ];
+
+  assert.equal(
+    shouldOfferTypedCardFallback({ name: "Alakazam", setName: "Mega Evolution Promos", number: "MEP0079" }, suggestions),
+    false,
+  );
 });
 
 test("catalogCardMatchesLookupContext rejects a same-set number when the name differs", () => {

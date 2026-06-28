@@ -119,6 +119,15 @@ export function catalogCardMatchesLookupContext(
   return true;
 }
 
+export function shouldOfferTypedCardFallback(
+  request: CatalogCardLookupContext,
+  suggestions: CatalogCard[],
+): boolean {
+  const requestedName = request.name?.trim();
+  if (!requestedName) return false;
+  return !suggestions.some((card) => catalogCardMatchesLookupContext(card, request));
+}
+
 export function parseCardSearchQuery(query: string): ParsedCardSearchQuery {
   const trimmed = stripLookupNoise(query).trim().replace(/\s+/g, " ");
   if (!trimmed) return { name: "" };
