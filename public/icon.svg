@@ -19,13 +19,12 @@
     </filter>
   </defs>
   <rect width="512" height="512" rx="104" fill="url(#bg)"/>
-  <circle cx="256" cy="252" r="174" fill="#0b1220" filter="url(#shadow)"/>
-  <path d="M92 252a164 164 0 0 1 328 0H92Z" fill="url(#red)"/>
-  <path d="M92 260a164 164 0 0 0 328 0H92Z" fill="url(#white)"/>
-  <path d="M92 252h328" stroke="#111827" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="186" fill="#0b1220" filter="url(#shadow)"/>
+  <path d="M80 256a176 176 0 0 1 352 0H80Z" fill="url(#red)"/>
+  <path d="M80 264a176 176 0 0 0 352 0H80Z" fill="url(#white)"/>
+  <path d="M80 256h352" stroke="#111827" stroke-width="30" stroke-linecap="round"/>
   <circle cx="256" cy="256" r="66" fill="#111827"/>
   <circle cx="256" cy="256" r="43" fill="#f8fafc"/>
   <circle cx="256" cy="256" r="25" fill="#dbeafe"/>
-  <path d="M155 170c21-31 57-52 101-52 25 0 48 7 67 19" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" opacity=".28"/>
-  <text x="256" y="472" text-anchor="middle" font-family="Avenir Next, Arial, sans-serif" font-size="52" font-weight="800" letter-spacing="0" fill="#f8fafc">Poke Deal</text>
+  <path d="M148 170c23-34 61-56 108-56 27 0 51 7 72 20" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" opacity=".28"/>
 </svg>
