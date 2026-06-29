@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
+  buildGradeLadder,
   buildPokemonPriceTrackerSearch,
   buildPokemonPriceTrackerSearchVariants,
   gradeToProviderKey,
@@ -564,6 +565,45 @@ test("BGS_9_5 and CGC_10 map from current live aggregate keys", () => {
   assert.equal(bgs.medianPence, usdToPence(749.99));
   assert.equal(cgc.sampleSize, 69);
   assert.equal(cgc.medianPence, usdToPence(800));
+});
+
+test("buildGradeLadder projects every grade from one response into GBP pence", () => {
+  const ladder = buildGradeLadder(fixture);
+  const byGrade = Object.fromEntries(ladder.map((row) => [row.grade, row]));
+
+  // All five buckets in the single salesByGrade block surface as ladder rows.
+  assert.deepEqual(
+    ladder.map((row) => row.grade).sort(),
+    ["BGS_9_5", "CGC_10", "PSA_10", "PSA_9", "RAW"].sort(),
+  );
+
+  // RAW uses the filtered smart price (not the noisy ungraded median of 400).
+  assert.equal(byGrade.RAW!.medianPence, usdToPence(392.5));
+  assert.equal(byGrade.RAW!.sampleSize, 248);
+  // Graded rows use the per-grade median.
+  assert.equal(byGrade.PSA_10!.medianPence, usdToPence(1349));
+  assert.equal(byGrade.PSA_10!.sampleSize, 249);
+  assert.equal(byGrade.BGS_9_5!.medianPence, usdToPence(749.99));
+  assert.equal(byGrade.CGC_10!.medianPence, usdToPence(800));
+
+  // Every row carries a non-bare signal: a sample size and a source.
+  for (const row of ladder) {
+    assert.ok(row.sampleSize > 0);
+    assert.equal(row.source, "pokemon-price-tracker");
+    assert.ok(row.medianPence > 0);
+  }
+});
+
+test("mapCardAggregateToComp attaches the grade ladder to raw", () => {
+  const c = mapCardAggregateToComp(fixture, ctx("RAW"));
+  const ladder = (c.raw as { gradeLadder?: { grade: string }[] }).gradeLadder ?? [];
+  assert.ok(ladder.length >= 5);
+  assert.ok(ladder.some((row) => row.grade === "PSA_10"));
+});
+
+test("buildGradeLadder returns empty array when no eBay grades present", () => {
+  assert.deepEqual(buildGradeLadder({ data: [{ name: "X", ebay: {} }] }), []);
+  assert.deepEqual(buildGradeLadder(null), []);
 });
 
 test("missing grade returns empty result, not an error", () => {

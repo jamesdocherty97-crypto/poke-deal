@@ -111,12 +111,28 @@ function emptySourceComp(source: string, card: CardRef, query: CompQuery, reason
 
 /** Largest confident sample wins; fall back to largest sample of any. */
 export function pickHeadline(results: CompResult[]): CompResult {
+  // Nothing is a better comp than what you actually sold the exact card+grade
+  // for. When an owned-sales signal is present it anchors the headline ahead of
+  // every external source, regardless of their sample size. Cross-source
+  // disagreement is still computed from `all`, so a thin or divergent owned
+  // sale surfaces a "cross-check" verdict rather than being trusted blindly.
+  const owned = pickOwnedSalesHeadline(results);
+  if (owned) return owned;
+
   const rawHeadline = pickRawHeadline(results);
   if (rawHeadline) return rawHeadline;
 
   const confident = results.filter((r) => isConfident(r));
   const pool = confident.length > 0 ? confident : results;
   return pool.reduce((best, r) => (r.sampleSize > best.sampleSize ? r : best));
+}
+
+function pickOwnedSalesHeadline(results: CompResult[]): CompResult | null {
+  const owned = results.filter(
+    (r) => r.source === "owned-sales" && r.sampleSize > 0 && r.medianPence > 0,
+  );
+  if (owned.length === 0) return null;
+  return owned.reduce((best, r) => (r.sampleSize > best.sampleSize ? r : best));
 }
 
 function pickRawHeadline(results: CompResult[]): CompResult | null {

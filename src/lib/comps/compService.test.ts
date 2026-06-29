@@ -173,6 +173,53 @@ test("pickHeadline keeps confident graded comps on sample size", () => {
   assert.equal(pickHeadline([psaSmall, psaLarge]), psaLarge);
 });
 
+test("pickHeadline anchors on owned sales over a much larger external sample", () => {
+  const ownedSale = comp({
+    source: "owned-sales",
+    medianPence: 1800,
+    sampleSize: 2,
+    raw: { kind: "owned-sales" },
+  });
+  const bigExternal = comp({
+    source: "pokemon-price-tracker",
+    medianPence: 2500,
+    sampleSize: 200,
+    raw: { chosenPriceSource: "smartMarketPrice" },
+  });
+
+  assert.equal(pickHeadline([bigExternal, ownedSale]), ownedSale);
+});
+
+test("pickHeadline anchors on owned sales for graded cards too", () => {
+  const ownedGraded = comp({
+    source: "owned-sales",
+    grade: "PSA_10",
+    medianPence: 11000,
+    sampleSize: 1,
+    raw: { kind: "owned-sales" },
+  });
+  const externalGraded = comp({
+    source: "pokemon-price-tracker",
+    grade: "PSA_10",
+    medianPence: 13000,
+    sampleSize: 40,
+  });
+
+  assert.equal(pickHeadline([externalGraded, ownedGraded]), ownedGraded);
+});
+
+test("pickHeadline ignores an empty owned-sales signal", () => {
+  const emptyOwned = comp({ source: "owned-sales", medianPence: 0, sampleSize: 0 });
+  const external = comp({
+    source: "pokemon-price-tracker",
+    medianPence: 2500,
+    sampleSize: 30,
+    raw: { chosenPriceSource: "smartMarketPrice" },
+  });
+
+  assert.equal(pickHeadline([emptyOwned, external]), external);
+});
+
 test("CompService degrades a hanging source into a visible empty comp", async () => {
   const hangingSource: CompSource = {
     name: "slow-source",

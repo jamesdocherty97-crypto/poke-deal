@@ -11,7 +11,7 @@
 // Grade sales (incl. "ungraded" = RAW) live at: data[0].ebay.salesByGrade[<providerKey>]
 // in current live responses; the mapper also accepts the older object-shaped data fixture.
 
-import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
+import { GRADE_VALUES, type CardRef, type CompQuery, type CompResult, type Grade } from "../../domain/types.js";
 import { getSetById, resolveSetIdForCard } from "../../catalog/setCatalog.js";
 import { normalizeSearchText, tokenMatches, tokenizeSearchText } from "../../catalog/fuzzy.js";
 import type { CompSource } from "../CompSource.js";
@@ -371,8 +371,61 @@ export function mapCardAggregateToComp(
       ...agg,
       prices: card?.prices,
       chosenPriceSource: smartRawPrice ? "smartMarketPrice" : "medianPrice",
+      // Full grade ladder from this same single response — no extra credits.
+      gradeLadder: buildGradeLadder(json, rates),
     },
   };
+}
+
+export interface GradeLadderRow {
+  grade: Grade;
+  providerKey: string;
+  medianPence: number;
+  sampleSize: number;
+  source: string;
+}
+
+/**
+ * Project every grade present in a SINGLE PPT /cards (includeEbay) response into
+ * a price ladder: RAW + each PSA/BGS/CGC bucket the provider returned, each with
+ * its own median (GBP pence) and sample size. The whole salesByGrade block ships
+ * in one response, so this costs zero extra API credits — it just surfaces data
+ * the headline lookup already paid for and discarded. RAW uses the provider's
+ * filtered smartMarketPrice (the broad ungraded eBay bucket is noisy), mirroring
+ * mapCardAggregateToComp so the ladder's RAW row matches the RAW headline.
+ */
+export function buildGradeLadder(json: unknown, rates: FxRates = STATIC_RATES): GradeLadderRow[] {
+  const card = readProviderCard(json);
+  const byGrade = card?.ebay?.salesByGrade;
+  if (!byGrade || typeof byGrade !== "object") return [];
+
+  const rows: GradeLadderRow[] = [];
+  for (const grade of GRADE_VALUES) {
+    const providerKey = gradeToProviderKey(grade);
+    const agg = (byGrade as Record<string, unknown>)[providerKey] as
+      | { count?: number; medianPrice?: number; smartMarketPrice?: { price?: number } }
+      | undefined;
+    if (!agg) continue;
+
+    const count = Number(agg.count ?? 0);
+    if (!Number.isFinite(count) || count <= 0) continue;
+
+    const smartRaw =
+      grade === "RAW" && Number.isFinite(Number(agg.smartMarketPrice?.price))
+        ? Number(agg.smartMarketPrice?.price)
+        : null;
+    const usd = smartRaw && smartRaw > 0 ? smartRaw : Number(agg.medianPrice);
+    if (!Number.isFinite(usd) || usd <= 0) continue;
+
+    rows.push({
+      grade,
+      providerKey,
+      medianPence: toGbpPence(usd, "USD", rates),
+      sampleSize: Math.round(count),
+      source: "pokemon-price-tracker",
+    });
+  }
+  return rows;
 }
 
 function estimateTrendPct(

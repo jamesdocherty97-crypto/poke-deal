@@ -216,6 +216,7 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
     sourceLabel?: string;
     note?: string;
     signals?: PokeTraceSignalView[];
+    gradeLadder?: { grade: Grade; medianPence: number; sampleSize: number; source?: string }[];
   };
 };
 
@@ -1131,6 +1132,11 @@ export default function Home() {
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
   const pokeTraceSignals =
     comp?.all.find((result) => result.source === "poketrace" && result.raw?.signals?.length)?.raw?.signals ?? [];
+  // Full RAW→PSA→BGS→CGC ladder, pulled from the same Price Tracker response
+  // that produced the headline. Tapping a row still runs a normal comp lookup
+  // for that grade so source confidence and cross-checks stay honest.
+  const gradeLadder =
+    comp?.all.find((result) => (result.raw?.gradeLadder?.length ?? 0) > 0)?.raw?.gradeLadder ?? [];
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
   const compLimitations = useMemo(() => (compForReceipt ? buildCompLimitations(compForReceipt) : []), [compForReceipt]);
   const needsManualComp = Boolean(
@@ -2122,6 +2128,22 @@ export default function Home() {
     }
   }
 
+  // Tap a grade in the price ladder -> re-comp the same locked card at that grade.
+  // This keeps identity pinned by id while allowing the service to recompute
+  // confidence and source disagreement for the selected grade.
+  function lookupCompAtGrade(nextGrade: Grade) {
+    if (nextGrade === grade || busy === "lookup") return;
+    setGrade(nextGrade);
+    void lookupComp({
+      name,
+      setName: setNameValue,
+      number,
+      grade: nextGrade,
+      tcgApiId: catalogCard?.tcgApiId,
+      tcgDexId: catalogCard?.tcgDexId,
+    });
+  }
+
   async function verifyPsaCert() {
     const cert = graderCert.trim();
     if (!cert) {
@@ -2190,7 +2212,16 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          card: { name, setName: setNameValue, number },
+          card: {
+            name,
+            setName: setNameValue,
+            number,
+            // Lock to the confirmed catalog printing — the route resolves by
+            // tcgApiId first, so a numberless query (e.g. Umbreon VMAX vs the
+            // Moonbreon alt-art) can't drift to a same-name sibling at the
+            // moment we commit it to stock/watch.
+            ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
+          },
           grade,
           costBasisPence: poundsToPence(cost),
           quantity: intakeQuantity,
@@ -2288,7 +2319,16 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          card: { name, setName: setNameValue, number },
+          card: {
+            name,
+            setName: setNameValue,
+            number,
+            // Lock to the confirmed catalog printing — the route resolves by
+            // tcgApiId first, so a numberless query (e.g. Umbreon VMAX vs the
+            // Moonbreon alt-art) can't drift to a same-name sibling at the
+            // moment we commit it to stock/watch.
+            ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
+          },
           grade,
           quantity: intakeQuantity,
           costBasisPence,
@@ -2484,7 +2524,16 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          card: { name, setName: setNameValue, number },
+          card: {
+            name,
+            setName: setNameValue,
+            number,
+            // Lock to the confirmed catalog printing — the route resolves by
+            // tcgApiId first, so a numberless query (e.g. Umbreon VMAX vs the
+            // Moonbreon alt-art) can't drift to a same-name sibling at the
+            // moment we commit it to stock/watch.
+            ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
+          },
           grade,
           targetPence: poundsToPence(watchTarget),
         }),
@@ -5438,6 +5487,33 @@ export default function Home() {
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
               </div>
+              {gradeLadder.length > 1 && (
+                <div className="grade-ladder" aria-label="Price by grade from one lookup">
+                  <div className="receipt-heading">
+                    <span>Price by grade</span>
+                    <strong>same response · tap to comp</strong>
+                  </div>
+                  <div className="grade-ladder-rows">
+                    {gradeLadder.map((row) => {
+                      const isCurrent = row.grade === grade;
+                      return (
+                        <button
+                          type="button"
+                          key={row.grade}
+                          className={`grade-ladder-row${isCurrent ? " current" : ""}`}
+                          onClick={() => lookupCompAtGrade(row.grade)}
+                          disabled={isCurrent || busy === "lookup"}
+                          aria-current={isCurrent}
+                        >
+                          <span className="grade-ladder-grade">{row.grade.replace(/_/g, " ")}</span>
+                          <strong>{gbp(row.medianPence)}</strong>
+                          <span className="grade-ladder-sample">{row.sampleSize} sold</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {compReceipt.length > 0 && (
                 <div className="comp-receipt">
                   <div className="receipt-heading">
