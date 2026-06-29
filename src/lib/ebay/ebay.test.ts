@@ -4,6 +4,11 @@ import { buildAuthUrl, exchangeCodeForTokens, refreshAccessToken } from "./oauth
 import { buildInventoryItemPayload, upsertInventoryItem } from "./inventoryItem.js";
 import { buildOfferPayload } from "./offer.js";
 import { buildEbayOfferPreflight, toEbaySku } from "./preflight.js";
+import {
+  buildTradingFixedPriceItemXml,
+  buildTradingVerifyFixedPriceItemXml,
+  parseTradingApiResult,
+} from "./trading.js";
 import { getAccessToken, clearTokenCache } from "./tokens.js";
 import { fetchEbayPolicies } from "./policies.js";
 import { isEbayConfigured, EBAY_UK_CATEGORY_POKEMON } from "./config.js";
@@ -378,6 +383,84 @@ test("buildEbayOfferPreflight reports missing item photos", () => {
 
   assert.equal(preflight.hasImage, false);
   assert.equal(preflight.inventoryItem.product.imageUrls, undefined);
+});
+
+// ── Trading API fallback ─────────────────────────────────────────────────────
+
+test("buildTradingFixedPriceItemXml emits UK fixed-price card listing fields", () => {
+  const xml = buildTradingFixedPriceItemXml({
+    listingId: "pdos-listing-123",
+    packInput: rawInput,
+    quantity: 1,
+    imageUrls: ["https://img.example.com/umbreon-front.jpg"],
+    policies: MOCK_POLICIES,
+    location: "Glasgow",
+    postalCode: "G14 9QL",
+  });
+
+  assert.match(xml, /<AddFixedPriceItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">/);
+  assert.match(xml, /<CategoryID>183454<\/CategoryID>/);
+  assert.match(xml, /<Currency>GBP<\/Currency>/);
+  assert.match(xml, /<ListingType>FixedPriceItem<\/ListingType>/);
+  assert.match(xml, /<ConditionID>4000<\/ConditionID>/);
+  assert.match(xml, /<Name>40001<\/Name>\s*<Value>400010<\/Value>/);
+  assert.match(xml, /<PictureURL>https:\/\/img\.example\.com\/umbreon-front\.jpg<\/PictureURL>/);
+  assert.match(xml, /<PaymentProfileID>pay-001<\/PaymentProfileID>/);
+  assert.match(xml, /<ReturnProfileID>ret-001<\/ReturnProfileID>/);
+  assert.match(xml, /<ShippingProfileID>ship-001<\/ShippingProfileID>/);
+});
+
+test("buildTradingFixedPriceItemXml emits graded descriptors and cert additional info", () => {
+  const xml = buildTradingFixedPriceItemXml({
+    listingId: "pdos-slab-123",
+    packInput: slabInput,
+    quantity: 1,
+    imageUrls: ["https://img.example.com/zard-slab.jpg"],
+    policies: MOCK_POLICIES,
+  });
+
+  assert.match(xml, /<ConditionID>2750<\/ConditionID>/);
+  assert.match(xml, /<Name>27501<\/Name>\s*<Value>275010<\/Value>/);
+  assert.match(xml, /<Name>27502<\/Name>\s*<Value>275020<\/Value>/);
+  assert.match(xml, /<Name>27503<\/Name>\s*<AdditionalInfo>84213567<\/AdditionalInfo>/);
+});
+
+test("buildTradingVerifyFixedPriceItemXml swaps the Trading API request wrapper", () => {
+  const xml = buildTradingVerifyFixedPriceItemXml({
+    listingId: "pdos-listing-123",
+    packInput: rawInput,
+    quantity: 1,
+    imageUrls: ["https://img.example.com/umbreon-front.jpg"],
+    policies: MOCK_POLICIES,
+  });
+
+  assert.match(xml, /<VerifyAddFixedPriceItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">/);
+  assert.doesNotMatch(xml, /<AddFixedPriceItemRequest xmlns=/);
+  assert.match(xml, /<\/VerifyAddFixedPriceItemRequest>/);
+});
+
+test("parseTradingApiResult captures ack item id and errors", () => {
+  const result = parseTradingApiResult(`
+    <AddFixedPriceItemResponse>
+      <Ack>Warning</Ack>
+      <ItemID>1234567890</ItemID>
+      <Errors>
+        <ShortMessage>Funds on hold.</ShortMessage>
+        <LongMessage>Funds from your sales may be unavailable.</LongMessage>
+        <ErrorCode>21917236</ErrorCode>
+        <SeverityCode>Warning</SeverityCode>
+      </Errors>
+    </AddFixedPriceItemResponse>
+  `);
+
+  assert.equal(result.ack, "Warning");
+  assert.equal(result.itemId, "1234567890");
+  assert.deepEqual(result.errors[0], {
+    severity: "Warning",
+    code: "21917236",
+    shortMessage: "Funds on hold.",
+    longMessage: "Funds from your sales may be unavailable.",
+  });
 });
 
 // ── merchant location setup ───────────────────────────────────────────────────
