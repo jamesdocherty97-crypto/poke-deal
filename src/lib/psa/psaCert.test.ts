@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PsaCertLookup, mapPsaCertResponse } from "./psaCert.js";
-import { buildPsaLookupFields, inferPsaSetName } from "./lookupFields.js";
+import {
+  buildPsaCompSearchParams,
+  buildPsaLookupFields,
+  inferPsaSetName,
+  isPsaPokemonTcgCert,
+} from "./lookupFields.js";
 import { psaGradeLabelToGrade } from "./types.js";
 
 const fixture = JSON.parse(
@@ -43,6 +48,49 @@ test("buildPsaLookupFields turns a PSA cert into comp-ready lookup fields", () =
     number: "215",
     grade: "PSA_10",
   });
+});
+
+test("isPsaPokemonTcgCert only allows Pokemon TCG certs to drive comps", () => {
+  const r = mapPsaCertResponse(fixture, "79721014", true);
+  assert.equal(isPsaPokemonTcgCert(r), true);
+  assert.equal(
+    isPsaPokemonTcgCert({
+      ...r,
+      subject: "JUNIOR CAMINERO",
+      brand: "2024 BOWMAN CHROME PROSPECT AUTOGRAPHS",
+      category: "BASEBALL CARDS",
+    }),
+    false,
+  );
+});
+
+test("buildPsaCompSearchParams lets a PSA cert drive a comp lookup", () => {
+  const r = mapPsaCertResponse(fixture, "79721014", true);
+  const params = buildPsaCompSearchParams(new URLSearchParams({ psaCert: "79721014" }), r);
+
+  assert.equal(params.get("name"), "Umbreon VMAX");
+  assert.equal(params.get("set"), "Evolving Skies");
+  assert.equal(params.get("number"), "215");
+  assert.equal(params.get("grade"), "PSA_10");
+});
+
+test("buildPsaCompSearchParams preserves typed identity but lets PSA own the grade", () => {
+  const r = mapPsaCertResponse(fixture, "79721014", true);
+  const params = buildPsaCompSearchParams(
+    new URLSearchParams({
+      name: "Umbreon VMAX Alt Art",
+      setName: "Evolving Skies",
+      number: "215/203",
+      grade: "RAW",
+      psaCert: "79721014",
+    }),
+    r,
+  );
+
+  assert.equal(params.get("name"), "Umbreon VMAX Alt Art");
+  assert.equal(params.get("setName"), "Evolving Skies");
+  assert.equal(params.get("number"), "215/203");
+  assert.equal(params.get("grade"), "PSA_10");
 });
 
 test("inferPsaSetName prefers the actual set over the series name", () => {

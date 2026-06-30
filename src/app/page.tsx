@@ -86,7 +86,7 @@ import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } fr
 import { buildSalePreview } from "@/lib/dealer/unitSale";
 import { buildSalePrompt, type SalePrompt } from "@/lib/dealer/salePrompt";
 import { checkEbayReadiness } from "@/lib/ebay/readiness";
-import { buildPsaLookupFields } from "@/lib/psa/lookupFields";
+import { buildPsaLookupFields, isPsaPokemonTcgCert } from "@/lib/psa/lookupFields";
 import {
   acceptedOfferItemSubtotalPence,
   buyerPaidPostagePence,
@@ -113,6 +113,7 @@ type PsaCertView = {
   certNumber: string;
   subject?: string;
   brand?: string;
+  category?: string;
   year?: string;
   cardNumber?: string;
   variety?: string;
@@ -120,6 +121,7 @@ type PsaCertView = {
   grade: Grade | null;
   totalPopulation?: number;
   populationHigher?: number;
+  isDualCert?: boolean;
   live: boolean;
   reason?: string;
 };
@@ -127,6 +129,7 @@ type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type AcquireListingState = "DRAFT" | "ACTIVE";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
+type InventoryFilter = "all" | "needs-listing" | "listed" | "needs-photos" | "held" | "sold";
 type ExpenseCategory = "SUPPLIES" | "POSTAGE" | "GRADING" | "TABLE_FEE" | "TRAVEL" | "PLATFORM" | "OTHER";
 type BuyFlowState = "done" | "current" | "wait" | "warn";
 type BuyFlowStep = {
@@ -141,6 +144,7 @@ type LookupInput = {
   grade: Grade;
   tcgApiId?: string;
   tcgDexId?: string;
+  psaCert?: string;
 };
 
 type LastStockedCard = {
@@ -227,6 +231,7 @@ type Reconciled = {
   ambiguous?: boolean;
   catalog?: CatalogCard | null;
   alternatives?: CatalogCard[];
+  psaCert?: PsaCertView | null;
 };
 type Suggestion = {
   pricePence: number;
@@ -510,6 +515,14 @@ const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCG
 const checkedCompSampleOptions = ["1", "2", "3", "5"];
 const expenseCategories: ExpenseCategory[] = ["SUPPLIES", "POSTAGE", "GRADING", "TABLE_FEE", "TRAVEL", "PLATFORM", "OTHER"];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
+const inventoryFilters: Array<{ value: InventoryFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "needs-listing", label: "Needs listing" },
+  { value: "listed", label: "Listed" },
+  { value: "needs-photos", label: "Needs photos" },
+  { value: "held", label: "Held" },
+  { value: "sold", label: "Sold" },
+];
 const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
 const RECENT_SETS_STORAGE_KEY = "pokemon-dealer-os.recent-sets.v1";
 const RECENT_COMPS_STORAGE_KEY = "pokemon-dealer-os.recent-comps.v1";
@@ -661,6 +674,7 @@ export default function Home() {
   const [cardSuggestionsOpen, setCardSuggestionsOpen] = useState(false);
   const [cardSuggestionsLoading, setCardSuggestionsLoading] = useState(false);
   const [inventoryQuery, setInventoryQuery] = useState("");
+  const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("all");
   const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
   const [listingQuery, setListingQuery] = useState("");
   const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("ALL");
@@ -859,13 +873,23 @@ export default function Home() {
     () => inventory.filter((item) => item.status === "SOLD"),
     [inventory],
   );
-  const visibleActiveInventory = useMemo(
-    () => buildInventoryView(activeInventory, { query: inventoryQuery, sort: inventorySort }),
-    [activeInventory, inventoryQuery, inventorySort],
+  const inventoryFilterCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        inventoryFilters.map(({ value }) => [
+          value,
+          inventory.filter((item) => inventoryItemMatchesFilter(item, value)).length,
+        ]),
+      ) as Record<InventoryFilter, number>,
+    [inventory],
   );
-  const visibleSoldInventory = useMemo(
-    () => buildInventoryView(soldInventory, { query: inventoryQuery, sort: inventorySort }),
-    [soldInventory, inventoryQuery, inventorySort],
+  const filteredInventory = useMemo(
+    () => inventory.filter((item) => inventoryItemMatchesFilter(item, inventoryFilter)),
+    [inventory, inventoryFilter],
+  );
+  const visibleInventory = useMemo(
+    () => buildInventoryView(filteredInventory, { query: inventoryQuery, sort: inventorySort }),
+    [filteredInventory, inventoryQuery, inventorySort],
   );
   const stockCompItem = useMemo(
     () => inventory.find((item) => item.id === stockCompItemId && item.status !== "SOLD") ?? null,
@@ -1137,6 +1161,7 @@ export default function Home() {
   // for that grade so source confidence and cross-checks stay honest.
   const gradeLadder =
     comp?.all.find((result) => (result.raw?.gradeLadder?.length ?? 0) > 0)?.raw?.gradeLadder ?? [];
+  const compPsaContext = comp?.psaCert ?? psaResult;
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
   const compLimitations = useMemo(() => (compForReceipt ? buildCompLimitations(compForReceipt) : []), [compForReceipt]);
   const needsManualComp = Boolean(
@@ -2086,6 +2111,7 @@ export default function Home() {
       grade: input.grade,
       ...(input.tcgApiId ? { tcgApiId: input.tcgApiId } : {}),
       ...(input.tcgDexId ? { tcgDexId: input.tcgDexId } : {}),
+      ...(input.psaCert ? { psaCert: input.psaCert } : {}),
     };
   }
 
@@ -2112,10 +2138,12 @@ export default function Home() {
       if (normalizedInput.number?.trim()) qs.set("number", normalizedInput.number.trim());
       if (normalizedInput.tcgApiId) qs.set("tcgApiId", normalizedInput.tcgApiId);
       if (normalizedInput.tcgDexId) qs.set("tcgDexId", normalizedInput.tcgDexId);
+      if (normalizedInput.psaCert) qs.set("psaCert", normalizedInput.psaCert);
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "lookup failed");
       setComp(payload);
+      if (payload.psaCert) setPsaResult(payload.psaCert);
       setCardArtUrl(payload.catalog?.imageUrl ?? null);
       pinRecentSetName(payload.catalog?.setName ?? normalizedInput.setName);
       rememberRecentComp(payload, normalizedInput);
@@ -2144,7 +2172,7 @@ export default function Home() {
     });
   }
 
-  async function verifyPsaCert() {
+  async function verifyPsaCert(options: { lookupAfter?: boolean } = {}) {
     const cert = graderCert.trim();
     if (!cert) {
       setError("Enter a PSA cert number first.");
@@ -2165,9 +2193,18 @@ export default function Home() {
         setNotice(result.reason ?? "No PSA cert data found.");
         return;
       }
+      if (!isPsaPokemonTcgCert(result)) {
+        setNotice("PSA cert verified, but it is not a Pokémon TCG card so it cannot feed comps here.");
+        return;
+      }
       // Auto-fill the buy form from the verified slab so a comp can follow.
       clearCompEvidence();
+      setGraderCert(result.certNumber);
       const lookupFields = buildPsaLookupFields(result);
+      const nextName = lookupFields.name ?? name;
+      const nextSetName = lookupFields.setName ?? setNameValue;
+      const nextNumber = lookupFields.number ?? number;
+      const nextGrade = lookupFields.grade ?? grade;
       if (lookupFields.name) setName(lookupFields.name);
       if (lookupFields.setName) {
         setSetNameValue(lookupFields.setName);
@@ -2175,6 +2212,21 @@ export default function Home() {
       }
       if (lookupFields.number) setNumber(lookupFields.number);
       if (lookupFields.grade) setGrade(lookupFields.grade);
+      if (options.lookupAfter) {
+        if (!nextName.trim()) {
+          setError("PSA verified, but it did not include a card name to comp.");
+          return;
+        }
+        setNotice(`Verified PSA ${result.gradeLabel ?? ""}. Looking up comp...`);
+        await lookupComp({
+          name: nextName,
+          setName: nextSetName,
+          number: nextNumber,
+          grade: nextGrade,
+          psaCert: result.certNumber,
+        });
+        return;
+      }
       setNotice(
         `Verified PSA ${result.gradeLabel ?? ""} ${toTitleCase(result.subject ?? "card")}${
           result.live ? "" : " (demo cert — add PSA_API_TOKEN for live)"
@@ -2185,6 +2237,17 @@ export default function Home() {
     } finally {
       setBusy(null);
     }
+  }
+
+  function lookupCompFromPsaResult(result: PsaCertView) {
+    const fields = buildPsaLookupFields(result);
+    void lookupComp({
+      name: fields.name ?? name,
+      setName: fields.setName ?? setNameValue,
+      number: fields.number ?? number,
+      grade: fields.grade ?? grade,
+      psaCert: result.certNumber,
+    });
   }
 
   async function acquire(event?: FormEvent) {
@@ -5111,26 +5174,47 @@ export default function Home() {
                   ))}
                 </select>
               </label>
-              <label className="psa-lookup-field">
-                PSA cert
-                <div className="quick-intake-row">
+              <label className={`psa-lookup-field ${isPsaGrade(grade) ? "active" : ""}`}>
+                <span className="psa-lookup-heading">
+                  <span>{isPsaGrade(grade) ? "PSA slab check" : "PSA cert"}</span>
+                  {isPsaGrade(grade) && <strong>PSA API + comps</strong>}
+                </span>
+                {isPsaGrade(grade) && (
+                  <small className="psa-lookup-hint">
+                    Enter the cert to pull PSA subject, grade, set, card number and population, then run the usual market comps from that verified slab identity.
+                  </small>
+                )}
+                <div className={`quick-intake-row psa-cert-row ${isPsaGrade(grade) ? "active" : ""}`}>
                   <input
                     inputMode="numeric"
                     value={graderCert}
                     onChange={(event) => setGraderCert(event.target.value)}
-                    placeholder={grade === "RAW" ? "optional for slabs" : "cert number"}
+                    placeholder={isPsaGrade(grade) ? "PSA cert number" : grade === "RAW" ? "optional for slabs" : "cert number"}
                   />
                   <button
                     type="button"
-                    onClick={verifyPsaCert}
+                    onClick={() => void verifyPsaCert()}
                     disabled={busy === "psa" || !graderCert.trim()}
                   >
                     {busy === "psa" ? "..." : "Verify"}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void verifyPsaCert({ lookupAfter: true })}
+                    disabled={busy === "psa" || busy === "lookup" || !graderCert.trim()}
+                  >
+                    {busy === "lookup" ? "Comping..." : isPsaGrade(grade) ? "Verify + comp" : "Comp"}
+                  </button>
                 </div>
               </label>
             </div>
-            {psaResult && <PsaCertCard result={psaResult} />}
+            {psaResult && !comp?.psaCert && (
+              <PsaCertCard
+                result={psaResult}
+                onComp={psaResult.found && isPsaPokemonTcgCert(psaResult) ? () => lookupCompFromPsaResult(psaResult) : undefined}
+                busy={busy === "lookup"}
+              />
+            )}
             {recentSets.length > 0 && (
               <div className="set-chip-stack" aria-label="Recent sets">
                 <span>Recent sets</span>
@@ -5333,6 +5417,31 @@ export default function Home() {
                   />
                 )}
               </div>
+              {compPsaContext && (
+                <PsaCertCard
+                  result={compPsaContext}
+                  onComp={compPsaContext.found && isPsaPokemonTcgCert(compPsaContext) ? () => lookupCompFromPsaResult(compPsaContext) : undefined}
+                  busy={busy === "lookup"}
+                />
+              )}
+              {!compPsaContext && isPsaGrade(grade) && (
+                <div className="psa-cert-card warn">
+                  <div className="psa-cert-heading">
+                    <div>
+                      <span>PSA data missing</span>
+                      <strong>Add the cert for slab verification</strong>
+                      <small>Market comps are showing below, but PSA subject, card number, grade label and population need the cert lookup.</small>
+                    </div>
+                    <span className="pill warn">{grade.replace(/_/g, " ")}</span>
+                  </div>
+                  <div className="psa-cert-actions">
+                    <p className="hint">Enter the PSA cert in the slab check above, then tap Verify + comp.</p>
+                    <button type="button" onClick={() => document.querySelector<HTMLInputElement>(".psa-lookup-field input")?.focus()}>
+                      Enter cert
+                    </button>
+                  </div>
+                </div>
+              )}
               {!needsManualComp && !stockCompItem && renderQuickStockCard()}
               {needsManualComp && (
                 <div className="manual-rescue-card">
@@ -6159,8 +6268,22 @@ export default function Home() {
       {view === "inventory" && (
         <section className="workspace inventory-workspace">
           <div className="section-heading">
-            <h2>Active stock</h2>
-            <span>{rowCountLabel(visibleActiveInventory.length, activeInventory.length)}</span>
+            <h2>Inventory</h2>
+            <span>{rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
+          </div>
+          <div className="inventory-filter-tabs" role="tablist" aria-label="Inventory filters">
+            {inventoryFilters.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                className={inventoryFilter === filter.value ? "selected" : ""}
+                onClick={() => setInventoryFilter(filter.value)}
+                aria-selected={inventoryFilter === filter.value}
+              >
+                <span>{filter.label}</span>
+                <strong>{inventoryFilterCounts[filter.value]}</strong>
+              </button>
+            ))}
           </div>
           <div className="dex-controls" aria-label="Inventory search and sort">
             <label className="search-control">
@@ -6183,7 +6306,7 @@ export default function Home() {
               </select>
             </label>
           </div>
-          {visibleActiveInventory.map((item) => (
+          {visibleInventory.map((item) => (
             <InventoryRow
               key={item.id}
               item={item}
@@ -6198,10 +6321,12 @@ export default function Home() {
               onPhotos={addPhotosToInventory}
             />
           ))}
-          {activeInventory.length === 0 ? (
+          {inventoryFilter === "all" && activeInventory.length === 0 ? (
             <EmptyState text="No active stock. Add your next buy from Buy." />
-          ) : visibleActiveInventory.length === 0 ? (
-            <EmptyState text="No matching active stock. Clear the search or change the sort." />
+          ) : filteredInventory.length === 0 ? (
+            <EmptyState text={emptyInventoryFilterText(inventoryFilter)} />
+          ) : visibleInventory.length === 0 ? (
+            <EmptyState text="No matching stock. Clear the search or change the sort." />
           ) : null}
 
           {editingItemId && (
@@ -6320,30 +6445,6 @@ export default function Home() {
             </form>
           )}
 
-          {soldInventory.length > 0 && (
-            <>
-              <div className="section-heading">
-                <h2>Sold</h2>
-                <span>{rowCountLabel(visibleSoldInventory.length, soldInventory.length)}</span>
-              </div>
-              {visibleSoldInventory.slice(0, 8).map((item) => (
-                <InventoryRow
-                  key={item.id}
-                  item={item}
-                  busy={busy}
-                  onEdit={openInventoryEditor}
-                  onSell={openSell}
-                  onComp={compInventoryItem}
-                  onList={listInventoryItem}
-                  onPack={openRecentListingWork}
-                  onStatus={updateStatus}
-                  onDelete={requestDeleteItem}
-                  onPhotos={addPhotosToInventory}
-                />
-              ))}
-              {visibleSoldInventory.length === 0 && <EmptyState text="No matching sold rows." />}
-            </>
-          )}
         </section>
       )}
 
@@ -7427,7 +7528,30 @@ function BuyFlowRail({ steps }: { steps: BuyFlowStep[] }) {
   );
 }
 
-function PsaCertCard({ result }: { result: PsaCertView }) {
+function PsaCertCard({
+  result,
+  onComp,
+  busy = false,
+}: {
+  result: PsaCertView;
+  onComp?: () => void;
+  busy?: boolean;
+}) {
+  const canFeedPokemonComps = result.found && isPsaPokemonTcgCert(result);
+  const detailRows = result.found
+    ? [
+        ["Subject", result.subject ? toTitleCase(result.subject) : null],
+        ["Brand", result.brand ? toTitleCase(result.brand) : null],
+        ["Category", result.category ? toTitleCase(result.category) : null],
+        ["Year", result.year ?? null],
+        ["Card #", result.cardNumber ?? null],
+        ["Variety", result.variety ? toTitleCase(result.variety) : null],
+        ["PSA grade", result.gradeLabel ?? null],
+        ["App grade", result.grade?.replace(/_/g, " ") ?? null],
+        ["Dual cert", result.isDualCert ? "Yes" : null],
+        ["Lookup", result.live ? "Live PSA API" : "Demo fixture"],
+      ].filter((row): row is [string, string] => Boolean(row[1]))
+    : [];
   return (
     <div className={`psa-cert-card ${result.found ? "good" : "warn"}`}>
       {result.found ? (
@@ -7449,7 +7573,28 @@ function PsaCertCard({ result }: { result: PsaCertView }) {
             <Metric label="Pop at grade" value={result.totalPopulation != null ? String(result.totalPopulation) : "-"} />
             <Metric label="Pop higher" value={result.populationHigher != null ? String(result.populationHigher) : "-"} />
           </div>
-          <p className="hint">Verified slab details are filling the buy form.</p>
+          {detailRows.length > 0 && (
+            <div className="psa-cert-data" aria-label="PSA cert data">
+              {detailRows.map(([label, value]) => (
+                <div key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="psa-cert-actions">
+            <p className="hint">
+              {canFeedPokemonComps
+                ? "Verified slab details can feed the comp lookup and listing cert."
+                : "Verified cert, but this app only comps Pokémon TCG cards."}
+            </p>
+            {onComp && (
+              <button type="button" onClick={onComp} disabled={busy}>
+                {busy ? "Comping..." : "Comp from cert"}
+              </button>
+            )}
+          </div>
         </>
       ) : (
         <p className="hint">{result.reason ?? "Cert not found."}</p>
@@ -7919,11 +8064,13 @@ function InventoryRow({
   onDelete: (item: InventoryItem) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
 }) {
-  const listing = item.listings[0];
   const draftListing = item.listings.find((row) => row.state === "DRAFT");
   const activeListing = item.listings.find((row) => row.state === "ACTIVE");
+  const otherOpenListing = item.listings.find((row) => row.state !== "SOLD" && row.state !== "ENDED");
+  const listing = draftListing ?? activeListing ?? otherOpenListing ?? (item.status === "SOLD" ? item.listings[0] : undefined);
   const sale = item.sales[0];
   const listingStateLabel = listing ? listing.state.charAt(0) + listing.state.slice(1).toLowerCase() : "";
+  const listPrice = listing?.listPrice ?? listing?.suggestedPrice ?? null;
   const soldNote =
     item.sales.length === 0
       ? ""
@@ -7939,6 +8086,40 @@ function InventoryRow({
   const swipeDelta = useRef({ x: 0, y: 0 });
   const canSell = item.status !== "SOLD";
   const photoCount = item.photos?.length ?? 0;
+  const needsPhotos = item.status !== "SOLD" && photoCount === 0;
+  const needsListing = item.status !== "SOLD" && !draftListing && !activeListing;
+  const stockCost =
+    item.quantity > 1
+      ? `${gbp(item.costBasis)} each · ${gbp(item.costBasis * item.quantity)} total`
+      : gbp(item.costBasis);
+  const listingSummary = listing
+    ? `${listingStateLabel} ${channelLabel(listing.channel)}${listPrice ? ` · ${gbp(listPrice)}` : ""}`
+    : "No listing";
+  const primaryAction = item.status === "SOLD"
+    ? null
+    : draftListing
+      ? {
+          label: "Open listing pack",
+          detail: `${channelLabel(draftListing.channel)} draft ready`,
+          tone: "",
+          onClick: () => onPack(item),
+          disabled: false,
+        }
+      : activeListing
+        ? {
+            label: "Record sale",
+            detail: `${channelLabel(activeListing.channel)} active${listPrice ? ` at ${gbp(listPrice)}` : ""}`,
+            tone: "good",
+            onClick: () => onSell(item),
+            disabled: busy?.startsWith("sell-") ?? false,
+          }
+        : {
+            label: "Draft listing",
+            detail: "Not listed yet",
+            tone: "",
+            onClick: () => onList(item),
+            disabled: Boolean(busy === `status-${item.id}` || busy?.startsWith("listing-") || busy?.startsWith("create-listing-")),
+          };
 
   function startSwipe(event: TouchEvent<HTMLElement>) {
     if (isInteractiveTarget(event.target)) return;
@@ -8000,94 +8181,84 @@ function InventoryRow({
               <span className={`pill ${statusTone(item.status)}`}>{item.status.replace(/_/g, " ")}</span>
             </span>
           </div>
-          <p>
-            {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
-          </p>
-          {stockNotes && <p>{stockNotes}</p>}
-          <p>
-            {listing ? `${listingStateLabel} ${channelLabel(listing.channel)} at ${gbp(listing.listPrice ?? listing.suggestedPrice ?? 0)}` : "No listing"}
-            {soldNote}
-          </p>
-          {photoCount > 0 && <p>{photoCount} real photo{photoCount === 1 ? "" : "s"} ready for eBay</p>}
-          {item.status !== "SOLD" && (
+          <div className="inventory-row-meta">
+            <span>{item.card.setName} {item.card.number ?? "no number"}</span>
+            <span>qty {item.quantity}</span>
+            <span>cost {stockCost}</span>
+            <span>{ageLabel(item.createdAt)}</span>
+          </div>
+          <div className="inventory-row-money">
+            <span>{listingSummary}{soldNote}</span>
+            {stockNotes && <span>{stockNotes}</span>}
+          </div>
+          {(needsListing || needsPhotos || photoCount > 0) && (
+            <div className="inventory-row-flags" aria-label="Stock tasks">
+              {needsListing && <span>Needs listing</span>}
+              {needsPhotos && <span>Needs photos</span>}
+              {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
+            </div>
+          )}
+          {primaryAction && (
             <div className="next-action-strip">
-              {draftListing ? (
-                <button className="next-action-button" type="button" onClick={() => onPack(item)}>
-                  Open listing pack
+              <button className={`next-action-button ${primaryAction.tone}`} type="button" onClick={primaryAction.onClick} disabled={primaryAction.disabled}>
+                {primaryAction.label}
+              </button>
+              <span>{primaryAction.detail}</span>
+            </div>
+          )}
+          <details className="row-more-actions">
+            <summary>More</summary>
+            <div className="row-actions">
+              {item.status !== "SOLD" && (
+                <label className={`row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
+                  {busy === `photo-${item.id}` ? "Uploading..." : photoCount > 0 ? "Add photos" : "Photos"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    disabled={busy === `photo-${item.id}`}
+                    onChange={(event) => {
+                      const files = event.currentTarget.files;
+                      if (files) onPhotos(item, files);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              )}
+              {item.status !== "SOLD" && (
+                <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
+                  Comp
                 </button>
-              ) : activeListing ? (
-                <button className="next-action-button good" type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
-                  Record sale
+              )}
+              {item.status !== "SOLD" && (
+                <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
+                  Edit
                 </button>
-              ) : (
+              )}
+              {item.status !== "SOLD" && (
+                <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
+                  Sell
+                </button>
+              )}
+              {item.status === "IN_STOCK" && (
                 <button
-                  className="next-action-button"
                   type="button"
                   onClick={() => onList(item)}
                   disabled={busy === `status-${item.id}` || busy?.startsWith("listing-") || busy?.startsWith("create-listing-")}
                 >
-                  Draft listing
+                  {listing ? "Activate" : "Draft"}
                 </button>
               )}
-              <span>
-                {draftListing
-                  ? `${channelLabel(draftListing.channel)} draft ready`
-                  : activeListing
-                    ? `${channelLabel(activeListing.channel)} active at ${gbp(activeListing.listPrice ?? activeListing.suggestedPrice ?? 0)}`
-                    : "Not listed yet"}
-              </span>
+              {item.status !== "RESERVED" && item.status !== "SOLD" && (
+                <button type="button" onClick={() => onStatus(item, "RESERVED")} disabled={busy === `status-${item.id}`}>
+                  Hold
+                </button>
+              )}
+              <button className="danger-button" type="button" onClick={() => onDelete(item)} disabled={busy === `delete-${item.id}`}>
+                Delete
+              </button>
             </div>
-          )}
-          <div className="row-actions">
-            {item.status !== "SOLD" && (
-              <label className={`row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
-                {busy === `photo-${item.id}` ? "Uploading..." : photoCount > 0 ? "Add photos" : "Photos"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  disabled={busy === `photo-${item.id}`}
-                  onChange={(event) => {
-                    const files = event.currentTarget.files;
-                    if (files) onPhotos(item, files);
-                    event.currentTarget.value = "";
-                  }}
-                />
-              </label>
-            )}
-            {item.status !== "SOLD" && (
-              <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
-                Comp
-              </button>
-            )}
-            {item.status !== "SOLD" && (
-              <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
-                Edit
-              </button>
-            )}
-            {item.status !== "SOLD" && (
-              <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
-                Sell
-              </button>
-            )}
-            {item.status === "IN_STOCK" && (
-              <button
-                type="button"
-                onClick={() => onList(item)}
-                disabled={busy === `status-${item.id}` || busy?.startsWith("listing-") || busy?.startsWith("create-listing-")}
-              >
-                {listing ? "Activate" : "Draft"}
-              </button>
-            )}
-            {item.status !== "RESERVED" && item.status !== "SOLD" && (
-              <button type="button" onClick={() => onStatus(item, "RESERVED")} disabled={busy === `status-${item.id}`}>
-                Hold
-              </button>
-            )}
-            <button className="danger-button" type="button" onClick={() => onDelete(item)} disabled={busy === `delete-${item.id}`}>
-              Delete
-            </button>
-          </div>
+          </details>
         </div>
       </div>
     </article>
@@ -8757,7 +8928,7 @@ function Toast({
 }
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && target.closest("button, input, select, textarea, a") != null;
+  return target instanceof HTMLElement && target.closest("button, input, select, textarea, a, summary, details, label") != null;
 }
 
 function Metric({
@@ -8869,6 +9040,10 @@ function GradeBadge({ grade }: { grade: string }) {
   return <span className={`grade-badge ${gradeTone(grade)}`}>{grade.replace(/_/g, " ")}</span>;
 }
 
+function isPsaGrade(grade: string | null | undefined): boolean {
+  return Boolean(grade?.startsWith("PSA_"));
+}
+
 function rowCountLabel(visible: number, total: number): string {
   return visible === total ? `${total} row${total === 1 ? "" : "s"}` : `${visible}/${total} rows`;
 }
@@ -8937,6 +9112,30 @@ function saleListPrice(item: InventoryItem): number | null {
     item.listings.find((row) => row.state === "DRAFT") ??
     item.listings[0];
   return listing?.listPrice ?? listing?.suggestedPrice ?? null;
+}
+
+function hasOpenListing(item: InventoryItem): boolean {
+  return item.listings.some((listing) => listing.state === "DRAFT" || listing.state === "ACTIVE");
+}
+
+function inventoryItemMatchesFilter(item: InventoryItem, filter: InventoryFilter): boolean {
+  if (filter === "sold") return item.status === "SOLD";
+  if (item.status === "SOLD") return false;
+  if (filter === "all") return true;
+  if (filter === "needs-listing") return !hasOpenListing(item);
+  if (filter === "listed") return hasOpenListing(item) || item.status === "LISTED";
+  if (filter === "needs-photos") return (item.photos?.length ?? 0) === 0;
+  if (filter === "held") return item.status === "RESERVED";
+  return true;
+}
+
+function emptyInventoryFilterText(filter: InventoryFilter): string {
+  if (filter === "needs-listing") return "Everything has a draft or active listing.";
+  if (filter === "listed") return "No listed stock yet.";
+  if (filter === "needs-photos") return "Every active stock row has photos.";
+  if (filter === "held") return "No stock is on hold.";
+  if (filter === "sold") return "No sold stock yet.";
+  return "No stock in this view.";
 }
 
 function gradeTone(grade: string): string {

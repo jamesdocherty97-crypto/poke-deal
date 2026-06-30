@@ -92,6 +92,27 @@ test("normalizeCatalogCardSearchInput splits dealer shorthand into card, set and
     number: "232/091",
   });
 
+  assert.deepEqual(normalizeCatalogCardSearchInput("Magikarp 203/193 Paldea Evolved PSA 10"), {
+    query: "Magikarp 203/193",
+    name: "Magikarp",
+    setName: "Paldea Evolved",
+    number: "203/193",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Mewtwo VSTAR GG44/GG70 Crown Zenith PSA 10"), {
+    query: "Mewtwo VSTAR GG44/GG70",
+    name: "Mewtwo VSTAR",
+    setName: "Crown Zenith Galarian Gallery",
+    number: "GG44/GG70",
+  });
+
+  assert.deepEqual(normalizeCatalogCardSearchInput("Aerodactyl V 180/196 Lost Origin PSA 10"), {
+    query: "Aerodactyl V 180/196",
+    name: "Aerodactyl V",
+    setName: "Lost Origin",
+    number: "180/196",
+  });
+
   assert.deepEqual(parseCardSearchQuery("Mew ex 232/091"), {
     name: "Mew ex",
     number: "232/091",

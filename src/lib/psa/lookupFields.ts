@@ -20,6 +20,33 @@ export function buildPsaLookupFields(result: PsaCertResult): PsaLookupFields {
   };
 }
 
+export function isPsaPokemonTcgCert(result: PsaCertResult): boolean {
+  if (!result.found) return false;
+  const brand = normalizeSearchText(result.brand ?? "");
+  const category = normalizeSearchText(result.category ?? "");
+  return brand.includes("pokemon") && (category.includes("tcg") || category.includes("card"));
+}
+
+export function buildPsaCompSearchParams(searchParams: URLSearchParams, result: PsaCertResult): URLSearchParams {
+  const next = new URLSearchParams(searchParams);
+  const fields = buildPsaLookupFields(result);
+
+  if (fields.name && !hasAny(next, "q", "query", "search", "name", "cardName", "card")) {
+    next.set("name", fields.name);
+  }
+  if (fields.setName && !hasAny(next, "set", "setName")) {
+    next.set("set", fields.setName);
+  }
+  if (fields.number && !hasAny(next, "number", "collectorNumber", "cardNumber")) {
+    next.set("number", fields.number);
+  }
+  if (fields.grade) {
+    next.set("grade", fields.grade);
+  }
+
+  return next;
+}
+
 export function inferPsaSetName(brand: string | undefined): string | undefined {
   const normalizedBrand = normalizeSearchText(brand ?? "");
   if (!normalizedBrand) return undefined;
@@ -68,6 +95,13 @@ function promoSetName(normalizedBrand: string): string | undefined {
 
 function hasPhrase(normalizedText: string, phrase: string): boolean {
   return ` ${normalizedText} `.includes(` ${phrase} `);
+}
+
+function hasAny(searchParams: URLSearchParams, ...keys: string[]): boolean {
+  return keys.some((key) => {
+    const value = searchParams.get(key)?.trim();
+    return Boolean(value && !["undefined", "null", "none", "n/a"].includes(value.toLowerCase()));
+  });
 }
 
 function phraseIndex(words: string[], phrase: string[]): number {

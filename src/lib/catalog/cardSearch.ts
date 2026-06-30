@@ -39,7 +39,7 @@ interface SetPhraseMatch {
   score: number;
 }
 
-const COLLECTOR_NUMBER_TEXT = String.raw`(?:(?!SET\b|EX\b)[A-Za-z]{1,5}\s*\d{1,4}|\d{1,4})(?:\s*/\s*[A-Za-z]{0,5}\s*\d{1,4})?`;
+const COLLECTOR_NUMBER_TEXT = String.raw`(?:(?!(?:SET|EX|GX|V|VMAX|VSTAR)\b)[A-Za-z]{1,5}\s*\d{1,4}|\d{1,4})(?:\s*/\s*[A-Za-z]{0,5}\s*\d{1,4})?`;
 
 export function rankCatalogCards(
   query: string,
@@ -209,9 +209,10 @@ export function normalizeCatalogCardSearchInput(
     }
   }
 
-  const trailingNumber = !number && setName ? splitTrailingPlainCollectorNumber(name) : null;
-  if (trailingNumber) {
+  const trailingNumber = !number && setName ? splitTrailingCollectorNumber(name) : null;
+  if (trailingNumber && setName) {
     name = trailingNumber.name;
+    setName = resolveSetDisplayName(setName, trailingNumber.number);
   }
 
   name = normalizeNameForSearch(name);
@@ -377,10 +378,10 @@ function normalizeNameForSearch(input: string): string {
     .replace(/\s+/g, " ");
 }
 
-function splitTrailingPlainCollectorNumber(input: string): { name: string; number: string } | null {
-  const match = input.trim().match(/^(.*?)\s+#?(\d{1,4})$/);
+function splitTrailingCollectorNumber(input: string): { name: string; number: string } | null {
+  const match = input.trim().match(new RegExp(`^(.*?)\\s+#?(${COLLECTOR_NUMBER_TEXT})$`, "i"));
   const name = match?.[1]?.trim();
-  const number = match?.[2];
+  const number = readCollectorNumber(match?.[2]);
   if (!name || !number) return null;
   return { name, number };
 }
