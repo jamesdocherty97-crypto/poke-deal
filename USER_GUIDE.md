@@ -48,7 +48,8 @@ Live today:
 Not live until keys are added:
 
 - PokeTrace second-source comps in production.
-- Discord push-style alerts in production.
+- eBay Marketplace Insights live UK sold comps until eBay approves the restricted API and the feature flag is enabled.
+- Push-style alert delivery in production.
 
 ## Navigation
 
@@ -105,8 +106,10 @@ Sources shown today:
 - Price Tracker: primary eBay sold-comp source.
 - Pokemon TCG API: catalog, card art and raw market baseline.
 - PokeTrace: EU-first second comp source once enabled.
+- eBay Marketplace Insights: future direct UK sold comps once eBay approval is granted.
+- PSA cert lookup: slab verification and grade/name/set helper.
 - Owned sales: your own sale history after you start selling.
-- Discord: alert delivery once enabled.
+- Push alerts: optional external alert delivery once enabled.
 
 How to use it:
 
@@ -118,13 +121,15 @@ How to use it:
 Current outstanding setup actions:
 
 - You need to provide a real `POKETRACE_API_KEY`.
-- You need to provide a real `DISCORD_WEBHOOK_URL`.
-- An agent then needs to add both to Vercel production env vars and redeploy.
+- eBay needs to approve restricted Marketplace Insights access before live UK sold comps can be switched on.
+- After eBay approval, an agent needs to set `EBAY_INSIGHTS_ENABLED=true` in production and redeploy.
+- Optional alert delivery needs a webhook if you want off-app notifications later.
 
 Why this matters:
 
 - Without PokeTrace, raw comps still work, but bigger raw buys need manual checking.
-- Without Discord, alerts still exist in-app, but they do not push to you.
+- Without eBay Marketplace Insights, UK solds still rely on Price Tracker plus manual eBay sold links.
+- Without push delivery, alerts still exist in-app, but they do not push to you.
 
 ## Buy Flow
 
@@ -221,10 +226,32 @@ The app returns:
 - Source receipt.
 - Confidence.
 - Manual check links.
+- Possible card matches when the typed search is ambiguous.
 
 Important:
 
 No comp should be treated as just a number. Always look at the sample size, confidence and whether sources disagree.
+
+### Ambiguous Cards
+
+If the app is not sure which printing you mean, it shows tappable card choices.
+
+Each choice can show:
+
+- Card name.
+- Set.
+- Number.
+- Thumbnail.
+- A cheap catalogue price hint when already available.
+
+Intended use:
+
+1. Type a broad search, such as `Umbreon Evolving Skies`.
+2. Look at the possible cards.
+3. Tap the exact card.
+4. The app runs the comp again using the selected number/card id.
+
+Once you tap an exact card, the lookup should resolve instead of staying ambiguous.
 
 ### Comp Receipt
 
@@ -235,7 +262,8 @@ Sources can include:
 - Price Tracker.
 - Catalog baseline.
 - PokeTrace, once enabled.
-- Owned sales, after you have sold matching cards.
+- eBay Marketplace Insights, once eBay approval is granted and enabled.
+- Your sales, after you have sold matching cards.
 - Checked comp, if you manually override.
 
 Intended use:
@@ -243,6 +271,22 @@ Intended use:
 - Check whether the headline is based on strong sold data.
 - Spot disagreement between sources.
 - Decide when to manually check eBay/Cardmarket.
+
+### Cached Comp Badge
+
+If every fresh source fails but the app has a recent stored comp for that exact card and grade, it can show the cached result instead of leaving you blank.
+
+You will see:
+
+- Cached badge.
+- How old the cached result is.
+- Which fresh sources were unavailable.
+
+Intended use:
+
+- Useful at fairs or shops with poor signal.
+- Treat it as a fallback, not fresh market proof.
+- Manually check before spending meaningful money.
 
 ### Dealer Verdict
 
@@ -260,6 +304,46 @@ Intended use:
 
 - For cheap buys, thin data may be acceptable.
 - For bigger buys, cross-check or manual check means slow down.
+
+### Deal Calculator
+
+The deal calculator turns the comp into a suggested buying ceiling.
+
+It uses:
+
+- Headline comp.
+- Confidence.
+- Sample size.
+- Expected selling fees.
+- Postage and materials.
+- Your margin target.
+- Raw condition discount.
+
+It can show:
+
+- Max cash offer.
+- Trade offer.
+- No-quote reasons.
+- Grading EV when a raw-to-graded comparison is available.
+
+No-quote behavior:
+
+- If the comp needs a manual check, the app refuses to auto-quote.
+- If confidence is too weak for a bigger card, it tells you why instead of inventing a safe-looking number.
+- If there is no real comp, it will not pretend there is.
+
+Settings:
+
+- Go to Setup.
+- Open Deal calculator.
+- Adjust target margin, trade premium, selling fees, postage tiers, confidence haircuts and grading assumptions.
+
+Intended use:
+
+1. Run a comp.
+2. Optionally verify weak comps manually.
+3. Use the max offer as the buying ceiling.
+4. Stock the card only when the deal still makes sense.
 
 ### Manual Checks
 
@@ -493,6 +577,12 @@ The app records:
 - Cost basis.
 - Realized profit.
 
+It also feeds future comps:
+
+- The next comp lookup for that same card and grade can show Your sales.
+- One or two recent sales help corroborate the market.
+- Three or more recent matching sales can become the trusted headline signal.
+
 For duplicate quantity rows:
 
 - Selling one copy decrements the stock.
@@ -672,7 +762,7 @@ Flow:
 Current behavior:
 
 - In-app checks work.
-- Discord delivery needs `DISCORD_WEBHOOK_URL`.
+- Optional push delivery needs a webhook.
 
 ## Stock Health and Repricing
 
@@ -701,7 +791,7 @@ Intended use:
 Current behavior:
 
 - In-app recommendations work.
-- Discord delivery needs `DISCORD_WEBHOOK_URL`.
+- Optional push delivery needs a webhook.
 
 ## Data Sources
 
@@ -757,15 +847,34 @@ Current gap:
 - Code is ready.
 - Production key is missing.
 
+### eBay Marketplace Insights
+
+Role:
+
+- Direct UK eBay sold comps once eBay grants restricted API access.
+
+Strength:
+
+- UK-region sold data is the best external fit for the business.
+- When it has a real sample and agrees with other sources, it can beat broader non-UK signals.
+
+Current gap:
+
+- Code is ready and dark-launched.
+- It is not called while disabled.
+- eBay approval is still required before enabling `EBAY_INSIGHTS_ENABLED=true`.
+
 ### Owned Sales
 
 Role:
 
-- Your private comp source.
+- Your private comp source, shown as Your sales in the receipt.
 
 How it works:
 
 - Once you sell matching cards, your own sales become evidence.
+- One or two recent matching sales corroborate but do not headline.
+- Three or more recent matching sales within the trust window can headline.
 
 Strength:
 
@@ -855,10 +964,9 @@ Best mobile flows:
 High priority:
 
 - Create/get a real PokeTrace API key.
-- Create/get a Discord webhook URL.
-- Give an agent those values or enter them into Vercel.
-- Test the app on iPhone/iPad after those env vars are live.
-- Decide whether to use Discord as the main alert channel.
+- Finish eBay Marketplace Insights approval when eBay makes it available.
+- Give an agent the PokeTrace key or enter it into Vercel.
+- Test the app on iPhone/iPad after the comp-source env vars are live.
 
 Medium priority:
 
@@ -867,6 +975,7 @@ Medium priority:
 - Build up owned-sales history.
 - Decide your default listing channel and pricing strategy.
 - Decide whether you want eBay listing automation soon.
+- Decide later whether push alerts are worth setting up.
 
 Low priority:
 
@@ -879,12 +988,12 @@ Low priority:
 High priority:
 
 - Add `POKETRACE_API_KEY` to Vercel production.
-- Add `DISCORD_WEBHOOK_URL` to Vercel production.
+- After eBay approval, set `EBAY_INSIGHTS_ENABLED=true` in Vercel production.
 - Redeploy and smoke-test:
   - Setup should show PokeTrace ready.
-  - Setup should show Discord ready.
+  - Setup should show eBay Marketplace Insights ready once approval and credentials are complete.
   - A RAW comp should include PokeTrace when available.
-  - Watch/reprice checks should report Discord ready.
+  - eBay MI should stay absent from comp aggregation while the flag is off.
 
 Comp robustness:
 
@@ -933,7 +1042,7 @@ Needed:
 
 - Real key in Vercel.
 
-### Discord Alerts
+### Optional Push Alerts
 
 Purpose:
 
@@ -943,7 +1052,7 @@ Purpose:
 
 Needed:
 
-- Webhook URL in Vercel.
+- Webhook URL in Vercel if you decide off-app alerts are worth it.
 
 ### PSA Cert Lookup
 
@@ -1023,9 +1132,9 @@ The inventory/listing/sale model is already generic enough to support this later
 ## Known Gaps
 
 - PokeTrace is coded but not live in production.
-- Discord is coded but not live in production.
+- eBay Marketplace Insights is coded but needs eBay approval before live UK sold comps can be enabled.
+- Push alert delivery is optional and not the next priority.
 - Listing automation is tracking/export only, not direct posting.
-- PSA cert lookup is not a daily UI feature yet.
 - RAW comps can still require manual checks.
 - Owned-sales comps need real sales history.
 - Daily scheduled jobs should be verified after env setup.
@@ -1047,4 +1156,4 @@ The platform is doing its job when James can:
 9. Reprice old stock.
 10. Watch future buy targets.
 
-The next big unlock is enabling PokeTrace and Discord in production, then using the app with real buys and sales for a week.
+The next big unlock is enabling PokeTrace and eBay Marketplace Insights in production, then using the app with real buys and sales for a week.
