@@ -37,6 +37,16 @@ import {
 import { buildDealerCompVerdict, type DealerCompVerdict } from "@/lib/dealer/compVerdict";
 import { judgeDeal } from "@/lib/dealer/dealJudge";
 import {
+  DEFAULT_DEAL_CALC_SETTINGS,
+  dealCalc,
+  normalizeDealCalcSettings,
+  type DealCalcCompInput,
+  type DealCalcResult,
+  type DealCalcSettingsInput,
+  type DealCalcSettings,
+  type DealConfidence,
+} from "@/lib/dealer/dealCalc";
+import {
   buildManualCompLinks,
   buildManualCompFallbackQuery,
   cardSearchQuery,
@@ -106,7 +116,7 @@ import { textMentionsFirstEdition } from "@/lib/comps/variants";
 import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@/lib/catalog/cardSearch";
 import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
 
-type View = "today" | "acquire" | "inventory" | "listings" | "pnl";
+type View = "today" | "acquire" | "inventory" | "listings" | "pnl" | "settings";
 type Grade = DomainGrade;
 type PsaCertView = {
   found: boolean;
@@ -538,6 +548,7 @@ const QUICK_HUNTS_STORAGE_KEY = "pokemon-dealer-os.quick-hunts.v1";
 const RECENT_SETS_STORAGE_KEY = "pokemon-dealer-os.recent-sets.v1";
 const RECENT_COMPS_STORAGE_KEY = "pokemon-dealer-os.recent-comps.v1";
 const INTAKE_PREFERENCES_STORAGE_KEY = "pokemon-dealer-os.intake-preferences.v1";
+const DEAL_SETTINGS_STORAGE_KEY = "pokemon-dealer-os.deal-settings.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
@@ -673,6 +684,8 @@ export default function Home() {
   const [gradeComp, setGradeComp] = useState<CompResult | null>(null);
   const [gradeOdds, setGradeOdds] = useState("45");
   const [gradingCost, setGradingCost] = useState("19.99");
+  const [dealSettings, setDealSettings] = useState<DealCalcSettings>(DEFAULT_DEAL_CALC_SETTINGS);
+  const [dealSettingsLoaded, setDealSettingsLoaded] = useState(false);
   const [popularSets, setPopularSets] = useState<CatalogSet[]>([]);
   const [allSets, setAllSets] = useState<CatalogSet[]>([]);
   const [showAllPopularSets, setShowAllPopularSets] = useState(false);
@@ -739,6 +752,26 @@ export default function Home() {
       setRecentComps([]);
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DEAL_SETTINGS_STORAGE_KEY);
+      setDealSettings(raw ? normalizeDealCalcSettings(JSON.parse(raw) as DealCalcSettingsInput) : DEFAULT_DEAL_CALC_SETTINGS);
+    } catch {
+      setDealSettings(DEFAULT_DEAL_CALC_SETTINGS);
+    } finally {
+      setDealSettingsLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!dealSettingsLoaded) return;
+    try {
+      window.localStorage.setItem(DEAL_SETTINGS_STORAGE_KEY, JSON.stringify(dealSettings));
+    } catch {
+      // Device storage is optional; the active session still uses the settings.
+    }
+  }, [dealSettings, dealSettingsLoaded]);
 
   useEffect(() => {
     try {
@@ -1178,6 +1211,22 @@ export default function Home() {
   const reconciliationReasons = useMemo(
     () => (compForReceipt ? buildReconciliationReasons(compForReceipt) : []),
     [compForReceipt],
+  );
+  const dealCalcInput = useMemo<DealCalcCompInput | null>(
+    () =>
+      headline
+        ? buildDealCalcInput({
+            headline,
+            comp: compForReceipt,
+            grade,
+            gradeLadder,
+          })
+        : null,
+    [compForReceipt, grade, gradeLadder, headline],
+  );
+  const offerCalc = useMemo(
+    () => (dealCalcInput ? dealCalc(dealCalcInput, dealSettings) : null),
+    [dealCalcInput, dealSettings],
   );
   const needsManualComp = Boolean(
     apiHeadline &&
@@ -5561,20 +5610,34 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {!needsManualComp && deal && (
-                <div className={`deal-banner ${deal.tone}`}>
+              {offerCalc && (
+                <div className={`deal-banner ${dealCalcTone(offerCalc)}`}>
                   <div>
-                    <span>{quickStockCostPence > 0 ? "Deal judge" : "Buy ceiling"}</span>
-                    <strong>{deal.label}</strong>
+                    <span>{offerCalc.route === "no-quote" ? "Buy offer" : "Max cash offer"}</span>
+                    <strong>
+                      {offerCalc.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}
+                    </strong>
                   </div>
                   <div>
-                    <span>{quickStockCostPence > 0 ? "Net profit" : "Offer up to"}</span>
-                    <strong>{gbp(quickStockCostPence > 0 ? deal.expectedProfitPence : deal.targetBuyPence)}</strong>
+                    <span>{offerCalc.route === "no-quote" ? "Reason" : "Trade credit"}</span>
+                    <strong>
+                      {offerCalc.maxTradeOfferPence == null
+                        ? dealCalcPrimaryReason(offerCalc)
+                        : gbp(offerCalc.maxTradeOfferPence)}
+                    </strong>
                   </div>
                   <div>
-                    <span>{quickStockCostPence > 0 ? "Target buy" : "List around"}</span>
-                    <strong>{gbp(quickStockCostPence > 0 ? deal.targetBuyPence : quickStockListPence)}</strong>
+                    <span>{offerCalc.route === "grade" ? "Best route" : "Net proceeds"}</span>
+                    <strong>{offerCalc.netProceedsPence == null ? "n/a" : gbp(offerCalc.netProceedsPence)}</strong>
                   </div>
+                </div>
+              )}
+              {offerCalc?.gradeRoute && (
+                <div className={`grade-verdict ${offerCalc.route === "grade" ? "good" : "warn"}`}>
+                  <span>Grade route EV</span>
+                  <strong>
+                    {offerCalc.route === "grade" ? "Grade beats flip" : "Flip still better"} · {gbp(offerCalc.gradeRoute.evPence)}
+                  </strong>
                 </div>
               )}
               {!needsManualComp && stockCompItem && stockCompSuggestion && (
@@ -6872,6 +6935,352 @@ export default function Home() {
         </section>
       )}
 
+      {view === "settings" && (
+        <section className="workspace settings-workspace">
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Deal calculator</h2>
+                <span className="muted">These numbers set the max cash and trade offers shown after a comp.</span>
+              </div>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setDealSettings(DEFAULT_DEAL_CALC_SETTINGS)}
+              >
+                Reset
+              </button>
+            </div>
+            <div className="form-grid">
+              <label>
+                Target margin %
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.marginTargetPct}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        marginTargetPct: numberFromInput(event.target.value, settings.marginTargetPct),
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                Trade premium %
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.tradePremiumPct}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        tradePremiumPct: numberFromInput(event.target.value, settings.tradePremiumPct),
+                      }),
+                    )
+                  }
+                />
+              </label>
+            </div>
+            <div className="settings-toggle-row">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={dealSettings.fees.promotedEnabled}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        fees: { ...settings.fees, promotedEnabled: event.target.checked },
+                      }),
+                    )
+                  }
+                />
+                Include promoted listing fee
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
+                eBay final value %
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.fees.ebayFvfPct}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        fees: { ...settings.fees, ebayFvfPct: numberFromInput(event.target.value, settings.fees.ebayFvfPct) },
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                Promoted %
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.fees.promotedPct}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        fees: { ...settings.fees, promotedPct: numberFromInput(event.target.value, settings.fees.promotedPct) },
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                Fixed fee
+                <MoneyInput
+                  value={penceToPounds(dealSettings.fees.ebayFixedPence)}
+                  onChange={(value) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        fees: { ...settings.fees, ebayFixedPence: poundsToPence(value) },
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                Materials
+                <MoneyInput
+                  value={penceToPounds(dealSettings.fees.materialsPence)}
+                  onChange={(value) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        fees: { ...settings.fees, materialsPence: poundsToPence(value) },
+                      }),
+                    )
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>Postage tiers</h2>
+              <span className="muted">Used when estimating what actually banks after a sale.</span>
+            </div>
+            <div className="form-grid">
+              <label>
+                Under £20
+                <MoneyInput
+                  value={penceToPounds(dealSettings.fees.postageTiers[0]?.postagePence ?? 0)}
+                  onChange={(value) =>
+                    setDealSettings((settings) => updateDealPostageTier(settings, 0, poundsToPence(value)))
+                  }
+                />
+              </label>
+              <label>
+                £20-£100
+                <MoneyInput
+                  value={penceToPounds(dealSettings.fees.postageTiers[1]?.postagePence ?? 0)}
+                  onChange={(value) =>
+                    setDealSettings((settings) => updateDealPostageTier(settings, 1, poundsToPence(value)))
+                  }
+                />
+              </label>
+              <label>
+                Over £100
+                <MoneyInput
+                  value={penceToPounds(dealSettings.fees.postageTiers[2]?.postagePence ?? 0)}
+                  onChange={(value) =>
+                    setDealSettings((settings) => updateDealPostageTier(settings, 2, poundsToPence(value)))
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>Confidence haircuts</h2>
+              <span className="muted">Lower confidence means the app bids less, or refuses big risky buys.</span>
+            </div>
+            <div className="form-grid">
+              <label>
+                High
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.confidenceHaircut.high}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        confidenceHaircut: {
+                          ...settings.confidenceHaircut,
+                          high: numberFromInput(event.target.value, settings.confidenceHaircut.high),
+                        },
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                Medium
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.confidenceHaircut.medium}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        confidenceHaircut: {
+                          ...settings.confidenceHaircut,
+                          medium: numberFromInput(event.target.value, settings.confidenceHaircut.medium),
+                        },
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                Low
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.confidenceHaircut.low}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        confidenceHaircut: {
+                          ...settings.confidenceHaircut,
+                          low: numberFromInput(event.target.value, settings.confidenceHaircut.low),
+                        },
+                      }),
+                    )
+                  }
+                />
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
+                n ≥ 100
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.liquidityHaircut.nAtLeast100}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        liquidityHaircut: {
+                          ...settings.liquidityHaircut,
+                          nAtLeast100: numberFromInput(event.target.value, settings.liquidityHaircut.nAtLeast100),
+                        },
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                n 30-99
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.liquidityHaircut.n30To99}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        liquidityHaircut: {
+                          ...settings.liquidityHaircut,
+                          n30To99: numberFromInput(event.target.value, settings.liquidityHaircut.n30To99),
+                        },
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                n under 30
+                <input
+                  inputMode="decimal"
+                  value={dealSettings.liquidityHaircut.nUnder30}
+                  onChange={(event) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        liquidityHaircut: {
+                          ...settings.liquidityHaircut,
+                          nUnder30: numberFromInput(event.target.value, settings.liquidityHaircut.nUnder30),
+                        },
+                      }),
+                    )
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>Grading EV</h2>
+              <span className="muted">Used when RAW comps also expose graded comp signals.</span>
+            </div>
+            <div className="form-grid">
+              <label>
+                Grading cost
+                <MoneyInput
+                  value={penceToPounds(dealSettings.grading.costPence)}
+                  onChange={(value) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        grading: { ...settings.grading, costPence: poundsToPence(value) },
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                Post to grader
+                <MoneyInput
+                  value={penceToPounds(dealSettings.grading.postageToGraderPence)}
+                  onChange={(value) =>
+                    setDealSettings((settings) =>
+                      normalizeDealCalcSettings({
+                        ...settings,
+                        grading: { ...settings.grading, postageToGraderPence: poundsToPence(value) },
+                      }),
+                    )
+                  }
+                />
+              </label>
+            </div>
+            <div className="form-grid">
+              {(["PSA_10", "PSA_9", "PSA_8"] as const).map((gradeKey) => (
+                <label key={gradeKey}>
+                  {gradeKey.replace(/_/g, " ")} odds
+                  <input
+                    inputMode="decimal"
+                    value={dealSettings.grading.gradeProbabilities[gradeKey] ?? 0}
+                    onChange={(event) =>
+                      setDealSettings((settings) =>
+                        normalizeDealCalcSettings({
+                          ...settings,
+                          grading: {
+                            ...settings.grading,
+                            gradeProbabilities: {
+                              ...settings.grading.gradeProbabilities,
+                              [gradeKey]: numberFromInput(event.target.value, settings.grading.gradeProbabilities[gradeKey] ?? 0),
+                            },
+                          },
+                        }),
+                      )
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
+        </section>
+      )}
+
       {view === "pnl" && (
         <section className="workspace pnl-workspace">
           <section className={`pnl-summary ${noBookedSales ? "empty" : ""}`}>
@@ -7535,6 +7944,7 @@ export default function Home() {
         <TabButton active={view === "inventory"} label="Inventory" onClick={() => setView("inventory")} />
         <TabButton active={view === "listings"} label="Listings" onClick={() => setView("listings")} />
         <TabButton active={view === "pnl"} label="P&L" onClick={() => setView("pnl")} />
+        <TabButton active={view === "settings"} label="Setup" onClick={() => setView("settings")} />
       </nav>
     </main>
   );
@@ -9449,11 +9859,80 @@ function ageLabel(value: string): string {
   return shortDate(value);
 }
 
+function buildDealCalcInput({
+  headline,
+  comp,
+  grade,
+  gradeLadder,
+}: {
+  headline: CompResult;
+  comp: Reconciled | null;
+  grade: Grade;
+  gradeLadder: Array<{ grade: Grade; medianPence: number; sampleSize: number }>;
+}): DealCalcCompInput {
+  const reconciliation = comp?.reconciliation ?? headline.raw?.reconciliation ?? null;
+  return {
+    headlinePence: headline.medianPence > 0 ? headline.medianPence : null,
+    confidence: reconciliation?.confidence ?? inferDealConfidence(headline, Boolean(comp?.sourcesDisagree)),
+    manualCheck: reconciliation?.manualCheck ?? Boolean(comp?.sourcesDisagree || headline.sampleSize === 0),
+    gradeBucket: grade,
+    sampleSizeOfChosen: headline.sampleSize,
+    reasons: reconciliation?.reasons ?? [],
+    gradedComps:
+      grade === "RAW"
+        ? gradeLadder
+            .filter((row) => row.grade !== "RAW" && row.medianPence > 0)
+            .map((row) => ({
+              grade: row.grade,
+              headlinePence: row.medianPence,
+              confidence: inferDealConfidence({ ...headline, sampleSize: row.sampleSize }, false),
+            }))
+        : undefined,
+  };
+}
+
+function inferDealConfidence(comp: Pick<CompResult, "sampleSize">, sourcesDisagree: boolean): DealConfidence {
+  if (sourcesDisagree || comp.sampleSize < 3) return "low";
+  if (comp.sampleSize >= 100) return "high";
+  return "medium";
+}
+
+function dealCalcTone(result: DealCalcResult): "good" | "warn" | "danger" {
+  if (result.route === "no-quote") return "danger";
+  if (result.route === "grade") return "good";
+  if (result.reasons.some((reason) => reason.includes("low confidence") || reason.includes("thin"))) return "warn";
+  return "good";
+}
+
+function dealCalcPrimaryReason(result: DealCalcResult): string {
+  const reason = result.reasons[result.reasons.length - 1] ?? "check solds";
+  return reason.replace(/[-_:]/g, " ");
+}
+
+function updateDealPostageTier(settings: DealCalcSettings, index: number, postagePence: number): DealCalcSettings {
+  const tiers = [...settings.fees.postageTiers];
+  const fallback = DEFAULT_DEAL_CALC_SETTINGS.fees.postageTiers[index];
+  tiers[index] = {
+    upToPence: tiers[index]?.upToPence ?? fallback?.upToPence ?? null,
+    postagePence,
+  };
+  return normalizeDealCalcSettings({
+    ...settings,
+    fees: { ...settings.fees, postageTiers: tiers },
+  });
+}
+
+function numberFromInput(value: string, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function viewTitle(view: View): string {
   if (view === "today") return "Status";
   if (view === "acquire") return "Buy cards";
   if (view === "inventory") return "Inventory";
   if (view === "listings") return "Listings";
+  if (view === "settings") return "Setup";
   return "P&L";
 }
 
