@@ -249,6 +249,8 @@ type Reconciled = {
   all: CompResult[];
   sourcesDisagree: boolean;
   reconciliation?: ReconciliationView;
+  unavailableSources?: { name: string; reason: string }[];
+  cached?: { asOf: string; ageHours: number };
   ambiguous?: boolean;
   catalog?: CatalogCard | null;
   alternatives?: CatalogCard[];
@@ -5674,6 +5676,21 @@ export default function Home() {
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
               </div>
+              {(comp?.cached || (comp?.unavailableSources?.length ?? 0) > 0) && (
+                <div className={`cache-badge ${comp?.cached ? "warn" : "info"}`}>
+                  {comp?.cached ? (
+                    <>
+                      <strong>Cached comp</strong>
+                      <span>{comp.cached.ageHours}h old · fresh sources unavailable</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>Source unavailable</strong>
+                      <span>{comp?.unavailableSources?.map((source) => source.name).join(", ")}</span>
+                    </>
+                  )}
+                </div>
+              )}
               {gradeLadder.length > 1 && (
                 <div className="grade-ladder" aria-label="Price by grade from one lookup">
                   <div className="receipt-heading">

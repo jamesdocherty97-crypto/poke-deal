@@ -3083,6 +3083,32 @@ label {
   padding: 10px;
 }
 
+.cache-badge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  border: 1px solid rgba(136, 200, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(136, 200, 255, 0.08);
+  padding: 9px 10px;
+}
+
+.cache-badge.warn {
+  border-color: rgba(255, 203, 5, 0.36);
+  background: rgba(255, 203, 5, 0.1);
+}
+
+.cache-badge strong {
+  font-size: 13px;
+}
+
+.cache-badge span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .stock-reprice-card div {
   display: grid;
   min-width: 0;

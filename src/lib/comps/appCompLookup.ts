@@ -12,6 +12,7 @@ import type { CatalogCard, CatalogSource } from "../catalog/types.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
 import { CompService } from "./compService.js";
+import { PrismaLastKnownCompCache } from "./prismaCompResultRepo.js";
 import { OwnedSalesSource, type OwnedSalesDb } from "./sources/ownedSales.js";
 import { PokeTraceSource } from "./sources/pokeTrace.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
@@ -224,13 +225,17 @@ export function createAppCompService(
   catalogSource: CatalogSource,
   catalog: CatalogCard | null,
 ): CompService {
-  return new CompService([
-    new PokemonPriceTrackerSource(),
-    new EbayMarketplaceInsightsSource(),
-    new PokemonTcgMarketSource(catalog ? fixedCatalogSource(catalogSource.live, catalog) : catalogSource),
-    new PokeTraceSource(),
-    ...(process.env.DATABASE_URL ? [new OwnedSalesSource(getPrisma() as unknown as OwnedSalesDb)] : []),
-  ]);
+  return new CompService(
+    [
+      new PokemonPriceTrackerSource(),
+      new EbayMarketplaceInsightsSource(),
+      new PokemonTcgMarketSource(catalog ? fixedCatalogSource(catalogSource.live, catalog) : catalogSource),
+      new PokeTraceSource(),
+      ...(process.env.DATABASE_URL ? [new OwnedSalesSource(getPrisma() as unknown as OwnedSalesDb)] : []),
+    ],
+    undefined,
+    process.env.DATABASE_URL ? new PrismaLastKnownCompCache() : null,
+  );
 }
 
 export function fixedCatalogSource(live: boolean, catalog: CatalogCard): CatalogSource {

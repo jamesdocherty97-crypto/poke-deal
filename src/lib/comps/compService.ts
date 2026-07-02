@@ -13,7 +13,28 @@ import { PokeTraceSource } from "./sources/pokeTrace.js";
 import { EbayMarketplaceInsightsSource } from "./sources/ebayMarketplaceInsights.js";
 import { reconcileComps, type ReconCandidate, type ReconQuery, type ReconResult, type ReconSource } from "./reconciler.js";
 
-const DEFAULT_SOURCE_TIMEOUT_MS = 8000;
+const DEFAULT_SOURCE_TIMEOUT_MS = 4000;
+const DEFAULT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export interface SourceUnavailable {
+  name: string;
+  reason: string;
+}
+
+export interface CachedCompBadge {
+  asOf: string;
+  ageHours: number;
+}
+
+export interface CachedCompRecord {
+  headline: CompResult;
+  reconciliation?: ReconResult;
+  cachedAt: string;
+}
+
+export interface LastKnownCompCache {
+  get(card: CardRef, query: CompQuery): Promise<CachedCompRecord | null>;
+}
 
 export interface ReconciledComp {
   /** The single comp to act on. */
@@ -24,12 +45,18 @@ export interface ReconciledComp {
   sourcesDisagree: boolean;
   /** Deterministic data-quality verdict used to explain the headline choice. */
   reconciliation?: ReconResult;
+  /** Sources that failed/timed out during this lookup, shown as unavailable evidence. */
+  unavailableSources?: SourceUnavailable[];
+  /** Present when no fresh source produced a price and a recent cached result is being shown. */
+  cached?: CachedCompBadge;
 }
 
 export class CompService {
   constructor(
     private readonly sources: CompSource[],
     private readonly sourceTimeoutMs = DEFAULT_SOURCE_TIMEOUT_MS,
+    private readonly cache: LastKnownCompCache | null = null,
+    private readonly cacheMaxAgeMs = DEFAULT_CACHE_MAX_AGE_MS,
   ) {}
 
   /** Default wiring. Add PokeTrace etc. here as adapters are built. */
@@ -58,13 +85,47 @@ export class CompService {
     const all = settled
       .filter((r): r is PromiseFulfilledResult<CompResult> => r.status === "fulfilled")
       .map((r) => r.value);
+    const unavailableSources = unavailableFromResults(all);
 
     if (all.length === 0) {
       throw new Error("All comp sources failed");
     }
 
+    if (!hasPricedSignal(all)) {
+      const cached = await this.readWarmCache(card, query);
+      if (cached) {
+        const cachedAtMs = new Date(cached.cachedAt).getTime();
+        const ageHours = Number.isFinite(cachedAtMs)
+          ? Math.max(0, Math.round((Date.now() - cachedAtMs) / (60 * 60 * 1000)))
+          : 0;
+        const reconciliation =
+          cached.reconciliation ??
+          reconcileComps(buildReconQuery(cached.headline.card, { ...query, grade: cached.headline.grade }, options), [
+            resultToReconCandidate(cached.headline),
+          ].filter((candidate): candidate is ReconCandidate => candidate != null));
+        return {
+          headline: applyCachedFlag(applyReconciliation(cached.headline, reconciliation), cached.cachedAt),
+          all: [applyCachedFlag(cached.headline, cached.cachedAt), ...all],
+          sourcesDisagree: false,
+          reconciliation,
+          unavailableSources,
+          cached: { asOf: cached.cachedAt, ageHours },
+        };
+      }
+    }
+
     const { headline, reconciliation } = pickHeadlineForQuery(all, card, query, options);
-    return { headline, all, sourcesDisagree: detectDisagreement(all) || reconciliation.manualCheck, reconciliation };
+    return { headline, all, sourcesDisagree: detectDisagreement(all) || reconciliation.manualCheck, reconciliation, unavailableSources };
+  }
+
+  private async readWarmCache(card: CardRef, query: CompQuery): Promise<CachedCompRecord | null> {
+    if (!this.cache) return null;
+    const cached = await maybe(this.cache.get(card, query));
+    if (!cached) return null;
+    const cachedAtMs = new Date(cached.cachedAt).getTime();
+    if (!Number.isFinite(cachedAtMs)) return null;
+    if (Date.now() - cachedAtMs > this.cacheMaxAgeMs) return null;
+    return cached;
   }
 
   private async lookupSource(source: CompSource, card: CardRef, query: CompQuery): Promise<CompResult> {
@@ -78,6 +139,22 @@ export class CompService {
     } catch (err) {
       return fallback(err instanceof Error ? `${source.name} failed: ${err.message}` : `${source.name} failed`);
     }
+  }
+}
+
+export class MemoryLastKnownCompCache implements LastKnownCompCache {
+  private readonly rows = new Map<string, CachedCompRecord>();
+
+  constructor(rows: CachedCompRecord[] = []) {
+    for (const row of rows) this.set(row.headline.card, { grade: row.headline.grade }, row);
+  }
+
+  async get(card: CardRef, query: CompQuery): Promise<CachedCompRecord | null> {
+    return this.rows.get(cacheKey(card, query)) ?? null;
+  }
+
+  set(card: CardRef, query: CompQuery, row: CachedCompRecord): void {
+    this.rows.set(cacheKey(card, query), row);
   }
 }
 
@@ -115,6 +192,46 @@ function emptySourceComp(source: string, card: CardRef, query: CompQuery, reason
     asOf: new Date().toISOString(),
     raw: { reason },
   };
+}
+
+function unavailableFromResults(results: CompResult[]): SourceUnavailable[] {
+  return results
+    .filter((result) => result.sampleSize <= 0 && result.medianPence <= 0)
+    .map((result) => ({ name: result.source, reason: readRawString(result, "reason") ?? "source unavailable" }))
+    .filter((source) => /timed out|failed|unavailable/i.test(source.reason));
+}
+
+function hasPricedSignal(results: CompResult[]): boolean {
+  return results.some((result) => result.sampleSize > 0 && result.medianPence > 0);
+}
+
+async function maybe<T>(value: Promise<T>): Promise<T | null> {
+  try {
+    return await value;
+  } catch {
+    return null;
+  }
+}
+
+function applyCachedFlag(result: CompResult, cachedAt: string): CompResult {
+  return {
+    ...result,
+    raw: {
+      ...(result.raw && typeof result.raw === "object" ? result.raw : {}),
+      cached: true,
+      cachedAt,
+    },
+  };
+}
+
+function cacheKey(card: CardRef, query: CompQuery): string {
+  return [
+    card.tcgApiId ?? "",
+    card.name.trim().toLowerCase(),
+    (card.setName ?? "").trim().toLowerCase(),
+    (card.number ?? "").trim().toLowerCase(),
+    query.grade ?? "RAW",
+  ].join("|");
 }
 
 export function pickHeadlineForQuery(

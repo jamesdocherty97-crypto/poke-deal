@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CompResult } from "../domain/types.js";
-import { PrismaCompResultRepo } from "./prismaCompResultRepo.js";
+import { PrismaCompResultRepo, PrismaLastKnownCompCache } from "./prismaCompResultRepo.js";
 
 type FakeCard = {
   id: string;
@@ -137,6 +137,19 @@ function fakeDb(seedCards: FakeCard[] = []) {
           compResults.push(row);
           return row;
         },
+        async findFirst({
+          where,
+          orderBy: _orderBy,
+        }: {
+          where: { cardId: string; grade: "RAW" | "PSA_10" };
+          orderBy: { createdAt: "desc" };
+        }) {
+          return (
+            [...compResults]
+              .filter((row) => row.cardId === where.cardId && row.grade === where.grade)
+              .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null
+          );
+        },
       },
     },
   };
@@ -193,4 +206,32 @@ test("PrismaCompResultRepo persists against an existing card id", async () => {
   assert.equal(db.cards.length, 1);
   assert.equal(row.cardId, "card_existing");
   assert.equal(db.compResults[0]?.asOf.toISOString(), "2026-06-21T12:00:00.000Z");
+});
+
+test("PrismaLastKnownCompCache reads the latest stored comp for card and grade", async () => {
+  const db = fakeDb([
+    {
+      id: "card_existing",
+      game: "POKEMON",
+      language: "EN",
+      name: "Charizard ex",
+      setName: "Scarlet & Violet 151",
+      setCode: "sv3pt5",
+      number: "199/165",
+      rarity: "Special Illustration Rare",
+      imageUrl: null,
+      tcgApiId: "sv3pt5-199",
+    },
+  ]);
+  const repo = new PrismaCompResultRepo(db.client);
+  await repo.create({ ...comp({ id: "card_existing", name: "Charizard ex" }), medianPence: 2400 });
+  await repo.create({ ...comp({ id: "card_existing", name: "Charizard ex" }), medianPence: 3100 });
+  db.compResults[1]!.createdAt = new Date("2026-06-21T12:06:00.000Z");
+
+  const cache = new PrismaLastKnownCompCache(repo);
+  const cached = await cache.get({ id: "card_existing", name: "Charizard ex" }, { grade: "RAW" });
+
+  assert.equal(cached?.headline.medianPence, 3100);
+  assert.equal(cached?.headline.card.tcgApiId, "sv3pt5-199");
+  assert.equal(cached?.cachedAt, "2026-06-21T12:06:00.000Z");
 });
