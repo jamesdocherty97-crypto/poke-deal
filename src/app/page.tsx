@@ -1,7 +1,7 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { forwardRef, type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   conditionAdjustedPricePence,
   rawConditionPriceFactor,
@@ -117,7 +117,8 @@ import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@
 import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
 import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
-import { CardImage, Metric } from "./components/UiBits";
+import { InventoryTab } from "./components/InventoryTab";
+import { CardImage, EmptyState, Metric, MoneyInput } from "./components/UiBits";
 
 type View = "today" | "acquire" | "inventory" | "listings" | "pnl" | "settings";
 type Grade = DomainGrade;
@@ -6214,50 +6215,23 @@ export default function Home() {
       )}
 
       {view === "inventory" && (
-        <section className="workspace inventory-workspace">
-          <div className="section-heading">
-            <h2>Inventory</h2>
-            <span>{rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
-          </div>
-          <div className="inventory-filter-tabs" role="tablist" aria-label="Inventory filters">
-            {inventoryFilters.map((filter) => (
-              <button
-                key={filter.value}
-                type="button"
-                className={inventoryFilter === filter.value ? "selected" : ""}
-                onClick={() => setInventoryFilter(filter.value)}
-                aria-selected={inventoryFilter === filter.value}
-              >
-                <span>{filter.label}</span>
-                <strong>{inventoryFilterCounts[filter.value]}</strong>
-              </button>
-            ))}
-          </div>
-          <div className="dex-controls" aria-label="Inventory search and sort">
-            <label className="search-control">
-              Search
-              <input
-                value={inventoryQuery}
-                onChange={(event) => setInventoryQuery(event.target.value)}
-                placeholder="Name, set, grade..."
-              />
-            </label>
-            <label>
-              Sort
-              <select value={inventorySort} onChange={(event) => setInventorySort(event.target.value as InventorySort)}>
-                <option value="newest">newest</option>
-                <option value="oldest">oldest</option>
-                <option value="highest-cost">highest cost</option>
-                <option value="lowest-cost">lowest cost</option>
-                <option value="grade">best grade</option>
-                <option value="name">name</option>
-              </select>
-            </label>
-          </div>
-          {visibleInventory.map((item) => (
+        <InventoryTab
+          visibleInventory={visibleInventory}
+          filteredInventory={filteredInventory}
+          activeInventory={activeInventory}
+          inventoryFilters={inventoryFilters}
+          inventoryFilter={inventoryFilter}
+          setInventoryFilter={setInventoryFilter}
+          inventoryFilterCounts={inventoryFilterCounts}
+          inventoryQuery={inventoryQuery}
+          setInventoryQuery={setInventoryQuery}
+          inventorySort={inventorySort}
+          setInventorySort={setInventorySort}
+          busy={busy}
+          renderInventoryRow={(item) => (
             <InventoryRow
               key={item.id}
-              item={item}
+              item={item as InventoryItem}
               busy={busy}
               onEdit={openInventoryEditor}
               onSell={openSell}
@@ -6268,132 +6242,42 @@ export default function Home() {
               onDelete={requestDeleteItem}
               onPhotos={addPhotosToInventory}
             />
-          ))}
-          {inventoryFilter === "all" && activeInventory.length === 0 ? (
-            <EmptyState text="No active stock. Add your next buy from Buy." />
-          ) : filteredInventory.length === 0 ? (
-            <EmptyState text={emptyInventoryFilterText(inventoryFilter)} />
-          ) : visibleInventory.length === 0 ? (
-            <EmptyState text="No matching stock. Clear the search or change the sort." />
-          ) : null}
-
-          {editingItemId && (
-            <form className="sell-sheet" onSubmit={saveInventoryItem}>
-              <div className="panel-heading">
-                <h2>Edit stock</h2>
-                <button className="ghost-button" type="button" onClick={() => setEditingItemId(null)}>Close</button>
-              </div>
-              <div className="form-grid">
-                <label>
-                  Cost
-                  <MoneyInput value={itemCost} onChange={setItemCost} disabled={busy === `edit-${editingItemId}`} />
-                </label>
-                <label>
-                  Qty
-                  <input
-                    inputMode="numeric"
-                    value={itemQuantity}
-                    onChange={(event) => setItemQuantity(event.target.value)}
-                    disabled={busy === `edit-${editingItemId}`}
-                  />
-                </label>
-              </div>
-              <div className="form-grid">
-                <label>
-                  Source
-                  <input
-                    value={itemSource}
-                    onChange={(event) => setItemSource(event.target.value)}
-                    disabled={busy === `edit-${editingItemId}`}
-                  />
-                </label>
-                <label>
-                  Location
-                  <input
-                    value={itemLocation}
-                    onChange={(event) => setItemLocation(event.target.value)}
-                    disabled={busy === `edit-${editingItemId}`}
-                  />
-                </label>
-              </div>
-              <div className="form-grid">
-                <label>
-                  Condition
-                  <input
-                    value={itemCondition}
-                    onChange={(event) => setItemCondition(event.target.value)}
-                    placeholder="NM, LP, light edgewear..."
-                    disabled={busy === `edit-${editingItemId}`}
-                  />
-                </label>
-                <label>
-                  Cert
-                  <input
-                    inputMode="numeric"
-                    value={itemGraderCert}
-                    onChange={(event) => setItemGraderCert(event.target.value)}
-                    placeholder="PSA/BGS/CGC cert"
-                    disabled={busy === `edit-${editingItemId}`}
-                  />
-                </label>
-              </div>
-              <label>
-                Status
-                <select
-                  value={itemStatus}
-                  onChange={(event) => setItemStatus(event.target.value as ItemStatus)}
-                  disabled={busy === `edit-${editingItemId}`}
-                >
-                  {editableStatuses.map((status) => (
-                    <option key={status} value={status}>{status.replace(/_/g, " ").toLowerCase()}</option>
-                  ))}
-                </select>
-              </label>
-              <button className="primary-action" type="submit" disabled={busy === `edit-${editingItemId}`}>
-                {busy === `edit-${editingItemId}` ? "Saving..." : "Save stock"}
-              </button>
-            </form>
           )}
-
-          {creatingListingItemId && creatingListingItem && (
-            <form className="sell-sheet" onSubmit={createListing}>
-              <div className="panel-heading">
-                <div>
-                  <h2>Create listing</h2>
-                  <span className="muted">{creatingListingItem.card.name} · cost {gbp(creatingListingItem.costBasis)}</span>
-                </div>
-                <button className="ghost-button" type="button" onClick={() => setCreatingListingItemId(null)}>Close</button>
-              </div>
-              <div className="form-grid">
-                <label>
-                  List price
-                  <MoneyInput value={listingPrice} onChange={setListingPrice} />
-                </label>
-                <label>
-                  Channel
-                  <select value={listingChannel} onChange={(event) => setListingChannel(event.target.value as Channel)}>
-                    {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
-                  </select>
-                </label>
-              </div>
-              <label>
-                State
-                <select value={listingState} onChange={(event) => setListingState(event.target.value as Exclude<ListingState, "SOLD">)}>
-                  <option value="DRAFT">draft</option>
-                  <option value="ACTIVE">active</option>
-                </select>
-              </label>
-              <label>
-                Listing URL
-                <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
-              </label>
-              <button className="primary-action" type="submit" disabled={busy === `create-listing-${creatingListingItemId}`}>
-                {busy === `create-listing-${creatingListingItemId}` ? "Saving..." : "Create listing"}
-              </button>
-            </form>
-          )}
-
-        </section>
+          emptyInventoryFilterText={emptyInventoryFilterText}
+          editingItemId={editingItemId}
+          saveInventoryItem={saveInventoryItem}
+          closeInventoryEditor={() => setEditingItemId(null)}
+          itemCost={itemCost}
+          setItemCost={setItemCost}
+          itemQuantity={itemQuantity}
+          setItemQuantity={setItemQuantity}
+          itemSource={itemSource}
+          setItemSource={setItemSource}
+          itemLocation={itemLocation}
+          setItemLocation={setItemLocation}
+          itemCondition={itemCondition}
+          setItemCondition={setItemCondition}
+          itemGraderCert={itemGraderCert}
+          setItemGraderCert={setItemGraderCert}
+          itemStatus={itemStatus}
+          setItemStatus={setItemStatus}
+          editableStatuses={editableStatuses}
+          creatingListingItemId={creatingListingItemId}
+          creatingListingItem={creatingListingItem ?? null}
+          createListing={createListing}
+          closeCreateListing={() => setCreatingListingItemId(null)}
+          listingPrice={listingPrice}
+          setListingPrice={setListingPrice}
+          listingChannel={listingChannel}
+          setListingChannel={setListingChannel}
+          channels={channels}
+          channelLabel={channelLabel}
+          listingState={listingState}
+          setListingState={setListingState}
+          listingExternalUrl={listingExternalUrl}
+          setListingExternalUrl={setListingExternalUrl}
+          gbp={gbp}
+        />
       )}
 
       {view === "listings" && (
@@ -8903,36 +8787,6 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
     </button>
   );
 }
-
-function EmptyState({ text }: { text: string }) {
-  return <p className="empty-state">{text}</p>;
-}
-
-const MoneyInput = forwardRef<HTMLInputElement, {
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
-}>(function MoneyInput({
-  value,
-  onChange,
-  disabled = false,
-  placeholder,
-}, ref) {
-  return (
-    <span className="money-input">
-      <span aria-hidden="true">£</span>
-      <input
-        ref={ref}
-        inputMode="decimal"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={disabled}
-        placeholder={placeholder}
-      />
-    </span>
-  );
-});
 
 function GradeBadge({ grade }: { grade: string }) {
   return <span className={`grade-badge ${gradeTone(grade)}`}>{grade.replace(/_/g, " ")}</span>;
