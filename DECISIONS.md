@@ -24,3 +24,10 @@ The six open decisions from the brief (§11), settled so the build can proceed w
 - **Current suite is enough for launch once PokeTrace is enabled in production.** Price Tracker is the primary sold-comp source, Pokémon TCG API resolves card identity/images and raw market baselines, PokeTrace is the required second opinion for bigger raw buys, and owned sales become a private source after James books sales.
 - **UK relevance means EU/Cardmarket signals matter.** PokeTrace is queried EU-first, then US fallback, so raw cross-checks can use Cardmarket-style baselines before leaning on US TCGPlayer/eBay signals.
 - **Do not trust noisy RAW sold buckets alone.** When smart RAW, catalog/PokeTrace baselines, and owned sales disagree materially, the UI should say to manually check rather than pretending a single median is safe.
+
+## Data safety / backups
+
+- **The app has a portable ledger backup.** `npm run backup` exports every persisted business table to `output/backups/<timestamp>/` as one JSON bundle plus per-table CSVs. `npm run restore -- <bundle>` restores a bundle into an empty database and verifies row counts; it refuses a non-empty database unless `--force` is supplied.
+- **Neon point-in-time recovery depends on the project restore window, not this repo.** Neon documents instant restore/history windows by plan: Free defaults to a short history window, paid plans can configure longer windows, and the effective restore window is managed in the Neon project settings. See `https://neon.com/docs/introduction/history-window`, `https://neon.com/docs/introduction/plans`, and `https://neon.com/docs/manage/projects`.
+- **Until the Neon restore window is confirmed in the Neon console, the product must say “backups: manual only.”** The Setup health panel treats the app-level export as available but does not promise PITR coverage that the code cannot verify.
+- **Use manual backup before risky operations.** Take a JSON bundle before schema work, bulk imports, catalogue migrations, listing automation changes, or any production data cleanup.

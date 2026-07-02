@@ -574,6 +574,7 @@ type SystemStatus = {
     secondaryCrossCheck: boolean;
     alertDelivery: boolean;
     storedSales: boolean;
+    manualBackups?: boolean;
   };
 };
 
@@ -2554,6 +2555,35 @@ export default function Home() {
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "comp warm-up failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadBackup() {
+    setBusy("backup");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/backup");
+      if (!res.ok) {
+        const payload = await readJson(res);
+        throw new Error(payload.error ?? "backup failed");
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? `poke-deal-backup-${new Date().toISOString()}.json`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice("Backup downloaded.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "backup failed");
     } finally {
       setBusy(null);
     }
@@ -4980,6 +5010,7 @@ export default function Home() {
           onBuyWatchesPanel={openBuyWatchesPanel}
           onCostsPanel={openCostsPanel}
           busy={busy}
+          onDownloadBackup={downloadBackup}
           onTakePortfolioSnapshot={takePortfolioSnapshot}
           onCheckWatches={() => void checkWatches()}
           onCheckReprices={checkReprices}

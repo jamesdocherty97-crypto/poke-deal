@@ -42,6 +42,7 @@ Live today:
 - Realized profit, cash position and channel P&L.
 - Operating costs.
 - CSV exports.
+- Manual ledger backups and restore tooling.
 - Buy watches and repricing checks.
 - Portfolio value snapshots.
 - Recent set quick-picks on each device.
@@ -110,6 +111,7 @@ Sources shown today:
 - eBay Marketplace Insights: future direct UK sold comps once eBay approval is granted.
 - PSA cert lookup: slab verification and grade/name/set helper.
 - Owned sales: your own sale history after you start selling.
+- Backups: manual ledger export and restore safety.
 - Push alerts: optional external alert delivery once enabled.
 
 How to use it:
@@ -124,13 +126,61 @@ Current outstanding setup actions:
 - You need to provide a real `POKETRACE_API_KEY`.
 - eBay needs to approve restricted Marketplace Insights access before live UK sold comps can be switched on.
 - After eBay approval, an agent needs to set `EBAY_INSIGHTS_ENABLED=true` in production and redeploy.
+- Check the Neon project restore window. Until that is confirmed, treat cloud recovery as manual backups only.
 - Optional alert delivery needs a webhook if you want off-app notifications later.
 
 Why this matters:
 
 - Without PokeTrace, raw comps still work, but bigger raw buys need manual checking.
 - Without eBay Marketplace Insights, UK solds still rely on Price Tracker plus manual eBay sold links.
+- Without a recent manual backup, recovery depends on whatever restore window is active in Neon.
 - Without push delivery, alerts still exist in-app, but they do not push to you.
+
+## Backups
+
+Use backups before risky changes, bulk imports, migrations or production cleanups.
+
+From the app:
+
+1. Go to Today.
+2. Open Setup.
+3. Tap Download backup.
+4. Keep the downloaded JSON somewhere safe.
+
+That phone download is the full JSON ledger bundle.
+
+From the Mac:
+
+```text
+npm run backup
+```
+
+This writes a timestamped folder under `output/backups/` with:
+
+- One full JSON bundle.
+- One CSV per table for inspection or spreadsheet use.
+
+Restore:
+
+```text
+npm run restore -- output/backups/<timestamp>
+```
+
+Important restore rules:
+
+- Restore is meant for an empty database.
+- It verifies row counts after restoring.
+- It refuses to run on a non-empty database.
+- Only use `--force` if you deliberately want to wipe the target database first.
+
+The bundle includes inventory, listings, sales, operating costs, deal sessions, watches, alerts, price snapshots, cards and stored comp results.
+
+Notes:
+
+- Costs are stored as `Expense` rows.
+- Manual checked comps are stored as `CompResult` rows, usually from the manual-check source.
+- There is no separate Settings table yet.
+- Neon may also provide point-in-time restore, but the actual recovery window depends on the Neon project plan/settings. Until that restore window is confirmed in Neon, the app says backups are manual only.
 
 ## Buy Flow
 

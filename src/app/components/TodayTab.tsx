@@ -44,6 +44,7 @@ type TodaySystemStatus = {
   summary: {
     livePrimaryComps: boolean;
     secondaryCrossCheck: boolean;
+    manualBackups?: boolean;
   };
 };
 
@@ -76,6 +77,7 @@ export function TodayTab({
   onBuyWatchesPanel,
   onCostsPanel,
   busy,
+  onDownloadBackup,
   onTakePortfolioSnapshot,
   onCheckWatches,
   onCheckReprices,
@@ -108,6 +110,7 @@ export function TodayTab({
   onBuyWatchesPanel: () => void;
   onCostsPanel: () => void;
   busy: string | null;
+  onDownloadBackup: () => void;
   onTakePortfolioSnapshot: () => void;
   onCheckWatches: () => void;
   onCheckReprices: () => void;
@@ -218,6 +221,14 @@ export function TodayTab({
             {systemStatus?.summary.secondaryCrossCheck ? "cross-check" : "single source"}
           </span>
         </div>
+        <button
+          className="ghost-button setup-backup-button"
+          type="button"
+          onClick={onDownloadBackup}
+          disabled={busy === "backup"}
+        >
+          {busy === "backup" ? "Preparing..." : "Download backup"}
+        </button>
         <div className="source-health-list">
           {setupSources.map((source) => (
             <SourceHealthRow key={source.id} source={source} />

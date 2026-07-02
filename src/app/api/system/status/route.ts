@@ -103,6 +103,16 @@ export async function GET() {
         : "Add DATABASE_URL in Vercel so stock and sales persist.",
     },
     {
+      id: "ledger-backups",
+      label: "Backups",
+      role: "ledger export + restore",
+      status: process.env.DATABASE_URL?.trim() ? "building" : "missing",
+      required: true,
+      setupHint: process.env.DATABASE_URL?.trim()
+        ? "Download/manual backups are available. Neon PITR depends on the project restore window; backups: manual only until that is confirmed in Neon."
+        : "Add DATABASE_URL before backup exports can read the ledger.",
+    },
+    {
       id: "push-alerts",
       label: "Push alerts",
       role: "price and reprice alerts",
@@ -124,6 +134,7 @@ export async function GET() {
       psaCertLookup: psa.live,
       alertDelivery: Boolean(process.env.DISCORD_WEBHOOK_URL?.trim()),
       storedSales: Boolean(process.env.DATABASE_URL?.trim()),
+      manualBackups: Boolean(process.env.DATABASE_URL?.trim()),
     },
   });
 }
