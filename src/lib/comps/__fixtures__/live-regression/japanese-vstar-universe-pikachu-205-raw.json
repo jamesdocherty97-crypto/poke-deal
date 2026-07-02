@@ -1,0 +1,282 @@
+{
+  "capturedAt": "2026-07-02T23:39:18.317Z",
+  "label": "Japanese VSTAR Universe Pikachu 205 RAW",
+  "request": {
+    "card": {
+      "name": "Pikachu",
+      "setName": "VSTAR Universe",
+      "number": "205/172",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Pikachu",
+      "setName": "VSTAR Universe",
+      "number": "205/172",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "id": "cmr4510b2001hykqocru9crvo",
+        "name": "Pikachu",
+        "setName": "VSTAR Universe",
+        "number": "205/172",
+        "game": "POKEMON",
+        "language": "EN"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 0,
+      "meanPence": 0,
+      "lowPence": 0,
+      "highPence": 0,
+      "sampleSize": 0,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-02T23:30:31.932Z",
+      "raw": {
+        "kind": "last-known-comp",
+        "cachedAt": "2026-07-02T23:37:24.991Z",
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        },
+        "cached": true
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "id": "cmr4510b2001hykqocru9crvo",
+          "name": "Pikachu",
+          "setName": "VSTAR Universe",
+          "number": "205/172",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:30:31.932Z",
+        "raw": {
+          "kind": "last-known-comp",
+          "cachedAt": "2026-07-02T23:37:24.991Z",
+          "cached": true
+        }
+      },
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Pikachu",
+          "setName": "VSTAR Universe",
+          "number": "205/172",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:18.072Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Pikachu",
+          "setName": "VSTAR Universe",
+          "number": "205/172",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:18.071Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "no catalog market price"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Pikachu",
+          "setName": "VSTAR Universe",
+          "number": "205/172",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:18.061Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Pikachu",
+          "setName": "VSTAR Universe",
+          "number": "205/172",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:18.102Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "cached": {
+      "asOf": "2026-07-02T23:37:24.991Z",
+      "ageHours": 0
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Pikachu",
+      "setName": "VSTAR Universe",
+      "number": "205/172"
+    },
+    "alternatives": [
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Pikachu",
+        "setName": "Wizards Black Star Promos",
+        "setCode": "basep",
+        "number": "1/53",
+        "rarity": "Promo",
+        "imageUrl": "https://images.pokemontcg.io/basep/1_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/basep/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/basep/symbol.png",
+        "tcgApiId": "basep-1"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Pikachu",
+        "setName": "Wizards Black Star Promos",
+        "setCode": "basep",
+        "number": "4/53",
+        "rarity": "Promo",
+        "imageUrl": "https://images.pokemontcg.io/basep/4_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/basep/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/basep/symbol.png",
+        "tcgApiId": "basep-4"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Pikachu",
+        "setName": "McDonald's Collection 2019",
+        "setCode": "mcd19",
+        "number": "6/12",
+        "imageUrl": "https://images.pokemontcg.io/mcd19/6_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/mcd19/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/mcd19/symbol.png",
+        "tcgApiId": "mcd19-6"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Pikachu",
+        "setName": "Pokémon Rumble",
+        "setCode": "ru1",
+        "number": "7/16",
+        "imageUrl": "https://images.pokemontcg.io/ru1/7_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/ru1/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/ru1/symbol.png",
+        "tcgApiId": "ru1-7"
+      }
+    ],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 997,
+    "headline": "£0.00 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 4,
+    "catalog": "Pikachu | VSTAR Universe | 205/172",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

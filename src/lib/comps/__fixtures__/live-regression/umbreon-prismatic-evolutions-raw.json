@@ -1,0 +1,636 @@
+{
+  "capturedAt": "2026-07-02T23:38:45.355Z",
+  "label": "Umbreon Prismatic Evolutions RAW",
+  "request": {
+    "card": {
+      "name": "Umbreon",
+      "setName": "Prismatic Evolutions",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Umbreon",
+      "setName": "Prismatic Evolutions",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "name": "Umbreon ex",
+        "setName": "Prismatic Evolutions",
+        "number": "161/131",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "sv8pt5-161"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 72047,
+      "meanPence": 144338,
+      "lowPence": 4724,
+      "highPence": 362205,
+      "sampleSize": 80,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-02T17:39:49.268Z",
+      "raw": {
+        "count": 80,
+        "totalValue": 139314.67,
+        "averagePrice": 1833.0877631578949,
+        "medianPrice": 1375,
+        "minPrice": 60,
+        "maxPrice": 4600,
+        "marketPrice7Day": null,
+        "marketPriceMedian7Day": null,
+        "dailyVolume7Day": null,
+        "marketTrend": "up",
+        "lastMarketUpdate": "2026-07-02T17:39:49.268Z",
+        "smartMarketPrice": {
+          "price": 915,
+          "confidence": "medium",
+          "method": "30day_filtered_weighted",
+          "daysUsed": 30
+        },
+        "prices": {
+          "market": 1535.86,
+          "low": 1100,
+          "sellers": 45,
+          "listings": 0,
+          "primaryPrinting": "Holofoil",
+          "lastUpdated": "2026-07-02T14:41:36.011Z",
+          "variants": {
+            "Holofoil": {
+              "Near Mint Holofoil": {
+                "price": 1535.86,
+                "listings": null,
+                "priceString": "$1535.86",
+                "lastUpdated": "2026-07-02T23:29:06.670Z"
+              }
+            }
+          }
+        },
+        "chosenPriceSource": "smartMarketPrice",
+        "gradeLadder": [
+          {
+            "grade": "RAW",
+            "providerKey": "ungraded",
+            "medianPence": 72047,
+            "sampleSize": 80,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_1",
+            "providerKey": "psa1",
+            "medianPence": 236220,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_6",
+            "providerKey": "psa6",
+            "medianPence": 90551,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_7",
+            "providerKey": "psa7",
+            "medianPence": 105315,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_8",
+            "providerKey": "psa8",
+            "medianPence": 84546,
+            "sampleSize": 72,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_9",
+            "providerKey": "psa9",
+            "medianPence": 106299,
+            "sampleSize": 451,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_10",
+            "providerKey": "psa10",
+            "medianPence": 389764,
+            "sampleSize": 459,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_8_5",
+            "providerKey": "bgs8_5",
+            "medianPence": 96457,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9",
+            "providerKey": "bgs9",
+            "medianPence": 119291,
+            "sampleSize": 16,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9_5",
+            "providerKey": "bgs9_5",
+            "medianPence": 220472,
+            "sampleSize": 51,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_10",
+            "providerKey": "bgs10",
+            "medianPence": 775472,
+            "sampleSize": 12,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9",
+            "providerKey": "cgc9",
+            "medianPence": 95867,
+            "sampleSize": 14,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9_5",
+            "providerKey": "cgc9_5",
+            "medianPence": 94566,
+            "sampleSize": 7,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_10",
+            "providerKey": "cgc10",
+            "medianPence": 187008,
+            "sampleSize": 58,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_9",
+            "providerKey": "ace9",
+            "medianPence": 97017,
+            "sampleSize": 6,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_10",
+            "providerKey": "ace10",
+            "medianPence": 281513,
+            "sampleSize": 13,
+            "source": "pokemon-price-tracker"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": 72047,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-raw-bucket-spread:pt-smart",
+            "penalty-region-us:pt-smart",
+            "penalty-region-us:tcg-market"
+          ],
+          "chosenSource": "pt-smart",
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Umbreon ex",
+          "setName": "Prismatic Evolutions",
+          "number": "161/131",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv8pt5-161"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 72047,
+        "meanPence": 144338,
+        "lowPence": 4724,
+        "highPence": 362205,
+        "sampleSize": 80,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T17:39:49.268Z",
+        "raw": {
+          "count": 80,
+          "totalValue": 139314.67,
+          "averagePrice": 1833.0877631578949,
+          "medianPrice": 1375,
+          "minPrice": 60,
+          "maxPrice": 4600,
+          "marketPrice7Day": null,
+          "marketPriceMedian7Day": null,
+          "dailyVolume7Day": null,
+          "marketTrend": "up",
+          "lastMarketUpdate": "2026-07-02T17:39:49.268Z",
+          "smartMarketPrice": {
+            "price": 915,
+            "confidence": "medium",
+            "method": "30day_filtered_weighted",
+            "daysUsed": 30
+          },
+          "prices": {
+            "market": 1535.86,
+            "low": 1100,
+            "sellers": 45,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:41:36.011Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 1535.86,
+                  "listings": null,
+                  "priceString": "$1535.86",
+                  "lastUpdated": "2026-07-02T23:29:06.670Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "smartMarketPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 72047,
+              "sampleSize": 80,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_1",
+              "providerKey": "psa1",
+              "medianPence": 236220,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_6",
+              "providerKey": "psa6",
+              "medianPence": 90551,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_7",
+              "providerKey": "psa7",
+              "medianPence": 105315,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_8",
+              "providerKey": "psa8",
+              "medianPence": 84546,
+              "sampleSize": 72,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 106299,
+              "sampleSize": 451,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_10",
+              "providerKey": "psa10",
+              "medianPence": 389764,
+              "sampleSize": 459,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_8_5",
+              "providerKey": "bgs8_5",
+              "medianPence": 96457,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9",
+              "providerKey": "bgs9",
+              "medianPence": 119291,
+              "sampleSize": 16,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9_5",
+              "providerKey": "bgs9_5",
+              "medianPence": 220472,
+              "sampleSize": 51,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_10",
+              "providerKey": "bgs10",
+              "medianPence": 775472,
+              "sampleSize": 12,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9",
+              "providerKey": "cgc9",
+              "medianPence": 95867,
+              "sampleSize": 14,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9_5",
+              "providerKey": "cgc9_5",
+              "medianPence": 94566,
+              "sampleSize": 7,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_10",
+              "providerKey": "cgc10",
+              "medianPence": 187008,
+              "sampleSize": 58,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_9",
+              "providerKey": "ace9",
+              "medianPence": 97017,
+              "sampleSize": 6,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_10",
+              "providerKey": "ace10",
+              "medianPence": 281513,
+              "sampleSize": 13,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Umbreon ex",
+          "setName": "Prismatic Evolutions",
+          "number": "161/131",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv8pt5-161"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 120906,
+        "meanPence": 120906,
+        "lowPence": 120906,
+        "highPence": 120906,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil market",
+            "pricePence": 120906,
+            "originalAmount": 1535.5,
+            "originalCurrency": "USD",
+            "kind": "market",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+          },
+          "signals": [
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil market",
+              "pricePence": 120906,
+              "originalAmount": 1535.5,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil mid",
+              "pricePence": 138646,
+              "originalAmount": 1760.8,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil low",
+              "pricePence": 102361,
+              "originalAmount": 1299.99,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil directLow",
+              "pricePence": 135559,
+              "originalAmount": 1721.6,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Umbreon ex",
+          "setName": "Prismatic Evolutions",
+          "number": "161/131",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv8pt5-161"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:45.250Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Umbreon ex",
+          "setName": "Prismatic Evolutions",
+          "number": "161/131",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv8pt5-161"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:45.285Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 72047,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-raw-bucket-spread:pt-smart",
+        "penalty-region-us:pt-smart",
+        "penalty-region-us:tcg-market"
+      ],
+      "chosenSource": "pt-smart",
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Umbreon ex",
+      "setName": "Prismatic Evolutions",
+      "setCode": "sv8pt5",
+      "number": "161/131",
+      "rarity": "Special Illustration Rare",
+      "imageUrl": "https://images.pokemontcg.io/sv8pt5/161_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/sv8pt5/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/sv8pt5/symbol.png",
+      "tcgApiId": "sv8pt5-161",
+      "priceSignals": [
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 120906,
+          "originalAmount": 1535.5,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 138646,
+          "originalAmount": 1760.8,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 102361,
+          "originalAmount": 1299.99,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 135559,
+          "originalAmount": 1721.6,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv8pt5-161"
+        }
+      ]
+    },
+    "alternatives": [
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Umbreon",
+        "setName": "Prismatic Evolutions",
+        "setCode": "sv8pt5",
+        "number": "59/131",
+        "rarity": "Rare",
+        "imageUrl": "https://images.pokemontcg.io/sv8pt5/59_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/sv8pt5/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/sv8pt5/symbol.png",
+        "tcgApiId": "sv8pt5-59"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Umbreon ex",
+        "setName": "Prismatic Evolutions",
+        "setCode": "sv8pt5",
+        "number": "60/131",
+        "rarity": "Double Rare",
+        "imageUrl": "https://images.pokemontcg.io/sv8pt5/60_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/sv8pt5/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/sv8pt5/symbol.png",
+        "tcgApiId": "sv8pt5-60"
+      }
+    ],
+    "ambiguous": true,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 365,
+    "headline": "£720.47 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": true,
+    "alternatives": 2,
+    "catalog": "Umbreon ex | Prismatic Evolutions | 161/131",
+    "unavailable": "poketrace",
+    "error": ""
+  }
+}

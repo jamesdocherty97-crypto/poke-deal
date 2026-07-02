@@ -1,0 +1,338 @@
+{
+  "capturedAt": "2026-07-02T23:39:12.138Z",
+  "label": "Lugia Neo Genesis CGC 1.5",
+  "request": {
+    "card": {
+      "name": "Lugia",
+      "setName": "Neo Genesis",
+      "number": "9/111",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "CGC_1_5",
+    "params": {
+      "name": "Lugia",
+      "setName": "Neo Genesis",
+      "number": "9/111",
+      "grade": "CGC_1_5"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "id": "cmqrutvwp0002u37ofuz4n506",
+        "name": "Lugia",
+        "setName": "Neo Genesis",
+        "number": "9/111",
+        "tcgApiId": "neo1-9",
+        "game": "POKEMON",
+        "language": "EN"
+      },
+      "grade": "CGC_1_5",
+      "currency": "GBP",
+      "medianPence": 0,
+      "meanPence": 0,
+      "lowPence": 0,
+      "highPence": 0,
+      "sampleSize": 0,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-06-28T18:25:54.606Z",
+      "raw": {
+        "kind": "last-known-comp",
+        "cachedAt": "2026-07-02T23:37:16.295Z",
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        },
+        "cached": true
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "id": "cmqrutvwp0002u37ofuz4n506",
+          "name": "Lugia",
+          "setName": "Neo Genesis",
+          "number": "9/111",
+          "tcgApiId": "neo1-9",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "CGC_1_5",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-06-28T18:25:54.606Z",
+        "raw": {
+          "kind": "last-known-comp",
+          "cachedAt": "2026-07-02T23:37:16.295Z",
+          "cached": true
+        }
+      },
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Lugia",
+          "setName": "Neo Genesis",
+          "number": "9/111",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "neo1-9"
+        },
+        "grade": "CGC_1_5",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:11.416Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Lugia",
+          "setName": "Neo Genesis",
+          "number": "9/111",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "neo1-9"
+        },
+        "grade": "CGC_1_5",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:11.416Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "catalog market prices are raw-card signals only"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Lugia",
+          "setName": "Neo Genesis",
+          "number": "9/111",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "neo1-9"
+        },
+        "grade": "CGC_1_5",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:11.416Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Lugia",
+          "setName": "Neo Genesis",
+          "number": "9/111",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "neo1-9"
+        },
+        "grade": "CGC_1_5",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:11.606Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "cached": {
+      "asOf": "2026-07-02T23:37:16.295Z",
+      "ageHours": 0
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Lugia",
+      "setName": "Neo Genesis",
+      "setCode": "neo1",
+      "number": "9/111",
+      "rarity": "Rare Holo",
+      "imageUrl": "https://images.pokemontcg.io/neo1/9_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/neo1/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/neo1/symbol.png",
+      "tcgApiId": "neo1-9",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 26614,
+          "originalAmount": 311.38,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/neo1-9"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 25260,
+          "originalAmount": 295.54,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/neo1-9"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 23738,
+          "originalAmount": 277.73,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/neo1-9"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 18499,
+          "originalAmount": 216.44,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/neo1-9"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 12821,
+          "originalAmount": 150,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/neo1-9"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 3248,
+          "originalAmount": 38,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/neo1-9"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer 1st  Edition Holofoil market",
+          "pricePence": 125983,
+          "originalAmount": 1599.98,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "1stEditionHolofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/neo1-9"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer 1st  Edition Holofoil mid",
+          "pricePence": 610236,
+          "originalAmount": 7750,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "1stEditionHolofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/neo1-9"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer 1st  Edition Holofoil low",
+          "pricePence": 102362,
+          "originalAmount": 1300,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "1stEditionHolofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/neo1-9"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 1387,
+    "headline": "£0.00 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Lugia | Neo Genesis | 9/111",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

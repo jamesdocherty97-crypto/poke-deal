@@ -1,0 +1,758 @@
+{
+  "capturedAt": "2026-07-02T23:38:39.379Z",
+  "label": "Gengar Lost Origin TG06 RAW",
+  "request": {
+    "card": {
+      "name": "Gengar",
+      "setName": "Lost Origin",
+      "number": "TG06",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Gengar",
+      "setName": "Lost Origin",
+      "number": "TG06",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "name": "Gengar",
+        "setName": "Lost Origin Trainer Gallery",
+        "number": "TG06/TG30",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "swsh11tg-TG06"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 13563,
+      "meanPence": 6171,
+      "lowPence": 2362,
+      "highPence": 15748,
+      "sampleSize": 84,
+      "windowDays": 90,
+      "trendPct": 266.1,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-02T18:19:25.032Z",
+      "raw": {
+        "count": 84,
+        "totalValue": 5643.02,
+        "averagePrice": 78.37527777777778,
+        "medianPrice": 64.99000000000001,
+        "minPrice": 30,
+        "maxPrice": 200,
+        "marketPrice7Day": 222.34,
+        "marketPriceMedian7Day": 270,
+        "dailyVolume7Day": 0.7142857142857143,
+        "marketTrend": "stable",
+        "lastMarketUpdate": "2026-07-02T18:19:25.032Z",
+        "smartMarketPrice": {
+          "price": 172.25,
+          "confidence": "medium",
+          "method": "7day_filtered_weighted",
+          "daysUsed": 7
+        },
+        "prices": {
+          "market": 60.73,
+          "low": 26.28,
+          "sellers": 158,
+          "listings": 0,
+          "primaryPrinting": "Holofoil",
+          "lastUpdated": "2026-07-02T14:42:08.754Z",
+          "variants": {
+            "Holofoil": {
+              "Near Mint Holofoil": {
+                "price": 60.73,
+                "listings": null,
+                "priceString": "$60.73",
+                "lastUpdated": "2026-07-02T23:37:25.469Z"
+              }
+            }
+          }
+        },
+        "chosenPriceSource": "smartMarketPrice",
+        "gradeLadder": [
+          {
+            "grade": "RAW",
+            "providerKey": "ungraded",
+            "medianPence": 13563,
+            "sampleSize": 84,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_1",
+            "providerKey": "psa1",
+            "medianPence": 7874,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_3",
+            "providerKey": "psa3",
+            "medianPence": 6299,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_6",
+            "providerKey": "psa6",
+            "medianPence": 3543,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_7",
+            "providerKey": "psa7",
+            "medianPence": 3031,
+            "sampleSize": 16,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_8",
+            "providerKey": "psa8",
+            "medianPence": 3622,
+            "sampleSize": 135,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_9",
+            "providerKey": "psa9",
+            "medianPence": 5905,
+            "sampleSize": 477,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_10",
+            "providerKey": "psa10",
+            "medianPence": 38822,
+            "sampleSize": 306,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_8_5",
+            "providerKey": "bgs8_5",
+            "medianPence": 2797,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9",
+            "providerKey": "bgs9",
+            "medianPence": 7873,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9_5",
+            "providerKey": "bgs9_5",
+            "medianPence": 19685,
+            "sampleSize": 8,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8",
+            "providerKey": "cgc8",
+            "medianPence": 4724,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8_5",
+            "providerKey": "cgc8_5",
+            "medianPence": 3209,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9",
+            "providerKey": "cgc9",
+            "medianPence": 4724,
+            "sampleSize": 24,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9_5",
+            "providerKey": "cgc9_5",
+            "medianPence": 6378,
+            "sampleSize": 20,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_10",
+            "providerKey": "cgc10",
+            "medianPence": 13386,
+            "sampleSize": 64,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_9",
+            "providerKey": "ace9",
+            "medianPence": 5523,
+            "sampleSize": 11,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_10",
+            "providerKey": "ace10",
+            "medianPence": 20183,
+            "sampleSize": 4,
+            "source": "pokemon-price-tracker"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "smart-diverges-from-own-median:pt-smart",
+            "trend-suppressed:pt-smart",
+            "penalty-region-eu:tcg-market",
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Gengar",
+          "setName": "Lost Origin Trainer Gallery",
+          "number": "TG06/TG30",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh11tg-TG06"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 13563,
+        "meanPence": 6171,
+        "lowPence": 2362,
+        "highPence": 15748,
+        "sampleSize": 84,
+        "windowDays": 90,
+        "trendPct": 266.1,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:19:25.032Z",
+        "raw": {
+          "count": 84,
+          "totalValue": 5643.02,
+          "averagePrice": 78.37527777777778,
+          "medianPrice": 64.99000000000001,
+          "minPrice": 30,
+          "maxPrice": 200,
+          "marketPrice7Day": 222.34,
+          "marketPriceMedian7Day": 270,
+          "dailyVolume7Day": 0.7142857142857143,
+          "marketTrend": "stable",
+          "lastMarketUpdate": "2026-07-02T18:19:25.032Z",
+          "smartMarketPrice": {
+            "price": 172.25,
+            "confidence": "medium",
+            "method": "7day_filtered_weighted",
+            "daysUsed": 7
+          },
+          "prices": {
+            "market": 60.73,
+            "low": 26.28,
+            "sellers": 158,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:42:08.754Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 60.73,
+                  "listings": null,
+                  "priceString": "$60.73",
+                  "lastUpdated": "2026-07-02T23:37:25.469Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "smartMarketPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 13563,
+              "sampleSize": 84,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_1",
+              "providerKey": "psa1",
+              "medianPence": 7874,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_3",
+              "providerKey": "psa3",
+              "medianPence": 6299,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_6",
+              "providerKey": "psa6",
+              "medianPence": 3543,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_7",
+              "providerKey": "psa7",
+              "medianPence": 3031,
+              "sampleSize": 16,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_8",
+              "providerKey": "psa8",
+              "medianPence": 3622,
+              "sampleSize": 135,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 5905,
+              "sampleSize": 477,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_10",
+              "providerKey": "psa10",
+              "medianPence": 38822,
+              "sampleSize": 306,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_8_5",
+              "providerKey": "bgs8_5",
+              "medianPence": 2797,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9",
+              "providerKey": "bgs9",
+              "medianPence": 7873,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9_5",
+              "providerKey": "bgs9_5",
+              "medianPence": 19685,
+              "sampleSize": 8,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8",
+              "providerKey": "cgc8",
+              "medianPence": 4724,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8_5",
+              "providerKey": "cgc8_5",
+              "medianPence": 3209,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9",
+              "providerKey": "cgc9",
+              "medianPence": 4724,
+              "sampleSize": 24,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9_5",
+              "providerKey": "cgc9_5",
+              "medianPence": 6378,
+              "sampleSize": 20,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_10",
+              "providerKey": "cgc10",
+              "medianPence": 13386,
+              "sampleSize": 64,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_9",
+              "providerKey": "ace9",
+              "medianPence": 5523,
+              "sampleSize": 11,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_10",
+              "providerKey": "ace10",
+              "medianPence": 20183,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Gengar",
+          "setName": "Lost Origin Trainer Gallery",
+          "number": "TG06/TG30",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh11tg-TG06"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 3010,
+        "meanPence": 3010,
+        "lowPence": 3010,
+        "highPence": 3010,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": -21.3,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-01T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 3010,
+            "originalAmount": 35.22,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2026/07/01",
+            "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+          },
+          "signals": [
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Trend Price",
+              "pricePence": 3010,
+              "originalAmount": 35.22,
+              "originalCurrency": "EUR",
+              "kind": "trendPrice",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Average Sell Price",
+              "pricePence": 3830,
+              "originalAmount": 44.81,
+              "originalCurrency": "EUR",
+              "kind": "averageSellPrice",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg30",
+              "pricePence": 4097,
+              "originalAmount": 47.93,
+              "originalCurrency": "EUR",
+              "kind": "avg30",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg7",
+              "pricePence": 3223,
+              "originalAmount": 37.71,
+              "originalCurrency": "EUR",
+              "kind": "avg7",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price Ex Plus",
+              "pricePence": 1966,
+              "originalAmount": 23,
+              "originalCurrency": "EUR",
+              "kind": "lowPriceExPlus",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price",
+              "pricePence": 1701,
+              "originalAmount": 19.9,
+              "originalCurrency": "EUR",
+              "kind": "lowPrice",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil market",
+              "pricePence": 4765,
+              "originalAmount": 60.52,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh11tg-TG06"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil mid",
+              "pricePence": 5191,
+              "originalAmount": 65.92,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh11tg-TG06"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil low",
+              "pricePence": 3543,
+              "originalAmount": 45,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh11tg-TG06"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil directLow",
+              "pricePence": 4330,
+              "originalAmount": 54.99,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh11tg-TG06"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Gengar",
+          "setName": "Lost Origin Trainer Gallery",
+          "number": "TG06/TG30",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh11tg-TG06"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:39.254Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Gengar",
+          "setName": "Lost Origin Trainer Gallery",
+          "number": "TG06/TG30",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh11tg-TG06"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:39.289Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "smart-diverges-from-own-median:pt-smart",
+        "trend-suppressed:pt-smart",
+        "penalty-region-eu:tcg-market",
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Gengar",
+      "setName": "Lost Origin Trainer Gallery",
+      "setCode": "swsh11tg",
+      "number": "TG06/TG30",
+      "rarity": "Trainer Gallery Rare Holo",
+      "imageUrl": "https://images.pokemontcg.io/swsh11tg/TG06_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/swsh11tg/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/swsh11tg/symbol.png",
+      "tcgApiId": "swsh11tg-TG06",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 3010,
+          "originalAmount": 35.22,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 3830,
+          "originalAmount": 44.81,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 4097,
+          "originalAmount": 47.93,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 3223,
+          "originalAmount": 37.71,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 1966,
+          "originalAmount": 23,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 1701,
+          "originalAmount": 19.9,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh11tg-TG06"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 4765,
+          "originalAmount": 60.52,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh11tg-TG06"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 5191,
+          "originalAmount": 65.92,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh11tg-TG06"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 3543,
+          "originalAmount": 45,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh11tg-TG06"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 4330,
+          "originalAmount": 54.99,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh11tg-TG06"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 298,
+    "headline": "£135.63 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Gengar | Lost Origin Trainer Gallery | TG06/TG30",
+    "unavailable": "poketrace",
+    "error": ""
+  }
+}

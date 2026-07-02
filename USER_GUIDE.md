@@ -239,6 +239,14 @@ Important:
 
 No comp should be treated as just a number. Always look at the sample size, confidence and whether sources disagree.
 
+Catalogue matching now has pinned coverage for common awkward inputs:
+
+- Trainer Gallery and Galarian Gallery numbers typed with the parent set.
+- Shiny Vault cards.
+- SVP, SWSH and MEP promos.
+- Zero-padded numbers such as `226/091`.
+- Rough Quick Fill lines with source/location words mixed in.
+
 ### Ambiguous Cards
 
 If the app is not sure which printing you mean, it shows tappable card choices.
@@ -1029,14 +1037,15 @@ High priority:
 
 Comp robustness:
 
-- Run more live examples across:
+- The 2026-07-03 QA sweep added captured fixtures across:
   - Trainer Gallery.
   - Galarian Gallery.
   - Shiny Vault.
   - Promos.
   - Vintage WOTC.
-  - PSA 9/10 slabs.
-- Add captured-response fixture tests for any new source behavior.
+  - PSA, BGS, CGC and ACE slabs.
+  - Rough Quick Fill typo lines.
+- Keep adding captured-response fixture tests for any new source behavior.
 - Add a credit-budget/rate-limit guard for paid sources.
 - Add live FX provider behind `FX_API_KEY`.
 
@@ -1170,7 +1179,7 @@ The inventory/listing/sale model is already generic enough to support this later
 - RAW comps can still require manual checks.
 - Owned-sales comps need real sales history.
 - Daily scheduled jobs should be verified after env setup.
-- Some API-backed comp examples may still fail on unusual names, promos or set aliases.
+- Some source-backed comps still return no price for unusual slabs, promos or Japanese cards, but they should fail safe with manual-check guidance.
 - App route type-check coverage should be widened later.
 
 ## What Good Looks Like

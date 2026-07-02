@@ -1,0 +1,241 @@
+{
+  "capturedAt": "2026-07-02T23:39:05.053Z",
+  "label": "Alakazam MEP0079 RAW",
+  "request": {
+    "card": {
+      "name": "Alakazam",
+      "setName": "MEP",
+      "number": "MEP0079",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Alakazam",
+      "setName": "MEP",
+      "number": "MEP0079",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "id": "cmqx0ek67000510qr2blg8j89",
+        "name": "Alakazam",
+        "setName": "Mega Evolution Promos",
+        "number": "MEP0079",
+        "tcgApiId": "mep-79",
+        "game": "POKEMON",
+        "language": "EN"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 0,
+      "meanPence": 0,
+      "lowPence": 0,
+      "highPence": 0,
+      "sampleSize": 0,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-06-28T18:25:43.589Z",
+      "raw": {
+        "kind": "last-known-comp",
+        "cachedAt": "2026-07-02T23:37:09.628Z",
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        },
+        "cached": true
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "id": "cmqx0ek67000510qr2blg8j89",
+          "name": "Alakazam",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP0079",
+          "tcgApiId": "mep-79",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-06-28T18:25:43.589Z",
+        "raw": {
+          "kind": "last-known-comp",
+          "cachedAt": "2026-07-02T23:37:09.628Z",
+          "cached": true
+        }
+      },
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Alakazam",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP0079",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "mep-79"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:04.361Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Alakazam",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP0079",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "mep-79"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:04.360Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "no catalog market price"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Alakazam",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP0079",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "mep-79"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:04.353Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Alakazam",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP0079",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "mep-79"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:04.388Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "cached": {
+      "asOf": "2026-07-02T23:37:09.628Z",
+      "ageHours": 0
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Alakazam",
+      "setName": "Mega Evolution Promos",
+      "setCode": "mep",
+      "number": "MEP0079",
+      "rarity": "Promo",
+      "imageUrl": "https://images.scrydex.com/pokemon/mep-79/large",
+      "tcgApiId": "mep-79"
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 4319,
+    "headline": "£0.00 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Alakazam | Mega Evolution Promos | MEP0079",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

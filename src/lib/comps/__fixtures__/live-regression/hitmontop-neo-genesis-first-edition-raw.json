@@ -1,0 +1,267 @@
+{
+  "capturedAt": "2026-07-02T23:39:09.917Z",
+  "label": "Hitmontop Neo Genesis 1st Edition RAW",
+  "request": {
+    "card": {
+      "name": "Hitmontop Neo Genesis 1st Edition LP raw",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "q": "Hitmontop Neo Genesis 1st Edition LP raw"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "id": "cmqrup90d0003y1fmbcbhjsld",
+        "name": "Hitmontop 1st Edition",
+        "setName": "Neo Genesis",
+        "game": "POKEMON",
+        "language": "EN"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 0,
+      "meanPence": 0,
+      "lowPence": 0,
+      "highPence": 0,
+      "sampleSize": 0,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-06-28T00:00:45.007Z",
+      "raw": {
+        "kind": "last-known-comp",
+        "cachedAt": "2026-07-02T23:37:15.075Z",
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        },
+        "cached": true
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "id": "cmqrup90d0003y1fmbcbhjsld",
+          "name": "Hitmontop 1st Edition",
+          "setName": "Neo Genesis",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-06-28T00:00:45.007Z",
+        "raw": {
+          "kind": "last-known-comp",
+          "cachedAt": "2026-07-02T23:37:15.075Z",
+          "cached": true
+        }
+      },
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Hitmontop 1st Edition",
+          "setName": "Neo Genesis",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:09.566Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Hitmontop 1st Edition",
+          "setName": "Neo Genesis",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:09.568Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "catalog card did not match requested set"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Hitmontop 1st Edition",
+          "setName": "Neo Genesis",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:09.565Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Hitmontop 1st Edition",
+          "setName": "Neo Genesis",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:09.597Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "cached": {
+      "asOf": "2026-07-02T23:37:15.075Z",
+      "ageHours": 0
+    },
+    "catalog": null,
+    "alternatives": [
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Hitmontop",
+        "setName": "Neo Discovery",
+        "setCode": "neo2",
+        "number": "3/75",
+        "rarity": "Rare Holo",
+        "imageUrl": "https://images.pokemontcg.io/neo2/3_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/neo2/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/neo2/symbol.png",
+        "tcgApiId": "neo2-3"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Hitmontop",
+        "setName": "HeartGold & SoulSilver",
+        "setCode": "hgss1",
+        "number": "5/123",
+        "rarity": "Rare Holo",
+        "imageUrl": "https://images.pokemontcg.io/hgss1/5_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/hgss1/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/hgss1/symbol.png",
+        "tcgApiId": "hgss1-5"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Hitmontop",
+        "setName": "Call of Legends",
+        "setCode": "col1",
+        "number": "8/95",
+        "rarity": "Rare Holo",
+        "imageUrl": "https://images.pokemontcg.io/col1/8_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/col1/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/col1/symbol.png",
+        "tcgApiId": "col1-8"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Hitmontop",
+        "setName": "Neo Discovery",
+        "setCode": "neo2",
+        "number": "22/75",
+        "rarity": "Rare",
+        "imageUrl": "https://images.pokemontcg.io/neo2/22_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/neo2/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/neo2/symbol.png",
+        "tcgApiId": "neo2-22"
+      }
+    ],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 4071,
+    "headline": "£0.00 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 4,
+    "catalog": "no catalog",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

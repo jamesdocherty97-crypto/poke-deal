@@ -1,0 +1,718 @@
+{
+  "capturedAt": "2026-07-02T23:38:40.059Z",
+  "label": "Pikachu Crown Zenith GG30 RAW",
+  "request": {
+    "card": {
+      "name": "Pikachu",
+      "setName": "Crown Zenith",
+      "number": "GG30/GG70",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Pikachu",
+      "setName": "Crown Zenith",
+      "number": "GG30/GG70",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "name": "Pikachu",
+        "setName": "Crown Zenith Galarian Gallery",
+        "number": "GG30/GG70",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "swsh12pt5gg-GG30"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 7872,
+      "meanPence": 8679,
+      "lowPence": 1181,
+      "highPence": 27559,
+      "sampleSize": 71,
+      "windowDays": 90,
+      "trendPct": 27.3,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-02T18:24:14.854Z",
+      "raw": {
+        "count": 71,
+        "totalValue": 7274.35,
+        "averagePrice": 110.21742424242424,
+        "medianPrice": 70,
+        "minPrice": 15,
+        "maxPrice": 350,
+        "marketPrice7Day": 67.07,
+        "marketPriceMedian7Day": 67.07,
+        "dailyVolume7Day": 0.2857142857142857,
+        "marketTrend": "up",
+        "lastMarketUpdate": "2026-07-02T18:24:14.854Z",
+        "smartMarketPrice": {
+          "price": 99.97,
+          "confidence": "high",
+          "method": "30day_filtered_weighted",
+          "daysUsed": 30
+        },
+        "prices": {
+          "market": 52.67,
+          "low": 19.5,
+          "sellers": 136,
+          "listings": 0,
+          "primaryPrinting": "Holofoil",
+          "lastUpdated": "2026-07-02T14:41:59.705Z",
+          "variants": {
+            "Holofoil": {
+              "Near Mint Holofoil": {
+                "price": 52.67,
+                "listings": null,
+                "priceString": "$52.67",
+                "lastUpdated": "2026-07-02T23:38:39.861Z"
+              }
+            }
+          }
+        },
+        "chosenPriceSource": "smartMarketPrice",
+        "gradeLadder": [
+          {
+            "grade": "RAW",
+            "providerKey": "ungraded",
+            "medianPence": 7872,
+            "sampleSize": 71,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_7",
+            "providerKey": "psa7",
+            "medianPence": 2206,
+            "sampleSize": 10,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_8",
+            "providerKey": "psa8",
+            "medianPence": 3228,
+            "sampleSize": 95,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_9",
+            "providerKey": "psa9",
+            "medianPence": 3936,
+            "sampleSize": 319,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_10",
+            "providerKey": "psa10",
+            "medianPence": 33071,
+            "sampleSize": 305,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9",
+            "providerKey": "bgs9",
+            "medianPence": 4488,
+            "sampleSize": 4,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9_5",
+            "providerKey": "bgs9_5",
+            "medianPence": 11023,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_7",
+            "providerKey": "cgc7",
+            "medianPence": 2362,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8",
+            "providerKey": "cgc8",
+            "medianPence": 2362,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8_5",
+            "providerKey": "cgc8_5",
+            "medianPence": 3150,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9",
+            "providerKey": "cgc9",
+            "medianPence": 3307,
+            "sampleSize": 21,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9_5",
+            "providerKey": "cgc9_5",
+            "medianPence": 3189,
+            "sampleSize": 13,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_10",
+            "providerKey": "cgc10",
+            "medianPence": 12027,
+            "sampleSize": 59,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_9",
+            "providerKey": "ace9",
+            "medianPence": 4227,
+            "sampleSize": 10,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_10",
+            "providerKey": "ace10",
+            "medianPence": 13582,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": 7872,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-raw-bucket-spread:pt-smart",
+            "penalty-region-us:pt-smart",
+            "penalty-age-90:tcg-market",
+            "penalty-region-eu:tcg-market"
+          ],
+          "chosenSource": "pt-smart",
+          "trendPct": 27.3
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Pikachu",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG30/GG70",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh12pt5gg-GG30"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 7872,
+        "meanPence": 8679,
+        "lowPence": 1181,
+        "highPence": 27559,
+        "sampleSize": 71,
+        "windowDays": 90,
+        "trendPct": 27.3,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:24:14.854Z",
+        "raw": {
+          "count": 71,
+          "totalValue": 7274.35,
+          "averagePrice": 110.21742424242424,
+          "medianPrice": 70,
+          "minPrice": 15,
+          "maxPrice": 350,
+          "marketPrice7Day": 67.07,
+          "marketPriceMedian7Day": 67.07,
+          "dailyVolume7Day": 0.2857142857142857,
+          "marketTrend": "up",
+          "lastMarketUpdate": "2026-07-02T18:24:14.854Z",
+          "smartMarketPrice": {
+            "price": 99.97,
+            "confidence": "high",
+            "method": "30day_filtered_weighted",
+            "daysUsed": 30
+          },
+          "prices": {
+            "market": 52.67,
+            "low": 19.5,
+            "sellers": 136,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:41:59.705Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 52.67,
+                  "listings": null,
+                  "priceString": "$52.67",
+                  "lastUpdated": "2026-07-02T23:38:39.861Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "smartMarketPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 7872,
+              "sampleSize": 71,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_7",
+              "providerKey": "psa7",
+              "medianPence": 2206,
+              "sampleSize": 10,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_8",
+              "providerKey": "psa8",
+              "medianPence": 3228,
+              "sampleSize": 95,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 3936,
+              "sampleSize": 319,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_10",
+              "providerKey": "psa10",
+              "medianPence": 33071,
+              "sampleSize": 305,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9",
+              "providerKey": "bgs9",
+              "medianPence": 4488,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9_5",
+              "providerKey": "bgs9_5",
+              "medianPence": 11023,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_7",
+              "providerKey": "cgc7",
+              "medianPence": 2362,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8",
+              "providerKey": "cgc8",
+              "medianPence": 2362,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8_5",
+              "providerKey": "cgc8_5",
+              "medianPence": 3150,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9",
+              "providerKey": "cgc9",
+              "medianPence": 3307,
+              "sampleSize": 21,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9_5",
+              "providerKey": "cgc9_5",
+              "medianPence": 3189,
+              "sampleSize": 13,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_10",
+              "providerKey": "cgc10",
+              "medianPence": 12027,
+              "sampleSize": 59,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_9",
+              "providerKey": "ace9",
+              "medianPence": 4227,
+              "sampleSize": 10,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_10",
+              "providerKey": "ace10",
+              "medianPence": 13582,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Pikachu",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG30/GG70",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh12pt5gg-GG30"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 3887,
+        "meanPence": 3887,
+        "lowPence": 3887,
+        "highPence": 3887,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": 9.2,
+        "outliersRemoved": 0,
+        "asOf": "2026-05-11T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 3887,
+            "originalAmount": 45.48,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2026/05/11",
+            "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+          },
+          "signals": [
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Trend Price",
+              "pricePence": 3887,
+              "originalAmount": 45.48,
+              "originalCurrency": "EUR",
+              "kind": "trendPrice",
+              "updatedAt": "2026/05/11",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Average Sell Price",
+              "pricePence": 3095,
+              "originalAmount": 36.21,
+              "originalCurrency": "EUR",
+              "kind": "averageSellPrice",
+              "updatedAt": "2026/05/11",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg30",
+              "pricePence": 3590,
+              "originalAmount": 42,
+              "originalCurrency": "EUR",
+              "kind": "avg30",
+              "updatedAt": "2026/05/11",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg7",
+              "pricePence": 3922,
+              "originalAmount": 45.89,
+              "originalCurrency": "EUR",
+              "kind": "avg7",
+              "updatedAt": "2026/05/11",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price Ex Plus",
+              "pricePence": 2393,
+              "originalAmount": 28,
+              "originalCurrency": "EUR",
+              "kind": "lowPriceExPlus",
+              "updatedAt": "2026/05/11",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price",
+              "pricePence": 1700,
+              "originalAmount": 19.89,
+              "originalCurrency": "EUR",
+              "kind": "lowPrice",
+              "updatedAt": "2026/05/11",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil market",
+              "pricePence": 4167,
+              "originalAmount": 52.92,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil mid",
+              "pricePence": 4392,
+              "originalAmount": 55.78,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil low",
+              "pricePence": 3504,
+              "originalAmount": 44.5,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG30"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil directLow",
+              "pricePence": 4486,
+              "originalAmount": 56.97,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG30"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Pikachu",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG30/GG70",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh12pt5gg-GG30"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:39.496Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Pikachu",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG30/GG70",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh12pt5gg-GG30"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:39.532Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 7872,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-raw-bucket-spread:pt-smart",
+        "penalty-region-us:pt-smart",
+        "penalty-age-90:tcg-market",
+        "penalty-region-eu:tcg-market"
+      ],
+      "chosenSource": "pt-smart",
+      "trendPct": 27.3
+    },
+    "unavailableSources": [
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Pikachu",
+      "setName": "Crown Zenith Galarian Gallery",
+      "setCode": "swsh12pt5gg",
+      "number": "GG30/GG70",
+      "rarity": "Trainer Gallery Rare Holo",
+      "imageUrl": "https://images.pokemontcg.io/swsh12pt5gg/GG30_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/swsh12pt5gg/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/swsh12pt5gg/symbol.png",
+      "tcgApiId": "swsh12pt5gg-GG30",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 3887,
+          "originalAmount": 45.48,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/05/11",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 3095,
+          "originalAmount": 36.21,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/05/11",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 3590,
+          "originalAmount": 42,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2026/05/11",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 3922,
+          "originalAmount": 45.89,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2026/05/11",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 2393,
+          "originalAmount": 28,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2026/05/11",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 1700,
+          "originalAmount": 19.89,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2026/05/11",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 4167,
+          "originalAmount": 52.92,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 4392,
+          "originalAmount": 55.78,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 3504,
+          "originalAmount": 44.5,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG30"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 4486,
+          "originalAmount": 56.97,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG30"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 679,
+    "headline": "£78.72 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Pikachu | Crown Zenith Galarian Gallery | GG30/GG70",
+    "unavailable": "poketrace",
+    "error": ""
+  }
+}

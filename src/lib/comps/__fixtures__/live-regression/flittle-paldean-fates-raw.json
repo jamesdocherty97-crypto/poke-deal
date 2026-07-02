@@ -1,0 +1,628 @@
+{
+  "capturedAt": "2026-07-02T23:39:13.418Z",
+  "label": "Flittle Paldean Fates RAW",
+  "request": {
+    "card": {
+      "name": "Flittle",
+      "setName": "Paldean Fates",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Flittle",
+      "setName": "Paldean Fates",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-tcg-market",
+      "card": {
+        "name": "Flittle",
+        "setName": "Paldean Fates",
+        "number": "164/91",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "sv4pt5-164"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 156,
+      "meanPence": 156,
+      "lowPence": 156,
+      "highPence": 156,
+      "sampleSize": 1,
+      "windowDays": 30,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2025-11-18T00:00:00.000Z",
+      "raw": {
+        "kind": "catalog-market-baseline",
+        "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+        "chosenSignal": {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 156,
+          "originalAmount": 1.83,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+        },
+        "signals": [
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 156,
+            "originalAmount": 1.83,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Average Sell Price",
+            "pricePence": 182,
+            "originalAmount": 2.13,
+            "originalCurrency": "EUR",
+            "kind": "averageSellPrice",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Avg30",
+            "pricePence": 170,
+            "originalAmount": 1.99,
+            "originalCurrency": "EUR",
+            "kind": "avg30",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Avg7",
+            "pricePence": 185,
+            "originalAmount": 2.17,
+            "originalCurrency": "EUR",
+            "kind": "avg7",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Low Price Ex Plus",
+            "pricePence": 85,
+            "originalAmount": 1,
+            "originalCurrency": "EUR",
+            "kind": "lowPriceExPlus",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Low Price",
+            "pricePence": 85,
+            "originalAmount": 1,
+            "originalCurrency": "EUR",
+            "kind": "lowPrice",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil market",
+            "pricePence": 183,
+            "originalAmount": 2.33,
+            "originalCurrency": "USD",
+            "kind": "market",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil mid",
+            "pricePence": 208,
+            "originalAmount": 2.64,
+            "originalCurrency": "USD",
+            "kind": "mid",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil low",
+            "pricePence": 98,
+            "originalAmount": 1.25,
+            "originalCurrency": "USD",
+            "kind": "low",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil directLow",
+            "pricePence": 260,
+            "originalAmount": 3.3,
+            "originalCurrency": "USD",
+            "kind": "directLow",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": 156,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-region-us:pt-smart",
+            "corroboration-stale:tcg-market",
+            "penalty-region-eu:tcg-market",
+            "corroboration-fallback:tcg-market"
+          ],
+          "chosenSource": "tcg-market",
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Flittle",
+          "setName": "Paldean Fates",
+          "number": "164/91",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv4pt5-164"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 3937,
+        "meanPence": 3937,
+        "lowPence": 3937,
+        "highPence": 3937,
+        "sampleSize": 1,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T20:21:37.960Z",
+        "raw": {
+          "count": 1,
+          "totalValue": 50,
+          "averagePrice": 50,
+          "medianPrice": 50,
+          "minPrice": 50,
+          "maxPrice": 50,
+          "marketPrice7Day": null,
+          "marketPriceMedian7Day": null,
+          "dailyVolume7Day": null,
+          "marketTrend": null,
+          "lastMarketUpdate": "2026-07-02T20:21:37.960Z",
+          "smartMarketPrice": {
+            "price": 50,
+            "confidence": "low",
+            "method": "all_filtered_weighted",
+            "daysUsed": 196
+          },
+          "prices": {
+            "market": 2.33,
+            "low": 1.25,
+            "sellers": 155,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:41:45.467Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 2.33,
+                  "listings": null,
+                  "priceString": "$2.33",
+                  "lastUpdated": "2026-07-02T23:30:22.768Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "smartMarketPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 3937,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 1496,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_10",
+              "providerKey": "psa10",
+              "medianPence": 4724,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_10",
+              "providerKey": "cgc10",
+              "medianPence": 2205,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Flittle",
+          "setName": "Paldean Fates",
+          "number": "164/91",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv4pt5-164"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 156,
+        "meanPence": 156,
+        "lowPence": 156,
+        "highPence": 156,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": 8.8,
+        "outliersRemoved": 0,
+        "asOf": "2025-11-18T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 156,
+            "originalAmount": 1.83,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+          },
+          "signals": [
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Trend Price",
+              "pricePence": 156,
+              "originalAmount": 1.83,
+              "originalCurrency": "EUR",
+              "kind": "trendPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Average Sell Price",
+              "pricePence": 182,
+              "originalAmount": 2.13,
+              "originalCurrency": "EUR",
+              "kind": "averageSellPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg30",
+              "pricePence": 170,
+              "originalAmount": 1.99,
+              "originalCurrency": "EUR",
+              "kind": "avg30",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg7",
+              "pricePence": 185,
+              "originalAmount": 2.17,
+              "originalCurrency": "EUR",
+              "kind": "avg7",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price Ex Plus",
+              "pricePence": 85,
+              "originalAmount": 1,
+              "originalCurrency": "EUR",
+              "kind": "lowPriceExPlus",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price",
+              "pricePence": 85,
+              "originalAmount": 1,
+              "originalCurrency": "EUR",
+              "kind": "lowPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil market",
+              "pricePence": 183,
+              "originalAmount": 2.33,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil mid",
+              "pricePence": 208,
+              "originalAmount": 2.64,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil low",
+              "pricePence": 98,
+              "originalAmount": 1.25,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil directLow",
+              "pricePence": 260,
+              "originalAmount": 3.3,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Flittle",
+          "setName": "Paldean Fates",
+          "number": "164/91",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv4pt5-164"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:13.318Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Flittle",
+          "setName": "Paldean Fates",
+          "number": "164/91",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv4pt5-164"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:13.351Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 156,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-region-us:pt-smart",
+        "corroboration-stale:tcg-market",
+        "penalty-region-eu:tcg-market",
+        "corroboration-fallback:tcg-market"
+      ],
+      "chosenSource": "tcg-market",
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Flittle",
+      "setName": "Paldean Fates",
+      "setCode": "sv4pt5",
+      "number": "164/91",
+      "rarity": "Shiny Rare",
+      "imageUrl": "https://images.pokemontcg.io/sv4pt5/164_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/sv4pt5/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/sv4pt5/symbol.png",
+      "tcgApiId": "sv4pt5-164",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 156,
+          "originalAmount": 1.83,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 182,
+          "originalAmount": 2.13,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 170,
+          "originalAmount": 1.99,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 185,
+          "originalAmount": 2.17,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 85,
+          "originalAmount": 1,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 85,
+          "originalAmount": 1,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-164"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 183,
+          "originalAmount": 2.33,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 208,
+          "originalAmount": 2.64,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 98,
+          "originalAmount": 1.25,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 260,
+          "originalAmount": 3.3,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-164"
+        }
+      ]
+    },
+    "alternatives": [
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Flittle",
+        "setName": "Paldean Fates",
+        "setCode": "sv4pt5",
+        "number": "41/91",
+        "rarity": "Common",
+        "imageUrl": "https://images.pokemontcg.io/sv4pt5/41_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/sv4pt5/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/sv4pt5/symbol.png",
+        "tcgApiId": "sv4pt5-41"
+      }
+    ],
+    "ambiguous": true,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 286,
+    "headline": "£1.56 pokemon-tcg-market",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": true,
+    "alternatives": 1,
+    "catalog": "Flittle | Paldean Fates | 164/91",
+    "unavailable": "poketrace",
+    "error": ""
+  }
+}

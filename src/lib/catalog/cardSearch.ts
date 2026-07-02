@@ -85,20 +85,25 @@ export function scoreCatalogCardForSearch(query: string, card: CatalogCard, setN
 export function catalogCardMatchesSetContext(
   card: CatalogCard | null | undefined,
   setName?: string | null,
+  number?: string | null,
 ): boolean {
   if (!setName?.trim()) return true;
   if (!card) return false;
   if (isGenericPromoSetContext(setName)) return scoreSetContextForSearch(setName, card) > 0;
 
-  const resolvedSetId = resolveSetId(setName);
+  const baseSetId = resolveSetId(setName);
+  const resolvedSetId = resolveSetIdForCard(setName, number ?? undefined);
   if (resolvedSetId) {
     const resolvedSet = getSetById(resolvedSetId);
+    const baseSet = baseSetId ? getSetById(baseSetId) : undefined;
     const matchedBySetName = normalizeSetTextForContext(card.setName) === normalizeSetTextForContext(resolvedSet?.name ?? "");
+    const matchedByParentSetNameWithoutCode = !card.setCode &&
+      normalizeSetTextForContext(card.setName) === normalizeSetTextForContext(baseSet?.name ?? "");
     const matchedBySetAlias = card.setCode === resolvedSetId;
     const matchedByPtcgo = normalizeSetTextForContext(card.setCode ?? "") ===
       normalizeSetTextForContext(resolvedSet?.ptcgoCode ?? "");
     return (
-      matchedBySetAlias || matchedBySetName || matchedByPtcgo
+      matchedBySetAlias || matchedBySetName || matchedByParentSetNameWithoutCode || matchedByPtcgo
     );
   }
 
@@ -110,7 +115,7 @@ export function catalogCardMatchesLookupContext(
   request: CatalogCardLookupContext,
 ): boolean {
   if (!card) return false;
-  if (!catalogCardMatchesSetContext(card, request.setName)) return false;
+  if (!catalogCardMatchesSetContext(card, request.setName, request.number)) return false;
 
   const requestedName = normalizeNameForSearch(stripLookupNoise(stripVariantLookupNoise(request.name ?? "")));
   if (requestedName && scoreSearchText(requestedName, card.name) === 0) return false;
@@ -209,6 +214,13 @@ export function normalizeCatalogCardSearchInput(
     }
   }
 
+  const embeddedNumber = !number && setName ? splitEmbeddedCollectorNumber(name) : null;
+  if (embeddedNumber) {
+    name = embeddedNumber.name;
+    number = embeddedNumber.number;
+    setName = resolveSetDisplayName(setName!, number);
+  }
+
   const trailingNumber = !number && setName ? splitTrailingCollectorNumber(name) : null;
   if (trailingNumber && setName) {
     name = trailingNumber.name;
@@ -228,6 +240,9 @@ function normalizeParentheticalPromoNumbers(input: string): string {
   );
   return withParenthetical.replace(
     /\b0?(\d{1,4})\s+(?:(?:IR|SIR|SAR|AR|illustration\s+rare|special\s+illustration\s+rare)\s+)?promo\b(?=\s|$)/gi,
+    (_, digits: string) => `SVP${digits.padStart(3, "0")}`,
+  ).replace(
+    /\bpromo\s+0?(\d{1,4})\b/gi,
     (_, digits: string) => `SVP${digits.padStart(3, "0")}`,
   );
 }
@@ -300,6 +315,8 @@ function stripLookupNoise(input: string): string {
   return input
     .replace(/(?:£\s*)\d+(?:[.,]\d{1,2})?/gi, " ")
     .replace(/\b(?:paid|cost|buy|bought)\s*(?:£\s*)?\d+(?:[.,]\d{1,2})?\b/gi, " ")
+    .replace(/\b(?:paid|cost|buy|bought|tenner)\b/gi, " ")
+    .replace(/\b(?:ebay|vinted|cardmarket|facebook|whatnot|local|shop|store|binder|binders|collection|pickup)\b/gi, " ")
     .replace(/\b(?:psa|bgs|cgc|ace)\s*(?:10|[1-9](?:\s*[.,]\s*5)?)\b/gi, " ")
     .replace(/\b(?:1st|first)\s*(?:edition|ed)\b/gi, " ")
     .replace(/\b(?:unlimited|shadowless)\b/gi, " ")
@@ -386,6 +403,19 @@ function splitTrailingCollectorNumber(input: string): { name: string; number: st
   return { name, number };
 }
 
+function splitEmbeddedCollectorNumber(input: string): { name: string; number: string } | null {
+  const match = input.trim().match(new RegExp(`(?:^|\\s)#?(${COLLECTOR_NUMBER_TEXT})(?=\\s|$)`, "i"));
+  const rawNumber = match?.[1];
+  const number = readCollectorNumber(rawNumber);
+  if (!number || !rawNumber) return null;
+  const name = input
+    .replace(new RegExp(`(?:^|\\s)#?${escapeRegExp(rawNumber)}(?=\\s|$)`, "i"), " ")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!name) return null;
+  return { name, number };
+}
+
 function isPlainCollectorNumber(value: string): boolean {
   return /^\d{1,4}$/.test(value);
 }
@@ -429,7 +459,7 @@ function sameCollectorNumberForCard(queryNumber: string, card: CatalogCard): boo
 
 function normalizeCollectorNumberForSearch(number: string): string {
   const trimmed = number.trim();
-  const parts = trimmed.split("/").map((part) => normalizeSearchText(part));
+  const parts = trimmed.split("/").map((part) => normalizeCollectorNumberPart(normalizeSearchText(part)));
   const left = parts[0] ?? "";
   const right = parts[1];
   if (!right) return left;
@@ -437,6 +467,10 @@ function normalizeCollectorNumberForSearch(number: string): string {
   const prefix = left.match(/^([a-z]{1,5})\d+$/)?.[1];
   if (prefix && /^\d+$/.test(right)) return `${left}/${prefix}${right}`;
   return `${left}/${right}`;
+}
+
+function normalizeCollectorNumberPart(part: string): string {
+  return /^\d+$/.test(part) ? String(Number.parseInt(part, 10)) : part;
 }
 
 function collectorNumberForms(number: string): Set<string> {

@@ -1,0 +1,253 @@
+{
+  "capturedAt": "2026-07-02T23:38:55.996Z",
+  "label": "Victini SVP 208 ACE 10",
+  "request": {
+    "card": {
+      "name": "Victini",
+      "setName": "SV Promos",
+      "number": "SVP 208",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "ACE_10",
+    "params": {
+      "name": "Victini",
+      "setName": "SV Promos",
+      "number": "SVP 208",
+      "grade": "ACE_10"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "id": "cmqwmup4700012olaq5qe4vkr",
+        "name": "Victini",
+        "setName": "Scarlet & Violet Black Star Promos",
+        "number": "SVP208",
+        "tcgApiId": "svp-208",
+        "game": "POKEMON",
+        "language": "EN"
+      },
+      "grade": "ACE_10",
+      "currency": "GBP",
+      "medianPence": 0,
+      "meanPence": 0,
+      "lowPence": 0,
+      "highPence": 0,
+      "sampleSize": 0,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-06-28T18:25:30.010Z",
+      "raw": {
+        "kind": "last-known-comp",
+        "cachedAt": "2026-07-02T23:36:59.698Z",
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        },
+        "cached": true
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "id": "cmqwmup4700012olaq5qe4vkr",
+          "name": "Victini",
+          "setName": "Scarlet & Violet Black Star Promos",
+          "number": "SVP208",
+          "tcgApiId": "svp-208",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "ACE_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-06-28T18:25:30.010Z",
+        "raw": {
+          "kind": "last-known-comp",
+          "cachedAt": "2026-07-02T23:36:59.698Z",
+          "cached": true
+        }
+      },
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Victini",
+          "setName": "Scarlet & Violet Black Star Promos",
+          "number": "SVP208",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "svp-208"
+        },
+        "grade": "ACE_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:49.327Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Victini",
+          "setName": "Scarlet & Violet Black Star Promos",
+          "number": "SVP208",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "svp-208"
+        },
+        "grade": "ACE_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:48.975Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "catalog market prices are raw-card signals only"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Victini",
+          "setName": "Scarlet & Violet Black Star Promos",
+          "number": "SVP208",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "svp-208"
+        },
+        "grade": "ACE_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:48.975Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Victini",
+          "setName": "Scarlet & Violet Black Star Promos",
+          "number": "SVP208",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "svp-208"
+        },
+        "grade": "ACE_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:49.093Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "cached": {
+      "asOf": "2026-07-02T23:36:59.698Z",
+      "ageHours": 0
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Victini",
+      "setName": "Scarlet & Violet Black Star Promos",
+      "setCode": "svp",
+      "number": "SVP208",
+      "rarity": "Promo",
+      "imageUrl": "https://images.scrydex.com/pokemon/svp-208/large",
+      "tcgApiId": "svp-208"
+    },
+    "alternatives": [
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Victini",
+        "setName": "Scarlet & Violet Black Star Promos",
+        "setCode": "svp",
+        "number": "SVP208",
+        "rarity": "Promo",
+        "imageUrl": "https://images.scrydex.com/pokemon/svp-208/large",
+        "tcgApiId": "svp-208"
+      }
+    ],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 10641,
+    "headline": "£0.00 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 1,
+    "catalog": "Victini | Scarlet & Violet Black Star Promos | SVP208",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

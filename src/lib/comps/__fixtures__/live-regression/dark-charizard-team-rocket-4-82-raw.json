@@ -1,0 +1,496 @@
+{
+  "capturedAt": "2026-07-02T23:39:05.846Z",
+  "label": "Dark Charizard Team Rocket 4/82 RAW",
+  "request": {
+    "card": {
+      "name": "Dark Charizard",
+      "setName": "Team Rocket",
+      "number": "4/82",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Dark Charizard",
+      "setName": "Team Rocket",
+      "number": "4/82",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-tcg-market",
+      "card": {
+        "name": "Dark Charizard",
+        "setName": "Team Rocket",
+        "number": "4/82",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "base5-4"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 38706,
+      "meanPence": 38706,
+      "lowPence": 38706,
+      "highPence": 38706,
+      "sampleSize": 1,
+      "windowDays": 30,
+      "trendPct": -63.6,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-01T00:00:00.000Z",
+      "raw": {
+        "kind": "catalog-market-baseline",
+        "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+        "chosenSignal": {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 38706,
+          "originalAmount": 452.86,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+        },
+        "signals": [
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Average Sell Price",
+            "pricePence": 38706,
+            "originalAmount": 452.86,
+            "originalCurrency": "EUR",
+            "kind": "averageSellPrice",
+            "updatedAt": "2026/07/01",
+            "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Avg30",
+            "pricePence": 38534,
+            "originalAmount": 450.85,
+            "originalCurrency": "EUR",
+            "kind": "avg30",
+            "updatedAt": "2026/07/01",
+            "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Avg7",
+            "pricePence": 14035,
+            "originalAmount": 164.21,
+            "originalCurrency": "EUR",
+            "kind": "avg7",
+            "updatedAt": "2026/07/01",
+            "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Low Price Ex Plus",
+            "pricePence": 17009,
+            "originalAmount": 199,
+            "originalCurrency": "EUR",
+            "kind": "lowPriceExPlus",
+            "updatedAt": "2026/07/01",
+            "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Low Price",
+            "pricePence": 5897,
+            "originalAmount": 69,
+            "originalCurrency": "EUR",
+            "kind": "lowPrice",
+            "updatedAt": "2026/07/01",
+            "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer 1st  Edition Holofoil market",
+            "pricePence": 34983,
+            "originalAmount": 444.29,
+            "originalCurrency": "USD",
+            "kind": "market",
+            "variant": "1stEditionHolofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer 1st  Edition Holofoil mid",
+            "pricePence": 59055,
+            "originalAmount": 750,
+            "originalCurrency": "USD",
+            "kind": "mid",
+            "variant": "1stEditionHolofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer 1st  Edition Holofoil low",
+            "pricePence": 44094,
+            "originalAmount": 559.99,
+            "originalCurrency": "USD",
+            "kind": "low",
+            "variant": "1stEditionHolofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "tcg-vintage-raw-excluded",
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Dark Charizard",
+          "setName": "Team Rocket",
+          "number": "4/82",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "base5-4"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:05.756Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Dark Charizard",
+          "setName": "Team Rocket",
+          "number": "4/82",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "base5-4"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 38706,
+        "meanPence": 38706,
+        "lowPence": 38706,
+        "highPence": 38706,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": -63.6,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-01T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "cardmarket",
+            "label": "Cardmarket Average Sell Price",
+            "pricePence": 38706,
+            "originalAmount": 452.86,
+            "originalCurrency": "EUR",
+            "kind": "averageSellPrice",
+            "updatedAt": "2026/07/01",
+            "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+          },
+          "signals": [
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Average Sell Price",
+              "pricePence": 38706,
+              "originalAmount": 452.86,
+              "originalCurrency": "EUR",
+              "kind": "averageSellPrice",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg30",
+              "pricePence": 38534,
+              "originalAmount": 450.85,
+              "originalCurrency": "EUR",
+              "kind": "avg30",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg7",
+              "pricePence": 14035,
+              "originalAmount": 164.21,
+              "originalCurrency": "EUR",
+              "kind": "avg7",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price Ex Plus",
+              "pricePence": 17009,
+              "originalAmount": 199,
+              "originalCurrency": "EUR",
+              "kind": "lowPriceExPlus",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price",
+              "pricePence": 5897,
+              "originalAmount": 69,
+              "originalCurrency": "EUR",
+              "kind": "lowPrice",
+              "updatedAt": "2026/07/01",
+              "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer 1st  Edition Holofoil market",
+              "pricePence": 34983,
+              "originalAmount": 444.29,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "1stEditionHolofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer 1st  Edition Holofoil mid",
+              "pricePence": 59055,
+              "originalAmount": 750,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "1stEditionHolofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer 1st  Edition Holofoil low",
+              "pricePence": 44094,
+              "originalAmount": 559.99,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "1stEditionHolofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Dark Charizard",
+          "setName": "Team Rocket",
+          "number": "4/82",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "base5-4"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:05.750Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Dark Charizard",
+          "setName": "Team Rocket",
+          "number": "4/82",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "base5-4"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:05.782Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "tcg-vintage-raw-excluded",
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Dark Charizard",
+      "setName": "Team Rocket",
+      "setCode": "base5",
+      "number": "4/82",
+      "rarity": "Rare Holo",
+      "imageUrl": "https://images.pokemontcg.io/base5/4_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/base5/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/base5/symbol.png",
+      "tcgApiId": "base5-4",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 10999,
+          "originalAmount": 128.69,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 38706,
+          "originalAmount": 452.86,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 38534,
+          "originalAmount": 450.85,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 14035,
+          "originalAmount": 164.21,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 17009,
+          "originalAmount": 199,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 5897,
+          "originalAmount": 69,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base5-4"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer 1st  Edition Holofoil market",
+          "pricePence": 34983,
+          "originalAmount": 444.29,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "1stEditionHolofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer 1st  Edition Holofoil mid",
+          "pricePence": 59055,
+          "originalAmount": 750,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "1stEditionHolofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer 1st  Edition Holofoil low",
+          "pricePence": 44094,
+          "originalAmount": 559.99,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "1stEditionHolofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/base5-4"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 208,
+    "headline": "£387.06 pokemon-tcg-market",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Dark Charizard | Team Rocket | 4/82",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

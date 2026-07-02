@@ -1,0 +1,716 @@
+{
+  "capturedAt": "2026-07-02T23:40:30.446Z",
+  "label": "Pawmi Paldean Fates 226 RAW",
+  "request": {
+    "card": {
+      "name": "Pawmi",
+      "setName": "Paldean Fates",
+      "number": "226/091",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Pawmi",
+      "setName": "Paldean Fates",
+      "number": "226/091",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "name": "Pawmi",
+        "setName": "Paldean Fates",
+        "number": "226/91",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "sv4pt5-226"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 886,
+      "meanPence": 886,
+      "lowPence": 472,
+      "highPence": 1575,
+      "sampleSize": 10,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-06-29T21:13:40.367Z",
+      "raw": {
+        "count": 10,
+        "totalValue": 90,
+        "averagePrice": 11.25,
+        "medianPrice": 10.25,
+        "minPrice": 6,
+        "maxPrice": 20,
+        "marketPrice7Day": null,
+        "marketPriceMedian7Day": null,
+        "dailyVolume7Day": null,
+        "marketTrend": "up",
+        "lastMarketUpdate": "2026-06-29T21:13:40.367Z",
+        "smartMarketPrice": {
+          "price": 11.25,
+          "confidence": "medium",
+          "method": "90day_filtered_weighted",
+          "daysUsed": 90
+        },
+        "prices": {
+          "market": 3.49,
+          "low": 1.4,
+          "sellers": 581,
+          "listings": 0,
+          "primaryPrinting": "Holofoil",
+          "lastUpdated": "2026-07-02T14:41:45.467Z",
+          "variants": {
+            "Holofoil": {
+              "Near Mint Holofoil": {
+                "price": 3.49,
+                "listings": null,
+                "priceString": "$3.49",
+                "lastUpdated": "2026-07-02T23:40:28.763Z"
+              }
+            }
+          }
+        },
+        "chosenPriceSource": "smartMarketPrice",
+        "gradeLadder": [
+          {
+            "grade": "RAW",
+            "providerKey": "ungraded",
+            "medianPence": 886,
+            "sampleSize": 10,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_1",
+            "providerKey": "psa1",
+            "medianPence": 2047,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_5",
+            "providerKey": "psa5",
+            "medianPence": 2874,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_7",
+            "providerKey": "psa7",
+            "medianPence": 955,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_8",
+            "providerKey": "psa8",
+            "medianPence": 1102,
+            "sampleSize": 11,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_9",
+            "providerKey": "psa9",
+            "medianPence": 1258,
+            "sampleSize": 58,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_10",
+            "providerKey": "psa10",
+            "medianPence": 3936,
+            "sampleSize": 109,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9",
+            "providerKey": "bgs9",
+            "medianPence": 1181,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_7",
+            "providerKey": "cgc7",
+            "medianPence": 783,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8_5",
+            "providerKey": "cgc8_5",
+            "medianPence": 630,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9",
+            "providerKey": "cgc9",
+            "medianPence": 678,
+            "sampleSize": 11,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9_5",
+            "providerKey": "cgc9_5",
+            "medianPence": 856,
+            "sampleSize": 4,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_10",
+            "providerKey": "cgc10",
+            "medianPence": 1964,
+            "sampleSize": 27,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_9",
+            "providerKey": "ace9",
+            "medianPence": 1933,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_10",
+            "providerKey": "ace10",
+            "medianPence": 5031,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": 886,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-region-us:pt-smart",
+            "corroboration-stale:tcg-market",
+            "penalty-region-eu:tcg-market"
+          ],
+          "chosenSource": "pt-smart",
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Pawmi",
+          "setName": "Paldean Fates",
+          "number": "226/91",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv4pt5-226"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 886,
+        "meanPence": 886,
+        "lowPence": 472,
+        "highPence": 1575,
+        "sampleSize": 10,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-06-29T21:13:40.367Z",
+        "raw": {
+          "count": 10,
+          "totalValue": 90,
+          "averagePrice": 11.25,
+          "medianPrice": 10.25,
+          "minPrice": 6,
+          "maxPrice": 20,
+          "marketPrice7Day": null,
+          "marketPriceMedian7Day": null,
+          "dailyVolume7Day": null,
+          "marketTrend": "up",
+          "lastMarketUpdate": "2026-06-29T21:13:40.367Z",
+          "smartMarketPrice": {
+            "price": 11.25,
+            "confidence": "medium",
+            "method": "90day_filtered_weighted",
+            "daysUsed": 90
+          },
+          "prices": {
+            "market": 3.49,
+            "low": 1.4,
+            "sellers": 581,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:41:45.467Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 3.49,
+                  "listings": null,
+                  "priceString": "$3.49",
+                  "lastUpdated": "2026-07-02T23:40:28.763Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "smartMarketPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 886,
+              "sampleSize": 10,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_1",
+              "providerKey": "psa1",
+              "medianPence": 2047,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_5",
+              "providerKey": "psa5",
+              "medianPence": 2874,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_7",
+              "providerKey": "psa7",
+              "medianPence": 955,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_8",
+              "providerKey": "psa8",
+              "medianPence": 1102,
+              "sampleSize": 11,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 1258,
+              "sampleSize": 58,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_10",
+              "providerKey": "psa10",
+              "medianPence": 3936,
+              "sampleSize": 109,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9",
+              "providerKey": "bgs9",
+              "medianPence": 1181,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_7",
+              "providerKey": "cgc7",
+              "medianPence": 783,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8_5",
+              "providerKey": "cgc8_5",
+              "medianPence": 630,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9",
+              "providerKey": "cgc9",
+              "medianPence": 678,
+              "sampleSize": 11,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9_5",
+              "providerKey": "cgc9_5",
+              "medianPence": 856,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_10",
+              "providerKey": "cgc10",
+              "medianPence": 1964,
+              "sampleSize": 27,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_9",
+              "providerKey": "ace9",
+              "medianPence": 1933,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_10",
+              "providerKey": "ace10",
+              "medianPence": 5031,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Pawmi",
+          "setName": "Paldean Fates",
+          "number": "226/91",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv4pt5-226"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 91,
+        "meanPence": 91,
+        "lowPence": 91,
+        "highPence": 91,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": 2.2,
+        "outliersRemoved": 0,
+        "asOf": "2025-11-18T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 91,
+            "originalAmount": 1.07,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+          },
+          "signals": [
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Trend Price",
+              "pricePence": 91,
+              "originalAmount": 1.07,
+              "originalCurrency": "EUR",
+              "kind": "trendPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Average Sell Price",
+              "pricePence": 95,
+              "originalAmount": 1.11,
+              "originalCurrency": "EUR",
+              "kind": "averageSellPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg30",
+              "pricePence": 91,
+              "originalAmount": 1.07,
+              "originalCurrency": "EUR",
+              "kind": "avg30",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg7",
+              "pricePence": 93,
+              "originalAmount": 1.09,
+              "originalCurrency": "EUR",
+              "kind": "avg7",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price Ex Plus",
+              "pricePence": 17,
+              "originalAmount": 0.2,
+              "originalCurrency": "EUR",
+              "kind": "lowPriceExPlus",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price",
+              "pricePence": 13,
+              "originalAmount": 0.15,
+              "originalCurrency": "EUR",
+              "kind": "lowPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil market",
+              "pricePence": 275,
+              "originalAmount": 3.49,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-226"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil mid",
+              "pricePence": 298,
+              "originalAmount": 3.79,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-226"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil low",
+              "pricePence": 110,
+              "originalAmount": 1.4,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-226"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil directLow",
+              "pricePence": 291,
+              "originalAmount": 3.69,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-226"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Pawmi",
+          "setName": "Paldean Fates",
+          "number": "226/91",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv4pt5-226"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:40:30.357Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Pawmi",
+          "setName": "Paldean Fates",
+          "number": "226/91",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv4pt5-226"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:40:28.198Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 886,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-region-us:pt-smart",
+        "corroboration-stale:tcg-market",
+        "penalty-region-eu:tcg-market"
+      ],
+      "chosenSource": "pt-smart",
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Pawmi",
+      "setName": "Paldean Fates",
+      "setCode": "sv4pt5",
+      "number": "226/91",
+      "rarity": "Illustration Rare",
+      "imageUrl": "https://images.pokemontcg.io/sv4pt5/226_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/sv4pt5/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/sv4pt5/symbol.png",
+      "tcgApiId": "sv4pt5-226",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 91,
+          "originalAmount": 1.07,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 95,
+          "originalAmount": 1.11,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 91,
+          "originalAmount": 1.07,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 93,
+          "originalAmount": 1.09,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 17,
+          "originalAmount": 0.2,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 13,
+          "originalAmount": 0.15,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv4pt5-226"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 275,
+          "originalAmount": 3.49,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-226"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 298,
+          "originalAmount": 3.79,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-226"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 110,
+          "originalAmount": 1.4,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-226"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 291,
+          "originalAmount": 3.69,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv4pt5-226"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 2787,
+    "headline": "£8.86 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Pawmi | Paldean Fates | 226/91",
+    "unavailable": "poketrace",
+    "error": ""
+  }
+}

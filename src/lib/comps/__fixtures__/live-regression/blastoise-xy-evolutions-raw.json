@@ -1,0 +1,598 @@
+{
+  "capturedAt": "2026-07-02T23:39:13.132Z",
+  "label": "Blastoise XY Evolutions RAW",
+  "request": {
+    "card": {
+      "name": "Blastoise",
+      "setName": "XY Evolutions",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW",
+    "params": {
+      "name": "Blastoise",
+      "setName": "XY Evolutions",
+      "grade": "RAW"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-tcg-market",
+      "card": {
+        "name": "Blastoise-EX",
+        "setName": "Evolutions",
+        "number": "21/108",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "xy12-21"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 669,
+      "meanPence": 669,
+      "lowPence": 669,
+      "highPence": 669,
+      "sampleSize": 1,
+      "windowDays": 30,
+      "trendPct": -21.9,
+      "outliersRemoved": 0,
+      "asOf": "2026-06-25T00:00:00.000Z",
+      "raw": {
+        "kind": "catalog-market-baseline",
+        "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+        "chosenSignal": {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 669,
+          "originalAmount": 7.83,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/06/25",
+          "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+        },
+        "signals": [
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 669,
+            "originalAmount": 7.83,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2026/06/25",
+            "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Average Sell Price",
+            "pricePence": 665,
+            "originalAmount": 7.78,
+            "originalCurrency": "EUR",
+            "kind": "averageSellPrice",
+            "updatedAt": "2026/06/25",
+            "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Avg30",
+            "pricePence": 638,
+            "originalAmount": 7.46,
+            "originalCurrency": "EUR",
+            "kind": "avg30",
+            "updatedAt": "2026/06/25",
+            "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Avg7",
+            "pricePence": 498,
+            "originalAmount": 5.83,
+            "originalCurrency": "EUR",
+            "kind": "avg7",
+            "updatedAt": "2026/06/25",
+            "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Low Price Ex Plus",
+            "pricePence": 325,
+            "originalAmount": 3.8,
+            "originalCurrency": "EUR",
+            "kind": "lowPriceExPlus",
+            "updatedAt": "2026/06/25",
+            "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+          },
+          {
+            "source": "cardmarket",
+            "label": "Cardmarket Low Price",
+            "pricePence": 170,
+            "originalAmount": 1.99,
+            "originalCurrency": "EUR",
+            "kind": "lowPrice",
+            "updatedAt": "2026/06/25",
+            "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil market",
+            "pricePence": 494,
+            "originalAmount": 6.28,
+            "originalCurrency": "USD",
+            "kind": "market",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil mid",
+            "pricePence": 526,
+            "originalAmount": 6.68,
+            "originalCurrency": "USD",
+            "kind": "mid",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil low",
+            "pricePence": 314,
+            "originalAmount": 3.99,
+            "originalCurrency": "USD",
+            "kind": "low",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+          },
+          {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Holofoil directLow",
+            "pricePence": 424,
+            "originalAmount": 5.39,
+            "originalCurrency": "USD",
+            "kind": "directLow",
+            "variant": "holofoil",
+            "updatedAt": "2026/07/02",
+            "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-region-eu:tcg-market",
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Blastoise-EX",
+          "setName": "Evolutions",
+          "number": "21/108",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "xy12-21"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:13.041Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Blastoise-EX",
+          "setName": "Evolutions",
+          "number": "21/108",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "xy12-21"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 669,
+        "meanPence": 669,
+        "lowPence": 669,
+        "highPence": 669,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": -21.9,
+        "outliersRemoved": 0,
+        "asOf": "2026-06-25T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 669,
+            "originalAmount": 7.83,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2026/06/25",
+            "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+          },
+          "signals": [
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Trend Price",
+              "pricePence": 669,
+              "originalAmount": 7.83,
+              "originalCurrency": "EUR",
+              "kind": "trendPrice",
+              "updatedAt": "2026/06/25",
+              "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Average Sell Price",
+              "pricePence": 665,
+              "originalAmount": 7.78,
+              "originalCurrency": "EUR",
+              "kind": "averageSellPrice",
+              "updatedAt": "2026/06/25",
+              "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg30",
+              "pricePence": 638,
+              "originalAmount": 7.46,
+              "originalCurrency": "EUR",
+              "kind": "avg30",
+              "updatedAt": "2026/06/25",
+              "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg7",
+              "pricePence": 498,
+              "originalAmount": 5.83,
+              "originalCurrency": "EUR",
+              "kind": "avg7",
+              "updatedAt": "2026/06/25",
+              "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price Ex Plus",
+              "pricePence": 325,
+              "originalAmount": 3.8,
+              "originalCurrency": "EUR",
+              "kind": "lowPriceExPlus",
+              "updatedAt": "2026/06/25",
+              "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price",
+              "pricePence": 170,
+              "originalAmount": 1.99,
+              "originalCurrency": "EUR",
+              "kind": "lowPrice",
+              "updatedAt": "2026/06/25",
+              "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil market",
+              "pricePence": 494,
+              "originalAmount": 6.28,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil mid",
+              "pricePence": 526,
+              "originalAmount": 6.68,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil low",
+              "pricePence": 314,
+              "originalAmount": 3.99,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil directLow",
+              "pricePence": 424,
+              "originalAmount": 5.39,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Blastoise-EX",
+          "setName": "Evolutions",
+          "number": "21/108",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "xy12-21"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:13.035Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Blastoise-EX",
+          "setName": "Evolutions",
+          "number": "21/108",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "xy12-21"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:13.068Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-region-eu:tcg-market",
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Blastoise-EX",
+      "setName": "Evolutions",
+      "setCode": "xy12",
+      "number": "21/108",
+      "rarity": "Rare Holo EX",
+      "imageUrl": "https://images.pokemontcg.io/xy12/21_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/xy12/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/xy12/symbol.png",
+      "tcgApiId": "xy12-21",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 669,
+          "originalAmount": 7.83,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/06/25",
+          "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 665,
+          "originalAmount": 7.78,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/06/25",
+          "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 638,
+          "originalAmount": 7.46,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2026/06/25",
+          "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 498,
+          "originalAmount": 5.83,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2026/06/25",
+          "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 325,
+          "originalAmount": 3.8,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2026/06/25",
+          "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 170,
+          "originalAmount": 1.99,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2026/06/25",
+          "url": "https://prices.pokemontcg.io/cardmarket/xy12-21"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 494,
+          "originalAmount": 6.28,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 526,
+          "originalAmount": 6.68,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 314,
+          "originalAmount": 3.99,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 424,
+          "originalAmount": 5.39,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/xy12-21"
+        }
+      ]
+    },
+    "alternatives": [
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Blastoise",
+        "setName": "Evolutions",
+        "setCode": "xy12",
+        "number": "31/108",
+        "rarity": "Rare Holo",
+        "imageUrl": "https://images.pokemontcg.io/xy12/31_hires.png",
+        "tcgApiId": "xy12-31"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Blastoise Spirit Link",
+        "setName": "Evolutions",
+        "setCode": "xy12",
+        "number": "73/108",
+        "rarity": "Uncommon",
+        "imageUrl": "https://images.pokemontcg.io/xy12/73_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/xy12/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/xy12/symbol.png",
+        "tcgApiId": "xy12-73"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "M Blastoise-EX",
+        "setName": "Evolutions",
+        "setCode": "xy12",
+        "number": "22/108",
+        "rarity": "Rare Holo EX",
+        "imageUrl": "https://images.pokemontcg.io/xy12/22_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/xy12/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/xy12/symbol.png",
+        "tcgApiId": "xy12-22"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "M Blastoise-EX",
+        "setName": "Evolutions",
+        "setCode": "xy12",
+        "number": "102/108",
+        "rarity": "Rare Ultra",
+        "imageUrl": "https://images.pokemontcg.io/xy12/102_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/xy12/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/xy12/symbol.png",
+        "tcgApiId": "xy12-102"
+      }
+    ],
+    "ambiguous": true,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 299,
+    "headline": "£6.69 pokemon-tcg-market",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": true,
+    "alternatives": 4,
+    "catalog": "Blastoise-EX | Evolutions | 21/108",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

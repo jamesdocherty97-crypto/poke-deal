@@ -1,0 +1,349 @@
+{
+  "capturedAt": "2026-07-02T23:38:44.989Z",
+  "label": "Charizard GX Hidden Fates SV49 PSA 9",
+  "request": {
+    "card": {
+      "name": "Charizard GX",
+      "setName": "Hidden Fates Shiny Vault",
+      "number": "SV49/SV94",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "PSA_9",
+    "params": {
+      "name": "Charizard GX",
+      "setName": "Hidden Fates Shiny Vault",
+      "number": "SV49/SV94",
+      "grade": "PSA_9"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "id": "cmqy5zoz30336lavjabg7fm20",
+        "name": "Charizard-GX",
+        "setName": "Hidden Fates Shiny Vault",
+        "number": "SV49/SV94",
+        "tcgApiId": "sma-SV49",
+        "game": "POKEMON",
+        "language": "EN"
+      },
+      "grade": "PSA_9",
+      "currency": "GBP",
+      "medianPence": 0,
+      "meanPence": 0,
+      "lowPence": 0,
+      "highPence": 0,
+      "sampleSize": 0,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-02T23:29:04.132Z",
+      "raw": {
+        "kind": "last-known-comp",
+        "cachedAt": "2026-07-02T23:36:54.955Z",
+        "reconciliation": {
+          "headlinePence": null,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "no-eligible-candidates"
+          ],
+          "trendPct": null
+        },
+        "cached": true
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "id": "cmqy5zoz30336lavjabg7fm20",
+          "name": "Charizard-GX",
+          "setName": "Hidden Fates Shiny Vault",
+          "number": "SV49/SV94",
+          "tcgApiId": "sma-SV49",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:29:04.132Z",
+        "raw": {
+          "kind": "last-known-comp",
+          "cachedAt": "2026-07-02T23:36:54.955Z",
+          "cached": true
+        }
+      },
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Charizard-GX",
+          "setName": "Hidden Fates Shiny Vault",
+          "number": "SV49/SV94",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sma-SV49"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:44.838Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Charizard-GX",
+          "setName": "Hidden Fates Shiny Vault",
+          "number": "SV49/SV94",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sma-SV49"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:44.448Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "catalog market prices are raw-card signals only"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Charizard-GX",
+          "setName": "Hidden Fates Shiny Vault",
+          "number": "SV49/SV94",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sma-SV49"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:44.448Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Charizard-GX",
+          "setName": "Hidden Fates Shiny Vault",
+          "number": "SV49/SV94",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sma-SV49"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:44.477Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "cached": {
+      "asOf": "2026-07-02T23:36:54.955Z",
+      "ageHours": 0
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Charizard-GX",
+      "setName": "Hidden Fates Shiny Vault",
+      "setCode": "sma",
+      "number": "SV49/SV94",
+      "rarity": "Rare Shiny GX",
+      "imageUrl": "https://images.pokemontcg.io/sma/SV49_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/sma/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/sma/symbol.png",
+      "tcgApiId": "sma-SV49",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 45202,
+          "originalAmount": 528.86,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/02/04",
+          "url": "https://prices.pokemontcg.io/cardmarket/sma-SV49"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 40325,
+          "originalAmount": 471.8,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/02/04",
+          "url": "https://prices.pokemontcg.io/cardmarket/sma-SV49"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 46535,
+          "originalAmount": 544.46,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2026/02/04",
+          "url": "https://prices.pokemontcg.io/cardmarket/sma-SV49"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 45287,
+          "originalAmount": 529.86,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2026/02/04",
+          "url": "https://prices.pokemontcg.io/cardmarket/sma-SV49"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 32050,
+          "originalAmount": 374.99,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2026/02/04",
+          "url": "https://prices.pokemontcg.io/cardmarket/sma-SV49"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 20940,
+          "originalAmount": 245,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2026/02/04",
+          "url": "https://prices.pokemontcg.io/cardmarket/sma-SV49"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 53806,
+          "originalAmount": 683.33,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sma-SV49"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 61589,
+          "originalAmount": 782.18,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sma-SV49"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 53806,
+          "originalAmount": 683.33,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sma-SV49"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 61328,
+          "originalAmount": 778.87,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sma-SV49"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 673,
+    "headline": "£0.00 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Charizard-GX | Hidden Fates Shiny Vault | SV49/SV94",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

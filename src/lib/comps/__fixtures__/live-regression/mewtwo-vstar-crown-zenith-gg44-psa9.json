@@ -1,0 +1,351 @@
+{
+  "capturedAt": "2026-07-02T23:38:44.315Z",
+  "label": "Mewtwo VSTAR Crown Zenith GG44 PSA 9",
+  "request": {
+    "card": {
+      "name": "Mewtwo VSTAR",
+      "setName": "Crown Zenith",
+      "number": "GG44/GG70",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "PSA_9",
+    "params": {
+      "name": "Mewtwo VSTAR",
+      "setName": "Crown Zenith",
+      "number": "GG44/GG70",
+      "grade": "PSA_9"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "id": "cmqy67zwk0ahclavjgppr72iq",
+        "name": "Mewtwo VSTAR",
+        "setName": "Crown Zenith Galarian Gallery",
+        "number": "GG44/GG70",
+        "tcgApiId": "swsh12pt5gg-GG44",
+        "game": "POKEMON",
+        "language": "EN"
+      },
+      "grade": "PSA_9",
+      "currency": "GBP",
+      "medianPence": 19684,
+      "meanPence": 19586,
+      "lowPence": 7209,
+      "highPence": 35349,
+      "sampleSize": 487,
+      "windowDays": 90,
+      "trendPct": 14.1,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-02T17:46:53.428Z",
+      "raw": {
+        "kind": "last-known-comp",
+        "cachedAt": "2026-07-02T23:36:54.131Z",
+        "reconciliation": {
+          "headlinePence": 19684,
+          "confidence": "medium",
+          "manualCheck": false,
+          "reasons": [
+            "penalty-region-us:pt-median"
+          ],
+          "chosenSource": "pt-median",
+          "trendPct": 14.1
+        },
+        "cached": true
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "id": "cmqy67zwk0ahclavjgppr72iq",
+          "name": "Mewtwo VSTAR",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG44/GG70",
+          "tcgApiId": "swsh12pt5gg-GG44",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 19684,
+        "meanPence": 19586,
+        "lowPence": 7209,
+        "highPence": 35349,
+        "sampleSize": 487,
+        "windowDays": 90,
+        "trendPct": 14.1,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T17:46:53.428Z",
+        "raw": {
+          "kind": "last-known-comp",
+          "cachedAt": "2026-07-02T23:36:54.131Z",
+          "cached": true
+        }
+      },
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Mewtwo VSTAR",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG44/GG70",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh12pt5gg-GG44"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:44.180Z",
+        "raw": {
+          "reason": "pokemon-price-tracker timed out"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Mewtwo VSTAR",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG44/GG70",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh12pt5gg-GG44"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:40.178Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "catalog market prices are raw-card signals only"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Mewtwo VSTAR",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG44/GG70",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh12pt5gg-GG44"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:40.178Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Mewtwo VSTAR",
+          "setName": "Crown Zenith Galarian Gallery",
+          "number": "GG44/GG70",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh12pt5gg-GG44"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:38:40.205Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": 19684,
+      "confidence": "medium",
+      "manualCheck": false,
+      "reasons": [
+        "penalty-region-us:pt-median"
+      ],
+      "chosenSource": "pt-median",
+      "trendPct": 14.1
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "pokemon-price-tracker timed out"
+      },
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "cached": {
+      "asOf": "2026-07-02T23:36:54.131Z",
+      "ageHours": 0
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Mewtwo VSTAR",
+      "setName": "Crown Zenith Galarian Gallery",
+      "setCode": "swsh12pt5gg",
+      "number": "GG44/GG70",
+      "rarity": "Rare Holo VSTAR",
+      "imageUrl": "https://images.pokemontcg.io/swsh12pt5gg/GG44_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/swsh12pt5gg/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/swsh12pt5gg/symbol.png",
+      "tcgApiId": "swsh12pt5gg-GG44",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 12316,
+          "originalAmount": 144.1,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/02/24",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 13602,
+          "originalAmount": 159.14,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/02/24",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 13150,
+          "originalAmount": 153.86,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2026/02/24",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 12001,
+          "originalAmount": 140.41,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2026/02/24",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 7179,
+          "originalAmount": 84,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2026/02/24",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 5974,
+          "originalAmount": 69.9,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2026/02/24",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 24094,
+          "originalAmount": 305.99,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 27513,
+          "originalAmount": 349.41,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 19606,
+          "originalAmount": 249,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG44"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 26574,
+          "originalAmount": 337.49,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh12pt5gg-GG44"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 4256,
+    "headline": "£196.84 pokemon-price-tracker",
+    "confidence": "medium",
+    "manualCheck": false,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Mewtwo VSTAR | Crown Zenith Galarian Gallery | GG44/GG70",
+    "unavailable": "pokemon-price-tracker,poketrace",
+    "error": ""
+  }
+}

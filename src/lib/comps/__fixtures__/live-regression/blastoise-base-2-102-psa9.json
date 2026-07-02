@@ -1,0 +1,752 @@
+{
+  "capturedAt": "2026-07-02T23:39:05.637Z",
+  "label": "Blastoise Base 2/102 PSA 9",
+  "request": {
+    "card": {
+      "name": "Blastoise",
+      "setName": "Base Set",
+      "number": "2/102",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "PSA_9",
+    "params": {
+      "name": "Blastoise",
+      "setName": "Base Set",
+      "number": "2/102",
+      "grade": "PSA_9"
+    }
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "name": "Blastoise",
+        "setName": "Base",
+        "number": "2/102",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "base1-2"
+      },
+      "grade": "PSA_9",
+      "currency": "GBP",
+      "medianPence": 39370,
+      "meanPence": 46475,
+      "lowPence": 7254,
+      "highPence": 86614,
+      "sampleSize": 11,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-02T17:50:27.022Z",
+      "raw": {
+        "count": 11,
+        "totalValue": 6492.54,
+        "averagePrice": 590.2309090909091,
+        "medianPrice": 500,
+        "minPrice": 92.13,
+        "maxPrice": 1100,
+        "marketPrice7Day": null,
+        "marketPriceMedian7Day": null,
+        "dailyVolume7Day": null,
+        "marketTrend": "up",
+        "lastMarketUpdate": "2026-07-02T17:50:27.022Z",
+        "smartMarketPrice": {
+          "price": 762.5,
+          "confidence": "medium",
+          "method": "90day_filtered_weighted",
+          "daysUsed": 90
+        },
+        "prices": {
+          "market": 232.4,
+          "low": 44.96,
+          "sellers": 99,
+          "listings": 0,
+          "primaryPrinting": "Holofoil",
+          "lastUpdated": "2026-07-02T14:45:04.891Z",
+          "variants": {
+            "Holofoil": {
+              "Near Mint Holofoil": {
+                "price": 232.4,
+                "listings": null,
+                "priceString": "$232.40",
+                "lastUpdated": "2026-07-02T23:29:37.224Z"
+              }
+            }
+          }
+        },
+        "chosenPriceSource": "medianPrice",
+        "gradeLadder": [
+          {
+            "grade": "RAW",
+            "providerKey": "ungraded",
+            "medianPence": 9035,
+            "sampleSize": 101,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_1",
+            "providerKey": "psa1",
+            "medianPence": 21653,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_2",
+            "providerKey": "psa2",
+            "medianPence": 7795,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_3",
+            "providerKey": "psa3",
+            "medianPence": 5787,
+            "sampleSize": 6,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_4",
+            "providerKey": "psa4",
+            "medianPence": 7681,
+            "sampleSize": 15,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_5",
+            "providerKey": "psa5",
+            "medianPence": 8169,
+            "sampleSize": 28,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_6",
+            "providerKey": "psa6",
+            "medianPence": 10630,
+            "sampleSize": 30,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_7",
+            "providerKey": "psa7",
+            "medianPence": 13937,
+            "sampleSize": 28,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_8",
+            "providerKey": "psa8",
+            "medianPence": 23622,
+            "sampleSize": 40,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_9",
+            "providerKey": "psa9",
+            "medianPence": 39370,
+            "sampleSize": 11,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_6_5",
+            "providerKey": "bgs6_5",
+            "medianPence": 9843,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_7_5",
+            "providerKey": "bgs7_5",
+            "medianPence": 13583,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_8",
+            "providerKey": "bgs8",
+            "medianPence": 20472,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_8_5",
+            "providerKey": "bgs8_5",
+            "medianPence": 19685,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9",
+            "providerKey": "bgs9",
+            "medianPence": 52795,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_4",
+            "providerKey": "cgc4",
+            "medianPence": 5512,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_4_5",
+            "providerKey": "cgc4_5",
+            "medianPence": 7795,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_5",
+            "providerKey": "cgc5",
+            "medianPence": 7874,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_5_5",
+            "providerKey": "cgc5_5",
+            "medianPence": 7480,
+            "sampleSize": 4,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_6",
+            "providerKey": "cgc6",
+            "medianPence": 7638,
+            "sampleSize": 4,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_6_5",
+            "providerKey": "cgc6_5",
+            "medianPence": 6693,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_7",
+            "providerKey": "cgc7",
+            "medianPence": 3858,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8",
+            "providerKey": "cgc8",
+            "medianPence": 12401,
+            "sampleSize": 4,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8_5",
+            "providerKey": "cgc8_5",
+            "medianPence": 15747,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9",
+            "providerKey": "cgc9",
+            "medianPence": 32637,
+            "sampleSize": 2,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9_5",
+            "providerKey": "cgc9_5",
+            "medianPence": 94488,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": 39370,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-graded-tail-spread:pt-median",
+            "penalty-region-us:pt-median"
+          ],
+          "chosenSource": "pt-median",
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Blastoise",
+          "setName": "Base",
+          "number": "2/102",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "base1-2"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 39370,
+        "meanPence": 46475,
+        "lowPence": 7254,
+        "highPence": 86614,
+        "sampleSize": 11,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T17:50:27.022Z",
+        "raw": {
+          "count": 11,
+          "totalValue": 6492.54,
+          "averagePrice": 590.2309090909091,
+          "medianPrice": 500,
+          "minPrice": 92.13,
+          "maxPrice": 1100,
+          "marketPrice7Day": null,
+          "marketPriceMedian7Day": null,
+          "dailyVolume7Day": null,
+          "marketTrend": "up",
+          "lastMarketUpdate": "2026-07-02T17:50:27.022Z",
+          "smartMarketPrice": {
+            "price": 762.5,
+            "confidence": "medium",
+            "method": "90day_filtered_weighted",
+            "daysUsed": 90
+          },
+          "prices": {
+            "market": 232.4,
+            "low": 44.96,
+            "sellers": 99,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:45:04.891Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 232.4,
+                  "listings": null,
+                  "priceString": "$232.40",
+                  "lastUpdated": "2026-07-02T23:29:37.224Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "medianPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 9035,
+              "sampleSize": 101,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_1",
+              "providerKey": "psa1",
+              "medianPence": 21653,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_2",
+              "providerKey": "psa2",
+              "medianPence": 7795,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_3",
+              "providerKey": "psa3",
+              "medianPence": 5787,
+              "sampleSize": 6,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_4",
+              "providerKey": "psa4",
+              "medianPence": 7681,
+              "sampleSize": 15,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_5",
+              "providerKey": "psa5",
+              "medianPence": 8169,
+              "sampleSize": 28,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_6",
+              "providerKey": "psa6",
+              "medianPence": 10630,
+              "sampleSize": 30,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_7",
+              "providerKey": "psa7",
+              "medianPence": 13937,
+              "sampleSize": 28,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_8",
+              "providerKey": "psa8",
+              "medianPence": 23622,
+              "sampleSize": 40,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 39370,
+              "sampleSize": 11,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_6_5",
+              "providerKey": "bgs6_5",
+              "medianPence": 9843,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_7_5",
+              "providerKey": "bgs7_5",
+              "medianPence": 13583,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_8",
+              "providerKey": "bgs8",
+              "medianPence": 20472,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_8_5",
+              "providerKey": "bgs8_5",
+              "medianPence": 19685,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9",
+              "providerKey": "bgs9",
+              "medianPence": 52795,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_4",
+              "providerKey": "cgc4",
+              "medianPence": 5512,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_4_5",
+              "providerKey": "cgc4_5",
+              "medianPence": 7795,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_5",
+              "providerKey": "cgc5",
+              "medianPence": 7874,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_5_5",
+              "providerKey": "cgc5_5",
+              "medianPence": 7480,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_6",
+              "providerKey": "cgc6",
+              "medianPence": 7638,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_6_5",
+              "providerKey": "cgc6_5",
+              "medianPence": 6693,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_7",
+              "providerKey": "cgc7",
+              "medianPence": 3858,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8",
+              "providerKey": "cgc8",
+              "medianPence": 12401,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8_5",
+              "providerKey": "cgc8_5",
+              "medianPence": 15747,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9",
+              "providerKey": "cgc9",
+              "medianPence": 32637,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9_5",
+              "providerKey": "cgc9_5",
+              "medianPence": 94488,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Blastoise",
+          "setName": "Base",
+          "number": "2/102",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "base1-2"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:05.545Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "catalog market prices are raw-card signals only"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Blastoise",
+          "setName": "Base",
+          "number": "2/102",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "base1-2"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:05.545Z",
+        "raw": {
+          "reason": "PokeTrace source unavailable: key problem"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Blastoise",
+          "setName": "Base",
+          "number": "2/102",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "base1-2"
+        },
+        "grade": "PSA_9",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T23:39:05.574Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 39370,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-graded-tail-spread:pt-median",
+        "penalty-region-us:pt-median"
+      ],
+      "chosenSource": "pt-median",
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace source unavailable: key problem"
+      }
+    ],
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Blastoise",
+      "setName": "Base",
+      "setCode": "base1",
+      "number": "2/102",
+      "rarity": "Rare Holo",
+      "imageUrl": "https://images.pokemontcg.io/base1/2_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/base1/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/base1/symbol.png",
+      "tcgApiId": "base1-2",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 10787,
+          "originalAmount": 126.21,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base1-2"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 12231,
+          "originalAmount": 143.1,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base1-2"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 12013,
+          "originalAmount": 140.55,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base1-2"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 9515,
+          "originalAmount": 111.33,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base1-2"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 8546,
+          "originalAmount": 99.99,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base1-2"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 2350,
+          "originalAmount": 27.5,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2026/07/01",
+          "url": "https://prices.pokemontcg.io/cardmarket/base1-2"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 18299,
+          "originalAmount": 232.4,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/base1-2"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 17192,
+          "originalAmount": 218.34,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/base1-2"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 11732,
+          "originalAmount": 149,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/base1-2"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 15748,
+          "originalAmount": 200,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/base1-2"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  },
+  "qa": {
+    "status": 200,
+    "elapsedMs": 287,
+    "headline": "£393.70 pokemon-price-tracker",
+    "confidence": "low",
+    "manualCheck": true,
+    "ambiguous": false,
+    "alternatives": 0,
+    "catalog": "Blastoise | Base | 2/102",
+    "unavailable": "poketrace",
+    "error": ""
+  }
+}
