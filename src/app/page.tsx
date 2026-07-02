@@ -165,6 +165,14 @@ type LookupInput = {
   psaCert?: string;
 };
 
+type PendingLookup = {
+  name: string;
+  setName: string;
+  number: string;
+  grade: Grade;
+  startedAt: number;
+};
+
 type LastStockedCard = {
   itemId: string;
   listingId: string | null;
@@ -753,6 +761,7 @@ export default function Home() {
   const [cardSuggestions, setCardSuggestions] = useState<CatalogSuggestion[]>([]);
   const [cardSuggestionsOpen, setCardSuggestionsOpen] = useState(false);
   const [cardSuggestionsLoading, setCardSuggestionsLoading] = useState(false);
+  const [pendingLookup, setPendingLookup] = useState<PendingLookup | null>(null);
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("all");
   const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
@@ -1160,6 +1169,16 @@ export default function Home() {
   ]);
   const visiblePopularSets = showAllPopularSets ? popularSets : popularSets.slice(0, VISIBLE_POPULAR_SET_LIMIT);
   const visibleQuickHunts = showAllQuickHunts ? quickHunts : quickHunts.slice(0, VISIBLE_QUICK_HUNT_LIMIT);
+  const pendingRecentComp = useMemo(() => {
+    if (!pendingLookup) return null;
+    const key = recentCompKey({
+      name: pendingLookup.name,
+      setName: pendingLookup.setName,
+      number: pendingLookup.number,
+      grade: pendingLookup.grade,
+    });
+    return recentComps.find((entry) => recentCompKey(entry) === key) ?? null;
+  }, [pendingLookup, recentComps]);
   const parsedQuickIntake = useMemo(
     () => (quickIntake.trim() ? parseQuickIntake(quickIntake) : null),
     [quickIntake],
@@ -1474,6 +1493,20 @@ export default function Home() {
         : [],
     [deal?.targetBuyPence, headline, watchTarget],
   );
+  const decisionBarWatchTargetPence =
+    buyTargetSuggestion?.targetPence ??
+    offerCalc?.maxCashOfferPence ??
+    deal?.targetBuyPence ??
+    (headline?.lowPence && headline.lowPence > 0 ? Math.max(1, Math.round(headline.lowPence * 0.85)) : 0);
+  const decisionBarOfferText = offerCalc
+    ? offerCalc.maxCashOfferPence == null
+      ? dealCalcPrimaryReason(offerCalc)
+      : `Max ${gbp(offerCalc.maxCashOfferPence)} cash / ${
+          offerCalc.maxTradeOfferPence == null ? "n/a" : gbp(offerCalc.maxTradeOfferPence)
+        } trade`
+    : deal?.targetBuyPence
+      ? `Target ${gbp(deal.targetBuyPence)}`
+      : "Add cost for buy maths";
   const buyFlowSteps = useMemo<BuyFlowStep[]>(() => {
     const cardReady = Boolean(name.trim() && (setNameValue.trim() || number.trim()));
     const compReady = Boolean(headline);
@@ -2005,6 +2038,7 @@ export default function Home() {
 
   function clearCompEvidence() {
     setComp(null);
+    setPendingLookup(null);
     setStockCompItemId(null);
     setSuggestion(null);
     setCardArtUrl(null);
@@ -2245,6 +2279,13 @@ export default function Home() {
   async function lookupComp(input: LookupInput) {
     const normalizedInput = normalizeLookupInput(input);
     applyNormalizedLookupFields(normalizedInput);
+    setPendingLookup({
+      name: normalizedInput.name,
+      setName: normalizedInput.setName,
+      number: normalizedInput.number,
+      grade: normalizedInput.grade,
+      startedAt: Date.now(),
+    });
     setBusy("lookup");
     setError(null);
     setNotice(null);
@@ -2265,9 +2306,11 @@ export default function Home() {
       setCardArtUrl(payload.catalog?.imageUrl ?? null);
       pinRecentSetName(payload.catalog?.setName ?? normalizedInput.setName);
       rememberRecentComp(payload, normalizedInput);
+      setPendingLookup(null);
       setGradeComp(null);
       setScrollToComp(true);
     } catch (err) {
+      setPendingLookup(null);
       setError(err instanceof Error ? err.message : "lookup failed");
     } finally {
       setBusy(null);
@@ -2844,7 +2887,8 @@ export default function Home() {
     setError(null);
   }
 
-  async function createWatch() {
+  async function createWatch(targetOverridePence?: number) {
+    const targetPence = targetOverridePence ?? poundsToPence(watchTarget);
     setBusy("watch-create");
     setError(null);
     setNotice(null);
@@ -2864,12 +2908,12 @@ export default function Home() {
             ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
           },
           grade,
-          targetPence: poundsToPence(watchTarget),
+          targetPence,
         }),
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "watch create failed");
-      setNotice(`Watching ${name} at ${gbp(poundsToPence(watchTarget))}.`);
+      setNotice(`Watching ${name} at ${gbp(targetPence)}.`);
       if (payload.watch?.id) {
         setWatchEdits((current) => ({ ...current, [payload.watch.id]: penceToPounds(payload.watch.targetPence) }));
       }
@@ -4458,6 +4502,23 @@ export default function Home() {
     window.requestAnimationFrame(() => costInputRef.current?.focus());
   }
 
+  function runDecisionBarBuy() {
+    if (mobileNeedsCheckedComp && !mobileCanStockLater) {
+      jumpToCheckedComp();
+      return;
+    }
+    runStockAction();
+  }
+
+  function watchDecisionTarget() {
+    if (!headline || decisionBarWatchTargetPence <= 0) {
+      setError("Run a comp before creating a buy watch.");
+      return;
+    }
+    setWatchTarget(penceToPounds(decisionBarWatchTargetPence));
+    void createWatch(decisionBarWatchTargetPence);
+  }
+
   function runStockAction() {
     if (!quickStockReady) {
       jumpToCostEntry();
@@ -5097,6 +5158,39 @@ export default function Home() {
                 </button>
               </div>
             </div>
+            {pendingLookup && busy === "lookup" && !headline && (
+              <div className="lookup-progress-card" aria-live="polite" aria-label="Comp lookup progress">
+                <div className="lookup-progress-heading">
+                  <div>
+                    <span>Card locked</span>
+                    <strong>{pendingLookup.name || selectedCardTitle}</strong>
+                    <small>
+                      {[pendingLookup.setName, pendingLookup.number ? `#${pendingLookup.number}` : "", pendingLookup.grade.replace(/_/g, " ")]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </small>
+                  </div>
+                  <span className="lookup-spinner" aria-hidden="true" />
+                </div>
+                {pendingRecentComp ? (
+                  <div className={`lookup-cached-comp ${pendingRecentComp.confidenceTone}`}>
+                    <span>Showing last local comp while sources refresh</span>
+                    <strong>{pendingRecentComp.pricePence > 0 ? gbp(pendingRecentComp.pricePence) : "No price"}</strong>
+                    <small>
+                      {pendingRecentComp.sampleSize}/{pendingRecentComp.windowDays}d · {pendingRecentComp.confidenceLabel} ·{" "}
+                      {recentCompMeta(pendingRecentComp)}
+                    </small>
+                  </div>
+                ) : (
+                  <div className="lookup-skeleton" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                )}
+                <p>Checking live GBP sources now. You can confirm the art, set and number while prices load.</p>
+              </div>
+            )}
             {recentComps.length > 0 && (
               <details className="buy-optional-drawer recent-comp-drawer">
                 <summary>
@@ -6115,7 +6209,7 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              <button className="secondary-action" type="button" onClick={createWatch} disabled={busy === "watch-create"}>
+              <button className="secondary-action" type="button" onClick={() => void createWatch()} disabled={busy === "watch-create"}>
                 {busy === "watch-create" ? "Saving watch..." : "Watch for buy price"}
               </button>
             </details>
@@ -7045,63 +7139,65 @@ export default function Home() {
       )}
 
       {view === "acquire" && (headline || name.trim() || number.trim() || checkedComp) && (
-        <section className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`} aria-label="Current buy action">
+        <section
+          className={`mobile-buy-action ${headline ? "decision" : ""} ${buyPlan?.tone ?? deal?.tone ?? "warn"}`}
+          aria-label={headline ? "Buy decision" : "Current buy action"}
+        >
           <div>
             <span>{headline ? confidenceLabel?.label ?? "Comp" : "Manual card"}</span>
             <strong>{headline ? (needsManualComp ? "Check solds" : gbp(headline.medianPence)) : "No auto comp"}</strong>
             <small>
-              {!headline
+              {headline
+                ? decisionBarOfferText
+                : !headline
                 ? manualStockReady
                   ? "stock manually now, price/list later if needed"
                   : "open UK solds or add cost and quantity"
-                : needsManualComp
-                ? mobileCanStockLater
-                  ? "open UK solds or stock now, price later"
-                  : "open UK solds, then enter checked price"
-                : requiresCheckedCompBeforeStock && mobileCanStockLater
-                  ? "enter checked price or stock now, price later"
-                : quickStockReady
-                ? `${quickStockQuantity} @ ${gbp(quickStockCostPence)} · ${
-                    requiresCheckedCompBeforeStock ? "check solds" : deal?.label ?? "ready"
-                  }`
                 : "add cost and quantity"}
             </small>
           </div>
-          <button
-            className="mobile-skip-button"
-            type="button"
-            onClick={!headline ? () => clearCurrentComp() : mobileCanStockLater ? () => void stockWithoutComp() : mobileNeedsCheckedComp ? jumpToCheckedComp : skipCurrentComp}
-            disabled={busy === "acquire" || busy === "manual-stock"}
-          >
-            {!headline ? "Next" : mobileCanStockLater ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : mobileNeedsCheckedComp ? "Enter price" : "Next"}
-          </button>
-          <button
-            className="primary-action"
-            type="button"
-            onClick={!headline ? (manualStockReady ? () => void stockWithoutComp() : () => openManualCompLink("EBAY_UK_SOLD")) : needsManualComp ? () => openManualCompLink("EBAY_UK_SOLD") : runStockAction}
-            disabled={
-              busy === "acquire" ||
-              busy === "manual-stock" ||
-              (!headline && !manualStockReady && !manualCompFallbackQuery.trim()) ||
-              Boolean(headline && !needsManualComp && quickStockReady && !quickStockCanSubmit)
-            }
-          >
-            {!headline
-              ? manualStockReady
-                ? busy === "manual-stock"
-                  ? "Stocking..."
-                  : "Stock now"
-                : "Open UK"
-              : needsManualComp
-              ? "Open UK"
-              : busy === "acquire"
-              ? "Stocking..."
-              : !quickStockReady
-                ? "Add cost"
-                : requiresCheckedCompBeforeStock
-                  ? "Add checked comp first"
-                  : stockButtonLabel}
-          </button>
+          {headline ? (
+            <>
+              <button
+                className="primary-action"
+                type="button"
+                onClick={runDecisionBarBuy}
+                disabled={busy === "acquire" || busy === "manual-stock" || Boolean(quickStockReady && !quickStockCanSubmit)}
+              >
+                {busy === "acquire" ? "Stocking..." : mobileNeedsCheckedComp && !mobileCanStockLater ? "Check first" : "Buy"}
+              </button>
+              <button
+                type="button"
+                onClick={watchDecisionTarget}
+                disabled={busy === "watch-create" || decisionBarWatchTargetPence <= 0}
+                title={decisionBarWatchTargetPence > 0 ? `Watch at ${gbp(decisionBarWatchTargetPence)}` : "No target yet"}
+              >
+                {busy === "watch-create" ? "Watching..." : "Watch"}
+              </button>
+              <button className="mobile-skip-button" type="button" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
+                Pass
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="mobile-skip-button"
+                type="button"
+                onClick={() => clearCurrentComp()}
+                disabled={busy === "acquire" || busy === "manual-stock"}
+              >
+                Next
+              </button>
+              <button
+                className="primary-action"
+                type="button"
+                onClick={manualStockReady ? () => void stockWithoutComp() : () => openManualCompLink("EBAY_UK_SOLD")}
+                disabled={busy === "acquire" || busy === "manual-stock" || (!manualStockReady && !manualCompFallbackQuery.trim())}
+              >
+                {manualStockReady ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : "Open UK"}
+              </button>
+            </>
+          )}
         </section>
       )}
 
