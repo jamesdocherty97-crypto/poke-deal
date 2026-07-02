@@ -93,6 +93,18 @@ export interface ProfitTrendPoint {
   cumulativeProfitPence: number;
 }
 
+export interface MonthlyPnlPoint {
+  month: string;
+  saleCount: number;
+  revenuePence: number;
+  feesPence: number;
+  postagePence: number;
+  costBasisPence: number;
+  profitPence: number;
+  operatingExpensePence: number;
+  netProfitPence: number;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const AGED_STOCK_DAYS = 45;
 
@@ -249,6 +261,36 @@ export function buildProfitTrend(
   return points.slice(-Math.max(1, maxPoints));
 }
 
+export function buildMonthlyPnl(
+  sales: DealerSaleSummary[],
+  expenses: DealerExpenseMetricItem[] = [],
+  maxMonths = 6,
+): MonthlyPnlPoint[] {
+  const months = new Map<string, MonthlyPnlPoint>();
+  for (const sale of sales) {
+    const month = monthKey(sale.soldAt);
+    if (!month) continue;
+    const current = getMonthlyPoint(months, month);
+    current.saleCount += 1;
+    current.revenuePence += sale.salePricePence;
+    current.feesPence += sale.feesPence;
+    current.postagePence += sale.postagePence;
+    current.costBasisPence += sale.costBasisPence;
+    current.profitPence += sale.profitPence;
+    current.netProfitPence = current.profitPence - current.operatingExpensePence;
+  }
+  for (const expense of expenses) {
+    const month = monthKey(expense.spentAt);
+    if (!month) continue;
+    const current = getMonthlyPoint(months, month);
+    current.operatingExpensePence += expense.amountPence;
+    current.netProfitPence = current.profitPence - current.operatingExpensePence;
+  }
+  return [...months.values()]
+    .sort((left, right) => left.month.localeCompare(right.month))
+    .slice(-Math.max(1, maxMonths));
+}
+
 function countByStatus(items: DealerInventoryMetricItem[], status: DealerStatus): number {
   return items
     .filter((item) => item.status === status)
@@ -269,4 +311,26 @@ function dateKey(value: string): string | null {
   const time = Date.parse(value);
   if (Number.isNaN(time)) return null;
   return new Date(time).toISOString().slice(0, 10);
+}
+
+function monthKey(value: string): string | null {
+  return dateKey(value)?.slice(0, 7) ?? null;
+}
+
+function getMonthlyPoint(months: Map<string, MonthlyPnlPoint>, month: string): MonthlyPnlPoint {
+  const current = months.get(month);
+  if (current) return current;
+  const next = {
+    month,
+    saleCount: 0,
+    revenuePence: 0,
+    feesPence: 0,
+    postagePence: 0,
+    costBasisPence: 0,
+    profitPence: 0,
+    operatingExpensePence: 0,
+    netProfitPence: 0,
+  };
+  months.set(month, next);
+  return next;
 }

@@ -263,6 +263,46 @@ type Reconciled = {
   alternatives?: CatalogCard[];
   psaCert?: PsaCertView | null;
 };
+
+type DealSessionLine = {
+  id: string;
+  name: string;
+  setName: string | null;
+  setCode: string | null;
+  number: string | null;
+  tcgApiId: string | null;
+  tcgDexId: string | null;
+  imageUrl: string | null;
+  grade: Grade;
+  headlinePence: number;
+  confidence: string;
+  manualCheck: boolean;
+  maxCashOfferPence: number | null;
+  maxTradeOfferPence: number | null;
+  dealerOfferPence: number | null;
+  netProceedsPence: number | null;
+  expectedProfitPence: number | null;
+  sampleSize: number;
+  windowDays: number;
+  compSource: string | null;
+  compAsOf: string | null;
+};
+
+type DealSessionPayload = {
+  session: { id: string; name: string; status: "OPEN"; lines: DealSessionLine[] } | null;
+  summary: {
+    includedCount: number;
+    excludedCount: number;
+    totalMaxCashPence: number;
+    totalMaxTradePence: number;
+    totalExpectedProceedsPence: number;
+    totalExpectedProfitPence: number;
+    suggestedBundleOfferPence: number;
+    completionReady: boolean;
+    completionBlockers: string[];
+  };
+};
+
 type Suggestion = {
   pricePence: number;
   strategy: string;
@@ -410,10 +450,23 @@ type Dashboard = {
     bestSale: SaleSummary | null;
     worstSale: SaleSummary | null;
   };
+  monthlyPnl?: MonthlyPnlPoint[];
   recentSales: SaleSummary[];
   recentExpenses: ExpenseRecord[];
   staleStock: Array<{ id: string; name: string; grade: string; status: ItemStatus; createdAt: string }>;
   listingsByState: Record<string, number>;
+};
+
+type MonthlyPnlPoint = {
+  month: string;
+  saleCount: number;
+  revenuePence: number;
+  feesPence: number;
+  postagePence: number;
+  costBasisPence: number;
+  profitPence: number;
+  operatingExpensePence: number;
+  netProfitPence: number;
 };
 
 type ChannelBreakdown = {
@@ -627,6 +680,8 @@ export default function Home() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioHistory | null>(null);
+  const [dealSession, setDealSession] = useState<DealSessionPayload | null>(null);
+  const [dealSessionPaid, setDealSessionPaid] = useState("");
   const [watches, setWatches] = useState<WatchRecord[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
@@ -1718,7 +1773,7 @@ export default function Home() {
     if (options.user) setUserRefreshing(true);
     setError(null);
     try {
-      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes, expensesRes, systemRes] = await Promise.all([
+      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes, expensesRes, systemRes, dealSessionRes] = await Promise.all([
         fetch("/api/inventory"),
         fetch("/api/listings"),
         fetch("/api/dashboard"),
@@ -1726,6 +1781,7 @@ export default function Home() {
         fetch("/api/watches"),
         fetch("/api/expenses"),
         fetch("/api/system/status"),
+        fetch("/api/deal-sessions"),
       ]);
       const inventoryJson = await readJson(inventoryRes);
       const listingsJson = await readJson(listingsRes);
@@ -1734,6 +1790,7 @@ export default function Home() {
       const watchesJson = await readJson(watchesRes);
       const expensesJson = await readJson(expensesRes);
       const systemJson = await readJson(systemRes);
+      const dealSessionJson = await readJson(dealSessionRes);
       if (!inventoryRes.ok) throw new Error(inventoryJson.error ?? "inventory failed");
       if (!listingsRes.ok) throw new Error(listingsJson.error ?? "listings failed");
       if (!dashboardRes.ok) throw new Error(dashboardJson.error ?? "dashboard failed");
@@ -1741,12 +1798,14 @@ export default function Home() {
       if (!watchesRes.ok) throw new Error(watchesJson.error ?? "watches failed");
       if (!expensesRes.ok) throw new Error(expensesJson.error ?? "expenses failed");
       if (!systemRes.ok) throw new Error(systemJson.error ?? "system status failed");
+      if (!dealSessionRes.ok) throw new Error(dealSessionJson.error ?? "deal session failed");
       setInventory(inventoryJson.items);
       setListings(listingsJson.listings);
       setDashboard(dashboardJson);
       setPortfolio(portfolioJson);
       setExpenses(expensesJson.expenses ?? []);
       setSystemStatus(systemJson);
+      setDealSession(dealSessionJson);
       const nextWatches = (watchesJson.watches ?? []) as WatchRecord[];
       setWatches(nextWatches);
       setWatchEdits((current) => {
@@ -2321,6 +2380,154 @@ export default function Home() {
       grade: fields.grade ?? grade,
       psaCert: result.certNumber,
     });
+  }
+
+  async function addCurrentCompToSession() {
+    if (!headline) {
+      setError("Run a comp before adding to a lot.");
+      return;
+    }
+    const cardName = (catalogCard?.name ?? name).trim();
+    if (!cardName) {
+      setError("Add a card name before adding to a lot.");
+      return;
+    }
+    setBusy("deal-session-add");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/deal-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "addLine",
+          line: {
+            card: {
+              name: cardName,
+              setName: catalogCard?.setName ?? (setNameValue || undefined),
+              setCode: catalogCard?.setCode,
+              number: catalogCard?.number ?? (number || undefined),
+              tcgApiId: catalogCard?.tcgApiId,
+              tcgDexId: catalogCard?.tcgDexId,
+              imageUrl: selectedCardImage ?? undefined,
+            },
+            grade,
+            headlinePence: headline.medianPence,
+            confidence: dealerVerdict?.label ?? confidenceLabel?.label ?? "low",
+            manualCheck: needsManualComp || offerCalc?.maxCashOfferPence == null,
+            maxCashOfferPence: offerCalc?.maxCashOfferPence ?? null,
+            maxTradeOfferPence: offerCalc?.maxTradeOfferPence ?? null,
+            netProceedsPence: offerCalc?.netProceedsPence ?? null,
+            expectedProfitPence: offerCalc?.expectedProfitPence ?? null,
+            sampleSize: headline.sampleSize,
+            windowDays: headline.windowDays,
+            compSource: headline.source,
+            compAsOf: headline.asOf,
+          },
+        }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "deal session add failed");
+      setDealSession(payload);
+      setNotice("Added to current lot.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "deal session add failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function updateDealSessionLine(lineId: string, offerPounds: string) {
+    const dealerOfferPence = offerPounds.trim() ? poundsToPence(offerPounds) : null;
+    setBusy(`deal-line-${lineId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/deal-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateLine", lineId, dealerOfferPence }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "deal line update failed");
+      setDealSession(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "deal line update failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function removeDealSessionLine(lineId: string) {
+    setBusy(`deal-remove-${lineId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/deal-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "removeLine", lineId }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "deal line remove failed");
+      setDealSession(payload);
+      setNotice("Removed from lot.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "deal line remove failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function completeDealSession() {
+    const sessionId = dealSession?.session?.id;
+    if (!sessionId) return;
+    const paidPence = poundsToPence(dealSessionPaid);
+    if (paidPence <= 0) {
+      setError("Enter the total paid for the lot.");
+      return;
+    }
+    setBusy("deal-session-complete");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/deal-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete", sessionId, paidPence }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "deal session completion failed");
+      setDealSession(payload);
+      setDealSessionPaid("");
+      setNotice(`Lot stocked. ${payload.items?.length ?? 0} card${payload.items?.length === 1 ? "" : "s"} added.`);
+      await refreshAll();
+      setView("inventory");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "deal session completion failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function warmInventoryComps() {
+    setBusy("warm-comps");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/comps/warm", { method: "POST" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "comp warm-up failed");
+      setNotice(
+        `Refreshed ${payload.refreshed ?? 0} comp${payload.refreshed === 1 ? "" : "s"}${
+          payload.failed ? ` · ${payload.failed} skipped/failed` : ""
+        }.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "comp warm-up failed");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function acquire(event?: FormEvent) {
@@ -5300,6 +5507,14 @@ export default function Home() {
                   <button className="ghost-button comp-skip-button" type="button" onClick={skipCurrentComp}>
                     Next comp
                   </button>
+                  <button
+                    className="ghost-button comp-skip-button"
+                    type="button"
+                    onClick={() => void addCurrentCompToSession()}
+                    disabled={busy === "deal-session-add"}
+                  >
+                    {busy === "deal-session-add" ? "Adding..." : "Add to lot"}
+                  </button>
                 </div>
               </div>
               <div className="comp-identity-strip" aria-label="Comp card identity">
@@ -5736,6 +5951,102 @@ export default function Home() {
               {comp?.sourcesDisagree && checkedComp && (
                 <p className="hint danger-text">API sources disagree; the checked comp is driving this buy.</p>
               )}
+            </section>
+          )}
+
+          {dealSession?.session && dealSession.session.lines.length > 0 && (
+            <section className="panel deal-session-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Current lot</h2>
+                  <span className="muted">
+                    {dealSession.session.lines.length} card{dealSession.session.lines.length === 1 ? "" : "s"} · offer{" "}
+                    {gbp(dealSession.summary.suggestedBundleOfferPence)}
+                  </span>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setView("inventory")}>
+                  Stock
+                </button>
+              </div>
+              {dealSession.summary.excludedCount > 0 && (
+                <div className="cache-badge warn">
+                  <strong>{dealSession.summary.excludedCount} need a price</strong>
+                  <span>Manual/no-quote cards are excluded until you add your offer.</span>
+                </div>
+              )}
+              <div className="deal-session-lines">
+                {dealSession.session.lines.map((line) => {
+                  const needsOverride = line.manualCheck || line.maxCashOfferPence == null || line.maxCashOfferPence <= 0;
+                  return (
+                    <article className="deal-session-line" key={line.id}>
+                      <CardImage
+                        src={line.imageUrl}
+                        className="mini-card-art"
+                        fallbackClassName="mini-card-art blank"
+                        alt=""
+                      />
+                      <div>
+                        <strong>{line.name}</strong>
+                        <span>
+                          {line.setName ?? "Unknown set"}
+                          {line.number ? ` #${line.number}` : ""} · {line.grade.replace(/_/g, " ")}
+                        </span>
+                        <small>
+                          comp {gbp(line.headlinePence)} · cash{" "}
+                          {line.maxCashOfferPence == null ? "n/a" : gbp(line.maxCashOfferPence)}
+                        </small>
+                      </div>
+                      <div className="deal-session-line-actions">
+                        {needsOverride && (
+                          <label>
+                            Offer
+                            <input
+                              inputMode="decimal"
+                              defaultValue={line.dealerOfferPence == null ? "" : penceToPounds(line.dealerOfferPence)}
+                              onBlur={(event) => void updateDealSessionLine(line.id, event.currentTarget.value)}
+                              placeholder="0.00"
+                              disabled={busy === `deal-line-${line.id}`}
+                            />
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void removeDealSessionLine(line.id)}
+                          disabled={busy === `deal-remove-${line.id}`}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <div className="detail-grid">
+                <Metric label="Max cash" value={gbp(dealSession.summary.totalMaxCashPence)} />
+                <Metric label="Max trade" value={gbp(dealSession.summary.totalMaxTradePence)} />
+                <Metric label="Profit plan" value={gbp(dealSession.summary.totalExpectedProfitPence)} />
+              </div>
+              <div className="form-grid">
+                <label>
+                  Paid total
+                  <MoneyInput value={dealSessionPaid} onChange={setDealSessionPaid} disabled={busy === "deal-session-complete"} />
+                </label>
+                <label>
+                  Suggested offer
+                  <input value={penceToPounds(dealSession.summary.suggestedBundleOfferPence)} readOnly />
+                </label>
+              </div>
+              {dealSession.summary.completionBlockers.length > 0 && (
+                <p className="hint danger-text">{dealSession.summary.completionBlockers.join(" · ")}</p>
+              )}
+              <button
+                className="primary-action"
+                type="button"
+                onClick={() => void completeDealSession()}
+                disabled={busy === "deal-session-complete" || !dealSession.summary.completionReady}
+              >
+                {busy === "deal-session-complete" ? "Stocking..." : "Stock this lot"}
+              </button>
             </section>
           )}
 
@@ -6231,6 +6542,8 @@ export default function Home() {
           inventorySort={inventorySort}
           setInventorySort={setInventorySort}
           busy={busy}
+          warmCompsBusy={busy === "warm-comps"}
+          onWarmComps={() => void warmInventoryComps()}
           renderInventoryRow={(item) => (
             <InventoryRow
               key={item.id}
@@ -6754,6 +7067,36 @@ export default function Home() {
               <span>costs {gbp(dashboard?.metrics.operatingExpensePence ?? 0)}</span>
             </div>
           </section>
+          {dashboard?.monthlyPnl?.length ? (
+            <section className="panel monthly-pnl-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Monthly P&amp;L</h2>
+                  <span className="muted">cost basis + fees + costs</span>
+                </div>
+              </div>
+              <div className="channel-list">
+                {dashboard.monthlyPnl.map((row) => (
+                  <article className={`channel-row ${row.netProfitPence >= 0 ? "good" : "warn"}`} key={row.month}>
+                    <div>
+                      <strong>{formatMonth(row.month)}</strong>
+                      <span>
+                        {row.saleCount} sale{row.saleCount === 1 ? "" : "s"} · revenue {gbp(row.revenuePence)}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>{gbp(row.netProfitPence)}</strong>
+                      <span>gross {gbp(row.profitPence)}</span>
+                    </div>
+                    <small>
+                      cost {gbp(row.costBasisPence)} · fees {gbp(row.feesPence)} · postage {gbp(row.postagePence)} · costs{" "}
+                      {gbp(row.operatingExpensePence)}
+                    </small>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <section className="panel channel-panel">
             <div className="panel-heading">
               <div>
@@ -8935,6 +9278,12 @@ function shortDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown";
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
+function formatMonth(value: string): string {
+  const date = new Date(`${value}-01T12:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 }
 
 function todayInputValue(): string {

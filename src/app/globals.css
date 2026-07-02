@@ -635,6 +635,19 @@ label {
   font-weight: 900;
 }
 
+.heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.heading-actions .ghost-button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
 .section-heading.tight {
   margin-top: -2px;
 }
@@ -2922,6 +2935,67 @@ label {
     linear-gradient(112deg, rgba(255, 203, 5, 0.1), rgba(42, 117, 187, 0.1)),
     rgba(3, 8, 20, 0.4);
   padding: 9px;
+}
+
+.deal-session-panel {
+  border-color: rgba(52, 211, 153, 0.28);
+  background:
+    linear-gradient(116deg, rgba(52, 211, 153, 0.12), transparent 48%),
+    var(--panel);
+}
+
+.deal-session-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.deal-session-line {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) minmax(92px, auto);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 8px;
+}
+
+.deal-session-line strong,
+.deal-session-line span,
+.deal-session-line small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deal-session-line span,
+.deal-session-line small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.deal-session-line-actions {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.deal-session-line-actions label {
+  width: 92px;
+  font-size: 11px;
+}
+
+.deal-session-line-actions input {
+  min-height: 34px;
+  padding: 7px 8px;
+}
+
+.deal-session-line-actions button {
+  min-height: 32px;
+  padding: 5px 9px;
+  font-size: 12px;
 }
 
 .comp-identity-strip div {

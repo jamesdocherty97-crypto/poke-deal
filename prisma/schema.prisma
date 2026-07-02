@@ -37,6 +37,7 @@ model Card {
   comps       CompResult[]
   snapshots   PriceSnapshot[]
   watches     Watch[]
+  dealSessionLines DealSessionLine[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -157,6 +158,61 @@ model Expense {
 
   @@index([spentAt])
   @@index([category])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Deal sessions (binder / lot buying)
+// ─────────────────────────────────────────────────────────────
+
+model DealSession {
+  id          String            @id @default(cuid())
+  name        String
+  status      DealSessionStatus @default(OPEN)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  completedAt DateTime?
+  abandonedAt DateTime?
+  paidPence   Int?
+
+  lines       DealSessionLine[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DealSessionLine {
+  id                 String      @id @default(cuid())
+  session            DealSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId          String
+  card               Card?       @relation(fields: [cardId], references: [id])
+  cardId             String?
+
+  name               String
+  setName            String?
+  setCode            String?
+  number             String?
+  tcgApiId           String?
+  tcgDexId           String?
+  imageUrl           String?
+  grade              Grade       @default(RAW)
+
+  headlinePence      Int
+  confidence         String
+  manualCheck        Boolean     @default(false)
+  maxCashOfferPence  Int?
+  maxTradeOfferPence Int?
+  dealerOfferPence   Int?
+  netProceedsPence   Int?
+  expectedProfitPence Int?
+  sampleSize         Int         @default(0)
+  windowDays         Int         @default(0)
+  compSource         String?
+  compAsOf           DateTime?
+
+  addedAt            DateTime    @default(now())
+
+  @@index([sessionId])
+  @@index([cardId])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -305,6 +361,12 @@ enum InventoryStatus {
   LISTED
   SOLD
   RESERVED
+}
+
+enum DealSessionStatus {
+  OPEN
+  COMPLETED
+  ABANDONED
 }
 
 enum Channel {

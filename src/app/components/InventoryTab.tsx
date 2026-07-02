@@ -35,6 +35,8 @@ export function InventoryTab({
   inventorySort,
   setInventorySort,
   busy,
+  warmCompsBusy,
+  onWarmComps,
   renderInventoryRow,
   emptyInventoryFilterText,
   editingItemId,
@@ -83,6 +85,8 @@ export function InventoryTab({
   inventorySort: InventorySort;
   setInventorySort: (value: InventorySort) => void;
   busy: string | null;
+  warmCompsBusy?: boolean;
+  onWarmComps?: () => void;
   renderInventoryRow: (item: InventoryItemLike) => ReactNode;
   emptyInventoryFilterText: (filter: InventoryFilter) => string;
   editingItemId: string | null;
@@ -123,7 +127,14 @@ export function InventoryTab({
     <section className="workspace inventory-workspace">
       <div className="section-heading">
         <h2>Inventory</h2>
-        <span>{rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
+        <div className="heading-actions">
+          {onWarmComps && (
+            <button className="ghost-button" type="button" onClick={onWarmComps} disabled={warmCompsBusy || activeInventory.length === 0}>
+              {warmCompsBusy ? "Refreshing..." : "Refresh comps"}
+            </button>
+          )}
+          <span>{rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
+        </div>
       </div>
       <div className="inventory-filter-tabs" role="tablist" aria-label="Inventory filters">
         {inventoryFilters.map((filter) => (

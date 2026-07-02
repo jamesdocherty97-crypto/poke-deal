@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildProfitTrend, computeDealerMetrics, summarizeSale } from "./metrics.js";
+import { buildMonthlyPnl, buildProfitTrend, computeDealerMetrics, summarizeSale } from "./metrics.js";
 
 const NOW = new Date("2026-06-21T12:00:00.000Z");
 
@@ -261,6 +261,70 @@ test("buildProfitTrend aggregates daily profit into a cumulative trend", () => {
   assert.deepEqual(points, [
     { date: "2026-06-21", profitPence: 350, cumulativeProfitPence: 350 },
     { date: "2026-06-22", profitPence: 900, cumulativeProfitPence: 1250 },
+  ]);
+});
+
+test("buildMonthlyPnl groups sales and operating expenses by month", () => {
+  const sales = [
+    summarizeSale({
+      id: "sale_1",
+      itemId: "item_1",
+      name: "Mew",
+      grade: "RAW",
+      channel: "EBAY",
+      salePricePence: 5000,
+      feesPence: 650,
+      postagePence: 120,
+      costBasisPence: 2500,
+      soldAt: "2026-06-20T12:00:00.000Z",
+    }),
+    summarizeSale({
+      id: "sale_2",
+      itemId: "item_2",
+      name: "Pikachu",
+      grade: "RAW",
+      channel: "IN_PERSON",
+      salePricePence: 3000,
+      feesPence: 0,
+      postagePence: 0,
+      costBasisPence: 1500,
+      soldAt: "2026-07-01T12:00:00.000Z",
+    }),
+  ];
+
+  const monthly = buildMonthlyPnl(sales, [
+    {
+      id: "expense_1",
+      category: "TABLE_FEE",
+      description: "July table",
+      amountPence: 1000,
+      spentAt: "2026-07-01T08:00:00.000Z",
+    },
+  ]);
+
+  assert.deepEqual(monthly, [
+    {
+      month: "2026-06",
+      saleCount: 1,
+      revenuePence: 5000,
+      feesPence: 650,
+      postagePence: 120,
+      costBasisPence: 2500,
+      profitPence: 1730,
+      operatingExpensePence: 0,
+      netProfitPence: 1730,
+    },
+    {
+      month: "2026-07",
+      saleCount: 1,
+      revenuePence: 3000,
+      feesPence: 0,
+      postagePence: 0,
+      costBasisPence: 1500,
+      profitPence: 1500,
+      operatingExpensePence: 1000,
+      netProfitPence: 500,
+    },
   ]);
 });
 

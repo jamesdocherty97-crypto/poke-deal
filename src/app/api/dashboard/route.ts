@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { computeDealerMetrics, summarizeSale, type DealerStatus } from "@/lib/dealer/metrics";
+import { buildMonthlyPnl, computeDealerMetrics, summarizeSale, type DealerStatus } from "@/lib/dealer/metrics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,12 +87,14 @@ export async function GET() {
         return counts;
       }, {});
 
+    const saleSummaries = metricSales
+        .map(summarizeSale)
+        .sort((a, b) => Date.parse(b.soldAt) - Date.parse(a.soldAt));
+
     return NextResponse.json({
       metrics: computeDealerMetrics(metricItems, metricSales, new Date(), metricExpenses),
-      recentSales: metricSales
-        .map(summarizeSale)
-        .sort((a, b) => Date.parse(b.soldAt) - Date.parse(a.soldAt))
-        .slice(0, 8),
+      monthlyPnl: buildMonthlyPnl(saleSummaries, metricExpenses),
+      recentSales: saleSummaries.slice(0, 8),
       recentExpenses: expenses.slice(0, 8).map((expense) => ({
         ...expense,
         spentAt: expense.spentAt.toISOString(),
