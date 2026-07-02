@@ -3653,6 +3653,29 @@ label {
   color: var(--danger);
 }
 
+.reconciliation-notes {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(255, 203, 5, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 203, 5, 0.08);
+  padding: 10px;
+}
+
+.reconciliation-notes ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.reconciliation-notes li {
+  color: #f8e7a0;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
 .poketrace-signal-list {
   display: grid;
   gap: 7px;

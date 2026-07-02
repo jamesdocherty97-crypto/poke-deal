@@ -204,6 +204,15 @@ type PokeTraceSignalView = {
   approxSaleCount?: boolean;
 };
 
+type ReconciliationView = {
+  headlinePence: number | null;
+  confidence: "high" | "medium" | "low";
+  manualCheck: boolean;
+  reasons: string[];
+  chosenSource?: string;
+  trendPct: number | null;
+};
+
 type CompResult = Omit<DomainCompResult, "raw"> & {
   raw?: {
     smartMarketPrice?: { confidence?: string; daysUsed?: number; method?: string };
@@ -221,6 +230,7 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
     note?: string;
     signals?: PokeTraceSignalView[];
     gradeLadder?: { grade: Grade; medianPence: number; sampleSize: number; source?: string }[];
+    reconciliation?: ReconciliationView;
   };
 };
 
@@ -228,6 +238,7 @@ type Reconciled = {
   headline: CompResult;
   all: CompResult[];
   sourcesDisagree: boolean;
+  reconciliation?: ReconciliationView;
   ambiguous?: boolean;
   catalog?: CatalogCard | null;
   alternatives?: CatalogCard[];
@@ -1164,6 +1175,10 @@ export default function Home() {
   const compPsaContext = comp?.psaCert ?? psaResult;
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
   const compLimitations = useMemo(() => (compForReceipt ? buildCompLimitations(compForReceipt) : []), [compForReceipt]);
+  const reconciliationReasons = useMemo(
+    () => (compForReceipt ? buildReconciliationReasons(compForReceipt) : []),
+    [compForReceipt],
+  );
   const needsManualComp = Boolean(
     apiHeadline &&
       !checkedComp &&
@@ -5645,6 +5660,19 @@ export default function Home() {
                   </div>
                 </div>
               )}
+              {reconciliationReasons.length > 0 && (
+                <div className="reconciliation-notes" title={reconciliationReasons.map((item) => item.label).join(" · ")}>
+                  <div className="receipt-heading">
+                    <span>Why check</span>
+                    <strong>{headline.raw?.reconciliation?.confidence ?? comp?.reconciliation?.confidence ?? "review"}</strong>
+                  </div>
+                  <ul>
+                    {reconciliationReasons.slice(0, 4).map((item) => (
+                      <li key={item.key}>{item.label}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {pokeTraceSignals.length > 0 && (
                 <div className="poketrace-signal-list" aria-label="PokeTrace returned signals">
                   <div className="receipt-heading">
@@ -9175,6 +9203,34 @@ function buildCompLimitations(comp: Reconciled): Array<{ key: string; reason: st
       reason: sourceEmptyReason(result),
     }))
     .filter((item, index, rows) => rows.findIndex((row) => row.reason === item.reason) === index);
+}
+
+function buildReconciliationReasons(comp: Reconciled): Array<{ key: string; label: string }> {
+  const reconciliation = comp.reconciliation ?? comp.headline.raw?.reconciliation;
+  if (!reconciliation?.manualCheck && reconciliation?.confidence !== "low") return [];
+  return (reconciliation?.reasons ?? [])
+    .filter((reason) => reason !== "reconciled-cleanly")
+    .map((reason, index) => ({
+      key: `${index}-${reason}`,
+      label: humanReconciliationReason(reason),
+    }))
+    .filter((item, index, rows) => rows.findIndex((row) => row.label === item.label) === index);
+}
+
+function humanReconciliationReason(reason: string): string {
+  if (reason.includes("smart-out-of-band")) return "Smart RAW price fell outside its own sale range.";
+  if (reason.includes("smart-diverges")) return "Smart RAW price diverged from its own median.";
+  if (reason.includes("dominant-source-outlier")) return "A much larger source disagreed with a thin price.";
+  if (reason.includes("identity-set") || reason.includes("identity-number")) return "A source matched the wrong card identity.";
+  if (reason.includes("tcg-vintage-raw")) return "Vintage catalog market data was excluded for RAW pricing.";
+  if (reason.includes("corroboration-stale")) return "One signal is too stale to headline.";
+  if (reason.includes("corroboration-thin-owned")) return "Owned sales are too thin or old to headline.";
+  if (reason.includes("penalty-raw-bucket-spread")) return "Raw eBay bucket is wide enough to suggest graded leakage.";
+  if (reason.includes("penalty-graded-bucket-spread")) return "Graded bucket has a wide sale spread.";
+  if (reason.includes("trend-suppressed")) return "Impossible trend was hidden.";
+  if (reason.includes("corroboration-fallback")) return "Only fallback evidence was available.";
+  if (reason.includes("no-eligible-candidates")) return "No source passed the quality gates.";
+  return reason.replace(/[-:]/g, " ");
 }
 
 function receiptRank(result: CompResult, headline: CompResult): number {

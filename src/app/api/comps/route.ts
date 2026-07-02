@@ -20,8 +20,9 @@ import { PsaCertLookup } from "@/lib/psa/psaCert";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const RECOVERY_ALTERNATIVES_TIMEOUT_MS = 1600;
+const RECOVERY_ALTERNATIVES_TIMEOUT_MS = 5000;
 const CATALOG_RESOLVE_TIMEOUT_MS = 3600;
+const MIN_AMBIGUOUS_ALTERNATIVES = 5;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -61,16 +62,24 @@ export async function GET(request: Request) {
       ? null
       : findAmbiguousCatalogCandidates(card, catalogSource, 8, { timeoutMs: RECOVERY_ALTERNATIVES_TIMEOUT_MS });
 
-    const result = await compService.lookup(compCard, { grade });
-    const needsRecovery = !catalog || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
-
     let alternatives: CatalogCard[] = [];
     let ambiguous = false;
     const ambiguousCandidates = ambiguousCandidatesPromise ? await ambiguousCandidatesPromise : [];
-    const ambiguityAlternatives = catalog
+    let ambiguityAlternatives = catalog
       ? ambiguousCandidates.filter((candidate) => catalogIdentityKey(candidate) !== catalogIdentityKey(catalog))
       : ambiguousCandidates;
-    ambiguous = ambiguityAlternatives.length > 0;
+    ambiguous = ambiguousCandidates.length > 1 || ambiguityAlternatives.length > 0;
+
+    if (ambiguous && ambiguityAlternatives.length < MIN_AMBIGUOUS_ALTERNATIVES) {
+      const expandedCandidates = await findAmbiguousCatalogCandidates(card, catalogSource, 12, { timeoutMs: 10000 });
+      ambiguityAlternatives = catalog
+        ? expandedCandidates.filter((candidate) => catalogIdentityKey(candidate) !== catalogIdentityKey(catalog))
+        : expandedCandidates;
+      ambiguous = expandedCandidates.length > 1 || ambiguityAlternatives.length > 0;
+    }
+
+    const result = await compService.lookup(compCard, { grade }, { ambiguous });
+    const needsRecovery = !catalog || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
 
     if (needsRecovery) {
       const recovery = await findCatalogAlternatives(card, catalogSource, 4, { timeoutMs: RECOVERY_ALTERNATIVES_TIMEOUT_MS });

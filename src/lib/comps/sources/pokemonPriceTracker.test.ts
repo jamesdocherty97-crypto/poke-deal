@@ -637,6 +637,49 @@ test("PokemonPriceTrackerSource degrades when live fetch fails or times out", as
   assert.match((comp.raw as { reason?: string }).reason ?? "", /failed|no response/);
 });
 
+test("PokemonPriceTrackerSource retries a graded lookup when the first matched response lacks the grade bucket", async () => {
+  let calls = 0;
+  const first = {
+    data: [{ name: "Retrymon", number: "1/1", setName: "151", ebay: { salesByGrade: {} } }],
+  };
+  const second = {
+    data: [
+      {
+        name: "Retrymon",
+        number: "1/1",
+        setName: "151",
+        ebay: {
+          salesByGrade: {
+            psa10: {
+              count: 8,
+              medianPrice: 100,
+              averagePrice: 102,
+              minPrice: 80,
+              maxPrice: 130,
+              lastMarketUpdate: "2026-07-01T00:00:00.000Z",
+            },
+          },
+        },
+      },
+    ],
+  };
+  const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
+    assert.ok(init?.signal, "live requests should carry a timeout signal");
+    calls += 1;
+    return new Response(JSON.stringify(calls === 1 ? first : second), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 25);
+  const comp = await source.lookup({ name: "Retrymon", number: "1/1", setName: "151" }, { grade: "PSA_10" });
+
+  assert.equal(calls, 2);
+  assert.equal(comp.sampleSize, 8);
+  assert.equal(comp.medianPence, usdToPence(100));
+});
+
 test("PokemonPriceTrackerSource live requests use the low-credit limit and cap history days", async () => {
   let requestedUrlString: string | null = null;
   const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {

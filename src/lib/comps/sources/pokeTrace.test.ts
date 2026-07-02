@@ -238,6 +238,32 @@ test("PokeTrace rejects wrong-set cards for unavailable promo sets", () => {
   assert.match((comp.raw as { reason?: string }).reason ?? "", /card match/);
 });
 
+test("PokeTrace rejects same-number cards from the wrong explicit set", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Charizard",
+          cardNumber: "4/102",
+          set: { name: "Celebrations: Classic Collection" },
+          market: "US",
+          currency: "USD",
+          prices: { tcgplayer: { NEAR_MINT: { avg: 180, saleCount: 400 } } },
+        },
+      ],
+    },
+    {
+      source: "poketrace",
+      card: { name: "Charizard", setName: "Base", number: "4/102" },
+      grade: "RAW",
+      windowDays: 90,
+    },
+  );
+
+  assert.equal(comp.sampleSize, 0);
+  assert.match((comp.raw as { reason?: string }).reason ?? "", /card match/);
+});
+
 test("PokeTrace rejects generic cards for first-edition requests", () => {
   const comp = mapPokeTraceCardsToComp(
     {

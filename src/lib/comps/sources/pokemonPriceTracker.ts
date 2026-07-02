@@ -59,7 +59,7 @@ export class PokemonPriceTrackerSource implements CompSource {
       });
     }
 
-    const matchedCard = await this.fetchCard(card, windowDays);
+    const matchedCard = await this.fetchCard(card, windowDays, grade);
     if (matchedCard == null) {
       return emptyComp({ source: this.name, card, grade, windowDays }, "Price Tracker lookup failed or returned no response");
     }
@@ -67,7 +67,7 @@ export class PokemonPriceTrackerSource implements CompSource {
   }
 
   /** Fetch one card with eBay graded-sales aggregates. Returns null on any failure. */
-  private async fetchCard(card: CardRef, windowDays: number): Promise<unknown | null> {
+  private async fetchCard(card: CardRef, windowDays: number, grade: Grade): Promise<unknown | null> {
     // BILLING: credits are charged on the requested `limit` (default 50!) — pass limit=1.
     const days = Math.min(Math.max(windowDays, 1), 180); // Pro plan caps history at 180d
     const search = buildPokemonPriceTrackerSearch(card);
@@ -75,33 +75,42 @@ export class PokemonPriceTrackerSource implements CompSource {
     const cacheKey = buildLookupCacheKey(card, days);
     const cached = readLookupCache(cacheKey);
     if (cached !== null) {
-      return cached;
+      return providerHasGradeAggregate(cached, grade) ? cached : null;
     }
 
-    for (const params of attempts) {
-      try {
-        const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${this.apiKey}`, Accept: "application/json" },
-          signal: timeoutSignal(this.fetchTimeoutMs),
-        });
-        if (!res.ok) {
-          console.warn(`[${this.name}] HTTP ${res.status} — no comp returned`);
-          continue;
+    let matchedWithoutGrade: unknown | null = null;
+    const rounds = grade === "RAW" ? 1 : 2;
+    for (let round = 0; round < rounds; round += 1) {
+      for (const params of attempts) {
+        try {
+          const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
+            headers: { Authorization: `Bearer ${this.apiKey}`, Accept: "application/json" },
+            signal: timeoutSignal(this.fetchTimeoutMs),
+          });
+          if (!res.ok) {
+            console.warn(`[${this.name}] HTTP ${res.status} — no comp returned`);
+            continue;
+          }
+          const json = (await res.json()) as unknown;
+          const match = selectMatchingPptCard(json, card);
+          if (match) {
+            if (providerHasGradeAggregate(match, grade)) {
+              writeLookupCache(cacheKey, match);
+              return match;
+            }
+            matchedWithoutGrade = match;
+            continue;
+          }
+          console.warn(`[${this.name}] returned a different card for ${search} — retrying/falling back`);
+        } catch (err) {
+          // Degrade, don't explode: a dead provider must not break a lookup.
+          console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
         }
-        const json = (await res.json()) as unknown;
-        const match = selectMatchingPptCard(json, card);
-        if (match) {
-          writeLookupCache(cacheKey, match);
-          return match;
-        }
-        console.warn(`[${this.name}] returned a different card for ${search} — retrying/falling back`);
-      } catch (err) {
-        // Degrade, don't explode: a dead provider must not break a lookup.
-        console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
       }
+      if (round < rounds - 1) await sleep(350);
     }
 
-    return null;
+    return matchedWithoutGrade;
   }
 }
 
@@ -125,8 +134,19 @@ function writeLookupCache(key: string, value: unknown): void {
   lookupCache.set(key, { value, expiresAt: Date.now() + LOOKUP_CACHE_TTL_MS });
 }
 
+function providerHasGradeAggregate(json: unknown, grade: Grade): boolean {
+  const card = readProviderCard(json);
+  const agg = card?.ebay?.salesByGrade?.[gradeToProviderKey(grade)] as { count?: unknown; medianPrice?: unknown } | undefined;
+  const count = Number(agg?.count ?? 0);
+  return Boolean(agg && Number.isFinite(count) && count > 0);
+}
+
 function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
   return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── Pure mapping (exported for fixture tests) ────────────────────────────────

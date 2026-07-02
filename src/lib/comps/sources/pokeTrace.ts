@@ -363,11 +363,9 @@ function readPokeTraceCards(json: unknown): PokeTraceCard[] {
 
 function buildPokeTraceMatchProfiles(request: CardRef): CardRef[] {
   const profiles: CardRef[] = [{ ...request }];
-  if (request.setName) profiles.push({ ...request, setName: undefined });
   const leftNumber = request.number?.trim().split("/")[0]?.trim();
   if (leftNumber && request.number && leftNumber !== request.number.trim()) {
     profiles.push({ ...request, number: leftNumber });
-    if (request.setName) profiles.push({ ...request, setName: undefined, number: leftNumber });
   }
 
   const deduped = new Map<string, CardRef>();
@@ -394,7 +392,7 @@ function pokeTraceCardMatchesRequest(card: PokeTraceCard, request: CardRef): boo
   if (requestedNumber && providerNumber && !collectorNumberMatches(providerNumber, requestedNumber)) return false;
 
   const providerSet = readString(card.set?.name) ?? "";
-  if (request.setName && !setMatchesRequest(providerSet, request.setName)) return false;
+  if (request.setName && providerSet && !setMatchesRequest(providerSet, request.setName)) return false;
 
   return true;
 }
@@ -407,12 +405,22 @@ function setMatchesRequest(providerSet: string, requestedSet: string): boolean {
   const requestedTokens = tokenizeSearchText(requestedSet)
     .map((token) => token.toLowerCase())
     .filter((token) => token.length >= 3 && !["set", "promo", "promos", "pokemon", "card"].includes(token));
-  const providerTokens = tokenizeSearchText(providerSet).map((token) => token.toLowerCase());
+  const providerTokens = tokenizeSearchText(providerSet)
+    .map((token) => token.toLowerCase())
+    .filter((token) => token.length >= 3 && !["set", "promo", "promos", "pokemon", "card"].includes(token));
   if (requestedTokens.length === 0 || providerTokens.length === 0) return true;
 
   const matchingTokens = requestedTokens.filter((token) =>
     providerTokens.some((candidate) => tokenMatches(token, candidate)),
   );
+  const providerSubsetMatchesRequested =
+    providerTokens.length >= 2 &&
+    providerTokens.every((providerToken) =>
+      requestedTokens.some((requestedToken) => tokenMatches(requestedToken, providerToken)),
+    );
+  if (requestedTokens.length > providerTokens.length && providerSubsetMatchesRequested) {
+    return true;
+  }
   if (requestedTokens.length <= 2) {
     return matchingTokens.length === requestedTokens.length;
   }

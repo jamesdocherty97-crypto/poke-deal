@@ -4,12 +4,14 @@
 // All individual results are returned too, so the UI can show cross-source spread.
 
 import type { CardRef, CompQuery, CompResult } from "../domain/types.js";
+import { getSetById, resolveSetIdForCard } from "../catalog/setCatalog.js";
 import type { CompSource } from "./CompSource.js";
 import { DEFAULT_WINDOW_DAYS, isConfident } from "./cleaning.js";
 import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
 import { PokeTraceSource } from "./sources/pokeTrace.js";
 import { EbayMarketplaceInsightsSource } from "./sources/ebayMarketplaceInsights.js";
+import { reconcileComps, type ReconCandidate, type ReconQuery, type ReconResult, type ReconSource } from "./reconciler.js";
 
 const DEFAULT_SOURCE_TIMEOUT_MS = 8000;
 
@@ -20,6 +22,8 @@ export interface ReconciledComp {
   all: CompResult[];
   /** True when sources disagree materially on the median (>15%). */
   sourcesDisagree: boolean;
+  /** Deterministic data-quality verdict used to explain the headline choice. */
+  reconciliation?: ReconResult;
 }
 
 export class CompService {
@@ -43,7 +47,11 @@ export class CompService {
     return this.sources.map((s) => ({ name: s.name, live: s.live }));
   }
 
-  async lookup(card: CardRef, query: CompQuery = {}): Promise<ReconciledComp> {
+  async lookup(
+    card: CardRef,
+    query: CompQuery = {},
+    options: { ambiguous?: boolean } = {},
+  ): Promise<ReconciledComp> {
     const settled = await Promise.allSettled(
       this.sources.map((source) => this.lookupSource(source, card, query)),
     );
@@ -55,8 +63,8 @@ export class CompService {
       throw new Error("All comp sources failed");
     }
 
-    const headline = pickHeadline(all);
-    return { headline, all, sourcesDisagree: detectDisagreement(all) };
+    const { headline, reconciliation } = pickHeadlineForQuery(all, card, query, options);
+    return { headline, all, sourcesDisagree: detectDisagreement(all) || reconciliation.manualCheck, reconciliation };
   }
 
   private async lookupSource(source: CompSource, card: CardRef, query: CompQuery): Promise<CompResult> {
@@ -109,6 +117,22 @@ function emptySourceComp(source: string, card: CardRef, query: CompQuery, reason
   };
 }
 
+export function pickHeadlineForQuery(
+  results: CompResult[],
+  card: CardRef,
+  query: CompQuery = {},
+  options: { ambiguous?: boolean } = {},
+): { headline: CompResult; reconciliation: ReconResult } {
+  const reconQuery = buildReconQuery(card, query, options);
+  const candidates = results.map((result) => resultToReconCandidate(result)).filter((candidate): candidate is ReconCandidate => candidate != null);
+  const reconciliation = reconcileComps(reconQuery, candidates);
+  const chosen = reconciliation.chosenSource
+    ? pickCompForReconSource(results, reconciliation.chosenSource, reconciliation.headlinePence)
+    : null;
+  const headline = chosen ? applyReconciliation(chosen, reconciliation) : applyReconciliation(pickHeadline(results), reconciliation);
+  return { headline, reconciliation };
+}
+
 /** Largest confident sample wins; fall back to largest sample of any. */
 export function pickHeadline(results: CompResult[]): CompResult {
   // Nothing is a better comp than what you actually sold the exact card+grade
@@ -125,6 +149,148 @@ export function pickHeadline(results: CompResult[]): CompResult {
   const confident = results.filter((r) => isConfident(r));
   const pool = confident.length > 0 ? confident : results;
   return pool.reduce((best, r) => (r.sampleSize > best.sampleSize ? r : best));
+}
+
+function buildReconQuery(card: CardRef, query: CompQuery, options: { ambiguous?: boolean }): ReconQuery {
+  const setId = resolveSetIdForCard(card.setName, card.number) ?? setIdFromTcgApiId(card.tcgApiId);
+  return {
+    setId,
+    cardNumber: card.number,
+    language: card.language ?? "EN",
+    gradeBucket: query.grade ?? "RAW",
+    isVintage: isVintageSet(setId),
+    ambiguous: Boolean(options.ambiguous),
+  };
+}
+
+function resultToReconCandidate(result: CompResult): ReconCandidate | null {
+  if (result.sampleSize <= 0 || result.medianPence <= 0) return null;
+  const source = reconSource(result);
+  if (!source) return null;
+  const raw = result.raw && typeof result.raw === "object" ? (result.raw as Record<string, unknown>) : {};
+  const providerCard = raw.providerCard && typeof raw.providerCard === "object" ? (raw.providerCard as CardRef) : null;
+  const matchedCard = providerCard ?? result.card;
+  const fields = source === "tcg-market" ? readTcgMarketFields(raw, result.medianPence) : undefined;
+  return {
+    source,
+    valuePence: result.medianPence,
+    n: result.sampleSize,
+    ageDays: ageDays(result.asOf),
+    region: reconRegion(result),
+    matchedSetId: resolveSetIdForCard(matchedCard.setName, matchedCard.number) ?? setIdFromTcgApiId(matchedCard.tcgApiId),
+    matchedCardNumber: matchedCard.number,
+    matchedLanguage: matchedCard.language ?? "EN",
+    raw: readRawStats(result),
+    fields,
+    trendPct: result.trendPct,
+    trendWindowDays: result.windowDays,
+    candidateHasGradeScopedData: source === "poketrace" && raw.kind === "sold-aggregate",
+  };
+}
+
+function reconSource(result: CompResult): ReconSource | null {
+  if (result.source === "owned-sales") return "owned-sales";
+  if (result.source === "ebay-marketplace-insights") return "ebay-insights";
+  if (result.source === "pokemon-price-tracker") {
+    return readRawString(result, "chosenPriceSource") === "smartMarketPrice" ? "pt-smart" : "pt-median";
+  }
+  if (result.source === "pokemon-tcg-market") return "tcg-market";
+  if (result.source === "poketrace") return "poketrace";
+  return null;
+}
+
+function reconRegion(result: CompResult): "UK" | "EU" | "US" {
+  if (result.source === "ebay-marketplace-insights" || result.source === "owned-sales") return "UK";
+  const raw = result.raw && typeof result.raw === "object" ? (result.raw as Record<string, unknown>) : {};
+  const market = typeof raw.market === "string" ? raw.market.toUpperCase() : "";
+  if (market === "EU") return "EU";
+  if (market === "US") return "US";
+  if (result.source === "pokemon-tcg-market") {
+    const chosen = raw.chosenSignal && typeof raw.chosenSignal === "object" ? (raw.chosenSignal as Record<string, unknown>) : null;
+    return chosen?.source === "cardmarket" ? "EU" : "US";
+  }
+  return "US";
+}
+
+function readRawStats(result: CompResult): ReconCandidate["raw"] | undefined {
+  if (result.source === "pokemon-price-tracker") {
+    return {
+      min: result.lowPence,
+      max: result.highPence,
+      median: readRawString(result, "chosenPriceSource") === "smartMarketPrice" ? result.meanPence || result.medianPence : result.medianPence,
+      count: result.sampleSize,
+    };
+  }
+  if (result.highPence > 0 && result.lowPence > 0 && result.highPence !== result.lowPence) {
+    return { min: result.lowPence, max: result.highPence, median: result.medianPence, count: result.sampleSize };
+  }
+  return undefined;
+}
+
+function readTcgMarketFields(raw: Record<string, unknown>, fallback: number): ReconCandidate["fields"] {
+  const signals = Array.isArray(raw.signals) ? raw.signals : [];
+  const price = (kind: string) => {
+    const match = signals.find(
+      (signal) =>
+        signal &&
+        typeof signal === "object" &&
+        (signal as { source?: unknown }).source === "cardmarket" &&
+        (signal as { kind?: unknown }).kind === kind,
+    ) as { pricePence?: unknown } | undefined;
+    const value = Number(match?.pricePence);
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  };
+  return {
+    trendPrice: price("trendPrice") ?? fallback,
+    avg30: price("avg30"),
+    avg7: price("avg7"),
+    low: price("lowPrice"),
+  };
+}
+
+function pickCompForReconSource(
+  results: CompResult[],
+  reconSourceName: ReconSource,
+  headlinePence: number | null,
+): CompResult | null {
+  const matching = results.filter((result) => reconSource(result) === reconSourceName && result.sampleSize > 0 && result.medianPence > 0);
+  if (matching.length === 0) return null;
+  if (headlinePence != null) {
+    const exact = matching.find((result) => result.medianPence === headlinePence);
+    if (exact) return exact;
+  }
+  return matching.reduce((best, result) => (result.sampleSize > best.sampleSize ? result : best));
+}
+
+function applyReconciliation(result: CompResult, reconciliation: ReconResult): CompResult {
+  const medianPence = reconciliation.headlinePence ?? result.medianPence;
+  return {
+    ...result,
+    medianPence,
+    meanPence: medianPence > 0 && result.meanPence <= 0 ? medianPence : result.meanPence,
+    lowPence: medianPence > 0 && result.lowPence <= 0 ? medianPence : result.lowPence,
+    highPence: medianPence > 0 && result.highPence <= 0 ? medianPence : result.highPence,
+    trendPct: reconciliation.chosenSource === reconSource(result) ? reconciliation.trendPct : result.trendPct,
+    raw: {
+      ...(result.raw && typeof result.raw === "object" ? result.raw : {}),
+      reconciliation,
+    },
+  };
+}
+
+function setIdFromTcgApiId(tcgApiId: string | undefined): string | undefined {
+  return tcgApiId?.split("-")[0] || undefined;
+}
+
+function isVintageSet(setId: string | undefined): boolean {
+  const release = setId ? getSetById(setId)?.releaseDate : undefined;
+  return Boolean(release && release < "2003-01-01");
+}
+
+function ageDays(asOf: string): number {
+  const time = new Date(asOf).getTime();
+  if (!Number.isFinite(time)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, Math.floor((Date.now() - time) / (24 * 60 * 60 * 1000)));
 }
 
 function pickOwnedSalesHeadline(results: CompResult[]): CompResult | null {
