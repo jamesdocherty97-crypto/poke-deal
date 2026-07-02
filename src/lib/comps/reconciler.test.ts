@@ -142,6 +142,28 @@ test("T9: non-thin owned sales anchor over external baselines", () => {
   assert.equal(result.manualCheck, false);
 });
 
+test("T9b: one or two recent owned sales corroborate but do not headline", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "owned-sales", valuePence: 30000, n: 2, ageDays: 20, region: "UK" }),
+    candidate({ source: "poketrace", valuePence: 22000, n: 3000, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 22000);
+  assert.equal(result.chosenSource, "poketrace");
+  assert.match(result.reasons.join(" "), /corroboration-thin-owned-sales/);
+});
+
+test("T9c: three recent owned sales can headline over external baselines", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "owned-sales", valuePence: 30000, n: 3, ageDays: 20, region: "UK" }),
+    candidate({ source: "poketrace", valuePence: 22000, n: 3000, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 30000);
+  assert.equal(result.chosenSource, "owned-sales");
+  assert.equal(result.manualCheck, false);
+});
+
 test("T10: no candidates returns no headline and a low-confidence manual check", () => {
   const result = reconcileComps(baseQuery, []);
 

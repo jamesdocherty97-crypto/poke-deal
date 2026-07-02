@@ -5791,7 +5791,7 @@ export default function Home() {
               {ownedSalesComp && (
                 <div className="owned-sales-signal">
                   <div>
-                    <span>Owned sales</span>
+                    <span>Your sales</span>
                     <strong>{gbp(ownedSalesComp.medianPence)}</strong>
                     <small>
                       {ownedSalesComp.sampleSize} sold · latest {shortDate(ownedSalesComp.asOf)}
