@@ -243,6 +243,52 @@ test("PokemonTcgMarketSource computes trend from cardmarket averages", async () 
   assert.equal(comp.trendPct, 12);
 });
 
+test("PokemonTcgMarketSource strips vintage Cardmarket trendPrice spikes from evidence", async () => {
+  const catalog: CatalogSource = {
+    name: "fake-catalog",
+    live: true,
+    async resolve() {
+      return {
+        ...catalogCard,
+        name: "Charizard",
+        setName: "Base",
+        setCode: "base1",
+        number: "4/102",
+        tcgApiId: "base1-4",
+        priceSignals: [
+          {
+            source: "cardmarket" as const,
+            label: "Cardmarket Trend Price",
+            pricePence: 357658,
+            originalAmount: 4184.6,
+            originalCurrency: "EUR" as const,
+            kind: "trendPrice",
+            updatedAt: "2026/07/01",
+          },
+          {
+            source: "tcgplayer" as const,
+            label: "TCGPlayer Holofoil market",
+            pricePence: 54652,
+            originalAmount: 694.08,
+            originalCurrency: "USD" as const,
+            kind: "market",
+            variant: "holofoil",
+            updatedAt: "2026/07/02",
+          },
+        ],
+      };
+    },
+  };
+  const source = new PokemonTcgMarketSource(catalog);
+  const comp = await source.lookup({ name: "Charizard", setName: "Base", number: "4/102" }, { grade: "RAW" });
+  const raw = comp.raw as { chosenSignal?: { source?: string; kind?: string }; signals?: Array<{ kind?: string }> };
+
+  assert.equal(comp.medianPence, 54652);
+  assert.equal(raw.chosenSignal?.source, "tcgplayer");
+  assert.equal(raw.chosenSignal?.kind, "market");
+  assert.equal(raw.signals?.some((signal) => signal.kind === "trendPrice"), false);
+});
+
 test("PokemonTcgMarketSource refuses regular market prices for first-edition requests", async () => {
   const catalog: CatalogSource = {
     name: "fake-catalog",

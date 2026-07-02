@@ -1,6 +1,7 @@
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "../../catalog/types.js";
 import { catalogCardMatchesLookupContext, catalogCardMatchesSetContext } from "../../catalog/cardSearch.js";
 import { PokemonTcgApiCatalogSource, pickCatalogPriceSignal } from "../../catalog/pokemonTcgApi.js";
+import { getSetById } from "../../catalog/setCatalog.js";
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
@@ -61,7 +62,8 @@ export function mapCatalogCardToMarketComp(
   catalogCard: CatalogCard | null,
   ctx: MarketContext,
 ): CompResult {
-  const bestSignal = pickCatalogPriceSignalForRequest(catalogCard?.priceSignals, ctx.card);
+  const priceSignals = filterVintageTrendPrice(catalogCard);
+  const bestSignal = pickCatalogPriceSignalForRequest(priceSignals, ctx.card);
   if (!catalogCard || !bestSignal) {
     return emptyMarketComp(
       ctx,
@@ -90,14 +92,14 @@ export function mapCatalogCardToMarketComp(
     highPence: bestSignal.pricePence,
     sampleSize: 1,
     windowDays: MARKET_WINDOW_DAYS,
-    trendPct: extractCatalogSignalTrendPct(catalogCard.priceSignals),
+    trendPct: extractCatalogSignalTrendPct(priceSignals),
     outliersRemoved: 0,
     asOf: parseMarketDate(bestSignal.updatedAt),
     raw: {
       kind: "catalog-market-baseline",
       caveat: "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
       chosenSignal: bestSignal,
-      signals: catalogCard.priceSignals ?? [],
+      signals: priceSignals ?? [],
     },
   };
 }
@@ -155,6 +157,19 @@ function extractCatalogSignalTrendPct(signals: CatalogPriceSignal[] | undefined)
   const avg7 = readSignalAmount(signals, "cardmarket", "avg7");
   if (!avg30 || avg30 <= 0 || !avg7) return null;
   return Math.round(((avg7 - avg30) / avg30) * 1000) / 10;
+}
+
+function filterVintageTrendPrice(catalogCard: CatalogCard | null): CatalogPriceSignal[] | undefined {
+  const signals = catalogCard?.priceSignals;
+  if (!signals || signals.length === 0) return signals;
+  if (!isVintageCatalogCard(catalogCard)) return signals;
+  return signals.filter((signal) => !(signal.source === "cardmarket" && signal.kind === "trendPrice"));
+}
+
+function isVintageCatalogCard(card: CatalogCard): boolean {
+  const setId = card.setCode ?? card.tcgApiId?.split("-")[0];
+  const release = setId ? getSetById(setId)?.releaseDate : undefined;
+  return Boolean(release && release < "2003-01-01");
 }
 
 function readSignalAmount(signals: CatalogPriceSignal[], source: "cardmarket" | "tcgplayer", kind: string): number | null {
