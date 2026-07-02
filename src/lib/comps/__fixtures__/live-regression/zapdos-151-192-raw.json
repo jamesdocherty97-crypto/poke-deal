@@ -1,0 +1,671 @@
+{
+  "capturedAt": "2026-07-02T18:57:42.814Z",
+  "request": {
+    "url": "http://127.0.0.1:3000/api/comps?name=Zapdos+ex&setName=151&number=192%2F165&grade=RAW",
+    "card": {
+      "name": "Zapdos ex",
+      "setName": "151",
+      "number": "192/165"
+    },
+    "grade": "RAW"
+  },
+  "response": {
+    "headline": {
+      "source": "poketrace",
+      "card": {
+        "name": "Zapdos ex",
+        "setName": "SV: Scarlet & Violet 151",
+        "number": "192/165",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "sv3pt5-192"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 982,
+      "meanPence": 982,
+      "lowPence": 706,
+      "highPence": 933,
+      "sampleSize": 5745,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-06-30T22:40:06.486Z",
+      "raw": {
+        "kind": "market-baseline",
+        "tier": "NEAR_MINT",
+        "priceSource": "tcgplayer",
+        "market": "US",
+        "currency": "USD",
+        "providerCard": {
+          "name": "Zapdos ex",
+          "setName": "SV: Scarlet & Violet 151",
+          "number": "192/165",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "approxSaleCount": false,
+        "signals": [
+          {
+            "priceSource": "tcgplayer",
+            "tier": "NEAR_MINT",
+            "kind": "market-baseline",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 982,
+            "lowPence": 706,
+            "highPence": 933,
+            "sampleSize": 5745,
+            "trendPct": null,
+            "approxSaleCount": false
+          },
+          {
+            "priceSource": "ebay",
+            "tier": "NEAR_MINT",
+            "kind": "sold-aggregate",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 1172,
+            "lowPence": 1163,
+            "highPence": 1181,
+            "sampleSize": 357,
+            "trendPct": 13.5,
+            "approxSaleCount": true
+          }
+        ],
+        "avg": 12.47,
+        "low": 8.96,
+        "high": 11.85,
+        "lastUpdated": "2026-07-01T00:00:00.000Z",
+        "avg1d": null,
+        "avg7d": null,
+        "avg30d": null,
+        "median3d": null,
+        "median7d": null,
+        "median30d": null,
+        "saleCount": 5745,
+        "reconciliation": {
+          "headlinePence": 982,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-region-us:pt-smart",
+            "corroboration-stale:tcg-market",
+            "penalty-region-eu:tcg-market",
+            "penalty-region-us:poketrace"
+          ],
+          "chosenSource": "poketrace",
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Zapdos ex",
+          "setName": "151",
+          "number": "192/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-192"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 1506,
+        "meanPence": 1720,
+        "lowPence": 1123,
+        "highPence": 2151,
+        "sampleSize": 14,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-06-29T20:48:30.218Z",
+        "raw": {
+          "count": 14,
+          "totalValue": 218.49,
+          "averagePrice": 21.849,
+          "medianPrice": 24,
+          "minPrice": 14.26,
+          "maxPrice": 27.32,
+          "marketPrice7Day": null,
+          "marketPriceMedian7Day": null,
+          "dailyVolume7Day": null,
+          "marketTrend": "up",
+          "lastMarketUpdate": "2026-06-29T20:48:30.218Z",
+          "smartMarketPrice": {
+            "price": 19.12,
+            "confidence": "medium",
+            "method": "90day_filtered_weighted",
+            "daysUsed": 90
+          },
+          "prices": {
+            "market": 12.33,
+            "low": 8.89,
+            "sellers": 207,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:41:47.380Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 12.33,
+                  "listings": null,
+                  "priceString": "$12.33",
+                  "lastUpdated": "2026-07-02T18:29:31.473Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "smartMarketPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 1506,
+              "sampleSize": 14,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_7",
+              "providerKey": "psa7",
+              "medianPence": 787,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_8",
+              "providerKey": "psa8",
+              "medianPence": 1259,
+              "sampleSize": 11,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 1909,
+              "sampleSize": 45,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_10",
+              "providerKey": "psa10",
+              "medianPence": 5433,
+              "sampleSize": 52,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9",
+              "providerKey": "bgs9",
+              "medianPence": 1969,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_6_5",
+              "providerKey": "cgc6_5",
+              "medianPence": 315,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8",
+              "providerKey": "cgc8",
+              "medianPence": 787,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8_5",
+              "providerKey": "cgc8_5",
+              "medianPence": 1181,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9",
+              "providerKey": "cgc9",
+              "medianPence": 787,
+              "sampleSize": 5,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9_5",
+              "providerKey": "cgc9_5",
+              "medianPence": 1004,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_10",
+              "providerKey": "cgc10",
+              "medianPence": 2598,
+              "sampleSize": 11,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_9",
+              "providerKey": "ace9",
+              "medianPence": 3577,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_10",
+              "providerKey": "ace10",
+              "medianPence": 4191,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "ebay-marketplace-insights",
+        "card": {
+          "name": "Zapdos ex",
+          "setName": "151",
+          "number": "192/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-192"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:57:40.507Z",
+        "raw": {
+          "kind": "uk-ebay-sold-comps",
+          "reason": "eBay Marketplace Insights is not enabled"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Zapdos ex",
+          "setName": "151",
+          "number": "192/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-192"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 1095,
+        "meanPence": 1095,
+        "lowPence": 1095,
+        "highPence": 1095,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": 9.5,
+        "outliersRemoved": 0,
+        "asOf": "2025-11-18T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 1095,
+            "originalAmount": 12.81,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+          },
+          "signals": [
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Trend Price",
+              "pricePence": 1095,
+              "originalAmount": 12.81,
+              "originalCurrency": "EUR",
+              "kind": "trendPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Average Sell Price",
+              "pricePence": 1056,
+              "originalAmount": 12.35,
+              "originalCurrency": "EUR",
+              "kind": "averageSellPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg30",
+              "pricePence": 1048,
+              "originalAmount": 12.26,
+              "originalCurrency": "EUR",
+              "kind": "avg30",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg7",
+              "pricePence": 1148,
+              "originalAmount": 13.43,
+              "originalCurrency": "EUR",
+              "kind": "avg7",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price Ex Plus",
+              "pricePence": 641,
+              "originalAmount": 7.5,
+              "originalCurrency": "EUR",
+              "kind": "lowPriceExPlus",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price",
+              "pricePence": 598,
+              "originalAmount": 7,
+              "originalCurrency": "EUR",
+              "kind": "lowPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil market",
+              "pricePence": 971,
+              "originalAmount": 12.33,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-192"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil mid",
+              "pricePence": 1096,
+              "originalAmount": 13.92,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-192"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil low",
+              "pricePence": 630,
+              "originalAmount": 8,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-192"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil directLow",
+              "pricePence": 950,
+              "originalAmount": 12.06,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-192"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Zapdos ex",
+          "setName": "SV: Scarlet & Violet 151",
+          "number": "192/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-192"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 982,
+        "meanPence": 982,
+        "lowPence": 706,
+        "highPence": 933,
+        "sampleSize": 5745,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-06-30T22:40:06.486Z",
+        "raw": {
+          "kind": "market-baseline",
+          "tier": "NEAR_MINT",
+          "priceSource": "tcgplayer",
+          "market": "US",
+          "currency": "USD",
+          "providerCard": {
+            "name": "Zapdos ex",
+            "setName": "SV: Scarlet & Violet 151",
+            "number": "192/165",
+            "game": "POKEMON",
+            "language": "EN"
+          },
+          "approxSaleCount": false,
+          "signals": [
+            {
+              "priceSource": "tcgplayer",
+              "tier": "NEAR_MINT",
+              "kind": "market-baseline",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 982,
+              "lowPence": 706,
+              "highPence": 933,
+              "sampleSize": 5745,
+              "trendPct": null,
+              "approxSaleCount": false
+            },
+            {
+              "priceSource": "ebay",
+              "tier": "NEAR_MINT",
+              "kind": "sold-aggregate",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 1172,
+              "lowPence": 1163,
+              "highPence": 1181,
+              "sampleSize": 357,
+              "trendPct": 13.5,
+              "approxSaleCount": true
+            }
+          ],
+          "avg": 12.47,
+          "low": 8.96,
+          "high": 11.85,
+          "lastUpdated": "2026-07-01T00:00:00.000Z",
+          "avg1d": null,
+          "avg7d": null,
+          "avg30d": null,
+          "median3d": null,
+          "median7d": null,
+          "median30d": null,
+          "saleCount": 5745
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Zapdos ex",
+          "setName": "151",
+          "number": "192/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-192"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:57:40.543Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 982,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-region-us:pt-smart",
+        "corroboration-stale:tcg-market",
+        "penalty-region-eu:tcg-market",
+        "penalty-region-us:poketrace"
+      ],
+      "chosenSource": "poketrace",
+      "trendPct": null
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Zapdos ex",
+      "setName": "151",
+      "setCode": "sv3pt5",
+      "number": "192/165",
+      "rarity": "Ultra Rare",
+      "imageUrl": "https://images.pokemontcg.io/sv3pt5/192_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/sv3pt5/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/sv3pt5/symbol.png",
+      "tcgApiId": "sv3pt5-192",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 1095,
+          "originalAmount": 12.81,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 1056,
+          "originalAmount": 12.35,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 1048,
+          "originalAmount": 12.26,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 1148,
+          "originalAmount": 13.43,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 641,
+          "originalAmount": 7.5,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 598,
+          "originalAmount": 7,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-192"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 971,
+          "originalAmount": 12.33,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-192"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 1096,
+          "originalAmount": 13.92,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-192"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 630,
+          "originalAmount": 8,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-192"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 950,
+          "originalAmount": 12.06,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-192"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  }
+}

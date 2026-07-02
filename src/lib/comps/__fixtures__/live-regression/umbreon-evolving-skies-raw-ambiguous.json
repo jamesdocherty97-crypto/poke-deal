@@ -1,0 +1,717 @@
+{
+  "capturedAt": "2026-07-02T18:57:12.718Z",
+  "request": {
+    "url": "http://127.0.0.1:3000/api/comps?name=Umbreon&setName=Evolving+Skies&grade=RAW",
+    "card": {
+      "name": "Umbreon",
+      "setName": "Evolving Skies"
+    },
+    "grade": "RAW"
+  },
+  "response": {
+    "headline": {
+      "source": "poketrace",
+      "card": {
+        "name": "Umbreon V (Full Art)",
+        "setName": "SWSH07: Evolving Skies",
+        "number": "188/203",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "swsh7-188"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 5615,
+      "meanPence": 5615,
+      "lowPence": 5615,
+      "highPence": 5615,
+      "sampleSize": 832,
+      "windowDays": 90,
+      "trendPct": 6.2,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-01T22:49:09.516Z",
+      "raw": {
+        "kind": "market-baseline",
+        "tier": "NEAR_MINT",
+        "priceSource": "tcgplayer",
+        "market": "US",
+        "currency": "USD",
+        "providerCard": {
+          "name": "Umbreon V (Full Art)",
+          "setName": "SWSH07: Evolving Skies",
+          "number": "188/203",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "approxSaleCount": false,
+        "signals": [
+          {
+            "priceSource": "tcgplayer",
+            "tier": "NEAR_MINT",
+            "kind": "market-baseline",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 5615,
+            "lowPence": 5615,
+            "highPence": 5615,
+            "sampleSize": 832,
+            "trendPct": 6.2,
+            "approxSaleCount": false
+          },
+          {
+            "priceSource": "ebay",
+            "tier": "NEAR_MINT",
+            "kind": "sold-aggregate",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 3876,
+            "lowPence": 3876,
+            "highPence": 3876,
+            "sampleSize": 106,
+            "trendPct": 0.6,
+            "approxSaleCount": true
+          }
+        ],
+        "avg": 71.31,
+        "low": 71.31,
+        "high": 71.31,
+        "lastUpdated": "2026-07-01T00:00:00.000Z",
+        "avg1d": 71.31,
+        "avg7d": 70.48428,
+        "avg30d": 67.133224,
+        "median3d": null,
+        "median7d": null,
+        "median30d": null,
+        "saleCount": 832,
+        "reconciliation": {
+          "headlinePence": 5615,
+          "confidence": "medium",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-raw-bucket-spread:pt-smart",
+            "penalty-region-us:pt-smart",
+            "corroboration-stale:tcg-market",
+            "penalty-region-eu:tcg-market",
+            "penalty-region-us:poketrace"
+          ],
+          "chosenSource": "poketrace",
+          "trendPct": 6.2
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Umbreon V",
+          "setName": "Evolving Skies",
+          "number": "188/203",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh7-188"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 3543,
+        "meanPence": 8460,
+        "lowPence": 2205,
+        "highPence": 20079,
+        "sampleSize": 20,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-01T06:55:42.997Z",
+        "raw": {
+          "count": 20,
+          "totalValue": 2148.81,
+          "averagePrice": 107.4405,
+          "medianPrice": 81.66499999999999,
+          "minPrice": 28,
+          "maxPrice": 255,
+          "marketPrice7Day": null,
+          "marketPriceMedian7Day": null,
+          "dailyVolume7Day": null,
+          "marketTrend": "down",
+          "lastMarketUpdate": "2026-07-01T06:55:42.997Z",
+          "smartMarketPrice": {
+            "price": 45,
+            "confidence": "low",
+            "method": "30day_filtered_weighted",
+            "daysUsed": 30
+          },
+          "prices": {
+            "market": 71.31,
+            "low": 34.99,
+            "sellers": 85,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:42:23.117Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 71.31,
+                  "listings": null,
+                  "priceString": "$71.31",
+                  "lastUpdated": "2026-07-02T18:30:26.467Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "smartMarketPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 3543,
+              "sampleSize": 20,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_6",
+              "providerKey": "psa6",
+              "medianPence": 2244,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_7",
+              "providerKey": "psa7",
+              "medianPence": 1575,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_8",
+              "providerKey": "psa8",
+              "medianPence": 2834,
+              "sampleSize": 13,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 4724,
+              "sampleSize": 76,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_10",
+              "providerKey": "psa10",
+              "medianPence": 17559,
+              "sampleSize": 121,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8",
+              "providerKey": "cgc8",
+              "medianPence": 3465,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9",
+              "providerKey": "cgc9",
+              "medianPence": 3543,
+              "sampleSize": 2,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9_5",
+              "providerKey": "cgc9_5",
+              "medianPence": 4331,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_10",
+              "providerKey": "cgc10",
+              "medianPence": 10374,
+              "sampleSize": 5,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_10",
+              "providerKey": "ace10",
+              "medianPence": 11472,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "ebay-marketplace-insights",
+        "card": {
+          "name": "Umbreon V",
+          "setName": "Evolving Skies",
+          "number": "188/203",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh7-188"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:57:10.218Z",
+        "raw": {
+          "kind": "uk-ebay-sold-comps",
+          "reason": "eBay Marketplace Insights is not enabled"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Umbreon V",
+          "setName": "Evolving Skies",
+          "number": "188/203",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh7-188"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 2748,
+        "meanPence": 2748,
+        "lowPence": 2748,
+        "highPence": 2748,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": -10.1,
+        "outliersRemoved": 0,
+        "asOf": "2025-11-18T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "cardmarket",
+            "label": "Cardmarket Trend Price",
+            "pricePence": 2748,
+            "originalAmount": 32.15,
+            "originalCurrency": "EUR",
+            "kind": "trendPrice",
+            "updatedAt": "2025/11/18",
+            "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+          },
+          "signals": [
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Trend Price",
+              "pricePence": 2748,
+              "originalAmount": 32.15,
+              "originalCurrency": "EUR",
+              "kind": "trendPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Average Sell Price",
+              "pricePence": 2689,
+              "originalAmount": 31.46,
+              "originalCurrency": "EUR",
+              "kind": "averageSellPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg30",
+              "pricePence": 3075,
+              "originalAmount": 35.98,
+              "originalCurrency": "EUR",
+              "kind": "avg30",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Avg7",
+              "pricePence": 2763,
+              "originalAmount": 32.33,
+              "originalCurrency": "EUR",
+              "kind": "avg7",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price Ex Plus",
+              "pricePence": 2050,
+              "originalAmount": 23.99,
+              "originalCurrency": "EUR",
+              "kind": "lowPriceExPlus",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+            },
+            {
+              "source": "cardmarket",
+              "label": "Cardmarket Low Price",
+              "pricePence": 1705,
+              "originalAmount": 19.95,
+              "originalCurrency": "EUR",
+              "kind": "lowPrice",
+              "updatedAt": "2025/11/18",
+              "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil market",
+              "pricePence": 5615,
+              "originalAmount": 71.31,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh7-188"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil mid",
+              "pricePence": 5615,
+              "originalAmount": 71.31,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh7-188"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil low",
+              "pricePence": 4693,
+              "originalAmount": 59.6,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh7-188"
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Holofoil directLow",
+              "pricePence": 4694,
+              "originalAmount": 59.61,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "holofoil",
+              "updatedAt": "2026/07/02",
+              "url": "https://prices.pokemontcg.io/tcgplayer/swsh7-188"
+            }
+          ]
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Umbreon V (Full Art)",
+          "setName": "SWSH07: Evolving Skies",
+          "number": "188/203",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh7-188"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 5615,
+        "meanPence": 5615,
+        "lowPence": 5615,
+        "highPence": 5615,
+        "sampleSize": 832,
+        "windowDays": 90,
+        "trendPct": 6.2,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-01T22:49:09.516Z",
+        "raw": {
+          "kind": "market-baseline",
+          "tier": "NEAR_MINT",
+          "priceSource": "tcgplayer",
+          "market": "US",
+          "currency": "USD",
+          "providerCard": {
+            "name": "Umbreon V (Full Art)",
+            "setName": "SWSH07: Evolving Skies",
+            "number": "188/203",
+            "game": "POKEMON",
+            "language": "EN"
+          },
+          "approxSaleCount": false,
+          "signals": [
+            {
+              "priceSource": "tcgplayer",
+              "tier": "NEAR_MINT",
+              "kind": "market-baseline",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 5615,
+              "lowPence": 5615,
+              "highPence": 5615,
+              "sampleSize": 832,
+              "trendPct": 6.2,
+              "approxSaleCount": false
+            },
+            {
+              "priceSource": "ebay",
+              "tier": "NEAR_MINT",
+              "kind": "sold-aggregate",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 3876,
+              "lowPence": 3876,
+              "highPence": 3876,
+              "sampleSize": 106,
+              "trendPct": 0.6,
+              "approxSaleCount": true
+            }
+          ],
+          "avg": 71.31,
+          "low": 71.31,
+          "high": 71.31,
+          "lastUpdated": "2026-07-01T00:00:00.000Z",
+          "avg1d": 71.31,
+          "avg7d": 70.48428,
+          "avg30d": 67.133224,
+          "median3d": null,
+          "median7d": null,
+          "median30d": null,
+          "saleCount": 832
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Umbreon V",
+          "setName": "Evolving Skies",
+          "number": "188/203",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "swsh7-188"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:57:10.321Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 5615,
+      "confidence": "medium",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-raw-bucket-spread:pt-smart",
+        "penalty-region-us:pt-smart",
+        "corroboration-stale:tcg-market",
+        "penalty-region-eu:tcg-market",
+        "penalty-region-us:poketrace"
+      ],
+      "chosenSource": "poketrace",
+      "trendPct": 6.2
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Umbreon V",
+      "setName": "Evolving Skies",
+      "setCode": "swsh7",
+      "number": "188/203",
+      "rarity": "Rare Ultra",
+      "imageUrl": "https://images.pokemontcg.io/swsh7/188_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/swsh7/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/swsh7/symbol.png",
+      "tcgApiId": "swsh7-188",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 2748,
+          "originalAmount": 32.15,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 2689,
+          "originalAmount": 31.46,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 3075,
+          "originalAmount": 35.98,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 2763,
+          "originalAmount": 32.33,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 2050,
+          "originalAmount": 23.99,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 1705,
+          "originalAmount": 19.95,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/swsh7-188"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 5615,
+          "originalAmount": 71.31,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh7-188"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 5615,
+          "originalAmount": 71.31,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh7-188"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 4693,
+          "originalAmount": 59.6,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh7-188"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 4694,
+          "originalAmount": 59.61,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/swsh7-188"
+        }
+      ]
+    },
+    "alternatives": [
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Umbreon V",
+        "setName": "Evolving Skies",
+        "setCode": "swsh7",
+        "number": "94/203",
+        "rarity": "Rare Holo V",
+        "imageUrl": "https://images.pokemontcg.io/swsh7/94_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/swsh7/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/swsh7/symbol.png",
+        "tcgApiId": "swsh7-94"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Umbreon V",
+        "setName": "Evolving Skies",
+        "setCode": "swsh7",
+        "number": "189/203",
+        "rarity": "Rare Ultra",
+        "imageUrl": "https://images.pokemontcg.io/swsh7/189_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/swsh7/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/swsh7/symbol.png",
+        "tcgApiId": "swsh7-189"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Umbreon VMAX",
+        "setName": "Evolving Skies",
+        "setCode": "swsh7",
+        "number": "95/203",
+        "rarity": "Rare Holo VMAX",
+        "imageUrl": "https://images.pokemontcg.io/swsh7/95_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/swsh7/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/swsh7/symbol.png",
+        "tcgApiId": "swsh7-95"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Umbreon VMAX",
+        "setName": "Evolving Skies",
+        "setCode": "swsh7",
+        "number": "214/203",
+        "rarity": "Rare Rainbow",
+        "imageUrl": "https://images.pokemontcg.io/swsh7/214_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/swsh7/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/swsh7/symbol.png",
+        "tcgApiId": "swsh7-214"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Umbreon VMAX",
+        "setName": "Evolving Skies",
+        "setCode": "swsh7",
+        "number": "215/203",
+        "rarity": "Rare Rainbow",
+        "imageUrl": "https://images.pokemontcg.io/swsh7/215_hires.png",
+        "setLogoUrl": "https://images.pokemontcg.io/swsh7/logo.png",
+        "setSymbolUrl": "https://images.pokemontcg.io/swsh7/symbol.png",
+        "tcgApiId": "swsh7-215"
+      }
+    ],
+    "ambiguous": true,
+    "psaCert": null
+  }
+}

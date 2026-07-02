@@ -1,0 +1,628 @@
+{
+  "capturedAt": "2026-07-02T18:57:26.436Z",
+  "request": {
+    "url": "http://127.0.0.1:3000/api/comps?name=Charizard+ex&setName=151&number=199%2F165&grade=PSA_10",
+    "card": {
+      "name": "Charizard ex",
+      "setName": "151",
+      "number": "199/165"
+    },
+    "grade": "PSA_10"
+  },
+  "response": {
+    "headline": {
+      "source": "pokemon-price-tracker",
+      "card": {
+        "name": "Charizard ex",
+        "setName": "151",
+        "number": "199/165",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "sv3pt5-199"
+      },
+      "grade": "PSA_10",
+      "currency": "GBP",
+      "medianPence": 106220,
+      "meanPence": 109705,
+      "lowPence": 24409,
+      "highPence": 188787,
+      "sampleSize": 251,
+      "windowDays": 90,
+      "trendPct": null,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-01T06:21:12.341Z",
+      "raw": {
+        "count": 251,
+        "totalValue": 349706.86,
+        "averagePrice": 1393.2544223107568,
+        "medianPrice": 1349,
+        "minPrice": 310,
+        "maxPrice": 2397.6,
+        "marketPrice7Day": 1675,
+        "marketPriceMedian7Day": 1675,
+        "dailyVolume7Day": 0.14285714285714285,
+        "marketTrend": "up",
+        "lastMarketUpdate": "2026-07-01T06:21:12.341Z",
+        "smartMarketPrice": {
+          "price": 1486.88,
+          "confidence": "medium",
+          "method": "14day_filtered_weighted",
+          "daysUsed": 14
+        },
+        "prices": {
+          "market": 421,
+          "low": 325.49,
+          "sellers": 103,
+          "listings": 0,
+          "primaryPrinting": "Holofoil",
+          "lastUpdated": "2026-07-02T14:41:47.380Z",
+          "variants": {
+            "Holofoil": {
+              "Near Mint Holofoil": {
+                "price": 421,
+                "listings": null,
+                "priceString": "$421.00",
+                "lastUpdated": "2026-07-02T18:29:34.430Z"
+              }
+            }
+          }
+        },
+        "chosenPriceSource": "medianPrice",
+        "gradeLadder": [
+          {
+            "grade": "RAW",
+            "providerKey": "ungraded",
+            "medianPence": 31496,
+            "sampleSize": 251,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_6",
+            "providerKey": "psa6",
+            "medianPence": 27165,
+            "sampleSize": 4,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_7",
+            "providerKey": "psa7",
+            "medianPence": 23228,
+            "sampleSize": 5,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_8",
+            "providerKey": "psa8",
+            "medianPence": 27558,
+            "sampleSize": 103,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_9",
+            "providerKey": "psa9",
+            "medianPence": 31629,
+            "sampleSize": 350,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "PSA_10",
+            "providerKey": "psa10",
+            "medianPence": 106220,
+            "sampleSize": 251,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_8_5",
+            "providerKey": "bgs8_5",
+            "medianPence": 21614,
+            "sampleSize": 4,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9",
+            "providerKey": "bgs9",
+            "medianPence": 32087,
+            "sampleSize": 24,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_9_5",
+            "providerKey": "bgs9_5",
+            "medianPence": 59054,
+            "sampleSize": 27,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "BGS_10",
+            "providerKey": "bgs10",
+            "medianPence": 393701,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8",
+            "providerKey": "cgc8",
+            "medianPence": 18622,
+            "sampleSize": 1,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_8_5",
+            "providerKey": "cgc8_5",
+            "medianPence": 23621,
+            "sampleSize": 3,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9",
+            "providerKey": "cgc9",
+            "medianPence": 26574,
+            "sampleSize": 19,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_9_5",
+            "providerKey": "cgc9_5",
+            "medianPence": 36653,
+            "sampleSize": 14,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "CGC_10",
+            "providerKey": "cgc10",
+            "medianPence": 62992,
+            "sampleSize": 74,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_9",
+            "providerKey": "ace9",
+            "medianPence": 31606,
+            "sampleSize": 13,
+            "source": "pokemon-price-tracker"
+          },
+          {
+            "grade": "ACE_10",
+            "providerKey": "ace10",
+            "medianPence": 76409,
+            "sampleSize": 15,
+            "source": "pokemon-price-tracker"
+          }
+        ],
+        "reconciliation": {
+          "headlinePence": 106220,
+          "confidence": "low",
+          "manualCheck": true,
+          "reasons": [
+            "penalty-graded-bucket-spread:pt-median",
+            "penalty-region-us:pt-median",
+            "trend-suppressed:pt-median"
+          ],
+          "chosenSource": "pt-median",
+          "trendPct": null
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Charizard ex",
+          "setName": "151",
+          "number": "199/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-199"
+        },
+        "grade": "PSA_10",
+        "currency": "GBP",
+        "medianPence": 106220,
+        "meanPence": 109705,
+        "lowPence": 24409,
+        "highPence": 188787,
+        "sampleSize": 251,
+        "windowDays": 90,
+        "trendPct": 297.9,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-01T06:21:12.341Z",
+        "raw": {
+          "count": 251,
+          "totalValue": 349706.86,
+          "averagePrice": 1393.2544223107568,
+          "medianPrice": 1349,
+          "minPrice": 310,
+          "maxPrice": 2397.6,
+          "marketPrice7Day": 1675,
+          "marketPriceMedian7Day": 1675,
+          "dailyVolume7Day": 0.14285714285714285,
+          "marketTrend": "up",
+          "lastMarketUpdate": "2026-07-01T06:21:12.341Z",
+          "smartMarketPrice": {
+            "price": 1486.88,
+            "confidence": "medium",
+            "method": "14day_filtered_weighted",
+            "daysUsed": 14
+          },
+          "prices": {
+            "market": 421,
+            "low": 325.49,
+            "sellers": 103,
+            "listings": 0,
+            "primaryPrinting": "Holofoil",
+            "lastUpdated": "2026-07-02T14:41:47.380Z",
+            "variants": {
+              "Holofoil": {
+                "Near Mint Holofoil": {
+                  "price": 421,
+                  "listings": null,
+                  "priceString": "$421.00",
+                  "lastUpdated": "2026-07-02T18:29:34.430Z"
+                }
+              }
+            }
+          },
+          "chosenPriceSource": "medianPrice",
+          "gradeLadder": [
+            {
+              "grade": "RAW",
+              "providerKey": "ungraded",
+              "medianPence": 31496,
+              "sampleSize": 251,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_6",
+              "providerKey": "psa6",
+              "medianPence": 27165,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_7",
+              "providerKey": "psa7",
+              "medianPence": 23228,
+              "sampleSize": 5,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_8",
+              "providerKey": "psa8",
+              "medianPence": 27558,
+              "sampleSize": 103,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_9",
+              "providerKey": "psa9",
+              "medianPence": 31629,
+              "sampleSize": 350,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "PSA_10",
+              "providerKey": "psa10",
+              "medianPence": 106220,
+              "sampleSize": 251,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_8_5",
+              "providerKey": "bgs8_5",
+              "medianPence": 21614,
+              "sampleSize": 4,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9",
+              "providerKey": "bgs9",
+              "medianPence": 32087,
+              "sampleSize": 24,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_9_5",
+              "providerKey": "bgs9_5",
+              "medianPence": 59054,
+              "sampleSize": 27,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "BGS_10",
+              "providerKey": "bgs10",
+              "medianPence": 393701,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8",
+              "providerKey": "cgc8",
+              "medianPence": 18622,
+              "sampleSize": 1,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_8_5",
+              "providerKey": "cgc8_5",
+              "medianPence": 23621,
+              "sampleSize": 3,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9",
+              "providerKey": "cgc9",
+              "medianPence": 26574,
+              "sampleSize": 19,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_9_5",
+              "providerKey": "cgc9_5",
+              "medianPence": 36653,
+              "sampleSize": 14,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "CGC_10",
+              "providerKey": "cgc10",
+              "medianPence": 62992,
+              "sampleSize": 74,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_9",
+              "providerKey": "ace9",
+              "medianPence": 31606,
+              "sampleSize": 13,
+              "source": "pokemon-price-tracker"
+            },
+            {
+              "grade": "ACE_10",
+              "providerKey": "ace10",
+              "medianPence": 76409,
+              "sampleSize": 15,
+              "source": "pokemon-price-tracker"
+            }
+          ]
+        }
+      },
+      {
+        "source": "ebay-marketplace-insights",
+        "card": {
+          "name": "Charizard ex",
+          "setName": "151",
+          "number": "199/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-199"
+        },
+        "grade": "PSA_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:57:22.398Z",
+        "raw": {
+          "kind": "uk-ebay-sold-comps",
+          "reason": "eBay Marketplace Insights is not enabled"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Charizard ex",
+          "setName": "151",
+          "number": "199/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-199"
+        },
+        "grade": "PSA_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:57:22.398Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "catalog market prices are raw-card signals only"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Charizard ex",
+          "setName": "151",
+          "number": "199/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-199"
+        },
+        "grade": "PSA_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:57:26.331Z",
+        "raw": {
+          "reason": "no PokeTrace PSA 10 price tier"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Charizard ex",
+          "setName": "151",
+          "number": "199/165",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "sv3pt5-199"
+        },
+        "grade": "PSA_10",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-02T18:57:22.434Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 106220,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-graded-bucket-spread:pt-median",
+        "penalty-region-us:pt-median",
+        "trend-suppressed:pt-median"
+      ],
+      "chosenSource": "pt-median",
+      "trendPct": null
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Charizard ex",
+      "setName": "151",
+      "setCode": "sv3pt5",
+      "number": "199/165",
+      "rarity": "Special Illustration Rare",
+      "imageUrl": "https://images.pokemontcg.io/sv3pt5/199_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/sv3pt5/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/sv3pt5/symbol.png",
+      "tcgApiId": "sv3pt5-199",
+      "priceSignals": [
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Trend Price",
+          "pricePence": 20146,
+          "originalAmount": 235.71,
+          "originalCurrency": "EUR",
+          "kind": "trendPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-199"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Average Sell Price",
+          "pricePence": 23377,
+          "originalAmount": 273.51,
+          "originalCurrency": "EUR",
+          "kind": "averageSellPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-199"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg30",
+          "pricePence": 23310,
+          "originalAmount": 272.73,
+          "originalCurrency": "EUR",
+          "kind": "avg30",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-199"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Avg7",
+          "pricePence": 23397,
+          "originalAmount": 273.75,
+          "originalCurrency": "EUR",
+          "kind": "avg7",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-199"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price Ex Plus",
+          "pricePence": 15726,
+          "originalAmount": 183.99,
+          "originalCurrency": "EUR",
+          "kind": "lowPriceExPlus",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-199"
+        },
+        {
+          "source": "cardmarket",
+          "label": "Cardmarket Low Price",
+          "pricePence": 14530,
+          "originalAmount": 170,
+          "originalCurrency": "EUR",
+          "kind": "lowPrice",
+          "updatedAt": "2025/11/18",
+          "url": "https://prices.pokemontcg.io/cardmarket/sv3pt5-199"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil market",
+          "pricePence": 33238,
+          "originalAmount": 422.12,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-199"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil mid",
+          "pricePence": 35433,
+          "originalAmount": 450,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-199"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil low",
+          "pricePence": 27559,
+          "originalAmount": 350,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-199"
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Holofoil directLow",
+          "pricePence": 30314,
+          "originalAmount": 384.99,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "holofoil",
+          "updatedAt": "2026/07/02",
+          "url": "https://prices.pokemontcg.io/tcgplayer/sv3pt5-199"
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  }
+}
