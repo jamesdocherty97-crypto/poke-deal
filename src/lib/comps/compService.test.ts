@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CompService, detectDisagreement, MemoryLastKnownCompCache, pickHeadline } from "./compService.js";
+import { CompService, defaultCompSources, detectDisagreement, MemoryLastKnownCompCache, pickHeadline } from "./compService.js";
 import type { CompResult } from "../domain/types.js";
 import type { CompSource } from "./CompSource.js";
 
@@ -220,6 +220,26 @@ test("pickHeadline ignores an empty owned-sales signal", () => {
   assert.equal(pickHeadline([emptyOwned, external]), external);
 });
 
+test("defaultCompSources dark-launches eBay Marketplace Insights behind an env flag", () => {
+  const originalShort = process.env.EBAY_INSIGHTS_ENABLED;
+  const originalLegacy = process.env.EBAY_MARKETPLACE_INSIGHTS_ENABLED;
+  try {
+    delete process.env.EBAY_INSIGHTS_ENABLED;
+    delete process.env.EBAY_MARKETPLACE_INSIGHTS_ENABLED;
+    assert.equal(defaultCompSources().some((source) => source.name === "ebay-marketplace-insights"), false);
+
+    process.env.EBAY_INSIGHTS_ENABLED = "true";
+    assert.equal(defaultCompSources().some((source) => source.name === "ebay-marketplace-insights"), true);
+
+    process.env.EBAY_INSIGHTS_ENABLED = "false";
+    process.env.EBAY_MARKETPLACE_INSIGHTS_ENABLED = "true";
+    assert.equal(defaultCompSources().some((source) => source.name === "ebay-marketplace-insights"), true);
+  } finally {
+    restoreEnv("EBAY_INSIGHTS_ENABLED", originalShort);
+    restoreEnv("EBAY_MARKETPLACE_INSIGHTS_ENABLED", originalLegacy);
+  }
+});
+
 test("CompService degrades a hanging source into a visible empty comp", async () => {
   const hangingSource: CompSource = {
     name: "slow-source",
@@ -300,3 +320,11 @@ test("CompService returns a clean no-data result when every source fails cold", 
   assert.equal(result.reconciliation?.manualCheck, true);
   assert.equal(result.unavailableSources?.[0]?.name, "failing-source");
 });
+
+function restoreEnv(key: string, value: string | undefined): void {
+  if (value == null) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}

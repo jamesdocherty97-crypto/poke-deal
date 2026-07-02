@@ -78,7 +78,7 @@ The frame runs without any of these (fixture mode). Add them to `.env` (copy fro
 
 **PokeTrace cross-check path:** set `POKETRACE_API_KEY` in Vercel before relying on bigger raw-card buys. The adapter asks PokeTrace for EU market data first, then falls back to US, and maps Cardmarket/TCGPlayer/eBay tiers into GBP `CompResult`s so noisy RAW buckets can be challenged by a second source.
 
-**eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and refresh token. Until then the source degrades to a zero-sample comp and the manual UK sold link remains the reliable fallback.
+**eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and refresh token (`EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` still works as the legacy flag). Until then the source stays out of comp aggregation and the manual UK sold link remains the reliable fallback.
 
 ---
 

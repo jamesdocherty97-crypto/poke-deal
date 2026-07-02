@@ -48,9 +48,17 @@ export class EbayMarketplaceInsightsSource implements CompSource {
   readonly name = SOURCE_NAME;
   readonly live: boolean;
 
+  /*
+   * Dark-launch enable steps after eBay grants restricted Marketplace Insights:
+   * 1. Keep the existing eBay app credentials and refresh token configured.
+   * 2. Set EBAY_INSIGHTS_ENABLED=true (legacy EBAY_MARKETPLACE_INSIGHTS_ENABLED
+   *    also works) in the deployment environment.
+   * 3. Restart/redeploy; the app will add this source to comp aggregation and
+   *    query buy/marketplace_insights/v1_beta/item_sales/search for UK solds.
+   */
   constructor(
     private readonly config: EbayConfig | null = getEbayConfig(),
-    private readonly enabled = process.env.EBAY_MARKETPLACE_INSIGHTS_ENABLED?.trim().toLowerCase() === "true",
+    private readonly enabled = isEbayMarketplaceInsightsEnabled(),
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
   ) {
@@ -119,6 +127,10 @@ export class EbayMarketplaceInsightsSource implements CompSource {
 
     return response.json() as Promise<unknown>;
   }
+}
+
+export function isEbayMarketplaceInsightsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return readBooleanEnv(env.EBAY_INSIGHTS_ENABLED) || readBooleanEnv(env.EBAY_MARKETPLACE_INSIGHTS_ENABLED);
 }
 
 export function buildEbayMarketplaceInsightsQuery(card: CardRef, grade: Grade): string {
@@ -198,6 +210,10 @@ function readString(value: unknown): string | null {
 function readPositiveInt(value: unknown): number | null {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function readBooleanEnv(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
 }
 
 function emptyComp(ctx: EbayMiContext, reason: string): CompResult {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { PokeTraceSource } from "@/lib/comps/sources/pokeTrace";
-import { EbayMarketplaceInsightsSource } from "@/lib/comps/sources/ebayMarketplaceInsights";
+import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from "@/lib/comps/sources/ebayMarketplaceInsights";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
 import { getEbayConfig, hasEbayRefreshToken } from "@/lib/ebay/config";
 import { PsaCertLookup } from "@/lib/psa/psaCert";
@@ -26,7 +26,7 @@ export async function GET() {
   const psa = new PsaCertLookup();
   const ebayConfigured = Boolean(getEbayConfig());
   const ebayConnected = hasEbayRefreshToken();
-  const ebayMiEnabled = process.env.EBAY_MARKETPLACE_INSIGHTS_ENABLED?.trim().toLowerCase() === "true";
+  const ebayMiEnabled = isEbayMarketplaceInsightsEnabled();
 
   const sources: SystemSource[] = [
     {

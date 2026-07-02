@@ -10,7 +10,7 @@ import { DEFAULT_WINDOW_DAYS, isConfident } from "./cleaning.js";
 import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
 import { PokeTraceSource } from "./sources/pokeTrace.js";
-import { EbayMarketplaceInsightsSource } from "./sources/ebayMarketplaceInsights.js";
+import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from "./sources/ebayMarketplaceInsights.js";
 import { reconcileComps, type ReconCandidate, type ReconQuery, type ReconResult, type ReconSource } from "./reconciler.js";
 
 const DEFAULT_SOURCE_TIMEOUT_MS = 4000;
@@ -61,12 +61,7 @@ export class CompService {
 
   /** Default wiring. Add PokeTrace etc. here as adapters are built. */
   static default(): CompService {
-    return new CompService([
-      new PokemonPriceTrackerSource(),
-      new EbayMarketplaceInsightsSource(),
-      new PokeTraceSource(),
-      new PokemonTcgMarketSource(),
-    ]);
+    return new CompService(defaultCompSources());
   }
 
   /** Names + live status of configured sources (for diagnostics / UI). */
@@ -140,6 +135,13 @@ export class CompService {
       return fallback(err instanceof Error ? `${source.name} failed: ${err.message}` : `${source.name} failed`);
     }
   }
+}
+
+export function defaultCompSources(): CompSource[] {
+  const sources: CompSource[] = [new PokemonPriceTrackerSource()];
+  if (isEbayMarketplaceInsightsEnabled()) sources.push(new EbayMarketplaceInsightsSource());
+  sources.push(new PokeTraceSource(), new PokemonTcgMarketSource());
+  return sources;
 }
 
 export class MemoryLastKnownCompCache implements LastKnownCompCache {

@@ -17,7 +17,7 @@ import { OwnedSalesSource, type OwnedSalesDb } from "./sources/ownedSales.js";
 import { PokeTraceSource } from "./sources/pokeTrace.js";
 import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
 import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
-import { EbayMarketplaceInsightsSource } from "./sources/ebayMarketplaceInsights.js";
+import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from "./sources/ebayMarketplaceInsights.js";
 import { addRequestedVariantHint } from "./variants.js";
 
 export async function resolveCatalogCard(
@@ -228,7 +228,7 @@ export function createAppCompService(
   return new CompService(
     [
       new PokemonPriceTrackerSource(),
-      new EbayMarketplaceInsightsSource(),
+      ...(isEbayMarketplaceInsightsEnabled() ? [new EbayMarketplaceInsightsSource()] : []),
       new PokemonTcgMarketSource(catalog ? fixedCatalogSource(catalogSource.live, catalog) : catalogSource),
       new PokeTraceSource(),
       ...(process.env.DATABASE_URL ? [new OwnedSalesSource(getPrisma() as unknown as OwnedSalesDb)] : []),
