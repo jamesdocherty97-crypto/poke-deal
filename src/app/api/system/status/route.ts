@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
-import { PokeTraceSource } from "@/lib/comps/sources/pokeTrace";
+import { getPokeTraceHealth, PokeTraceSource } from "@/lib/comps/sources/pokeTrace";
 import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from "@/lib/comps/sources/ebayMarketplaceInsights";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
 import { getEbayConfig, hasEbayRefreshToken } from "@/lib/ebay/config";
@@ -13,7 +13,7 @@ type SystemSource = {
   id: string;
   label: string;
   role: string;
-  status: "ready" | "public" | "fixture" | "missing" | "building";
+  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem";
   required: boolean;
   setupHint?: string;
 };
@@ -22,6 +22,7 @@ export async function GET() {
   const priceTracker = new PokemonPriceTrackerSource();
   const catalog = new PokemonTcgApiCatalogSource();
   const pokeTrace = new PokeTraceSource();
+  const pokeTraceHealth = getPokeTraceHealth();
   const ebayMi = new EbayMarketplaceInsightsSource();
   const psa = new PsaCertLookup();
   const ebayConfigured = Boolean(getEbayConfig());
@@ -53,11 +54,21 @@ export async function GET() {
       id: "poketrace",
       label: "PokeTrace",
       role: "EU-first RAW cross-check",
-      status: pokeTrace.live ? "ready" : "missing",
+      status: pokeTraceHealth.persistentKeyProblem
+        ? "problem"
+        : pokeTrace.live && pokeTraceHealth.inCooldown
+          ? "building"
+          : pokeTrace.live
+            ? "ready"
+            : "missing",
       required: false,
-      setupHint: pokeTrace.live
-        ? "PokeTrace is configured for RAW cross-checks. Graded coverage depends on account tier and source data."
-        : "Add POKETRACE_API_KEY in Vercel for EU/Cardmarket and US cross-checks.",
+      setupHint: pokeTraceHealth.persistentKeyProblem
+        ? "PokeTrace is returning 403 after cooldown. Check the key, account tier or dashboard access."
+        : pokeTrace.live && pokeTraceHealth.inCooldown
+          ? `PokeTrace is cooling down after ${pokeTraceHealth.cooldownReason === "rate-limit" ? "rate limits" : "authorization errors"} until ${pokeTraceHealth.cooldownUntil}.`
+          : pokeTrace.live
+            ? "PokeTrace is configured for RAW cross-checks. Graded coverage depends on account tier and source data."
+            : "Add POKETRACE_API_KEY in Vercel for EU/Cardmarket and US cross-checks.",
     },
     {
       id: "ebay-marketplace-insights",
@@ -108,7 +119,7 @@ export async function GET() {
     summary: {
       livePrimaryComps: priceTracker.live,
       liveCatalogKey: catalog.live,
-      secondaryCrossCheck: pokeTrace.live,
+      secondaryCrossCheck: pokeTrace.live && !pokeTraceHealth.persistentKeyProblem,
       ebayMarketplaceInsights: ebayMi.live,
       psaCertLookup: psa.live,
       alertDelivery: Boolean(process.env.DISCORD_WEBHOOK_URL?.trim()),

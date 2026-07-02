@@ -29,11 +29,23 @@ export interface WarmCompSummary {
   failed: number;
   successes: WarmCompSuccess[];
   failures: WarmCompFailure[];
+  sourceStats?: WarmCompSourceStats[];
 }
 
 const DEFAULT_LIMIT = 100;
-const DEFAULT_CONCURRENCY = 3;
+const DEFAULT_CONCURRENCY = 2;
 const DEFAULT_TIMEOUT_MS = 15_000;
+
+export interface WarmCompSourceStats {
+  source: string;
+  calls: number;
+  rateLimited: number;
+  forbidden: number;
+  cooldowns: number;
+  inCooldown?: boolean;
+  cooldownReason?: string | null;
+  persistentKeyProblem?: boolean;
+}
 
 export async function warmComps(
   items: WarmCompItem[],

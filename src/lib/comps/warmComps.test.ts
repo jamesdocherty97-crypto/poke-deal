@@ -49,6 +49,23 @@ test("warmComps keeps going when one lookup fails or returns no price", async ()
   assert.deepEqual(summary.failures.map((failure) => failure.itemId), ["item_2", "item_3"]);
 });
 
+test("warmComps completes when one source has cooled down mid-run", async () => {
+  let cooledDown = false;
+  const summary = await warmComps(items.slice(0, 4), async (item) => {
+    if (item.id === "item_1") {
+      cooledDown = true;
+      throw new Error("PokeTrace source unavailable: rate limited");
+    }
+    return pricedComp(item.id);
+  }, { concurrency: 2 });
+
+  assert.equal(cooledDown, true);
+  assert.equal(summary.scanned, 4);
+  assert.equal(summary.refreshed, 3);
+  assert.equal(summary.failed, 1);
+  assert.match(summary.failures[0]?.reason ?? "", /source unavailable/);
+});
+
 function pricedComp(id: string): CompResult {
   return {
     source: "test",

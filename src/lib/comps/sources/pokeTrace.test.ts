@@ -4,9 +4,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   buildPokeTraceSearchVariants,
+  getPokeTraceHealth,
   gradeToPokeTraceTier,
   mapPokeTraceCardsToComp,
   PokeTraceSource,
+  resetPokeTraceSourceHealthForTests,
   resetPokeTraceSharedThrottleForTests,
 } from "./pokeTrace.js";
 import type { CardRef } from "../../domain/types.js";
@@ -379,6 +381,78 @@ test("PokeTraceSource degrades without keys or failed fetches", async () => {
   assert.equal(comp.sampleSize, 0);
   assert.equal(comp.medianPence, 0);
   assert.match((comp.raw as { reason?: string }).reason ?? "", /failed|no response/);
+});
+
+test("PokeTraceSource respects Retry-After before retrying a 429", async () => {
+  resetPokeTraceSourceHealthForTests();
+  const delays: number[] = [];
+  let calls = 0;
+  const fetchImpl = (async () => {
+    calls += 1;
+    if (calls === 1) return new Response("rate limited", { status: 429, headers: { "Retry-After": "0.03" } });
+    return Response.json(fixture);
+  }) as typeof fetch;
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 1000, async (ms) => {
+    delays.push(ms);
+  });
+  const comp = await source.lookup(card, { grade: "RAW" });
+
+  assert.deepEqual(delays, [30]);
+  assert.equal(comp.sampleSize, 73);
+  assert.equal(getPokeTraceHealth().stats.rateLimited, 1);
+  resetPokeTraceSourceHealthForTests();
+});
+
+test("PokeTraceSource cools down on a second 429", async () => {
+  resetPokeTraceSourceHealthForTests();
+  const fetchImpl = (async () => new Response("rate limited", { status: 429 })) as typeof fetch;
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 10_000, async () => undefined);
+  const comp = await source.lookup(card, { grade: "RAW" });
+  const health = getPokeTraceHealth();
+
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(health.inCooldown, true);
+  assert.equal(health.cooldownReason, "rate-limit");
+  assert.equal(health.stats.calls, 2);
+  assert.equal(health.stats.rateLimited, 2);
+  assert.equal(health.stats.cooldowns, 1);
+  resetPokeTraceSourceHealthForTests();
+});
+
+test("PokeTraceSource cools down after forbidden responses and short-circuits later calls", async () => {
+  resetPokeTraceSourceHealthForTests();
+  let calls = 0;
+  const fetchImpl = (async () => {
+    calls += 1;
+    return new Response("forbidden", { status: 403 });
+  }) as typeof fetch;
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 10_000);
+  const first = await source.lookup(card, { grade: "RAW" });
+  const second = await source.lookup(card, { grade: "RAW" });
+  const health = getPokeTraceHealth();
+
+  assert.equal(calls, 1);
+  assert.equal(first.sampleSize, 0);
+  assert.equal(second.sampleSize, 0);
+  assert.match((second.raw as { reason?: string }).reason ?? "", /source unavailable/);
+  assert.equal(health.inCooldown, true);
+  assert.equal(health.cooldownReason, "forbidden");
+  assert.equal(health.stats.forbidden, 1);
+  assert.equal(health.stats.cooldowns, 1);
+  resetPokeTraceSourceHealthForTests();
+});
+
+test("PokeTraceSource marks a repeated forbidden cooldown as a key problem", async () => {
+  resetPokeTraceSourceHealthForTests();
+  const fetchImpl = (async () => new Response("forbidden", { status: 403 })) as typeof fetch;
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 1);
+
+  await source.lookup(card, { grade: "RAW" });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  await source.lookup(card, { grade: "RAW" });
+
+  assert.equal(getPokeTraceHealth().persistentKeyProblem, true);
+  resetPokeTraceSourceHealthForTests();
 });
 
 test("free tier: spaces the fallback US request to clear the 1-req/2s burst window", async () => {

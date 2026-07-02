@@ -572,7 +572,7 @@ type SystemSource = {
   id: string;
   label: string;
   role: string;
-  status: "ready" | "public" | "fixture" | "missing" | "building";
+  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem";
   required: boolean;
   setupHint?: string;
 };

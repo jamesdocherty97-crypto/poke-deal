@@ -10,7 +10,7 @@ type TodaySystemSource = {
   id: string;
   label: string;
   role: string;
-  status: "ready" | "public" | "fixture" | "missing" | "building";
+  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem";
   required: boolean;
   setupHint?: string;
 };
@@ -459,6 +459,7 @@ function sourceStatusLabel(status: TodaySystemSource["status"]): string {
   if (status === "public") return "public";
   if (status === "fixture") return "fixture";
   if (status === "building") return "building";
+  if (status === "problem") return "problem";
   return "missing";
 }
 
@@ -466,6 +467,7 @@ function sourceStatusTone(status: TodaySystemSource["status"]): string {
   if (status === "ready" || status === "building") return "good";
   if (status === "public") return "info";
   if (status === "fixture") return "warn";
+  if (status === "problem") return "danger";
   return "danger";
 }
 

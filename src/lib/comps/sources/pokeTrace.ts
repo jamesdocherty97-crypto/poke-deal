@@ -8,6 +8,7 @@ import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
 
 const BASE_URL = "https://api.poketrace.com/v1";
 const DEFAULT_FETCH_TIMEOUT_MS = 2200;
+const DEFAULT_COOLDOWN_MS = 10 * 60 * 1000;
 // Free tier allows only 1 request / 2s. The EU-first then US fallback fires two
 // requests, so without spacing the second call is rate-limited (429) and PokeTrace
 // silently returns nothing. We pause before the fallback market to clear the burst
@@ -16,8 +17,28 @@ const DEFAULT_INTER_MARKET_DELAY_MS = 2100;
 const MARKET_FALLBACKS: PokeTraceMarket[] = ["EU", "US"];
 let sharedPokeTraceRequestAt = 0;
 let sharedPokeTraceQueue = Promise.resolve();
+let sharedPokeTraceCooldownUntil = 0;
+let sharedPokeTraceCooldownReason: "rate-limit" | "forbidden" | null = null;
+let sharedPokeTraceHadForbiddenCooldown = false;
+let sharedPokeTracePersistentKeyProblem = false;
+let sharedPokeTraceStats = emptyPokeTraceStats();
 
 type PokeTraceMarket = "US" | "EU";
+
+export type PokeTraceHealth = {
+  inCooldown: boolean;
+  cooldownUntil: string | null;
+  cooldownReason: "rate-limit" | "forbidden" | null;
+  persistentKeyProblem: boolean;
+  stats: PokeTraceStats;
+};
+
+export type PokeTraceStats = {
+  calls: number;
+  rateLimited: number;
+  forbidden: number;
+  cooldowns: number;
+};
 
 type PokeTracePriceTier = {
   avg?: unknown;
@@ -84,6 +105,8 @@ export class PokeTraceSource implements CompSource {
     private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
     private readonly interMarketDelayMs = DEFAULT_INTER_MARKET_DELAY_MS,
     private readonly useSharedThrottle = fetchImpl === fetch,
+    private readonly cooldownMs = DEFAULT_COOLDOWN_MS,
+    private readonly sleepImpl: (ms: number) => Promise<void> = sleep,
   ) {
     this.live = Boolean(apiKey && apiKey.trim().length > 0);
   }
@@ -93,12 +116,16 @@ export class PokeTraceSource implements CompSource {
     const windowDays = query.windowDays ?? DEFAULT_WINDOW_DAYS;
     const ctx = { source: this.name, card, grade, windowDays };
     if (!this.live) return emptyComp(ctx, "PokeTrace key missing");
+    const cooldown = readPokeTraceCooldown();
+    if (cooldown) return emptyComp(ctx, `PokeTrace source unavailable: ${cooldown}`);
 
     let lastEmpty: CompResult | null = null;
     for (let i = 0; i < MARKET_FALLBACKS.length; i += 1) {
       const market = MARKET_FALLBACKS[i]!;
       // Respect the free-tier 1-req/2s burst limit before the fallback market call.
-      if (i > 0 && this.interMarketDelayMs > 0) await sleep(this.interMarketDelayMs);
+      if (i > 0 && this.interMarketDelayMs > 0) await this.sleepImpl(this.interMarketDelayMs);
+      const midRunCooldown = readPokeTraceCooldown();
+      if (midRunCooldown) return emptyComp(ctx, `PokeTrace source unavailable: ${midRunCooldown}`);
       const payload = await this.fetchCards(card, market);
       const comp = payload == null
         ? emptyComp(ctx, `PokeTrace ${market} lookup failed or returned no response`)
@@ -121,13 +148,12 @@ export class PokeTraceSource implements CompSource {
 
       try {
         if (this.useSharedThrottle) await waitForSharedPokeTraceSlot(this.interMarketDelayMs);
-        const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
-          headers: { "X-API-Key": this.apiKey ?? "", Accept: "application/json" },
-          signal: timeoutSignal(this.fetchTimeoutMs),
-        });
+        const cooldown = readPokeTraceCooldown();
+        if (cooldown) return null;
+        const res = await this.fetchWithRetry(`${BASE_URL}/cards?${params.toString()}`);
+        if (res === "cooldown") return null;
         if (!res.ok) {
           console.warn(`[${this.name}] HTTP ${res.status} - no comp returned`);
-          if (res.status === 403) break;
           continue;
         }
         const json = (await res.json()) as unknown;
@@ -139,11 +165,62 @@ export class PokeTraceSource implements CompSource {
 
     return null;
   }
+
+  private async fetchWithRetry(url: string): Promise<Response | "cooldown"> {
+    let rateLimitCount = 0;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      sharedPokeTraceStats.calls += 1;
+      const res = await this.fetchImpl(url, {
+        headers: { "X-API-Key": this.apiKey ?? "", Accept: "application/json" },
+        signal: timeoutSignal(this.fetchTimeoutMs),
+      });
+      if (res.status === 403) {
+        sharedPokeTraceStats.forbidden += 1;
+        enterPokeTraceCooldown("forbidden", this.cooldownMs);
+        console.warn(`[${this.name}] HTTP 403 - cooling source down`);
+        return "cooldown";
+      }
+      if (res.status !== 429) return res;
+
+      rateLimitCount += 1;
+      sharedPokeTraceStats.rateLimited += 1;
+      if (rateLimitCount >= 2) {
+        enterPokeTraceCooldown("rate-limit", this.cooldownMs);
+        console.warn(`[${this.name}] HTTP 429 - cooling source down`);
+        return "cooldown";
+      }
+      await this.sleepImpl(retryDelayMs(res, rateLimitCount));
+    }
+    return "cooldown";
+  }
 }
 
 export function resetPokeTraceSharedThrottleForTests(): void {
   sharedPokeTraceRequestAt = 0;
   sharedPokeTraceQueue = Promise.resolve();
+}
+
+export function resetPokeTraceSourceHealthForTests(): void {
+  sharedPokeTraceCooldownUntil = 0;
+  sharedPokeTraceCooldownReason = null;
+  sharedPokeTraceHadForbiddenCooldown = false;
+  sharedPokeTracePersistentKeyProblem = false;
+  sharedPokeTraceStats = emptyPokeTraceStats();
+}
+
+export function resetPokeTraceRunStats(): void {
+  sharedPokeTraceStats = emptyPokeTraceStats();
+}
+
+export function getPokeTraceHealth(now = Date.now()): PokeTraceHealth {
+  const inCooldown = sharedPokeTraceCooldownUntil > now;
+  return {
+    inCooldown,
+    cooldownUntil: inCooldown ? new Date(sharedPokeTraceCooldownUntil).toISOString() : null,
+    cooldownReason: inCooldown ? sharedPokeTraceCooldownReason : null,
+    persistentKeyProblem: sharedPokeTracePersistentKeyProblem,
+    stats: { ...sharedPokeTraceStats },
+  };
 }
 
 export function gradeToPokeTraceTier(grade: Grade): string {
@@ -539,4 +616,45 @@ function waitForSharedPokeTraceSlot(intervalMs: number): Promise<void> {
   });
   sharedPokeTraceQueue = wait.catch(() => undefined);
   return wait;
+}
+
+function retryDelayMs(res: Response, rateLimitCount: number): number {
+  const retryAfter = res.headers.get("Retry-After");
+  const parsed = parseRetryAfterMs(retryAfter);
+  if (parsed != null) return parsed;
+  return rateLimitCount <= 1 ? 1000 : 4000;
+}
+
+function parseRetryAfterMs(value: string | null): number | null {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
+  const dateMs = Date.parse(value);
+  if (!Number.isNaN(dateMs)) return Math.max(0, dateMs - Date.now());
+  return null;
+}
+
+function readPokeTraceCooldown(now = Date.now()): string | null {
+  if (sharedPokeTraceCooldownUntil <= now) return null;
+  return sharedPokeTraceCooldownReason === "forbidden" ? "key problem" : "rate limited";
+}
+
+function enterPokeTraceCooldown(reason: "rate-limit" | "forbidden", cooldownMs: number): void {
+  const now = Date.now();
+  if (
+    reason === "forbidden" &&
+    sharedPokeTraceHadForbiddenCooldown &&
+    sharedPokeTraceCooldownReason === "forbidden" &&
+    sharedPokeTraceCooldownUntil <= now
+  ) {
+    sharedPokeTracePersistentKeyProblem = true;
+  }
+  if (reason === "forbidden") sharedPokeTraceHadForbiddenCooldown = true;
+  sharedPokeTraceCooldownReason = reason;
+  sharedPokeTraceCooldownUntil = now + Math.max(0, cooldownMs);
+  sharedPokeTraceStats.cooldowns += 1;
+}
+
+function emptyPokeTraceStats(): PokeTraceStats {
+  return { calls: 0, rateLimited: 0, forbidden: 0, cooldowns: 0 };
 }

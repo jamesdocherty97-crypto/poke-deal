@@ -3,6 +3,7 @@ import type { Grade } from "../domain/types.js";
 import { CompService } from "./compService.js";
 import { PrismaCompResultRepo } from "./prismaCompResultRepo.js";
 import { warmComps, type WarmCompOptions, type WarmCompSummary, type WarmCompItem } from "./warmComps.js";
+import { getPokeTraceHealth, resetPokeTraceRunStats } from "./sources/pokeTrace.js";
 
 type WarmInventoryItem = {
   id: string;
@@ -29,6 +30,7 @@ export async function runInventoryCompWarmup(options: WarmCompOptions = {}): Pro
   const warmItems = toWarmItems(items as WarmInventoryItem[]);
   const compService = CompService.default();
   const compRepo = new PrismaCompResultRepo();
+  resetPokeTraceRunStats();
 
   const summary = await warmComps(
     warmItems,
@@ -45,7 +47,22 @@ export async function runInventoryCompWarmup(options: WarmCompOptions = {}): Pro
     });
   }
 
-  return summary;
+  const pokeTrace = getPokeTraceHealth();
+  return {
+    ...summary,
+    sourceStats: [
+      {
+        source: "poketrace",
+        calls: pokeTrace.stats.calls,
+        rateLimited: pokeTrace.stats.rateLimited,
+        forbidden: pokeTrace.stats.forbidden,
+        cooldowns: pokeTrace.stats.cooldowns,
+        inCooldown: pokeTrace.inCooldown,
+        cooldownReason: pokeTrace.cooldownReason,
+        persistentKeyProblem: pokeTrace.persistentKeyProblem,
+      },
+    ],
+  };
 }
 
 function toWarmItems(items: WarmInventoryItem[]): WarmCompItem[] {
