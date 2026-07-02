@@ -88,6 +88,28 @@ test("T4: PSA10 single source keeps headline, suppresses impossible trend, and c
   assert.equal(result.trendPct, null);
 });
 
+test("T4b: real Charizard ex PSA10 production bucket is medium without manual check", () => {
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10", cardNumber: "199/165", setId: "sv3pt5" }, [
+    candidate({
+      source: "pt-median",
+      valuePence: 106220,
+      n: 251,
+      raw: { min: 24409, max: 188787, median: 106220, count: 251 },
+      trendPct: 297.9,
+      trendWindowDays: 30,
+      matchedSetId: "sv3pt5",
+      matchedCardNumber: "199/165",
+    }),
+  ]);
+
+  assert.equal(result.headlinePence, 106220);
+  assert.equal(result.confidence, "medium");
+  assert.equal(result.manualCheck, false);
+  assert.equal(result.trendPct, null);
+  assert.match(result.reasons.join(" "), /penalty-graded-tail-spread/);
+  assert.match(result.reasons.join(" "), /trend-suppressed/);
+});
+
 test("T5: strong unambiguous PokeTrace baseline can be high confidence", () => {
   const result = reconcileComps({ ...baseQuery, setId: "svp", cardNumber: "208" }, [
     candidate({ source: "poketrace", valuePence: 1282, n: 24491, matchedSetId: "svp", matchedCardNumber: "208", region: "US" }),
@@ -192,4 +214,38 @@ test("T12: UK eBay MI wins over a broad non-UK PokeTrace source when both agree"
   assert.equal(result.headlinePence, 10000);
   assert.equal(result.confidence, "high");
   assert.equal(result.manualCheck, false);
+});
+
+test("T13: graded symmetric bucket spread does not count as contamination", () => {
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
+    candidate({
+      source: "pt-median",
+      valuePence: 1000,
+      n: 1000,
+      region: "UK",
+      raw: { min: 500, median: 1000, max: 1500 },
+    }),
+  ]);
+
+  assert.equal(result.headlinePence, 1000);
+  assert.equal(result.confidence, "medium");
+  assert.equal(result.manualCheck, false);
+  assert.doesNotMatch(result.reasons.join(" "), /penalty-graded-tail-spread/);
+});
+
+test("T14: graded asymmetric tail is marked as contamination but is not automatically manual-check", () => {
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
+    candidate({
+      source: "pt-median",
+      valuePence: 1000,
+      n: 1000,
+      region: "UK",
+      raw: { min: 900, median: 1000, max: 3500 },
+    }),
+  ]);
+
+  assert.equal(result.headlinePence, 1000);
+  assert.equal(result.confidence, "medium");
+  assert.equal(result.manualCheck, false);
+  assert.match(result.reasons.join(" "), /penalty-graded-tail-spread/);
 });

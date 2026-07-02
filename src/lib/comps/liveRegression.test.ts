@@ -59,9 +59,9 @@ const expectations: FixtureExpectation[] = [
   {
     file: "charizard-ex-151-199-165-psa10.json",
     band: [100000, 112000],
-    confidence: "low",
-    manualCheck: true,
-    rationale: "Single-provider PSA 10 Charizard ex data is useful but spread/trend risk keeps it check-before-buy.",
+    confidence: "medium",
+    manualCheck: false,
+    rationale: "Single-provider PSA 10 Charizard ex data suppresses the impossible trend but remains usable at medium confidence.",
   },
   {
     file: "victini-svp-208-raw.json",

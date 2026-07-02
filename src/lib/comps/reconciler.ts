@@ -66,6 +66,8 @@ interface CandidateState {
   reasons: string[];
   penalties: Array<{ factor: number; quality: boolean }>;
   penaltyProduct: number;
+  qualityPenaltyProduct: number;
+  regionFactor: number;
   weight: number;
   trendPct: number | null;
   trendSuppressed: boolean;
@@ -119,7 +121,7 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
   const peers = eligible.filter((state) => state.weight >= 0.3 * chosen.weight);
   const spreadPeer = spreadRatio(peers.map((state) => state.valuePence));
   const spreadAll = spreadRatio(eligible.map((state) => state.valuePence));
-  const everyEligibleHeavyPenalty = eligible.every((state) => state.penaltyProduct < 0.5);
+  const everyEligibleHeavyPenalty = eligible.every((state) => state.qualityPenaltyProduct < 0.5);
   const hardExclusions = states.filter((state) => state.excluded).length;
   const dominantOutlierExcluded = states.some((state) => state.reasons.some((reason) => reason.includes("dominant-source-outlier")));
   const ownedDeviation = ownedSalesDeviation(chosen, states);
@@ -134,7 +136,7 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
   const capsMedium =
     Boolean(query.ambiguous) ||
     (isGraded(query.gradeBucket) && eligible.length === 1) ||
-    qualityPenaltyProduct(chosen) < 1 ||
+    chosen.qualityPenaltyProduct < 1 ||
     chosen.trendSuppressed ||
     staleCorroborationDisagrees;
 
@@ -150,7 +152,7 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     confidence === "low" ||
     spreadAll > 1.4 ||
     Boolean(query.ambiguous) ||
-    qualityPenaltyProduct(chosen) <= 0.5 ||
+    chosen.qualityPenaltyProduct <= 0.5 ||
     hardExclusions >= 2 ||
     dominantOutlierExcluded ||
     ownedDeviation ||
@@ -177,6 +179,8 @@ function initialState(candidate: ReconCandidate): CandidateState {
     reasons: [],
     penalties: [],
     penaltyProduct: 1,
+    qualityPenaltyProduct: 1,
+    regionFactor: 1,
     weight: 0,
     trendPct: candidate.trendPct ?? null,
     trendSuppressed: false,
@@ -262,8 +266,9 @@ function applyPenalties(state: CandidateState, query: ReconQuery): void {
   if (query.gradeBucket === "RAW" && (state.candidate.source === "pt-smart" || state.candidate.source === "pt-median") && spread > 8) {
     penalty(state, 0.3, "penalty-raw-bucket-spread");
   }
-  if (isGraded(query.gradeBucket) && spread > 2.5) {
-    penalty(state, 0.5, "penalty-graded-bucket-spread");
+  const gradedTail = gradedTailRatio(state.candidate.raw, state.valuePence);
+  if (isGraded(query.gradeBucket) && gradedTail > 3) {
+    penalty(state, 0.6, "penalty-graded-tail-spread");
   }
   if (state.ageDays <= 30) {
     penalty(state, 1, "penalty-fresh");
@@ -280,7 +285,9 @@ function applyPenalties(state: CandidateState, query: ReconQuery): void {
     penalty(state, 0.5, "penalty-pt-smart-no-raw-stats");
   }
 
-  state.penaltyProduct = state.penalties.reduce((product, entry) => product * entry.factor, 1);
+  state.qualityPenaltyProduct = qualityPenaltyProduct(state);
+  state.regionFactor = regionFactor(state);
+  state.penaltyProduct = state.qualityPenaltyProduct * state.regionFactor;
 }
 
 function applyTrendSuppression(state: CandidateState): void {
@@ -308,7 +315,7 @@ function applyTrendSuppression(state: CandidateState): void {
 
 function candidateWeight(state: CandidateState): number {
   const tier = TIER_WEIGHT[state.candidate.source];
-  const weight = tier * sizeFactor(state.n) * state.penaltyProduct;
+  const weight = tier * sizeFactor(state.n) * state.qualityPenaltyProduct * state.regionFactor;
   if (state.candidate.source === "owned-sales" && !state.corroborationOnly) {
     return Math.max(weight, 0.45);
   }
@@ -369,6 +376,11 @@ function rawSpread(raw: ReconCandidate["raw"]): number {
   return raw.max / raw.min;
 }
 
+function gradedTailRatio(raw: ReconCandidate["raw"], valuePence: number): number {
+  if (!raw?.min || !raw.max || raw.min <= 0 || raw.max <= 0 || valuePence <= 0) return 1;
+  return Math.max(raw.max / valuePence, valuePence / raw.min);
+}
+
 function spreadRatio(values: number[]): number {
   const positive = values.filter((value) => value > 0);
   if (positive.length < 2) return 1;
@@ -383,6 +395,12 @@ function penalty(state: CandidateState, factor: number, reason: string): void {
 function qualityPenaltyProduct(state: CandidateState): number {
   return state.penalties
     .filter((entry) => entry.quality)
+    .reduce((product, entry) => product * entry.factor, 1);
+}
+
+function regionFactor(state: CandidateState): number {
+  return state.penalties
+    .filter((entry) => !entry.quality)
     .reduce((product, entry) => product * entry.factor, 1);
 }
 
