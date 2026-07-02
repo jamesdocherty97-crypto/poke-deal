@@ -5537,32 +5537,36 @@ export default function Home() {
                     <strong>{comp?.ambiguous ? "More than one card matches" : "Tap to recheck"}</strong>
                   </div>
                   <div className="catalog-alternative-row">
-                    {comp.alternatives.map((card) => (
-                      <button
-                        key={card.tcgApiId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
-                        className="catalog-alternative-card"
-                        type="button"
-                        onClick={() => chooseCatalogAlternative(card)}
-                        disabled={busy === "lookup"}
-                      >
-                        <CardImage
-                          src={card.imageUrl ?? null}
-                          className="catalog-alternative-art"
-                          fallbackClassName="catalog-alternative-art blank"
-                          alt=""
-                        />
-                        <span>
-                          <strong>{card.name}</strong>
-                          <small>
-                            {card.setName}
-                            {card.number ? ` #${card.number}` : ""}
-                          </small>
-                        </span>
-                        {(card.setLogoUrl || card.setSymbolUrl) && (
-                          <img src={card.setLogoUrl ?? card.setSymbolUrl} alt="" onError={hideBrokenImage} />
-                        )}
-                      </button>
-                    ))}
+                    {comp.alternatives.map((card) => {
+                      const priceHint = catalogPriceHint(card);
+                      return (
+                        <button
+                          key={card.tcgApiId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
+                          className="catalog-alternative-card"
+                          type="button"
+                          onClick={() => chooseCatalogAlternative(card)}
+                          disabled={busy === "lookup"}
+                        >
+                          <CardImage
+                            src={card.imageUrl ?? null}
+                            className="catalog-alternative-art"
+                            fallbackClassName="catalog-alternative-art blank"
+                            alt=""
+                          />
+                          <span>
+                            <strong>{card.name}</strong>
+                            <small>
+                              {card.setName}
+                              {card.number ? ` #${card.number}` : ""}
+                            </small>
+                            {priceHint && <small>{priceHint}</small>}
+                          </span>
+                          {(card.setLogoUrl || card.setSymbolUrl) && (
+                            <img src={card.setLogoUrl ?? card.setSymbolUrl} alt="" onError={hideBrokenImage} />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -9765,6 +9769,23 @@ function sourceEmptyReason(result: CompResult): string {
     return "Owned sales: no previous sold history for this card/grade yet.";
   }
   return reason ? `${source}: ${reason}` : `${source}: no matching signal for ${grade}.`;
+}
+
+function catalogPriceHint(card: CatalogCard): string | null {
+  const signal = card.priceSignals
+    ?.filter((candidate) => candidate.pricePence > 0)
+    .sort((a, b) => {
+      const rank = (signal: CatalogPriceSignal) => {
+        if (signal.kind === "market") return 0;
+        if (signal.kind === "trendPrice") return 1;
+        if (signal.kind === "avg30") return 2;
+        return 3;
+      };
+      return rank(a) - rank(b);
+    })[0];
+  if (!signal) return null;
+  const source = signal.source === "tcgplayer" ? "TCGPlayer" : "Cardmarket";
+  return `${source} ${gbp(signal.pricePence)}`;
 }
 
 function receiptTone(result: CompResult, headline: CompResult, sourcesDisagree: boolean): string {
