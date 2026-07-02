@@ -1,6 +1,7 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
+import dynamic from "next/dynamic";
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   conditionAdjustedPricePence,
@@ -117,8 +118,9 @@ import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@
 import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
 import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
-import { InventoryTab } from "./components/InventoryTab";
 import { CardImage, EmptyState, Metric, MoneyInput } from "./components/UiBits";
+
+const InventoryTab = dynamic(() => import("./components/InventoryTab").then((mod) => mod.InventoryTab));
 
 type View = "today" | "acquire" | "inventory" | "listings" | "pnl" | "settings";
 type Grade = DomainGrade;
