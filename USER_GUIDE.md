@@ -33,6 +33,7 @@ Live today:
 - Mobile-first PWA app shell.
 - Live card lookup and card art from Pokemon TCG API.
 - Live primary comps from Pokemon Price Tracker.
+- Staged comp lookup: card identity appears first, then live pricing fills in.
 - RAW comp protection using smart price and catalog baselines.
 - Manual checked-comp override.
 - Inventory and stock ledger.
@@ -216,6 +217,12 @@ Intended use:
 
 Tap the comp lookup button to get a GBP comp.
 
+While the comp is loading:
+
+- The app locks the likely card identity first.
+- You can confirm card art, set and number while sources load.
+- If you have checked the same card on that device before, the app can show the last local comp while the live result refreshes.
+
 The app returns:
 
 - Headline price.
@@ -304,6 +311,28 @@ Intended use:
 
 - For cheap buys, thin data may be acceptable.
 - For bigger buys, cross-check or manual check means slow down.
+
+### Sticky Decision Bar
+
+After a comp resolves, the phone view shows a sticky decision bar above the bottom navigation.
+
+It shows:
+
+- Headline price.
+- Confidence/verdict.
+- Max cash and trade offer when available.
+- Buy, Watch and Pass buttons.
+
+Use it at a fair like this:
+
+1. Type or scan the card into Buy.
+2. Run the comp.
+3. Glance at the bar.
+4. Tap Buy to jump to cost entry.
+5. Tap Watch to save a buy target.
+6. Tap Pass to clear and comp the next card.
+
+If the comp needs a manual check, Buy becomes a check-first action. You can still stock manually, but the app is deliberately warning you not to trust the headline blindly.
 
 ### Deal Calculator
 
@@ -401,7 +430,7 @@ Intended use:
 
 Buy Target creates a watch for a card at a target price.
 
-The app now suggests a target based on the comp and expected selling costs.
+The app suggests a target based on the comp and expected selling costs. The sticky decision bar can create that watch in one tap after a comp.
 
 Use it when:
 
@@ -431,11 +460,14 @@ Intended use:
 
 Outstanding:
 
-- PSA cert/pop lookup is still planned and not fully wired as a daily tool.
+- PSA cert lookup is wired into Buy for PSA slabs. Enter a cert to pull subject, card number, grade and population, then run the usual market comp from that verified identity.
+- PSA data is most useful for PSA slabs. ACE/BGS/CGC slabs still rely on manual cert/context and market comps.
 
 ## Just Bought It
 
 This section turns a comp into stock and a listing draft.
+
+On mobile, tap Buy in the sticky decision bar to jump straight to the cost field. Enter cost, check quantity, then stock.
 
 Fields:
 
