@@ -3,6 +3,7 @@
 import type { FormEvent, ReactNode } from "react";
 import type { ListingSort, ListingStateFilter } from "@/lib/dealer/tableControls";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
+import { orderListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { InventoryPhotoTools } from "./InventoryPhotoTools";
 import { CardImage, EmptyState, Metric } from "./UiBits";
 
@@ -86,6 +87,7 @@ export function ListingsTab({
   openSell,
   addPhotosToInventory,
   addPhotoUrlToInventory,
+  addCatalogArtToInventory,
   moveInventoryPhoto,
   deleteInventoryPhoto,
   copyStockListingCopy,
@@ -145,6 +147,7 @@ export function ListingsTab({
   openSell: (item: InventoryItem) => void;
   addPhotosToInventory: (item: InventoryItem, files: FileList | File[]) => void;
   addPhotoUrlToInventory: (item: InventoryItem, url: string) => void;
+  addCatalogArtToInventory: (item: InventoryItem) => void;
   moveInventoryPhoto: (item: InventoryItem, photoId: string, direction: -1 | 1) => void;
   deleteInventoryPhoto: (item: InventoryItem, photoId: string) => void;
   copyStockListingCopy: (item: InventoryItem, channel: Channel) => void;
@@ -377,6 +380,7 @@ export function ListingsTab({
                 onSell={openSell}
                 onPhotos={addPhotosToInventory}
                 onPhotoUrl={addPhotoUrlToInventory}
+                onCatalogArt={addCatalogArtToInventory}
                 onMovePhoto={moveInventoryPhoto}
                 onDeletePhoto={deleteInventoryPhoto}
                 onCopy={copyStockListingCopy}
@@ -519,6 +523,7 @@ function ListingQueueRow({
   onSell,
   onPhotos,
   onPhotoUrl,
+  onCatalogArt,
   onMovePhoto,
   onDeletePhoto,
   onCopy,
@@ -530,6 +535,7 @@ function ListingQueueRow({
   onSell: (item: InventoryItem) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
   onPhotoUrl: (item: InventoryItem, url: string) => void;
+  onCatalogArt: (item: InventoryItem) => void;
   onMovePhoto: (item: InventoryItem, photoId: string, direction: -1 | 1) => void;
   onDeletePhoto: (item: InventoryItem, photoId: string) => void;
   onCopy: (item: InventoryItem, channel: Channel) => void;
@@ -539,6 +545,8 @@ function ListingQueueRow({
     .join(" · ");
 
   const photoCount = item.photos?.length ?? 0;
+  const realPhotoCount = (item.photos ?? []).filter((photo: { origin?: string | null }) => photo.origin !== "CATALOG").length;
+  const catalogPhotoCount = photoCount - realPhotoCount;
 
   return (
     <article className="item-row listing-queue-row">
@@ -555,12 +563,20 @@ function ListingQueueRow({
           {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
         </p>
         {stockNotes && <p>{stockNotes}</p>}
-        {photoCount > 0 && <p>{photoCount} real photo{photoCount === 1 ? "" : "s"} ready for eBay</p>}
+        {photoCount > 0 && (
+          <p>
+            {realPhotoCount > 0
+              ? `${realPhotoCount} real photo${realPhotoCount === 1 ? "" : "s"}`
+              : `${catalogPhotoCount} stock photo${catalogPhotoCount === 1 ? "" : "s"}`}
+            {" "}ready for eBay prep
+          </p>
+        )}
         <InventoryPhotoTools
           item={item}
           busy={busy}
           onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
           onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
+          onCatalogArt={(target) => onCatalogArt(target as InventoryItem)}
           onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
           onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
         />
@@ -790,7 +806,7 @@ function rowCountLabel(visible: number, total: number): string {
 }
 
 function inventoryDisplayImage(item: InventoryItem | undefined | null): string | null {
-  return item?.photos?.[0]?.url ?? item?.card.imageUrl ?? null;
+  return orderListingPhotos(item?.photos ?? [])[0]?.url ?? item?.card.imageUrl ?? null;
 }
 
 function statusTone(status: ItemStatus): string {

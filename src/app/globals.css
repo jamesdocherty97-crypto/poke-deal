@@ -4923,6 +4923,34 @@ label {
   line-height: 1.2;
 }
 
+.listing-pack-photo-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.stock-photo-tag {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  border: 1px solid rgba(42, 117, 187, 0.34);
+  border-radius: 999px;
+  background: rgba(42, 117, 187, 0.12);
+  color: rgba(202, 224, 255, 0.92);
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.stock-photo-tag.warn {
+  border-color: rgba(255, 203, 5, 0.35);
+  background: rgba(255, 203, 5, 0.12);
+  color: var(--yellow);
+}
+
 .row-actions button,
 .row-file-action,
 .ghost-button,
@@ -5024,6 +5052,22 @@ label {
   flex-wrap: wrap;
   gap: 6px;
   align-items: flex-start;
+}
+
+.catalog-photo-action {
+  min-height: 36px;
+  border: 1px solid rgba(42, 117, 187, 0.34);
+  border-radius: 8px;
+  background: rgba(42, 117, 187, 0.12);
+  color: var(--text);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.catalog-photo-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .photo-nudge {

@@ -5,6 +5,11 @@ import dynamic from "next/dynamic";
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
 import {
+  orderListingPhotos,
+  photoRequirementMessage,
+  summarizeListingPhotos,
+} from "@/lib/photos/listingPhotoPolicy";
+import {
   conditionAdjustedPricePence,
   rawConditionPriceFactor,
   suggestListPrice,
@@ -401,6 +406,7 @@ type CardPhoto = {
   id: string;
   url: string;
   role: "FRONT" | "BACK" | "SLAB" | "EXTRA";
+  origin: "REAL" | "CATALOG";
   width: number | null;
   height: number | null;
   order: number;
@@ -1183,6 +1189,11 @@ export default function Home() {
     if (!listingPackTarget?.item) return null;
     const { item } = listingPackTarget;
     const savedListPrice = listingPackTarget.listPrice ?? listingPackTarget.suggestedPrice ?? undefined;
+    const photoSummary = summarizeListingPhotos({
+      photos: item.photos ?? [],
+      grade: item.grade,
+      pricePence: savedListPrice ?? 0,
+    });
     return buildListingPack({
       channel: listingPackTarget.channel,
       card: {
@@ -1197,6 +1208,7 @@ export default function Home() {
       condition: item.condition,
       certNumber: item.graderCert,
       copySettings: listingCopySettings,
+      usesCatalogOnlyImages: listingPackTarget.channel === "EBAY" && photoSummary.catalogOnly && photoSummary.satisfiesEbayPhotoRequirement,
     });
   }, [listingCopySettings, listingPackTarget]);
   const recentIntake = useMemo(() => inventory.slice(0, 4), [inventory]);
@@ -2031,6 +2043,7 @@ export default function Home() {
           body: JSON.stringify({
             url: blob.url,
             role,
+            origin: "REAL",
             width: processed.width,
             height: processed.height,
             order: existingCount + index,
@@ -2062,6 +2075,7 @@ export default function Home() {
         body: JSON.stringify({
           url: cleanUrl,
           role: inferPhotoRole(existingCount),
+          origin: "REAL",
           order: existingCount,
         }),
       });
@@ -2071,6 +2085,37 @@ export default function Home() {
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Photo URL save failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function addCatalogArtToInventory(item: InventoryItem) {
+    const catalogUrl = item.card.imageUrl?.trim();
+    if (!catalogUrl) {
+      setError("This stock row has no saved catalog art yet.");
+      return;
+    }
+    setBusy(`photo-${item.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const saveRes = await fetch(`/api/inventory/${item.id}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: catalogUrl,
+          role: "FRONT",
+          origin: "CATALOG",
+          order: item.photos?.length ?? 0,
+        }),
+      });
+      const savePayload = await readJson(saveRes);
+      if (!saveRes.ok) throw new Error(savePayload.error ?? "Catalog art save failed");
+      setNotice("Catalog art added as a stock image.");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Catalog art save failed");
     } finally {
       setBusy(null);
     }
@@ -7172,6 +7217,7 @@ export default function Home() {
               onDelete={requestDeleteItem}
               onPhotos={addPhotosToInventory}
               onPhotoUrl={addPhotoUrlToInventory}
+              onCatalogArt={addCatalogArtToInventory}
               onMovePhoto={moveInventoryPhoto}
               onDeletePhoto={deleteInventoryPhoto}
               onCopyListingCopy={(target, channel) => void copyInventoryListingCopy(target, channel)}
@@ -7262,6 +7308,7 @@ export default function Home() {
           openSell={openSell}
           addPhotosToInventory={addPhotosToInventory}
           addPhotoUrlToInventory={addPhotoUrlToInventory}
+          addCatalogArtToInventory={addCatalogArtToInventory}
           moveInventoryPhoto={moveInventoryPhoto}
           deleteInventoryPhoto={deleteInventoryPhoto}
           copyStockListingCopy={(item, channel) => void copyInventoryListingCopy(item, channel)}
@@ -7892,6 +7939,14 @@ function ListingPackSheet({
   // eBay listings can only be marked active via the real publish flow (or by
   // pasting a genuine live URL) — never via this generic shortcut.
   const canActivate = listing.state === "DRAFT" && !(isEbayListing && !isPublished);
+  const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? pack.suggestedPricePence;
+  const photoSummary = item
+    ? summarizeListingPhotos({
+        photos: item.photos ?? [],
+        grade: item.grade,
+        pricePence: effectivePricePence,
+      })
+    : null;
 
   const ebayReadiness = isEbayListing
     ? checkEbayReadiness({
@@ -7899,10 +7954,12 @@ function ListingPackSheet({
         ebayConnected: Boolean(ebayStatus?.connected),
         channel: listing.channel,
         listingState: listing.state,
-        pricePence: listing.listPrice ?? listing.suggestedPrice ?? null,
+        pricePence: effectivePricePence,
         externalRef: listing.externalRef,
         hasMerchantLocation: Boolean(ebayStatus?.hasMerchantLocation || ebayStatus?.policies?.merchantLocationKey),
-        hasImage: Boolean(listing.item?.photos?.length),
+        hasImage: Boolean(photoSummary?.satisfiesEbayPhotoRequirement),
+        photoDetail: photoSummary ? photoRequirementMessage(photoSummary) : undefined,
+        photoUsesCatalogOnly: Boolean(photoSummary?.catalogOnly && photoSummary.satisfiesEbayPhotoRequirement),
         sellerRegistrationCompleted: ebayStatus?.sellerRegistration?.completed,
         locationSetupConfigured: ebayStatus?.locationSetup?.configured,
         locationCreateAvailable: ebayStatus?.locationSetup?.createAvailable,
@@ -7986,7 +8043,16 @@ function ListingPackSheet({
           <strong>{gbp(pack.postage.pricePence)}</strong>
         </div>
       </div>
-      {item && <InventoryPhotoStrip item={item} />}
+      {item && (
+        <div className="listing-pack-photo-summary">
+          <InventoryPhotoStrip item={item} />
+          {photoSummary?.catalogOnly && (
+            <span className={`stock-photo-tag ${photoSummary.satisfiesEbayPhotoRequirement ? "" : "warn"}`}>
+              stock photo
+            </span>
+          )}
+        </div>
+      )}
       {economics && (
         <div className={`listing-economics ${economics.profitPence >= 0 ? "good" : "warn"}`}>
           <div>
@@ -8159,6 +8225,11 @@ function buildListingPackInputFromItem(
     copySettings?: Partial<ListingCopySettings>;
   },
 ): ListingPackInput {
+  const photoSummary = summarizeListingPhotos({
+    photos: item.photos ?? [],
+    grade: item.grade,
+    pricePence: options.listPricePence ?? 0,
+  });
   return {
     channel: options.channel,
     card: {
@@ -8173,6 +8244,7 @@ function buildListingPackInputFromItem(
     condition: item.condition,
     certNumber: item.graderCert,
     copySettings: options.copySettings,
+    usesCatalogOnlyImages: options.channel === "EBAY" && photoSummary.catalogOnly && photoSummary.satisfiesEbayPhotoRequirement,
   };
 }
 
@@ -8354,6 +8426,7 @@ function InventoryRow({
   onDelete,
   onPhotos,
   onPhotoUrl,
+  onCatalogArt,
   onMovePhoto,
   onDeletePhoto,
   onCopyListingCopy,
@@ -8369,6 +8442,7 @@ function InventoryRow({
   onDelete: (item: InventoryItem) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
   onPhotoUrl: (item: InventoryItem, url: string) => void;
+  onCatalogArt: (item: InventoryItem) => void;
   onMovePhoto: (item: InventoryItem, photoId: string, direction: -1 | 1) => void;
   onDeletePhoto: (item: InventoryItem, photoId: string) => void;
   onCopyListingCopy: (item: InventoryItem, channel: Channel) => void;
@@ -8396,6 +8470,7 @@ function InventoryRow({
   const canSell = item.status !== "SOLD";
   const photoCount = item.photos?.length ?? 0;
   const needsPhotos = item.status !== "SOLD" && photoCount === 0;
+  const needsEbayPhotos = needsPhotos && listing?.channel === "EBAY";
   const needsListing = item.status !== "SOLD" && !draftListing && !activeListing;
   const stockCost =
     item.quantity > 1
@@ -8404,7 +8479,7 @@ function InventoryRow({
   const listingSummary = listing
     ? `${listingStateLabel} ${channelLabel(listing.channel)}${listPrice ? ` · ${gbp(listPrice)}` : ""}`
     : "No listing";
-  const primaryAction = item.status === "SOLD"
+  const primaryAction = item.status === "SOLD" || needsEbayPhotos
     ? null
     : draftListing
       ? {
@@ -8507,6 +8582,26 @@ function InventoryRow({
               {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
             </div>
           )}
+          {needsEbayPhotos && (
+            <div className="next-action-strip">
+              <label className={`next-action-button row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
+                {busy === `photo-${item.id}` ? "Uploading..." : "Add photos"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  disabled={busy === `photo-${item.id}`}
+                  onChange={(event) => {
+                    const files = event.currentTarget.files;
+                    if (files) onPhotos(item, files);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+              <span>eBay needs listing images before publish. Use More for catalog art on low-value raw cards.</span>
+            </div>
+          )}
           {primaryAction && (
             <div className="next-action-strip">
               <button className={`next-action-button ${primaryAction.tone}`} type="button" onClick={primaryAction.onClick} disabled={primaryAction.disabled}>
@@ -8522,6 +8617,7 @@ function InventoryRow({
               busy={busy}
               onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
               onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
+              onCatalogArt={(target) => onCatalogArt(target as InventoryItem)}
               onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
               onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
             />
@@ -8958,7 +9054,7 @@ function medianSpreadPct(results: CompResult[]): number | null {
 }
 
 function primaryItemPhoto(item: InventoryItem | undefined | null): CardPhoto | null {
-  return item?.photos?.[0] ?? null;
+  return orderListingPhotos(item?.photos ?? [])[0] ?? null;
 }
 
 function inventoryDisplayImage(item: InventoryItem | undefined | null): string | null {

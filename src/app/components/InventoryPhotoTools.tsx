@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { orderListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { CardImage } from "./UiBits";
 
 type CardPhoto = {
   id: string;
   url: string;
   role?: "FRONT" | "BACK" | "SLAB" | "EXTRA";
+  origin?: "REAL" | "CATALOG";
 };
 
 type PhotoItem = {
   id: string;
   grade?: string;
   status?: string;
+  card?: { imageUrl?: string | null };
   photos?: CardPhoto[];
 };
 
@@ -29,7 +32,7 @@ export function InventoryPhotoStrip({
   onMovePhoto?: (item: PhotoItem, photoId: string, direction: -1 | 1) => void;
   onDeletePhoto?: (item: PhotoItem, photoId: string) => void;
 }) {
-  const photos = item?.photos ?? [];
+  const photos = orderListingPhotos(item?.photos ?? []);
   if (!item || photos.length === 0) return null;
 
   return (
@@ -42,7 +45,10 @@ export function InventoryPhotoStrip({
             fallbackClassName="inventory-photo-thumb blank"
             alt={index === 0 ? "Primary listing photo" : `Listing photo ${index + 1}`}
           />
-          <span>{index === 0 ? "Primary" : photo.role?.toLowerCase() ?? `#${index + 1}`}</span>
+          <span>
+            {index === 0 ? "Primary" : photo.role?.toLowerCase() ?? `#${index + 1}`}
+            {photo.origin === "CATALOG" ? " · stock" : ""}
+          </span>
           {controls && (
             <div className="inventory-photo-actions" aria-label={`Photo ${index + 1} actions`}>
               <button
@@ -80,6 +86,7 @@ export function InventoryPhotoTools({
   busy,
   onPhotos,
   onPhotoUrl,
+  onCatalogArt,
   onMovePhoto,
   onDeletePhoto,
 }: {
@@ -87,6 +94,7 @@ export function InventoryPhotoTools({
   busy: string | null;
   onPhotos: (item: PhotoItem, files: FileList | File[]) => void;
   onPhotoUrl: (item: PhotoItem, url: string) => void;
+  onCatalogArt?: (item: PhotoItem) => void;
   onMovePhoto: (item: PhotoItem, photoId: string, direction: -1 | 1) => void;
   onDeletePhoto: (item: PhotoItem, photoId: string) => void;
 }) {
@@ -94,6 +102,8 @@ export function InventoryPhotoTools({
   const photoCount = item.photos?.length ?? 0;
   const isBusy = busy === `photo-${item.id}`;
   const isGraded = item.grade != null && item.grade !== "RAW";
+  const hasCatalogArt = Boolean(item.photos?.some((photo) => photo.origin === "CATALOG"));
+  const canUseCatalogArt = Boolean(!isGraded && item.card?.imageUrl && !hasCatalogArt);
 
   return (
     <div className="inventory-photo-tools">
@@ -124,6 +134,17 @@ export function InventoryPhotoTools({
               }}
             />
           </label>
+          {!isGraded && (
+            <button
+              className="catalog-photo-action"
+              type="button"
+              onClick={() => onCatalogArt?.(item)}
+              disabled={isBusy || !canUseCatalogArt || !onCatalogArt}
+              title={!item.card?.imageUrl ? "No catalog image is saved for this card yet." : undefined}
+            >
+              {hasCatalogArt ? "Catalog art added" : "Use catalog art"}
+            </button>
+          )}
           <details className="manual-photo-url">
             <summary>Image URL</summary>
             <div>

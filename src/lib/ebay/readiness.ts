@@ -16,6 +16,8 @@ export interface EbayReadinessInput {
   pricePence: number | null;
   externalRef: string | null;
   hasImage: boolean;
+  photoDetail?: string;
+  photoUsesCatalogOnly?: boolean;
   sellerRegistrationCompleted?: boolean | null;
   locationSetupConfigured?: boolean;
   locationCreateAvailable?: boolean;
@@ -102,9 +104,9 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
 
   checks.push({
     key: "has_image",
-    label: "Real card photo",
+    label: input.photoUsesCatalogOnly ? "Stock image allowed" : "Listing photo",
     status: input.hasImage ? "pass" : "fail",
-    detail: input.hasImage ? undefined : "Add at least one real item photo before creating an eBay offer",
+    detail: input.hasImage ? undefined : input.photoDetail ?? "Add photos from the Stock/List row before creating an eBay offer",
   });
 
   const blockingFails = checks.filter((c) => c.status === "fail");

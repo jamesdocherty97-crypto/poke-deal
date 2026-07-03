@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
+import { orderListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const photoRoleSchema = z.enum(["FRONT", "BACK", "SLAB", "EXTRA"]);
+const photoOriginSchema = z.enum(["REAL", "CATALOG"]);
 
 const photoCreateSchema = z.object({
   url: z.string().trim().url().refine((url) => url.startsWith("https://"), "Photo URL must be HTTPS."),
   role: photoRoleSchema.default("FRONT"),
+  origin: photoOriginSchema.default("REAL"),
   width: z.coerce.number().int().positive().optional(),
   height: z.coerce.number().int().positive().optional(),
   order: z.coerce.number().int().nonnegative().default(0),
@@ -23,7 +26,8 @@ export async function GET(
   _request: Request,
   { params }: { params: { id: string } },
 ) {
-  const item = await getPrisma().inventoryItem.findUnique({
+  const prisma = getPrisma();
+  const item = await prisma.inventoryItem.findUnique({
     where: { id: params.id },
     select: {
       id: true,
@@ -58,26 +62,39 @@ export async function POST(
   }
 
   try {
-    const item = await getPrisma().inventoryItem.findUnique({
+    const prisma = getPrisma();
+    const item = await prisma.inventoryItem.findUnique({
       where: { id: params.id },
-      select: { id: true },
+      select: { id: true, card: { select: { imageUrl: true } } },
     });
     if (!item) {
       return NextResponse.json({ error: "Inventory item not found." }, { status: 404 });
     }
 
-    const photo = await getPrisma().cardPhoto.create({
+    if (parsed.data.origin === "CATALOG") {
+      const catalogUrl = item.card.imageUrl?.trim();
+      if (!catalogUrl) {
+        return NextResponse.json({ error: "This card has no catalog art saved yet." }, { status: 400 });
+      }
+      if (parsed.data.url !== catalogUrl) {
+        return NextResponse.json({ error: "Catalog photos must use the saved card catalog image." }, { status: 400 });
+      }
+    }
+
+    const photo = await prisma.cardPhoto.create({
       data: {
         inventoryItemId: params.id,
         url: parsed.data.url,
         role: parsed.data.role,
+        origin: parsed.data.origin,
         width: parsed.data.width,
         height: parsed.data.height,
         order: parsed.data.order,
       },
     });
+    const photos = await normalizePhotoOrder(params.id);
 
-    return NextResponse.json({ photo }, { status: 201 });
+    return NextResponse.json({ photo, photos }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Photo save failed." },
@@ -111,7 +128,8 @@ export async function PATCH(
   }
 
   try {
-    const photos = await getPrisma().cardPhoto.findMany({
+    const prisma = getPrisma();
+    const photos = await prisma.cardPhoto.findMany({
       where: { inventoryItemId: params.id },
       select: { id: true },
     });
@@ -125,19 +143,16 @@ export async function PATCH(
       ...orderedIds,
       ...photos.map((photo) => photo.id).filter((id) => !orderedIds.includes(id)),
     ];
-    await getPrisma().$transaction(
+    await prisma.$transaction(
       finalOrder.map((id, order) =>
-        getPrisma().cardPhoto.update({
+        prisma.cardPhoto.update({
           where: { id },
           data: { order },
         }),
       ),
     );
 
-    const updated = await getPrisma().cardPhoto.findMany({
-      where: { inventoryItemId: params.id },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-    });
+    const updated = await normalizePhotoOrder(params.id);
 
     return NextResponse.json({ photos: updated });
   } catch (err) {
@@ -158,7 +173,8 @@ export async function DELETE(
   }
 
   try {
-    const photo = await getPrisma().cardPhoto.findUnique({
+    const prisma = getPrisma();
+    const photo = await prisma.cardPhoto.findUnique({
       where: { id: photoId },
       select: { id: true, inventoryItemId: true },
     });
@@ -166,27 +182,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Photo not found." }, { status: 404 });
     }
 
-    await getPrisma().cardPhoto.delete({ where: { id: photoId } });
-    const remaining = await getPrisma().cardPhoto.findMany({
-      where: { inventoryItemId: params.id },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      select: { id: true },
-    });
-    if (remaining.length > 0) {
-      await getPrisma().$transaction(
-        remaining.map((row, order) =>
-          getPrisma().cardPhoto.update({
-            where: { id: row.id },
-            data: { order },
-          }),
-        ),
-      );
-    }
-
-    const photos = await getPrisma().cardPhoto.findMany({
-      where: { inventoryItemId: params.id },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-    });
+    await prisma.cardPhoto.delete({ where: { id: photoId } });
+    const photos = await normalizePhotoOrder(params.id);
 
     return NextResponse.json({ photos });
   } catch (err) {
@@ -195,4 +192,27 @@ export async function DELETE(
       { status: 500 },
     );
   }
+}
+
+async function normalizePhotoOrder(inventoryItemId: string) {
+  const prisma = getPrisma();
+  const photos = await prisma.cardPhoto.findMany({
+    where: { inventoryItemId },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+  });
+  const ordered = orderListingPhotos(photos);
+  if (ordered.length > 0) {
+    await prisma.$transaction(
+      ordered.map((photo, order) =>
+        prisma.cardPhoto.update({
+          where: { id: photo.id },
+          data: { order },
+        }),
+      ),
+    );
+  }
+  return prisma.cardPhoto.findMany({
+    where: { inventoryItemId },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+  });
 }

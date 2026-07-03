@@ -1,0 +1,4 @@
+CREATE TYPE "PhotoOrigin" AS ENUM ('REAL', 'CATALOG');
+
+ALTER TABLE "CardPhoto"
+ADD COLUMN "origin" "PhotoOrigin" NOT NULL DEFAULT 'REAL';

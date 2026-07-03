@@ -195,6 +195,7 @@ function seedRows(): Partial<Record<keyof typeof delegateByTable, PlainRow[]>> {
         inventoryItemId: "item-1",
         url: "https://example.test/front.jpg",
         role: "FRONT",
+        origin: "REAL",
         width: 800,
         height: 1100,
         order: 0,

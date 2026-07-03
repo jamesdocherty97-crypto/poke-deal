@@ -8,6 +8,7 @@ import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { readEbayLocationSetup } from "@/lib/ebay/location";
 import { addTradingFixedPriceItem } from "@/lib/ebay/trading";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
+import { photoRequirementMessage, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ type PublishListing = {
       rarity: string | null;
       language: string;
     };
-    photos: Array<{ url: string }>;
+    photos: Array<{ url: string; origin?: "REAL" | "CATALOG" | null; order?: number | null; createdAt?: Date | string | null }>;
   };
 };
 
@@ -63,6 +64,19 @@ export async function POST(
   }
   if (listing.item.status === "SOLD") {
     return NextResponse.json({ error: "Item is already sold." }, { status: 400 });
+  }
+
+  const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? 0;
+  const photoSummary = summarizeListingPhotos({
+    photos: listing.item.photos,
+    grade: listing.item.grade,
+    pricePence: effectivePricePence,
+  });
+  if (!photoSummary.satisfiesEbayPhotoRequirement) {
+    return NextResponse.json(
+      { error: photoRequirementMessage(photoSummary), canUseCatalogArt: photoSummary.catalogPhotoAllowed },
+      { status: 400 },
+    );
   }
 
   const offerId = listing.externalRef?.startsWith("offer:")
@@ -151,10 +165,14 @@ async function publishViaTradingApiFallback({
     );
   }
 
-  const imageUrls = listing.item.photos.map((photo) => photo.url).filter(Boolean);
-  if (imageUrls.length === 0) {
+  const photoSummary = summarizeListingPhotos({
+    photos: listing.item.photos,
+    grade: listing.item.grade,
+    pricePence: effectivePricePence,
+  });
+  if (!photoSummary.satisfiesEbayPhotoRequirement) {
     return NextResponse.json(
-      { error: "Add at least one real card photo before publishing to eBay." },
+      { error: photoRequirementMessage(photoSummary), canUseCatalogArt: photoSummary.catalogPhotoAllowed },
       { status: 400 },
     );
   }
@@ -177,9 +195,10 @@ async function publishViaTradingApiFallback({
         listPricePence: effectivePricePence,
         condition: listing.item.condition ?? undefined,
         certNumber: listing.item.graderCert ?? undefined,
+        usesCatalogOnlyImages: photoSummary.catalogOnly,
       },
       quantity: listing.item.quantity ?? 1,
-      imageUrls,
+      imageUrls: photoSummary.imageUrls,
       policies,
       location: locationSetup?.address.city ?? null,
       postalCode: locationSetup?.address.postalCode ?? null,

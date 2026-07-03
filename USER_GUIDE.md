@@ -729,15 +729,21 @@ You can:
 - Take photos from the phone camera.
 - Upload multiple photos.
 - Paste a public image URL as a fallback.
+- Use catalog art for low-end raw stock.
 - Reorder photos.
 - Delete photos.
 
 Important:
 
 - The first photo is the primary eBay image.
-- eBay publishing requires at least one real card photo.
+- Real photos always become primary when they exist.
+- eBay publishing normally requires at least one real card photo.
+- Catalog art can satisfy the photo check only for raw eBay listings under £20.
+- The £20 default keeps cheap raw singles fast to list, while higher-value cards and slabs still need actual photos.
+- The threshold can be changed with `CATALOG_PHOTO_MAX_PRICE_GBP` in deployment settings.
 - Graded slabs should include a clear cert photo.
 - The app compresses phone photos before upload so fair/mobile-data uploads are less painful.
+- If a listing publishes with catalog-only images, the eBay description automatically says it is a stock image.
 
 ### eBay Publish Flow
 

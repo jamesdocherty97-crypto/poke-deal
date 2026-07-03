@@ -6,6 +6,7 @@ import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { getOfferBySku } from "@/lib/ebay/offer";
 import { buildEbayOfferPreflight, toEbaySku } from "@/lib/ebay/preflight";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
+import { summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,14 +66,21 @@ export async function GET(
       listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
       condition: listing.item.condition ?? undefined,
       certNumber: listing.item.graderCert ?? undefined,
+      usesCatalogOnlyImages: false,
     };
+    const photoSummary = summarizeListingPhotos({
+      photos: listing.item.photos,
+      grade: listing.item.grade,
+      pricePence: effectivePricePence,
+    });
+    packInput.usesCatalogOnlyImages = photoSummary.catalogOnly && photoSummary.satisfiesEbayPhotoRequirement;
 
     const preflight = buildEbayOfferPreflight({
       listingId: params.id,
       itemId: listing.itemId,
       packInput,
       quantity: listing.item.quantity ?? 1,
-      imageUrls: listing.item.photos.map((photo) => photo.url),
+      imageUrls: photoSummary.satisfiesEbayPhotoRequirement ? photoSummary.imageUrls : [],
       policies,
       config,
     });

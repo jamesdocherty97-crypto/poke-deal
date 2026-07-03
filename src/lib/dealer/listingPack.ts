@@ -8,6 +8,8 @@
 //
 // Money is GBP integer pence throughout, matching the rest of the app.
 
+import { STOCK_IMAGE_DISCLOSURE } from "../photos/listingPhotoPolicy.js";
+
 export interface ListingPackCard {
   name: string;
   setName?: string | null;
@@ -36,6 +38,8 @@ export interface ListingPackInput {
   certNumber?: string | null;
   /** Editable listing boilerplate from Settings. Defaults keep the app usable. */
   copySettings?: Partial<ListingCopySettings>;
+  /** True when an eBay listing will use catalog art only, not real item photos. */
+  usesCatalogOnlyImages?: boolean;
 }
 
 export interface ListingPack {
@@ -47,6 +51,7 @@ export interface ListingPack {
   suggestedPricePence: number;
   postage: { service: string; pricePence: number };
   description: string;
+  photoDisclosure?: string | null;
   /** A single copy-paste block for marketplaces without an API. */
   copyReady: string;
 }
@@ -223,10 +228,11 @@ export function buildDescription(input: ListingPackInput): string {
     `${card.name}${idLine ? ` — ${idLine}` : ""}.`,
     gradeLine,
     conditionNote,
+    input.usesCatalogOnlyImages ? STOCK_IMAGE_DISCLOSURE : null,
     "Genuine Pokémon TCG single from a UK seller.",
     settings.postageTerms,
     settings.returnsLine,
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 function buildVintedDescription(input: ListingPackInput): string {
@@ -284,6 +290,11 @@ export function buildListingPack(input: ListingPackInput): ListingPack {
   const suggestedPricePence = suggestListPricePence(input);
   const postage = suggestPostage(input);
   const description = buildDescription(input);
+  const photoDisclosure = input.channel === "EBAY" || input.channel == null
+    ? input.usesCatalogOnlyImages
+      ? STOCK_IMAGE_DISCLOSURE
+      : null
+    : null;
 
   const copyReady = [
     `CHANNEL: ${listingPackChannelLabel(input.channel)}`,
@@ -299,7 +310,7 @@ export function buildListingPack(input: ListingPackInput): ListingPack {
     description,
   ].join("\n");
 
-  return { title, subtitle, condition, conditionNote, itemSpecifics, suggestedPricePence, postage, description, copyReady };
+  return { title, subtitle, condition, conditionNote, itemSpecifics, suggestedPricePence, postage, description, photoDisclosure, copyReady };
 }
 
 export function listingPackCopyFields(pack: ListingPack): ListingPackCopyField[] {

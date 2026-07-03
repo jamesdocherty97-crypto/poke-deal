@@ -7,6 +7,7 @@ import { upsertInventoryItem } from "@/lib/ebay/inventoryItem";
 import { createEbayOffer, getOfferBySku, updateEbayOffer } from "@/lib/ebay/offer";
 import { buildEbayOfferPreflight } from "@/lib/ebay/preflight";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
+import { photoRequirementMessage, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,24 +71,30 @@ export async function POST(
       listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
       condition: listing.item.condition ?? undefined,
       certNumber: listing.item.graderCert ?? undefined,
+      usesCatalogOnlyImages: false,
     };
+    const photoSummary = summarizeListingPhotos({
+      photos: listing.item.photos,
+      grade: listing.item.grade,
+      pricePence: effectivePricePence,
+    });
+    if (!photoSummary.satisfiesEbayPhotoRequirement) {
+      return NextResponse.json(
+        { error: photoRequirementMessage(photoSummary), canUseCatalogArt: photoSummary.catalogPhotoAllowed },
+        { status: 400 },
+      );
+    }
+    packInput.usesCatalogOnlyImages = photoSummary.catalogOnly;
 
     const preflight = buildEbayOfferPreflight({
       listingId: params.id,
       itemId: listing.itemId,
       packInput,
       quantity: listing.item.quantity ?? 1,
-      imageUrls: listing.item.photos.map((photo) => photo.url),
+      imageUrls: photoSummary.imageUrls,
       policies,
       config,
     });
-
-    if (!preflight.hasImage) {
-      return NextResponse.json(
-        { error: "Add at least one real card photo before creating an eBay offer." },
-        { status: 400 },
-      );
-    }
 
     // Upsert the inventory item (idempotent — safe to call multiple times)
     await upsertInventoryItem(config, preflight.sku, preflight.inventoryItem, accessToken);

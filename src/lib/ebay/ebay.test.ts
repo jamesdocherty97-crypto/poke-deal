@@ -970,12 +970,19 @@ test("checkEbayReadiness does not fail for pending offer state", () => {
   assert.equal(check?.status, "pass");
 });
 
-test("checkEbayReadiness fails when no real item photo is attached", () => {
+test("checkEbayReadiness fails when listing photos are missing", () => {
   const result = checkEbayReadiness({ ...READY_INPUT, hasImage: false });
   assert.equal(result.ready, false);
   const check = result.checks.find((c) => c.key === "has_image");
   assert.equal(check?.status, "fail");
-  assert.match(check?.detail ?? "", /real item photo/);
+  assert.match(check?.detail ?? "", /Stock\/List row/);
+});
+
+test("checkEbayReadiness labels allowed stock images clearly", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, photoUsesCatalogOnly: true });
+  const check = result.checks.find((c) => c.key === "has_image");
+  assert.equal(check?.status, "pass");
+  assert.equal(check?.label, "Stock image allowed");
 });
 
 test("checkEbayReadiness fails when channel is not EBAY", () => {

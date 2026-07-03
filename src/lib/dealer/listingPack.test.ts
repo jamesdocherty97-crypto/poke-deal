@@ -142,6 +142,17 @@ test("listing copy settings replace default eBay boilerplate", () => {
   assert.equal(pack.description.includes(DEFAULT_LISTING_COPY_SETTINGS.postageTerms), false);
 });
 
+test("eBay catalog-only listing packs include the stock image disclosure", () => {
+  const pack = buildListingPack({ ...moonbreon, usesCatalogOnlyImages: true });
+  assert.match(pack.description, /Stock image shown — you will receive the card pictured in the title, in the condition stated\./);
+  assert.equal(pack.photoDisclosure, "Stock image shown — you will receive the card pictured in the title, in the condition stated.");
+  assert.match(pack.copyReady, /Stock image shown/);
+
+  const vintedPack = buildListingPack({ ...moonbreon, channel: "VINTED", usesCatalogOnlyImages: true });
+  assert.doesNotMatch(vintedPack.description, /Stock image shown/);
+  assert.equal(vintedPack.photoDisclosure, null);
+});
+
 test("Cardmarket condition mapping normalises common raw grades", () => {
   assert.equal(cardmarketConditionCode("Near Mint"), "NM");
   assert.equal(cardmarketConditionCode("LP"), "EX");

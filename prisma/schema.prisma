@@ -87,6 +87,7 @@ model CardPhoto {
   inventoryItemId String
   url             String
   role            PhotoRole     @default(FRONT)
+  origin          PhotoOrigin   @default(REAL)
   width           Int?
   height          Int?
   order           Int           @default(0)
@@ -474,6 +475,11 @@ enum PhotoRole {
   BACK
   SLAB
   EXTRA
+}
+
+enum PhotoOrigin {
+  REAL
+  CATALOG
 }
 
 enum ExpenseCategory {
