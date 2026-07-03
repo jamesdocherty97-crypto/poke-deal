@@ -45,7 +45,22 @@ type TodaySystemStatus = {
     livePrimaryComps: boolean;
     secondaryCrossCheck: boolean;
     manualBackups?: boolean;
+    lastSnapshotAt?: string | null;
+    lastWatchCheckAt?: string | null;
+    lastRepriceAt?: string | null;
   };
+};
+
+type TodayAppAlert = {
+  id: string;
+  kind: "PRICE_DROP" | "REPRICE" | "CRON_FAILURE";
+  title: string;
+  message: string;
+  pence: number | null;
+  href: string | null;
+  delivered: boolean;
+  readAt: string | null;
+  createdAt: string;
 };
 
 export function TodayTab({
@@ -81,6 +96,9 @@ export function TodayTab({
   onTakePortfolioSnapshot,
   onCheckWatches,
   onCheckReprices,
+  appAlerts,
+  appAlertUnreadCount,
+  onMarkAlertsRead,
 }: {
   launchProgress: LaunchProgress;
   primaryTodayAction: TodayAction | null;
@@ -114,6 +132,9 @@ export function TodayTab({
   onTakePortfolioSnapshot: () => void;
   onCheckWatches: () => void;
   onCheckReprices: () => void;
+  appAlerts: TodayAppAlert[];
+  appAlertUnreadCount: number;
+  onMarkAlertsRead: () => void;
 }) {
   const stockCount = dashboard?.metrics.stockCount ?? 0;
   const soldCount = dashboard?.metrics.soldCount ?? 0;
@@ -193,6 +214,33 @@ export function TodayTab({
           </div>
         </section>
       )}
+
+      <section className="panel automation-inbox-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Automation inbox</h2>
+            <span className="muted">
+              {appAlertUnreadCount > 0
+                ? `${appAlertUnreadCount} unread`
+                : systemStatus?.summary.lastSnapshotAt
+                  ? `last snapshot ${ageLabel(systemStatus.summary.lastSnapshotAt)}`
+                  : "waiting for first run"}
+            </span>
+          </div>
+          <button className="ghost-button" type="button" onClick={onMarkAlertsRead} disabled={appAlertUnreadCount === 0}>
+            Mark read
+          </button>
+        </div>
+        {appAlerts.length > 0 ? (
+          <div className="automation-inbox-list">
+            {appAlerts.slice(0, 5).map((alert) => (
+              <AutomationAlertRow key={alert.id} alert={alert} />
+            ))}
+          </div>
+        ) : (
+          <p className="hint">No automation messages yet. Daily checks will appear here if a target hits, stock needs repricing, or a run fails.</p>
+        )}
+      </section>
 
       <section className="panel launch-plan-panel">
         <div className="panel-heading">
@@ -380,6 +428,31 @@ function SourceHealthRow({ source }: { source: TodaySystemSource }) {
   );
 }
 
+function AutomationAlertRow({ alert }: { alert: TodayAppAlert }) {
+  return (
+    <div className={`automation-alert-row ${alert.readAt ? "read" : "unread"} ${alertKindTone(alert.kind)}`}>
+      <span>{alertKindLabel(alert.kind)}</span>
+      <div>
+        <strong>{alert.title}</strong>
+        <small>{alert.message}</small>
+      </div>
+      <small>{ageLabel(alert.createdAt)}</small>
+    </div>
+  );
+}
+
+function alertKindLabel(kind: TodayAppAlert["kind"]): string {
+  if (kind === "PRICE_DROP") return "Target";
+  if (kind === "REPRICE") return "Reprice";
+  return "Cron";
+}
+
+function alertKindTone(kind: TodayAppAlert["kind"]): string {
+  if (kind === "CRON_FAILURE") return "danger";
+  if (kind === "PRICE_DROP") return "good";
+  return "warn";
+}
+
 function OperatingSnapshotCard({ row }: { row: OperatingSnapshotRow }) {
   return (
     <div className={`operating-snapshot-card ${row.tone}`}>
@@ -514,4 +587,14 @@ function inventoryDisplayImage(item: TodayListingItem | undefined | null): strin
 function gbp(pence: number): string {
   const sign = pence < 0 ? "-" : "";
   return `${sign}£${(Math.abs(pence) / 100).toFixed(2)}`;
+}
+
+function ageLabel(value: string): string {
+  const date = new Date(value);
+  const diffMs = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 60) return `${minutes || 1}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
 }

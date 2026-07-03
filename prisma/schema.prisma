@@ -257,6 +257,22 @@ model PriceSnapshot {
   @@unique([cardId, grade, takenAt])
 }
 
+model CronRun {
+  id         String        @id @default(cuid())
+  job        String
+  runKey     String
+  status     CronRunStatus @default(RUNNING)
+  startedAt  DateTime      @default(now())
+  finishedAt DateTime?
+  details    Json?
+  error      String?
+  createdAt  DateTime      @default(now())
+
+  @@unique([job, runKey])
+  @@index([job, startedAt])
+  @@index([status])
+}
+
 // ─────────────────────────────────────────────────────────────
 // Alerts / sourcing
 // ─────────────────────────────────────────────────────────────
@@ -286,6 +302,23 @@ model Alert {
   delivered  Boolean   @default(false)
 
   @@index([delivered])
+}
+
+model AppAlert {
+  id         String       @id @default(cuid())
+  kind       AppAlertKind
+  title      String
+  message    String
+  pence      Int?
+  href       String?
+  sourceKey  String?      @unique
+  delivered  Boolean      @default(false)
+  readAt     DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@index([kind])
+  @@index([readAt, createdAt])
+  @@index([createdAt])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -403,4 +436,17 @@ enum ExpenseCategory {
 enum AlertKind {
   PRICE_DROP // watchlist target hit (sourcing)
   REPRICE // owned stock should be repriced
+}
+
+enum AppAlertKind {
+  PRICE_DROP
+  REPRICE
+  CRON_FAILURE
+}
+
+enum CronRunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
 }

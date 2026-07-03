@@ -31,8 +31,10 @@ const delegateByTable = {
   dealSessionLines: "dealSessionLine",
   compResults: "compResult",
   priceSnapshots: "priceSnapshot",
+  cronRuns: "cronRun",
   watches: "watch",
   alerts: "alert",
+  appAlerts: "appAlert",
 } as const;
 
 test("ledger backup exports every persisted table and round-trips into an empty database", async () => {
@@ -309,6 +311,19 @@ function seedRows(): Partial<Record<keyof typeof delegateByTable, PlainRow[]>> {
         takenAt: "2026-07-01T23:59:00.000Z",
       },
     ],
+    cronRuns: [
+      {
+        id: "cron-1",
+        job: "daily-portfolio-snapshot",
+        runKey: "2026-07-02",
+        status: "SUCCESS",
+        startedAt: "2026-07-02T07:30:00.000Z",
+        finishedAt: "2026-07-02T07:31:00.000Z",
+        details: { written: 1 },
+        error: null,
+        createdAt: "2026-07-02T07:30:00.000Z",
+      },
+    ],
     watches: [
       {
         id: "watch-1",
@@ -328,6 +343,20 @@ function seedRows(): Partial<Record<keyof typeof delegateByTable, PlainRow[]>> {
         pence: 89000,
         firedAt: "2026-07-02T12:00:00.000Z",
         delivered: false,
+      },
+    ],
+    appAlerts: [
+      {
+        id: "app-alert-1",
+        kind: "PRICE_DROP",
+        title: "Buy target hit",
+        message: "Target hit",
+        pence: 89000,
+        href: "/?view=pnl",
+        sourceKey: "watch:alert-1",
+        delivered: false,
+        readAt: null,
+        createdAt: "2026-07-02T12:00:00.000Z",
       },
     ],
   };

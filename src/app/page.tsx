@@ -583,6 +583,18 @@ type PortfolioHistory = {
   checkedAt?: string;
 };
 
+type AppAlertRecord = {
+  id: string;
+  kind: "PRICE_DROP" | "REPRICE" | "CRON_FAILURE";
+  title: string;
+  message: string;
+  pence: number | null;
+  href: string | null;
+  delivered: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
+
 type SystemStatus = {
   sources: SystemSource[];
   summary: {
@@ -592,6 +604,9 @@ type SystemStatus = {
     alertDelivery: boolean;
     storedSales: boolean;
     manualBackups?: boolean;
+    lastSnapshotAt?: string | null;
+    lastWatchCheckAt?: string | null;
+    lastRepriceAt?: string | null;
   };
 };
 
@@ -703,6 +718,8 @@ export default function Home() {
   const [dealSession, setDealSession] = useState<DealSessionPayload | null>(null);
   const [dealSessionPaid, setDealSessionPaid] = useState("");
   const [watches, setWatches] = useState<WatchRecord[]>([]);
+  const [appAlerts, setAppAlerts] = useState<AppAlertRecord[]>([]);
+  const [appAlertUnreadCount, setAppAlertUnreadCount] = useState(0);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -1835,12 +1852,13 @@ export default function Home() {
     if (options.user) setUserRefreshing(true);
     setError(null);
     try {
-      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes, expensesRes, systemRes, dealSessionRes] = await Promise.all([
+      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes, alertsRes, expensesRes, systemRes, dealSessionRes] = await Promise.all([
         fetch("/api/inventory"),
         fetch("/api/listings"),
         fetch("/api/dashboard"),
         fetch("/api/snapshots/portfolio"),
         fetch("/api/watches"),
+        fetch("/api/alerts/inbox"),
         fetch("/api/expenses"),
         fetch("/api/system/status"),
         fetch("/api/deal-sessions"),
@@ -1850,6 +1868,7 @@ export default function Home() {
       const dashboardJson = await readJson(dashboardRes);
       const portfolioJson = await readJson(portfolioRes);
       const watchesJson = await readJson(watchesRes);
+      const alertsJson = await readJson(alertsRes);
       const expensesJson = await readJson(expensesRes);
       const systemJson = await readJson(systemRes);
       const dealSessionJson = await readJson(dealSessionRes);
@@ -1858,6 +1877,7 @@ export default function Home() {
       if (!dashboardRes.ok) throw new Error(dashboardJson.error ?? "dashboard failed");
       if (!portfolioRes.ok) throw new Error(portfolioJson.error ?? "snapshot history failed");
       if (!watchesRes.ok) throw new Error(watchesJson.error ?? "watches failed");
+      if (!alertsRes.ok) throw new Error(alertsJson.error ?? "alerts failed");
       if (!expensesRes.ok) throw new Error(expensesJson.error ?? "expenses failed");
       if (!systemRes.ok) throw new Error(systemJson.error ?? "system status failed");
       if (!dealSessionRes.ok) throw new Error(dealSessionJson.error ?? "deal session failed");
@@ -1865,6 +1885,8 @@ export default function Home() {
       setListings(listingsJson.listings);
       setDashboard(dashboardJson);
       setPortfolio(portfolioJson);
+      setAppAlerts((alertsJson.alerts ?? []) as AppAlertRecord[]);
+      setAppAlertUnreadCount(Number(alertsJson.unreadCount ?? 0));
       setExpenses(expensesJson.expenses ?? []);
       setSystemStatus(systemJson);
       setDealSession(dealSessionJson);
@@ -4595,6 +4617,29 @@ export default function Home() {
     }
   }
 
+  async function markAppAlertsRead(ids?: string[]) {
+    try {
+      const res = await fetch("/api/alerts/inbox", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ids?.length ? { ids } : { all: true }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "alert update failed");
+      const readAt = String(payload.readAt ?? new Date().toISOString());
+      setAppAlerts((rows) =>
+        rows.map((row) =>
+          !row.readAt && (!ids?.length || ids.includes(row.id))
+            ? { ...row, readAt }
+            : row,
+        ),
+      );
+      setAppAlertUnreadCount((count) => Math.max(0, count - Number(payload.updated ?? 0)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "alert update failed");
+    }
+  }
+
   async function lookupGradeEv() {
     setBusy("grade-ev");
     setError(null);
@@ -5091,6 +5136,7 @@ export default function Home() {
         <div className="topbar-actions">
           <button className={view === "today" ? "topbar-secondary active" : "topbar-secondary"} type="button" onClick={() => setView("today")}>
             Status
+            {appAlertUnreadCount > 0 && <span className="nav-badge">{appAlertUnreadCount}</span>}
           </button>
           <button className="topbar-secondary" type="button" onClick={openBuyWatchesPanel}>
             Watch
@@ -5175,6 +5221,9 @@ export default function Home() {
           onTakePortfolioSnapshot={takePortfolioSnapshot}
           onCheckWatches={() => void checkWatches()}
           onCheckReprices={checkReprices}
+          appAlerts={appAlerts}
+          appAlertUnreadCount={appAlertUnreadCount}
+          onMarkAlertsRead={() => void markAppAlertsRead()}
         />
       )}
 

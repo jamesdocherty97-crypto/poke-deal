@@ -15,8 +15,10 @@ export type BackupTableName =
   | "dealSessionLines"
   | "compResults"
   | "priceSnapshots"
+  | "cronRuns"
   | "watches"
-  | "alerts";
+  | "alerts"
+  | "appAlerts";
 
 type BackupDelegate = {
   findMany(args?: { orderBy?: { id: "asc" } }): Promise<PlainRow[]>;
@@ -85,8 +87,10 @@ const TABLES: readonly TableDefinition[] = [
   { name: "dealSessionLines", delegate: "dealSessionLine", dateFields: ["addedAt", "compAsOf"] },
   { name: "compResults", delegate: "compResult", dateFields: ["asOf", "createdAt"] },
   { name: "priceSnapshots", delegate: "priceSnapshot", dateFields: ["takenAt"] },
+  { name: "cronRuns", delegate: "cronRun", dateFields: ["startedAt", "finishedAt", "createdAt"] },
   { name: "watches", delegate: "watch", dateFields: ["createdAt"] },
   { name: "alerts", delegate: "alert", dateFields: ["firedAt"] },
+  { name: "appAlerts", delegate: "appAlert", dateFields: ["readAt", "createdAt"] },
 ];
 
 export const LEDGER_BACKUP_TABLES = TABLES.map((table) => table.name);
@@ -102,8 +106,10 @@ const RESTORE_ORDER: readonly BackupTableName[] = [
   "sales",
   "compResults",
   "priceSnapshots",
+  "cronRuns",
   "watches",
   "alerts",
+  "appAlerts",
 ];
 
 const DELETE_ORDER = [...RESTORE_ORDER].reverse();

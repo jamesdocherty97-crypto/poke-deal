@@ -1,29 +1,37 @@
-import { CompService } from "../comps/compService.js";
+import { CompService, defaultCompSources } from "../comps/compService.js";
+import { PrismaLastKnownCompCache } from "../comps/prismaCompResultRepo.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
-import { notifierFromEnv } from "./notifier.js";
+import { createInboxAlert } from "./inbox.js";
+import { alertWebhookConfigured, notifierFromEnv } from "./notifier.js";
 import { checkWatch, formatWatchDigest, shouldCreateWatchAlert, type WatchHit } from "./watchlist.js";
 
 export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: boolean; limit?: number }) {
-  const notifierConfigured = Boolean(process.env.DISCORD_WEBHOOK_URL?.trim());
+  const notifierConfigured = alertWebhookConfigured();
   if (limit <= 0) {
     return {
       hits: [],
       notified: false,
       notifierConfigured,
       scannedCount: 0,
+      skippedCount: 0,
       checkedAt: new Date().toISOString(),
     };
   }
 
   const prisma = getPrisma();
+  const activeCount = await prisma.watch.count({ where: { active: true } });
   const watches = await prisma.watch.findMany({
     where: { active: true },
     include: { card: true, alerts: { orderBy: { firedAt: "desc" }, take: 1 } },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
-  const compService = CompService.default();
+  const compService = new CompService(
+    defaultCompSources(),
+    undefined,
+    process.env.DATABASE_URL ? new PrismaLastKnownCompCache() : null,
+  );
   const hits: WatchHit[] = [];
   const alertHits: WatchHit[] = [];
   const alertIds: string[] = [];
@@ -63,6 +71,15 @@ export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: b
     });
     alertIds.push(alert.id);
     alertHits.push(hit);
+    await createInboxAlert(prisma, {
+      kind: "PRICE_DROP",
+      title: "Buy target hit",
+      message: hit.message,
+      pence: hit.marketPence,
+      href: "/?view=pnl",
+      sourceKey: `watch:${alert.id}`,
+      delivered: false,
+    });
   }
 
   let notified = false;
@@ -76,6 +93,10 @@ export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: b
       where: { id: { in: alertIds } },
       data: { delivered: true },
     });
+    await prisma.appAlert.updateMany({
+      where: { sourceKey: { in: alertIds.map((id) => `watch:${id}`) } },
+      data: { delivered: true },
+    });
   }
 
   return {
@@ -85,6 +106,7 @@ export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: b
     notified,
     notifierConfigured,
     scannedCount: watches.length,
+    skippedCount: Math.max(0, activeCount - watches.length),
     checkedAt: new Date().toISOString(),
   };
 }

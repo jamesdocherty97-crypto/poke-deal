@@ -248,6 +248,7 @@ label {
 }
 
 .topbar-secondary {
+  position: relative;
   min-height: 38px;
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
@@ -261,6 +262,23 @@ label {
   border-color: rgba(255, 203, 5, 0.44);
   background: rgba(255, 203, 5, 0.12);
   color: var(--yellow);
+}
+
+.nav-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 1000;
+  line-height: 1;
 }
 
 .eyebrow {
@@ -1850,6 +1868,7 @@ label {
 .today-action-list,
 .launch-plan-list,
 .source-health-list,
+.automation-inbox-list,
 .readiness-list,
 .setup-step-list {
   display: grid;
@@ -2045,6 +2064,69 @@ label {
 
 .operating-snapshot-card.info strong {
   color: #cfe6ff;
+}
+
+.automation-inbox-panel {
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.09), transparent 48%),
+    var(--panel);
+}
+
+.automation-alert-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.34);
+  padding: 9px;
+}
+
+.automation-alert-row.unread {
+  border-color: rgba(255, 203, 5, 0.38);
+  background: rgba(255, 203, 5, 0.08);
+}
+
+.automation-alert-row > span {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 5px 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 1000;
+  text-align: center;
+}
+
+.automation-alert-row.good > span {
+  color: var(--green);
+}
+
+.automation-alert-row.warn > span {
+  color: var(--yellow);
+}
+
+.automation-alert-row.danger > span {
+  color: var(--red);
+}
+
+.automation-alert-row div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.automation-alert-row strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.12;
+}
+
+.automation-alert-row small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
 }
 
 .launch-plan-panel {

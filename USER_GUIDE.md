@@ -112,7 +112,8 @@ Sources shown today:
 - PSA cert lookup: slab verification and grade/name/set helper.
 - Owned sales: your own sale history after you start selling.
 - Backups: manual ledger export and restore safety.
-- Push alerts: optional external alert delivery once enabled.
+- Alert webhook: optional external alert delivery once enabled.
+- Automation: last daily snapshot, last buy-watch check and last weekly reprice check.
 
 How to use it:
 
@@ -127,14 +128,14 @@ Current outstanding setup actions:
 - eBay needs to approve restricted Marketplace Insights access before live UK sold comps can be switched on.
 - After eBay approval, an agent needs to set `EBAY_INSIGHTS_ENABLED=true` in production and redeploy.
 - Check the Neon project restore window. Until that is confirmed, treat cloud recovery as manual backups only.
-- Optional alert delivery needs a webhook if you want off-app notifications later.
+- Optional alert delivery needs `ALERT_WEBHOOK_URL` if you want off-app notifications later.
 
 Why this matters:
 
 - Without PokeTrace, raw comps still work, but bigger raw buys need manual checking.
 - Without eBay Marketplace Insights, UK solds still rely on Price Tracker plus manual eBay sold links.
 - Without a recent manual backup, recovery depends on whatever restore window is active in Neon.
-- Without push delivery, alerts still exist in-app, but they do not push to you.
+- Without off-app delivery, alerts still exist in the Status inbox.
 
 ## Backups
 
@@ -889,9 +890,11 @@ Intended use:
 - Track whether inventory value is rising or falling.
 - Build history over time rather than paid backfill.
 
-Outstanding:
+Automation:
 
-- Daily scheduled snapshots exist as a backend direction, but operational scheduling should be verified after production envs are complete.
+- A Vercel daily cron takes a stock-value snapshot.
+- The same daily cron checks buy watches with a capped source budget.
+- Setup shows the last successful snapshot and buy-watch run.
 
 ## Buy Watches
 
@@ -913,11 +916,19 @@ Flow:
 Current behavior:
 
 - In-app checks work.
-- Optional push delivery needs a webhook.
+- Daily cron checks active watches with a capped source budget.
+- Hits land in the Status automation inbox.
+- Optional off-app delivery needs `ALERT_WEBHOOK_URL`.
 
 ## Stock Health and Repricing
 
 Stock Health helps find cards that may need repricing.
+
+Automation:
+
+- A Vercel weekly cron runs the stock-health reprice check.
+- Reprice recommendations land in the Status automation inbox.
+- Cron failures also land in the inbox so failed background work is visible.
 
 It uses:
 
@@ -1164,7 +1175,6 @@ Comp robustness:
 Workflow:
 
 - Improve keyboard navigation in set autocomplete.
-- Verify daily cron/snapshot behavior in production.
 - Add richer listing export templates for eBay/Cardmarket/Vinted.
 - Add PSA cert lookup adapter and UI.
 
@@ -1172,7 +1182,7 @@ Automation:
 
 - Add eBay Sell API listing push.
 - Add notification preferences.
-- Add scheduled alert checks.
+- Monitor the new cron run log after a few real production runs.
 
 Engineering:
 

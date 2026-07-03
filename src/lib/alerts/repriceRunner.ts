@@ -1,8 +1,10 @@
 import { getPrisma } from "../db/prisma.js";
-import { CompService } from "../comps/compService.js";
+import { CompService, defaultCompSources } from "../comps/compService.js";
+import { PrismaLastKnownCompCache } from "../comps/prismaCompResultRepo.js";
 import type { CardRef } from "../domain/types.js";
 import { formatRepriceDigest, recommendReprice, type RepriceRecommendation } from "./repricing.js";
-import { notifierFromEnv } from "./notifier.js";
+import { createInboxAlert } from "./inbox.js";
+import { alertWebhookConfigured, notifierFromEnv } from "./notifier.js";
 
 export async function runRepriceCheck({
   notify = false,
@@ -13,19 +15,24 @@ export async function runRepriceCheck({
   limit?: number;
   thresholdPct?: number;
 }) {
-  const notifierConfigured = Boolean(process.env.DISCORD_WEBHOOK_URL?.trim());
+  const notifierConfigured = alertWebhookConfigured();
   if (limit <= 0) {
     return {
       recommendations: [],
       notified: false,
       notifierConfigured,
       scannedCount: 0,
+      skippedCount: 0,
       thresholdPct,
       checkedAt: new Date().toISOString(),
     };
   }
 
-  const items = await getPrisma().inventoryItem.findMany({
+  const prisma = getPrisma();
+  const activeCount = await prisma.inventoryItem.count({
+    where: { status: { in: ["IN_STOCK", "LISTED"] } },
+  });
+  const items = await prisma.inventoryItem.findMany({
     where: { status: { in: ["IN_STOCK", "LISTED"] } },
     include: {
       card: true,
@@ -36,7 +43,11 @@ export async function runRepriceCheck({
   });
 
   const recommendations: RepriceRecommendation[] = [];
-  const compService = CompService.default();
+  const compService = new CompService(
+    defaultCompSources(),
+    undefined,
+    process.env.DATABASE_URL ? new PrismaLastKnownCompCache() : null,
+  );
 
   for (const item of items) {
     const listing = item.listings[0];
@@ -62,7 +73,18 @@ export async function runRepriceCheck({
       thresholdPct,
       sourcesDisagree: comps.sourcesDisagree,
     });
-    if (recommendation) recommendations.push(recommendation);
+    if (recommendation) {
+      recommendations.push(recommendation);
+      await createInboxAlert(prisma, {
+        kind: "REPRICE",
+        title: "Reprice stock",
+        message: `${recommendation.cardName} ${recommendation.grade.replace(/_/g, " ")}: ${recommendation.reason}`,
+        pence: recommendation.suggestedPricePence,
+        href: "/?view=pnl",
+        sourceKey: `reprice:${recommendation.itemId}:${recommendation.suggestedPricePence}`,
+        delivered: false,
+      });
+    }
   }
 
   let notified = false;
@@ -72,6 +94,16 @@ export async function runRepriceCheck({
       body: formatRepriceDigest(recommendations),
     });
     notified = notifierConfigured;
+    if (notified) {
+      await prisma.appAlert.updateMany({
+        where: {
+          sourceKey: {
+            in: recommendations.map((recommendation) => `reprice:${recommendation.itemId}:${recommendation.suggestedPricePence}`),
+          },
+        },
+        data: { delivered: true },
+      });
+    }
   }
 
   return {
@@ -79,6 +111,7 @@ export async function runRepriceCheck({
     notified,
     notifierConfigured,
     scannedCount: items.length,
+    skippedCount: Math.max(0, activeCount - items.length),
     thresholdPct,
     checkedAt: new Date().toISOString(),
   };

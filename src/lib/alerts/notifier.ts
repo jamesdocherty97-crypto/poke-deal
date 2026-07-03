@@ -35,6 +35,10 @@ export class NullNotifier implements Notifier {
 }
 
 export function notifierFromEnv(): Notifier {
-  const webhook = process.env.DISCORD_WEBHOOK_URL?.trim();
+  const webhook = process.env.ALERT_WEBHOOK_URL?.trim() || process.env.DISCORD_WEBHOOK_URL?.trim();
   return webhook ? new DiscordNotifier(webhook) : new NullNotifier();
+}
+
+export function alertWebhookConfigured(): boolean {
+  return Boolean(process.env.ALERT_WEBHOOK_URL?.trim() || process.env.DISCORD_WEBHOOK_URL?.trim());
 }

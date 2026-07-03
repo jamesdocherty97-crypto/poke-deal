@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { getPokeTraceHealth, PokeTraceSource } from "@/lib/comps/sources/pokeTrace";
 import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from "@/lib/comps/sources/ebayMarketplaceInsights";
+import { latestSuccessfulRun } from "@/lib/automation/cronRunLog";
+import { alertWebhookConfigured } from "@/lib/alerts/notifier";
+import { getPrisma } from "@/lib/db/prisma";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
 import { getEbayConfig, hasEbayRefreshToken } from "@/lib/ebay/config";
 import { PsaCertLookup } from "@/lib/psa/psaCert";
@@ -28,6 +31,16 @@ export async function GET() {
   const ebayConfigured = Boolean(getEbayConfig());
   const ebayConnected = hasEbayRefreshToken();
   const ebayMiEnabled = isEbayMarketplaceInsightsEnabled();
+  const webhookReady = alertWebhookConfigured();
+  const cronRuns = process.env.DATABASE_URL?.trim()
+    ? await getPrisma().cronRun.findMany({
+        orderBy: { startedAt: "desc" },
+        take: 20,
+      })
+    : [];
+  const lastSnapshot = latestSuccessfulRun(cronRuns, "daily-portfolio-snapshot");
+  const lastWatchCheck = latestSuccessfulRun(cronRuns, "daily-buy-watch-check");
+  const lastReprice = latestSuccessfulRun(cronRuns, "weekly-stock-health-reprice");
 
   const sources: SystemSource[] = [
     {
@@ -114,13 +127,25 @@ export async function GET() {
     },
     {
       id: "push-alerts",
-      label: "Push alerts",
+      label: "Alert webhook",
       role: "price and reprice alerts",
-      status: process.env.DISCORD_WEBHOOK_URL?.trim() ? "ready" : "missing",
+      status: webhookReady ? "ready" : "missing",
       required: false,
-      setupHint: process.env.DISCORD_WEBHOOK_URL?.trim()
-        ? "Alert delivery is ready for buy targets and repricing."
-        : "Push delivery is off; buy targets and reprices still stay in-app.",
+      setupHint: webhookReady
+        ? "Off-app alert delivery is ready for buy targets and repricing."
+        : "Off-app delivery is off; buy targets, reprices and cron failures still stay in the app inbox.",
+    },
+    {
+      id: "automation",
+      label: "Automation",
+      role: "daily snapshot + weekly reprice",
+      status: lastSnapshot || lastWatchCheck || lastReprice ? "ready" : "building",
+      required: true,
+      setupHint: [
+        lastSnapshot ? `Last snapshot: ${lastSnapshot.startedAt.toISOString()}.` : "Last snapshot: not run yet.",
+        lastWatchCheck ? `Last buy-watch check: ${lastWatchCheck.startedAt.toISOString()}.` : "Last buy-watch check: not run yet.",
+        lastReprice ? `Last weekly reprice: ${lastReprice.startedAt.toISOString()}.` : "Last weekly reprice: not run yet.",
+      ].join(" "),
     },
   ];
 
@@ -132,9 +157,12 @@ export async function GET() {
       secondaryCrossCheck: pokeTrace.live && !pokeTraceHealth.persistentKeyProblem,
       ebayMarketplaceInsights: ebayMi.live,
       psaCertLookup: psa.live,
-      alertDelivery: Boolean(process.env.DISCORD_WEBHOOK_URL?.trim()),
+      alertDelivery: webhookReady,
       storedSales: Boolean(process.env.DATABASE_URL?.trim()),
       manualBackups: Boolean(process.env.DATABASE_URL?.trim()),
+      lastSnapshotAt: lastSnapshot?.startedAt.toISOString() ?? null,
+      lastWatchCheckAt: lastWatchCheck?.startedAt.toISOString() ?? null,
+      lastRepriceAt: lastReprice?.startedAt.toISOString() ?? null,
     },
   });
 }
