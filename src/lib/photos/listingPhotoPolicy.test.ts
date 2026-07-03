@@ -40,6 +40,31 @@ test("catalog-only photos satisfy eBay only for raw stock below the threshold", 
   assert.equal(summary.requiresRealPhoto, false);
 });
 
+test("catalog-only photos do not satisfy eBay at or above the threshold", () => {
+  const summary = summarizeListingPhotos({
+    photos: [{ id: "catalog-1", url: "https://img.test/catalog.png", origin: "CATALOG" }],
+    grade: "RAW",
+    pricePence: 2000,
+  });
+
+  assert.equal(summary.catalogOnly, true);
+  assert.equal(summary.catalogPhotoAllowed, false);
+  assert.equal(summary.satisfiesEbayPhotoRequirement, false);
+  assert.match(photoRequirementMessage(summary), /Real photos are required/);
+});
+
+test("missing photos tell the dealer where the catalog art escape hatch is", () => {
+  const summary = summarizeListingPhotos({
+    photos: [],
+    grade: "RAW",
+    pricePence: 999,
+  });
+
+  assert.equal(summary.satisfiesEbayPhotoRequirement, false);
+  assert.equal(summary.catalogPhotoAllowed, true);
+  assert.match(photoRequirementMessage(summary), /Use catalog art/);
+});
+
 test("graded stock never passes the eBay photo gate with catalog art only", () => {
   const summary = summarizeListingPhotos({
     photos: [{ id: "catalog-1", url: "https://img.test/catalog.png", origin: "CATALOG" }],

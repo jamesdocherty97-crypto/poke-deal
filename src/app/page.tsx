@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
 import {
+  isCatalogPhotoEligible,
   orderListingPhotos,
   photoRequirementMessage,
   summarizeListingPhotos,
@@ -8471,6 +8472,11 @@ function InventoryRow({
   const photoCount = item.photos?.length ?? 0;
   const needsPhotos = item.status !== "SOLD" && photoCount === 0;
   const needsEbayPhotos = needsPhotos && listing?.channel === "EBAY";
+  const canUseCatalogArt = Boolean(
+    needsEbayPhotos &&
+    item.card?.imageUrl &&
+    isCatalogPhotoEligible({ grade: item.grade, pricePence: listPrice ?? 0 }),
+  );
   const needsListing = item.status !== "SOLD" && !draftListing && !activeListing;
   const stockCost =
     item.quantity > 1
@@ -8599,7 +8605,21 @@ function InventoryRow({
                   }}
                 />
               </label>
-              <span>eBay needs listing images before publish. Use More for catalog art on low-value raw cards.</span>
+              {canUseCatalogArt && (
+                <button
+                  className="next-action-button"
+                  type="button"
+                  onClick={() => onCatalogArt(item)}
+                  disabled={busy === `photo-${item.id}`}
+                >
+                  Use catalog art
+                </button>
+              )}
+              <span>
+                {canUseCatalogArt
+                  ? "eBay needs images. Low-value raw stock can use catalog art."
+                  : "eBay needs real photos before publish."}
+              </span>
             </div>
           )}
           {primaryAction && (
