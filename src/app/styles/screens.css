@@ -111,17 +111,6 @@
     min-height: 128px;
   }
 
-  .sell-sheet {
-    right: calc(50% - 360px);
-    left: auto;
-    width: 420px;
-  }
-
-  .confirm-sheet {
-    right: calc(50% - 360px);
-    left: auto;
-    width: 420px;
-  }
 }
 
 @media (min-width: 820px) and (max-width: 1180px) {
@@ -155,7 +144,6 @@
   .listings-workspace > .dex-controls,
   .listings-workspace > .section-heading.tight,
   .listings-workspace > .ebay-setup-banner,
-  .listings-workspace > .ebay-publish-overlay,
   .pnl-workspace > .pnl-summary,
   .pnl-workspace > .cash-panel,
   .pnl-workspace > .channel-panel {
@@ -171,9 +159,6 @@
   .listings-workspace > .export-actions,
   .listings-workspace > .listing-desk-panel,
   .listings-workspace > .listing-queue-panel,
-  .listings-workspace > .sell-sheet,
-  .listings-workspace > .listing-pack-sheet,
-  .inventory-workspace > .sell-sheet,
   .inventory-workspace > .stock-import-panel,
   .inventory-workspace > .recent-intake-panel,
   .pnl-workspace > .export-actions,
@@ -185,12 +170,10 @@
 
   .buy-workspace > .lookup-panel,
   .buy-workspace > .last-stocked-panel,
-  .inventory-workspace > .sell-sheet,
   .inventory-workspace > .stock-import-panel,
   .inventory-workspace > .recent-intake-panel,
   .listings-workspace > .listing-desk-panel,
   .listings-workspace > .listing-queue-panel,
-  .listings-workspace > .listing-pack-sheet,
   .pnl-workspace > .expense-panel,
   .pnl-workspace > .watch-panel {
     position: sticky;
@@ -225,16 +208,6 @@
 
   .buy-workspace .buy-plan.compact {
     grid-template-columns: minmax(0, 1.1fr) repeat(3, minmax(88px, 0.75fr));
-  }
-
-  .inventory-workspace > .sell-sheet,
-  .listings-workspace > .sell-sheet {
-    right: auto;
-    bottom: auto;
-    left: auto;
-    width: auto;
-    max-height: calc(100vh - 112px);
-    z-index: var(--z-base);
   }
 
   .inventory-workspace .item-row,
@@ -642,20 +615,33 @@
 }
 
 .ebay-publish-overlay {
-  position: sticky;
-  top: 12px;
-  z-index: var(--z-overlay);
-  margin-bottom: 8px;
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  display: grid;
+  align-items: end;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.48);
+  padding: var(--space-4) var(--space-3) 0;
 }
 
 .ebay-publish-confirm {
   border: 1px solid rgba(255, 100, 100, 0.4);
-  border-radius: var(--r-md);
-  background: rgba(255, 100, 100, 0.08);
-  padding: 12px 14px;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background:
+    linear-gradient(145deg, rgba(255, 100, 100, 0.1), transparent 42%),
+    rgba(13, 20, 36, 0.985);
+  width: min(720px, 100%);
+  max-height: 85dvh;
+  margin: 0 auto;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 10px;
+  box-shadow: var(--shadow-2);
+  overscroll-behavior: contain;
+  animation: sheetIn 0.2s ease-out;
 }
 
 .ebay-publish-card {
@@ -681,8 +667,15 @@
 }
 
 .ebay-publish-confirm > div:last-child {
-  display: flex;
+  position: sticky;
+  bottom: calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 8px;
+  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(13, 20, 36, 0.985);
+  padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
 }
 
 .ebay-policy-summary {

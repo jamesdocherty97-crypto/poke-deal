@@ -23,6 +23,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+body:has(.sell-sheet),
+body:has(.confirm-sheet),
+body:has(.ebay-publish-overlay) {
+  overflow: hidden;
+}
+
 button,
 input,
 select,

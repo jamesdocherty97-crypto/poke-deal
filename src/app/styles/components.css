@@ -4922,18 +4922,24 @@
 
 .sell-sheet {
   position: fixed;
-  right: 12px;
-  bottom: calc(82px + env(safe-area-inset-bottom));
-  left: 12px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: var(--z-sheet);
-  max-height: calc(100vh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  width: min(720px, calc(100% - var(--space-6)));
+  max-height: 85dvh;
   overflow-y: auto;
-  background: rgba(13, 20, 36, 0.98);
-  box-shadow: var(--shadow);
+  margin: 0 auto;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: rgba(13, 20, 36, 0.985);
+  padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-2), 0 0 0 100vmax rgba(0, 0, 0, 0.48);
+  overscroll-behavior: contain;
+  animation: sheetIn 0.2s ease-out;
 }
 
 .listing-pack-sheet {
-  max-height: min(78vh, 720px);
+  max-height: 85dvh;
   overflow-y: auto;
 }
 
@@ -5752,19 +5758,23 @@
 
 .confirm-sheet {
   position: fixed;
-  right: 12px;
-  bottom: calc(82px + env(safe-area-inset-bottom));
-  left: 12px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: var(--z-sheet);
   display: grid;
   gap: 12px;
-  max-height: calc(100vh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  width: min(720px, calc(100% - var(--space-6)));
+  max-height: 85dvh;
   overflow-y: auto;
+  margin: 0 auto;
   border: 1px solid rgba(251, 113, 133, 0.34);
-  border-radius: var(--r-md);
-  background: rgba(13, 20, 36, 0.98);
-  padding: 14px;
-  box-shadow: var(--shadow);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: rgba(13, 20, 36, 0.985);
+  padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-2), 0 0 0 100vmax rgba(0, 0, 0, 0.48);
+  overscroll-behavior: contain;
+  animation: sheetIn 0.2s ease-out;
 }
 
 .confirm-sheet h2,
@@ -5780,8 +5790,61 @@
 
 .confirm-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
+  position: sticky;
+  bottom: calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(13, 20, 36, 0.985);
+  padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+}
+
+.confirm-actions .danger-button {
+  order: 2;
+  width: 100%;
+  min-height: 48px;
+}
+
+.sell-sheet > .panel-heading,
+.confirm-sheet > div:first-child {
+  position: sticky;
+  top: calc(-1 * var(--space-4));
+  z-index: var(--z-base);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(13, 20, 36, 0.985);
+  padding: var(--space-4);
+}
+
+.sell-sheet > .primary-action,
+.sell-sheet .sale-submit-row {
+  position: sticky;
+  bottom: calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(13, 20, 36, 0.985);
+  padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+}
+
+@keyframes sheetIn {
+  from {
+    opacity: 0.94;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sell-sheet,
+  .confirm-sheet,
+  .ebay-publish-confirm {
+    animation: none;
+  }
 }
 
 .bottom-nav {
