@@ -1,0 +1,907 @@
+@keyframes spinRefresh {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulseRefresh {
+  from {
+    opacity: 0.48;
+    transform: scale(0.82);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@media (min-width: 760px) {
+  .app-shell {
+    padding: 22px 24px calc(112px + env(safe-area-inset-bottom));
+  }
+
+  .topbar h1 {
+    max-width: none;
+    font-size: 34px;
+  }
+
+  .hero-board {
+    grid-template-columns: minmax(0, 1fr) 190px;
+    min-height: 190px;
+    padding: 22px;
+  }
+
+  .hero-copy strong {
+    font-size: 34px;
+  }
+
+  .hero-card-art img {
+    width: 124px;
+    height: 174px;
+  }
+
+  .hero-card-art .set-mark {
+    width: auto;
+    height: auto;
+    max-width: 128px;
+    max-height: 52px;
+  }
+
+  .workspace {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .buy-workspace {
+    grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .inventory-workspace,
+  .listings-workspace,
+  .pnl-workspace {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace > .section-heading,
+  .workspace > .dex-controls,
+  .workspace > .inventory-filter-tabs,
+  .workspace > .pnl-summary,
+  .workspace > .detail-grid,
+  .workspace > .buy-flow-rail {
+    grid-column: 1 / -1;
+  }
+
+  .mobile-buy-action,
+  .mobile-buy-spacer {
+    display: none;
+  }
+
+  .buy-workspace > .lookup-panel {
+    position: sticky;
+    top: 84px;
+  }
+
+  .buy-workspace > .lookup-panel,
+  .buy-workspace > .buy-flow-rail,
+  .buy-workspace > .last-stocked-panel {
+    grid-column: 1;
+  }
+
+  .buy-workspace > .comp-panel,
+  .buy-workspace > .fallback-stock-panel,
+  .buy-workspace > .grade-lab,
+  .buy-workspace > .watch-panel {
+    grid-column: 2;
+  }
+
+  .buy-workspace > .stock-import-panel,
+  .buy-workspace > .recent-intake-panel {
+    grid-column: 1 / -1;
+  }
+
+  .inventory-workspace > .sell-sheet,
+  .listings-workspace > .sell-sheet,
+  .pnl-workspace > .sell-sheet {
+    grid-column: auto;
+  }
+
+  .inventory-workspace .item-row,
+  .listings-workspace .item-row {
+    min-height: 128px;
+  }
+
+  .sell-sheet {
+    right: calc(50% - 360px);
+    left: auto;
+    width: 420px;
+  }
+
+  .confirm-sheet {
+    right: calc(50% - 360px);
+    left: auto;
+    width: 420px;
+  }
+}
+
+@media (min-width: 820px) and (max-width: 1180px) {
+  .app-shell {
+    width: min(100%, 1024px);
+  }
+
+  .inventory-workspace,
+  .listings-workspace {
+    grid-template-columns: minmax(0, 1.38fr) minmax(300px, 0.92fr);
+    grid-auto-flow: dense;
+  }
+
+  .buy-workspace {
+    grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.18fr);
+    grid-auto-flow: dense;
+  }
+
+  .pnl-workspace {
+    grid-template-columns: minmax(0, 1.26fr) minmax(300px, 0.95fr);
+    grid-auto-flow: dense;
+  }
+
+  .buy-workspace > .buy-flow-rail,
+  .buy-workspace > .last-stocked-panel,
+  .buy-workspace > .lookup-panel,
+  .inventory-workspace > .section-heading,
+  .inventory-workspace > .inventory-filter-tabs,
+  .inventory-workspace > .dex-controls,
+  .listings-workspace > .detail-grid,
+  .listings-workspace > .dex-controls,
+  .listings-workspace > .section-heading.tight,
+  .listings-workspace > .ebay-setup-banner,
+  .listings-workspace > .ebay-publish-overlay,
+  .pnl-workspace > .pnl-summary,
+  .pnl-workspace > .cash-panel,
+  .pnl-workspace > .channel-panel {
+    grid-column: 1;
+  }
+
+  .buy-workspace > .comp-panel,
+  .buy-workspace > .fallback-stock-panel,
+  .buy-workspace > .grade-lab,
+  .buy-workspace > .watch-panel,
+  .buy-workspace > .stock-import-panel,
+  .buy-workspace > .recent-intake-panel,
+  .listings-workspace > .export-actions,
+  .listings-workspace > .listing-desk-panel,
+  .listings-workspace > .listing-queue-panel,
+  .listings-workspace > .sell-sheet,
+  .listings-workspace > .listing-pack-sheet,
+  .inventory-workspace > .sell-sheet,
+  .inventory-workspace > .stock-import-panel,
+  .inventory-workspace > .recent-intake-panel,
+  .pnl-workspace > .export-actions,
+  .pnl-workspace > .expense-panel,
+  .pnl-workspace > .portfolio-panel,
+  .pnl-workspace > .watch-panel {
+    grid-column: 2;
+  }
+
+  .buy-workspace > .lookup-panel,
+  .buy-workspace > .last-stocked-panel,
+  .inventory-workspace > .sell-sheet,
+  .inventory-workspace > .stock-import-panel,
+  .inventory-workspace > .recent-intake-panel,
+  .listings-workspace > .listing-desk-panel,
+  .listings-workspace > .listing-queue-panel,
+  .listings-workspace > .listing-pack-sheet,
+  .pnl-workspace > .expense-panel,
+  .pnl-workspace > .watch-panel {
+    position: sticky;
+    top: 84px;
+  }
+
+  .buy-workspace > .last-stocked-panel {
+    top: 84px;
+    align-self: start;
+  }
+
+  .buy-workspace > .lookup-panel {
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .buy-workspace > .comp-panel {
+    align-self: start;
+  }
+
+  .buy-workspace .quick-stock-card {
+    border-color: rgba(255, 203, 5, 0.3);
+    background:
+      linear-gradient(125deg, rgba(255, 203, 5, 0.1), transparent 48%),
+      rgba(3, 8, 20, 0.38);
+  }
+
+  .buy-workspace .quick-stock-grid {
+    grid-template-columns: minmax(0, 1fr) 84px repeat(2, minmax(90px, 0.75fr));
+  }
+
+  .buy-workspace .buy-plan.compact {
+    grid-template-columns: minmax(0, 1.1fr) repeat(3, minmax(88px, 0.75fr));
+  }
+
+  .inventory-workspace > .sell-sheet,
+  .listings-workspace > .sell-sheet {
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: auto;
+    max-height: calc(100vh - 112px);
+    z-index: var(--z-base);
+  }
+
+  .inventory-workspace .item-row,
+  .listings-workspace .item-row {
+    min-height: auto;
+  }
+
+  .inventory-workspace .row-actions,
+  .listings-workspace .row-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .inventory-workspace .row-actions button,
+  .inventory-workspace .row-file-action,
+  .listings-workspace .row-actions button,
+  .listings-workspace .row-file-action {
+    min-width: 0;
+  }
+
+  .pnl-workspace .expense-row,
+  .pnl-workspace .watch-hit-row,
+  .pnl-workspace .reprice-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pnl-workspace .expense-row div:last-child,
+  .pnl-workspace .watch-hit-row div:last-child,
+  .pnl-workspace .reprice-row div:last-child {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 430px) {
+  .topbar {
+    gap: 8px;
+  }
+
+  .app-mark,
+  .app-mark-image {
+    width: 36px;
+  }
+
+  .app-mark {
+    height: 36px;
+  }
+
+  .app-mark-image {
+    height: 50px;
+  }
+
+  .brand-lockup {
+    gap: 8px;
+  }
+
+  .topbar h1 {
+    max-width: 34vw;
+    font-size: 22px;
+  }
+
+  .topbar-secondary {
+    min-height: 34px;
+    padding: 6px 7px;
+    font-size: 11px;
+  }
+
+  .topbar-actions {
+    gap: 5px;
+  }
+
+  .psa-cert-row.active,
+  .psa-cert-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .psa-cert-row.active button,
+  .psa-cert-actions button {
+    width: 100%;
+  }
+
+  .psa-cert-data {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-board {
+    display: none;
+  }
+
+  .ebay-location-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ebay-location-form input,
+  .ebay-location-form input:nth-of-type(3),
+  .ebay-location-form button {
+    grid-column: 1 / -1;
+  }
+
+  .detail-grid,
+  .form-grid,
+  .deal-banner,
+  .quick-stock-grid,
+  .split-cost-card,
+  .buy-plan,
+  .sale-preview,
+  .listing-economics,
+  .listing-pack-summary,
+  .listing-pack-specifics {
+    grid-template-columns: 1fr;
+  }
+
+  .buy-flow-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .segmented {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-board {
+    grid-template-columns: minmax(0, 1fr) 88px;
+  }
+
+  .watch-controls {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .watch-controls label {
+    grid-column: 1 / -1;
+  }
+
+  .dex-controls,
+  .dex-controls.listings-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dex-controls .search-control {
+    grid-column: 1 / -1;
+  }
+
+  .bottom-nav button {
+    min-height: 38px;
+    padding: 7px 4px;
+    font-size: 11px;
+  }
+
+  .item-row,
+  .swipe-content,
+  .listing-desk-card,
+  .watch-row {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .card-thumb {
+    width: 52px;
+    height: 72px;
+  }
+
+  .item-title-line {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .item-badges {
+    max-width: 100%;
+  }
+
+  .next-action-strip,
+  .listing-next-action,
+  .target-suggestion,
+  .channel-row,
+  .expense-row,
+  .reprice-row,
+  .watch-hit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .next-action-strip .next-action-button,
+  .listing-next-action button,
+  .target-suggestion button,
+  .reprice-row button {
+    width: 100%;
+  }
+
+  .row-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .row-actions button,
+  .row-file-action {
+    min-width: 0;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .expense-row div:last-child,
+  .reprice-row div:last-child,
+  .watch-hit-row div:last-child,
+  .channel-row > div:nth-child(2),
+  .sale-mini-row .sale-result {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .sale-mini-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .profit-sparkline {
+    grid-template-columns: 1fr;
+  }
+}
+
+.listing-pack-ebay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.ebay-preflight-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(125deg, rgba(52, 211, 153, 0.1), transparent 58%),
+    rgba(3, 8, 20, 0.34);
+  padding: 10px;
+}
+
+.ebay-preflight-card > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.ebay-preflight-card span,
+.ebay-preflight-card dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.ebay-preflight-card strong {
+  color: var(--green);
+  font-size: 14px;
+  line-height: 1.12;
+}
+
+.ebay-preflight-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.ebay-preflight-card dl div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 7px;
+}
+
+.ebay-preflight-card dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.12;
+}
+
+.ebay-preflight-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.ebay-readiness-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ebay-readiness-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.ebay-readiness-list li.readiness-pass {
+  color: rgba(123, 214, 143, 0.75);
+}
+
+.ebay-readiness-list li.readiness-warn {
+  color: rgba(255, 200, 80, 0.85);
+}
+
+.ebay-readiness-list li.readiness-fail {
+  color: rgba(255, 100, 100, 0.9);
+}
+
+.readiness-icon {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.ebay-setup-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(255, 200, 80, 0.08);
+  border: 1px solid rgba(255, 200, 80, 0.25);
+  font-size: 0.8125rem;
+  color: rgba(255, 200, 80, 0.9);
+  margin-bottom: 8px;
+}
+
+.ebay-location-form {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.4fr) minmax(160px, 2fr) minmax(130px, 1.4fr) minmax(92px, 0.8fr) auto;
+  gap: 8px;
+  width: 100%;
+}
+
+.ebay-location-form input {
+  min-width: 0;
+  min-height: 34px;
+  border-color: rgba(255, 200, 80, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.ebay-location-form input:nth-of-type(3) {
+  grid-column: span 2;
+}
+
+.ebay-location-form input::placeholder {
+  color: rgba(255, 230, 170, 0.55);
+}
+
+.ebay-location-form.compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ebay-location-form small {
+  color: rgba(255, 230, 170, 0.72);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.ebay-setup-banner a {
+  color: rgba(255, 200, 80, 0.9);
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.ebay-setup-banner button {
+  border: 1px solid rgba(255, 200, 80, 0.34);
+  border-radius: 6px;
+  background: rgba(255, 200, 80, 0.12);
+  color: rgba(255, 235, 180, 0.96);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.ebay-setup-banner button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.ebay-setup-detail {
+  color: rgba(255, 230, 170, 0.78);
+  overflow-wrap: anywhere;
+}
+
+.ebay-publish-overlay {
+  position: sticky;
+  top: 12px;
+  z-index: var(--z-overlay);
+  margin-bottom: 8px;
+}
+
+.ebay-publish-confirm {
+  border: 1px solid rgba(255, 100, 100, 0.4);
+  border-radius: var(--r-md);
+  background: rgba(255, 100, 100, 0.08);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ebay-publish-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.ebay-publish-confirm p {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  min-width: 0;
+}
+
+.ebay-publish-confirm small,
+.ebay-publish-confirm span {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.ebay-publish-confirm > div:last-child {
+  display: flex;
+  gap: 8px;
+}
+
+.ebay-policy-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  border: 1px solid rgba(255, 200, 80, 0.22);
+  border-radius: var(--r-md);
+  background: rgba(3, 8, 20, 0.24);
+  padding: 8px;
+}
+
+.ebay-policy-summary span {
+  min-width: 0;
+  color: rgba(255, 240, 190, 0.86);
+  font-size: 12px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.ebay-sales-sync-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ebay-sales-sync-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ebay-sales-sync-summary span,
+.ebay-unmatched-list div {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.ebay-sales-sync-summary span {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.ebay-sales-sync-summary .warn {
+  border-color: rgba(181, 108, 0, 0.32);
+  background: rgba(255, 244, 222, 0.78);
+  color: #8a5200;
+}
+
+.ebay-unmatched-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ebay-unmatched-list div {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.55rem;
+}
+
+.ebay-unmatched-list small {
+  color: var(--muted);
+}
+
+@media (max-width: 759px) {
+  .hero-board {
+    display: none;
+  }
+
+  .lookup-panel {
+    order: 1;
+    margin-bottom: 0;
+  }
+
+  .buy-workspace > .comp-panel,
+  .buy-workspace > .fallback-stock-panel {
+    order: 2;
+  }
+
+  .buy-workspace > .buy-flow-rail {
+    order: 3;
+  }
+
+  .buy-workspace > .last-stocked-panel,
+  .buy-workspace > .grade-lab,
+  .buy-workspace > .watch-panel,
+  .buy-workspace > .recent-intake-panel {
+    order: 4;
+  }
+
+  .buy-workspace > .stock-import-panel {
+    order: 5;
+  }
+
+  .inventory-workspace,
+  .listings-workspace,
+  .pnl-workspace {
+    gap: 10px;
+  }
+
+  .inventory-workspace .row-actions,
+  .listings-workspace .row-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .inventory-workspace .row-actions button,
+  .listings-workspace .row-actions button {
+    flex: 0 0 auto;
+    min-width: 72px;
+    white-space: nowrap;
+  }
+
+  .next-action-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .next-action-button {
+    width: 100%;
+  }
+
+  .ebay-setup-banner {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .ebay-location-form {
+    grid-template-columns: 1fr;
+  }
+
+  .ebay-location-form input,
+  .ebay-location-form input:nth-of-type(3),
+  .ebay-location-form button {
+    grid-column: 1 / -1;
+    min-height: 42px;
+  }
+
+  .ebay-setup-banner a,
+  .ebay-setup-banner button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .ebay-publish-overlay {
+    top: max(8px, env(safe-area-inset-top));
+  }
+
+  .ebay-publish-confirm > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .ebay-publish-confirm button,
+  .listing-pack-ebay-actions a,
+  .listing-pack-ebay-actions button {
+    width: 100%;
+  }
+
+  .ebay-preflight-card dl {
+    grid-template-columns: 1fr;
+  }
+
+  .ebay-policy-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-workspace .section-heading,
+  .listings-workspace .section-heading,
+  .pnl-workspace .section-heading {
+    position: sticky;
+    top: max(8px, env(safe-area-inset-top));
+    z-index: var(--z-nav);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--r-md);
+    background: rgba(13, 20, 36, 0.94);
+    padding: 8px 10px;
+    backdrop-filter: blur(12px);
+  }
+
+  .detail-grid,
+  .form-grid,
+  .deal-banner,
+  .quick-stock-grid,
+  .split-cost-card,
+  .buy-plan.compact,
+  .sale-preview,
+  .listing-economics,
+  .listing-pack-summary,
+  .listing-pack-specifics {
+    grid-template-columns: 1fr;
+  }
+
+  .smart-grade-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-intake-actions,
+  .quick-intake-actions.has-next {
+    grid-template-columns: minmax(0, 1fr) 66px;
+  }
+
+  .quick-intake-actions.has-next .quick-next-button {
+    grid-column: 1 / -1;
+  }
+
+  .stock-import-panel summary {
+    min-height: 38px;
+  }
+
+  .stock-import-panel summary small {
+    text-align: right;
+  }
+
+  .mobile-buy-spacer {
+    display: block;
+    min-height: calc(148px + env(safe-area-inset-bottom));
+  }
+}
