@@ -147,21 +147,37 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     everyEligibleHeavyPenalty,
   });
 
-  const manualCheck =
-    confidence === "low" ||
-    spreadAll > 1.4 ||
-    Boolean(query.ambiguous) ||
-    chosen.qualityPenaltyProduct <= 0.5 ||
-    hardExclusions >= 2 ||
+  const spreadManualCheck = spreadAll > 1.4;
+  const lowConfidenceManualCheck = confidence === "low";
+  const ambiguityManualCheck = Boolean(query.ambiguous);
+  const damagedChosenManualCheck = chosen.qualityPenaltyProduct <= 0.5;
+  const hardExclusionManualCheck = hardExclusions >= 2;
+  const otherManualCheck =
+    lowConfidenceManualCheck ||
+    ambiguityManualCheck ||
+    damagedChosenManualCheck ||
+    hardExclusionManualCheck ||
     dominantOutlierExcluded ||
     ownedDeviation ||
     staleCorroborationDisagrees;
+  const spreadOnly = spreadManualCheck && !otherManualCheck;
+  const suppressedSpreadReasons = spreadOnly
+    ? [
+        confidence === "high" ? "spread-flag-suppressed:high-confidence" : null,
+        chosen.valuePence < 1000 ? "spread-flag-suppressed:low-stakes" : null,
+      ].filter((reason): reason is string => reason != null)
+    : [];
+  const shouldManualCheckForSpread = spreadManualCheck && suppressedSpreadReasons.length === 0;
+  const manualCheck =
+    otherManualCheck ||
+    shouldManualCheckForSpread;
+  const finalReasons = [...reasons, ...suppressedSpreadReasons];
 
   return {
     headlinePence: chosen.valuePence,
     confidence,
     manualCheck,
-    reasons: reasons.length > 0 ? reasons : ["reconciled-cleanly"],
+    reasons: finalReasons.length > 0 ? finalReasons : ["reconciled-cleanly"],
     chosenSource: chosen.candidate.source,
     trendPct: chosen.trendPct,
   };

@@ -229,6 +229,63 @@ test("T12: UK eBay MI wins over a broad non-UK PokeTrace source when both agree"
   assert.equal(result.manualCheck, false);
 });
 
+test("A2-1: high-confidence spread-only signal does not force manual check", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 4000, n: 10000, region: "US" }),
+    candidate({ source: "tcg-market", valuePence: 7000, n: 3, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 4000);
+  assert.equal(result.confidence, "high");
+  assert.equal(result.manualCheck, false);
+  assert.match(result.reasons.join(" "), /spread-flag-suppressed:high-confidence/);
+});
+
+test("A2-1: ambiguity still forces manual check on an otherwise high-confidence spread", () => {
+  const result = reconcileComps({ ...baseQuery, ambiguous: true }, [
+    candidate({ source: "poketrace", valuePence: 4000, n: 10000, region: "US" }),
+    candidate({ source: "tcg-market", valuePence: 7000, n: 3, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 4000);
+  assert.equal(result.manualCheck, true);
+  assert.doesNotMatch(result.reasons.join(" "), /spread-flag-suppressed/);
+});
+
+test("A2-2: sub-£10 spread-only signal does not force manual check", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 900, n: 180, region: "US" }),
+    candidate({ source: "tcg-market", valuePence: 2000, n: 3, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 900);
+  assert.equal(result.confidence, "medium");
+  assert.equal(result.manualCheck, false);
+  assert.match(result.reasons.join(" "), /spread-flag-suppressed:low-stakes/);
+});
+
+test("A2-2: £10+ spread-only signal still forces manual check", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 1000, n: 180, region: "US" }),
+    candidate({ source: "tcg-market", valuePence: 2000, n: 3, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 1000);
+  assert.equal(result.confidence, "medium");
+  assert.equal(result.manualCheck, true);
+});
+
+test("A2-2: sub-£10 ambiguity still forces manual check", () => {
+  const result = reconcileComps({ ...baseQuery, ambiguous: true }, [
+    candidate({ source: "poketrace", valuePence: 900, n: 180, region: "US" }),
+    candidate({ source: "tcg-market", valuePence: 2000, n: 3, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 900);
+  assert.equal(result.manualCheck, true);
+  assert.doesNotMatch(result.reasons.join(" "), /spread-flag-suppressed/);
+});
+
 test("T13: graded symmetric bucket spread does not count as contamination", () => {
   const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
     candidate({
