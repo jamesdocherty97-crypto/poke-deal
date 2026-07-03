@@ -1,4 +1,4 @@
-export type AppAlertKind = "PRICE_DROP" | "REPRICE" | "CRON_FAILURE";
+export type AppAlertKind = "PRICE_DROP" | "REPRICE" | "CRON_FAILURE" | "EBAY_SALE";
 
 export type AppAlertRow = {
   id: string;

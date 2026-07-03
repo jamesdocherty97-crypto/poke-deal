@@ -17,30 +17,30 @@ datasource db {
 
 /// A canonical card in the catalog. Card-agnostic on purpose so sports cards slot in later.
 model Card {
-  id          String   @id @default(cuid())
-  game        Game     @default(POKEMON)
-  language    Language @default(EN)
+  id       String   @id @default(cuid())
+  game     Game     @default(POKEMON)
+  language Language @default(EN)
 
-  name        String
-  setName     String
-  setCode     String?
-  number      String? // collector number within the set, e.g. "058/198"
-  rarity      String?
-  imageUrl    String?
+  name     String
+  setName  String
+  setCode  String?
+  number   String? // collector number within the set, e.g. "058/198"
+  rarity   String?
+  imageUrl String?
 
   // External catalog references, for adapter lookups.
-  tcgApiId    String? @unique // pokemontcg.io id
-  tcgDexId    String? @unique // tcgdex.net id
+  tcgApiId     String? @unique // pokemontcg.io id
+  tcgDexId     String? @unique // tcgdex.net id
   cardmarketId String?
 
-  inventory   InventoryItem[]
-  comps       CompResult[]
-  snapshots   PriceSnapshot[]
-  watches     Watch[]
+  inventory        InventoryItem[]
+  comps            CompResult[]
+  snapshots        PriceSnapshot[]
+  watches          Watch[]
   dealSessionLines DealSessionLine[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([game, language])
   @@index([name])
@@ -53,28 +53,29 @@ model Card {
 // ─────────────────────────────────────────────────────────────
 
 model InventoryItem {
-  id            String          @id @default(cuid())
-  card          Card            @relation(fields: [cardId], references: [id])
-  cardId        String
+  id     String @id @default(cuid())
+  card   Card   @relation(fields: [cardId], references: [id])
+  cardId String
 
-  grade         Grade           @default(RAW)
-  graderCert    String? // PSA/BGS/CGC cert number when graded
-  condition     String? // free-text for raw nuance ("NM", "light edgewear")
-  quantity      Int             @default(1)
+  grade      Grade   @default(RAW)
+  graderCert String? // PSA/BGS/CGC cert number when graded
+  condition  String? // free-text for raw nuance ("NM", "light edgewear")
+  quantity   Int     @default(1)
 
-  costBasis     Int // GBP pence — what I paid, per unit
-  acquiredFrom  String? // source: "eBay", "card fair", "collection buy", etc.
-  acquiredAt    DateTime        @default(now())
-  location      String? // bin / box / shelf reference
+  costBasis    Int // GBP pence — what I paid, per unit
+  acquiredFrom String? // source: "eBay", "card fair", "collection buy", etc.
+  acquiredAt   DateTime @default(now())
+  location     String? // bin / box / shelf reference
 
-  status        InventoryStatus @default(IN_STOCK)
+  status InventoryStatus @default(IN_STOCK)
 
-  listings      Listing[]
-  sales         Sale[]
-  photos        CardPhoto[]
+  listings         Listing[]
+  sales            Sale[]
+  photos           CardPhoto[]
+  ebayOrderImports EbayOrderImport[]
 
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([cardId, grade])
@@ -99,12 +100,12 @@ model CardPhoto {
 // ─────────────────────────────────────────────────────────────
 
 model Listing {
-  id             String        @id @default(cuid())
-  item           InventoryItem @relation(fields: [itemId], references: [id])
-  itemId         String
+  id     String        @id @default(cuid())
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+  itemId String
 
-  channel        Channel
-  state          ListingState  @default(DRAFT)
+  channel Channel
+  state   ListingState @default(DRAFT)
 
   title          String?
   description    String?
@@ -113,11 +114,12 @@ model Listing {
   externalRef    String? // eBay listing/offer id etc.
   externalUrl    String?
 
-  listedAt       DateTime?
-  endedAt        DateTime?
+  listedAt         DateTime?
+  endedAt          DateTime?
+  ebayOrderImports EbayOrderImport[]
 
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([channel, state])
 }
@@ -127,20 +129,56 @@ model Listing {
 // ─────────────────────────────────────────────────────────────
 
 model Sale {
-  id          String        @id @default(cuid())
-  item        InventoryItem @relation(fields: [itemId], references: [id])
-  itemId      String
+  id     String        @id @default(cuid())
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+  itemId String
 
-  channel     Channel
-  salePrice   Int // GBP pence — gross
-  fees        Int           @default(0) // GBP pence — channel + payment fees
-  postage     Int           @default(0) // GBP pence — cost to me, net of what buyer paid
-  soldAt      DateTime      @default(now())
+  channel   Channel
+  salePrice Int // GBP pence — gross
+  fees      Int      @default(0) // GBP pence — channel + payment fees
+  postage   Int      @default(0) // GBP pence — cost to me, net of what buyer paid
+  soldAt    DateTime @default(now())
 
   // realized profit = salePrice - fees - postage - (item.costBasis) ; computed in service layer
-  createdAt   DateTime      @default(now())
+  createdAt       DateTime         @default(now())
+  ebayOrderImport EbayOrderImport?
 
   @@index([soldAt])
+}
+
+model EbayOrderImport {
+  id         String                @id @default(cuid())
+  importKey  String                @unique
+  orderId    String
+  lineItemId String?
+  sku        String?
+  ebayItemId String?
+  title      String?
+  status     EbayOrderImportStatus @default(UNMATCHED)
+  reason     String?
+
+  item      InventoryItem? @relation(fields: [itemId], references: [id])
+  itemId    String?
+  listing   Listing?       @relation(fields: [listingId], references: [id])
+  listingId String?
+  sale      Sale?          @relation(fields: [saleId], references: [id])
+  saleId    String?        @unique
+
+  orderCreatedAt      DateTime?
+  paidAt              DateTime?
+  buyerPaidPence      Int?
+  postageChargedPence Int?
+  feesEstimatePence   Int?
+  payload             Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([orderId])
+  @@index([sku])
+  @@index([itemId])
+  @@index([listingId])
 }
 
 model Expense {
@@ -153,8 +191,8 @@ model Expense {
   source      String?
   notes       String?
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([spentAt])
   @@index([category])
@@ -174,42 +212,42 @@ model DealSession {
   abandonedAt DateTime?
   paidPence   Int?
 
-  lines       DealSessionLine[]
+  lines DealSessionLine[]
 
   @@index([status])
   @@index([createdAt])
 }
 
 model DealSessionLine {
-  id                 String      @id @default(cuid())
-  session            DealSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId          String
-  card               Card?       @relation(fields: [cardId], references: [id])
-  cardId             String?
+  id        String      @id @default(cuid())
+  session   DealSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  card      Card?       @relation(fields: [cardId], references: [id])
+  cardId    String?
 
-  name               String
-  setName            String?
-  setCode            String?
-  number             String?
-  tcgApiId           String?
-  tcgDexId           String?
-  imageUrl           String?
-  grade              Grade       @default(RAW)
+  name     String
+  setName  String?
+  setCode  String?
+  number   String?
+  tcgApiId String?
+  tcgDexId String?
+  imageUrl String?
+  grade    Grade   @default(RAW)
 
-  headlinePence      Int
-  confidence         String
-  manualCheck        Boolean     @default(false)
-  maxCashOfferPence  Int?
-  maxTradeOfferPence Int?
-  dealerOfferPence   Int?
-  netProceedsPence   Int?
+  headlinePence       Int
+  confidence          String
+  manualCheck         Boolean   @default(false)
+  maxCashOfferPence   Int?
+  maxTradeOfferPence  Int?
+  dealerOfferPence    Int?
+  netProceedsPence    Int?
   expectedProfitPence Int?
-  sampleSize         Int         @default(0)
-  windowDays         Int         @default(0)
-  compSource         String?
-  compAsOf           DateTime?
+  sampleSize          Int       @default(0)
+  windowDays          Int       @default(0)
+  compSource          String?
+  compAsOf            DateTime?
 
-  addedAt            DateTime    @default(now())
+  addedAt DateTime @default(now())
 
   @@index([sessionId])
   @@index([cardId])
@@ -221,25 +259,25 @@ model DealSessionLine {
 
 /// A cleaned comp result, persisted for history/audit. Mirrors lib/comps CompResult.
 model CompResult {
-  id             String   @id @default(cuid())
-  card           Card     @relation(fields: [cardId], references: [id])
-  cardId         String
+  id     String @id @default(cuid())
+  card   Card   @relation(fields: [cardId], references: [id])
+  cardId String
 
-  grade          Grade
-  source         String // adapter name, e.g. "pokemon-price-tracker"
-  currency       String   @default("GBP")
+  grade    Grade
+  source   String // adapter name, e.g. "pokemon-price-tracker"
+  currency String @default("GBP")
 
-  medianPence    Int
-  meanPence      Int
-  lowPence       Int
-  highPence      Int
-  sampleSize     Int
-  windowDays     Int
-  trendPct       Float?
-  outliersRemoved Int     @default(0)
+  medianPence     Int
+  meanPence       Int
+  lowPence        Int
+  highPence       Int
+  sampleSize      Int
+  windowDays      Int
+  trendPct        Float?
+  outliersRemoved Int    @default(0)
 
-  asOf           DateTime
-  createdAt      DateTime @default(now())
+  asOf      DateTime
+  createdAt DateTime @default(now())
 
   @@index([cardId, grade, asOf])
 }
@@ -253,8 +291,8 @@ model PriceSnapshot {
   marketPence Int // GBP pence — the headline comp value on this day
   takenAt     DateTime @default(now())
 
-  @@index([takenAt])
   @@unique([cardId, grade, takenAt])
+  @@index([takenAt])
 }
 
 model CronRun {
@@ -301,35 +339,35 @@ model Watch {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  alerts      Alert[]
+  alerts Alert[]
 
   @@index([active])
 }
 
 model Alert {
-  id         String    @id @default(cuid())
-  watch      Watch     @relation(fields: [watchId], references: [id])
-  watchId    String
-  kind       AlertKind
-  message    String
-  pence      Int?
-  firedAt    DateTime  @default(now())
-  delivered  Boolean   @default(false)
+  id        String    @id @default(cuid())
+  watch     Watch     @relation(fields: [watchId], references: [id])
+  watchId   String
+  kind      AlertKind
+  message   String
+  pence     Int?
+  firedAt   DateTime  @default(now())
+  delivered Boolean   @default(false)
 
   @@index([delivered])
 }
 
 model AppAlert {
-  id         String       @id @default(cuid())
-  kind       AppAlertKind
-  title      String
-  message    String
-  pence      Int?
-  href       String?
-  sourceKey  String?      @unique
-  delivered  Boolean      @default(false)
-  readAt     DateTime?
-  createdAt  DateTime     @default(now())
+  id        String       @id @default(cuid())
+  kind      AppAlertKind
+  title     String
+  message   String
+  pence     Int?
+  href      String?
+  sourceKey String?      @unique
+  delivered Boolean      @default(false)
+  readAt    DateTime?
+  createdAt DateTime     @default(now())
 
   @@index([kind])
   @@index([readAt, createdAt])
@@ -457,6 +495,13 @@ enum AppAlertKind {
   PRICE_DROP
   REPRICE
   CRON_FAILURE
+  EBAY_SALE
+}
+
+enum EbayOrderImportStatus {
+  MATCHED
+  UNMATCHED
+  SKIPPED
 }
 
 enum CronRunStatus {

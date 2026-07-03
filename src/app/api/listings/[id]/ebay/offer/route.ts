@@ -74,6 +74,7 @@ export async function POST(
 
     const preflight = buildEbayOfferPreflight({
       listingId: params.id,
+      itemId: listing.itemId,
       packInput,
       quantity: listing.item.quantity ?? 1,
       imageUrls: listing.item.photos.map((photo) => photo.url),

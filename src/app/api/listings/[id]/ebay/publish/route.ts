@@ -164,7 +164,7 @@ async function publishViaTradingApiFallback({
   let result;
   try {
     result = await addTradingFixedPriceItem(config, accessToken, {
-      listingId: `pdos-${listingId}`,
+      listingId: `pdos-${listing.itemId}`,
       packInput: {
         card: {
           name: listing.item.card.name,

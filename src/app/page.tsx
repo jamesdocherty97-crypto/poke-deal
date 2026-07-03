@@ -285,6 +285,35 @@ type EbayAskEvidence = {
   reason?: string;
 };
 
+type EbaySalesSyncRow = {
+  importKey: string;
+  orderId: string;
+  lineItemId: string | null;
+  sku: string | null;
+  ebayItemId: string | null;
+  title: string | null;
+  status: "MATCHED" | "UNMATCHED" | "SKIPPED";
+  reason: string | null;
+  itemId: string | null;
+  listingId: string | null;
+  saleId: string | null;
+  buyerPaidPence: number | null;
+  postageChargedPence: number | null;
+  feesEstimatePence: number | null;
+};
+
+type EbaySalesSyncResult = {
+  ok: boolean;
+  checkedAt: string;
+  skipped: boolean;
+  reason?: string;
+  fetchedOrders: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  skippedCount: number;
+  imports: EbaySalesSyncRow[];
+};
+
 type CompResult = Omit<DomainCompResult, "raw"> & {
   raw?: {
     smartMarketPrice?: { confidence?: string; daysUsed?: number; method?: string };
@@ -640,7 +669,7 @@ type PortfolioHistory = {
 
 type AppAlertRecord = {
   id: string;
-  kind: "PRICE_DROP" | "REPRICE" | "CRON_FAILURE";
+  kind: "PRICE_DROP" | "REPRICE" | "CRON_FAILURE" | "EBAY_SALE";
   title: string;
   message: string;
   pence: number | null;
@@ -832,6 +861,7 @@ export default function Home() {
   const [ebayStatus, setEbayStatus] = useState<EbayStatus | null>(null);
   const [ebayPreflight, setEbayPreflight] = useState<EbayPreflight | null>(null);
   const [ebayPublishTarget, setEbayPublishTarget] = useState<string | null>(null);
+  const [ebaySalesSync, setEbaySalesSync] = useState<EbaySalesSyncResult | null>(null);
   const [ebayLocationName, setEbayLocationName] = useState("Poke Deal");
   const [ebayLocationAddress1, setEbayLocationAddress1] = useState("");
   const [ebayLocationAddress2, setEbayLocationAddress2] = useState("");
@@ -4614,6 +4644,30 @@ export default function Home() {
     }
   }
 
+  async function syncEbaySales() {
+    setBusy("ebay-sales-sync");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/ebay/orders/sync", { method: "POST" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay sales sync failed"));
+      setEbaySalesSync(payload as EbaySalesSyncResult);
+      if (payload.skipped) {
+        setNotice(payload.reason ?? "eBay sales sync skipped.");
+      } else {
+        setNotice(
+          `eBay sync complete: ${payload.matchedCount ?? 0} matched, ${payload.unmatchedCount ?? 0} unmatched.`,
+        );
+      }
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "eBay sales sync failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function patchListing(
     listing: Listing,
     patch: Partial<{
@@ -7179,6 +7233,7 @@ export default function Home() {
           listings={listings}
           busy={busy}
           ebayStatus={ebayStatus}
+          ebaySalesSync={ebaySalesSync}
           ebayNeedsReconnect={ebayNeedsReconnect}
           ebayNeedsMerchantLocation={ebayNeedsMerchantLocation}
           ebayLocationName={ebayLocationName}
@@ -7197,6 +7252,7 @@ export default function Home() {
           ebayLocationCreateAvailable={ebayLocationEnvCreateReady}
           ebayLocationMissingFields={ebayStatus?.locationSetup?.missingFields ?? []}
           ebayLocationMissingRecommendedFields={ebayStatus?.locationSetup?.missingRecommendedFields ?? []}
+          syncEbaySales={() => void syncEbaySales()}
           createEbaySellerLocation={(event) => void createEbaySellerLocation(event)}
           onAddBuy={() => setView("acquire")}
           startListingDesk={startListingDesk}

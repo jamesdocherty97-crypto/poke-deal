@@ -390,11 +390,13 @@ test("buildOfferPayload omits merchantLocationKey when null", () => {
 
 test("toEbaySku creates stable app-owned SKUs", () => {
   assert.equal(toEbaySku("listing-123"), "pdos-listing-123");
+  assert.equal(toEbaySku("listing-123", "item-456"), "pdos-item-456");
 });
 
 test("buildEbayOfferPreflight previews inventory and offer payloads without writing", () => {
   const preflight = buildEbayOfferPreflight({
     listingId: "listing-123",
+    itemId: "item-123",
     packInput: slabInput,
     quantity: 2,
     imageUrls: ["https://blob.vercel-storage.com/charizard-front.jpg"],
@@ -402,7 +404,7 @@ test("buildEbayOfferPreflight previews inventory and offer payloads without writ
     config: TEST_CONFIG,
   });
 
-  assert.equal(preflight.sku, "pdos-listing-123");
+  assert.equal(preflight.sku, "pdos-item-123");
   assert.equal(preflight.quantity, 2);
   assert.equal(preflight.priceGbp, "1063.00");
   assert.equal(preflight.marketplaceId, "EBAY_GB");

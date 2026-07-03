@@ -50,7 +50,7 @@ export async function GET(
   try {
     const accessToken = await getAccessToken(config);
     const policies = await fetchEbayPolicies(config, accessToken);
-    const sku = toEbaySku(params.id);
+    const sku = toEbaySku(params.id, listing.itemId);
     const existingOfferId = await getOfferBySku(config, sku, accessToken);
 
     const packInput = {
@@ -69,6 +69,7 @@ export async function GET(
 
     const preflight = buildEbayOfferPreflight({
       listingId: params.id,
+      itemId: listing.itemId,
       packInput,
       quantity: listing.item.quantity ?? 1,
       imageUrls: listing.item.photos.map((photo) => photo.url),

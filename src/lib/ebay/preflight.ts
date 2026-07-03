@@ -16,6 +16,7 @@ export interface EbayPolicySummary {
 
 export interface EbayOfferPreflightInput {
   listingId: string;
+  itemId?: string;
   packInput: ListingPackInput;
   quantity: number;
   imageUrls?: string[];
@@ -42,13 +43,13 @@ export interface EbayOfferPreflight {
   offer: EbayOfferPayload;
 }
 
-export function toEbaySku(listingId: string): string {
-  return `pdos-${listingId}`;
+export function toEbaySku(listingId: string, itemId?: string | null): string {
+  return `pdos-${(itemId?.trim() || listingId).trim()}`;
 }
 
 export function buildEbayOfferPreflight(input: EbayOfferPreflightInput): EbayOfferPreflight {
   const pack = buildListingPack(input.packInput);
-  const sku = toEbaySku(input.listingId);
+  const sku = toEbaySku(input.listingId, input.itemId);
   const quantity = Math.max(1, input.quantity);
   const imageUrls = (input.imageUrls ?? []).map((url) => url.trim()).filter(Boolean).slice(0, 12);
   const inventoryItem = buildInventoryItemPayload(input.packInput, quantity, imageUrls);

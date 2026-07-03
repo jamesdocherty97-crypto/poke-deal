@@ -10,6 +10,7 @@ export type BackupTableName =
   | "cardPhotos"
   | "listings"
   | "sales"
+  | "ebayOrderImports"
   | "expenses"
   | "dealSessions"
   | "dealSessionLines"
@@ -79,6 +80,11 @@ const TABLES: readonly TableDefinition[] = [
   { name: "cardPhotos", delegate: "cardPhoto", dateFields: ["createdAt"] },
   { name: "listings", delegate: "listing", dateFields: ["listedAt", "endedAt", "createdAt", "updatedAt"] },
   { name: "sales", delegate: "sale", dateFields: ["soldAt", "createdAt"] },
+  {
+    name: "ebayOrderImports",
+    delegate: "ebayOrderImport",
+    dateFields: ["orderCreatedAt", "paidAt", "createdAt", "updatedAt"],
+  },
   { name: "expenses", delegate: "expense", dateFields: ["spentAt", "createdAt", "updatedAt"] },
   {
     name: "dealSessions",
@@ -106,6 +112,7 @@ const RESTORE_ORDER: readonly BackupTableName[] = [
   "cardPhotos",
   "listings",
   "sales",
+  "ebayOrderImports",
   "compResults",
   "priceSnapshots",
   "cronRuns",

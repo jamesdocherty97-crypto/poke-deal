@@ -53,7 +53,7 @@ type TodaySystemStatus = {
 
 type TodayAppAlert = {
   id: string;
-  kind: "PRICE_DROP" | "REPRICE" | "CRON_FAILURE";
+  kind: "PRICE_DROP" | "REPRICE" | "CRON_FAILURE" | "EBAY_SALE";
   title: string;
   message: string;
   pence: number | null;
@@ -442,6 +442,7 @@ function AutomationAlertRow({ alert }: { alert: TodayAppAlert }) {
 }
 
 function alertKindLabel(kind: TodayAppAlert["kind"]): string {
+  if (kind === "EBAY_SALE") return "eBay";
   if (kind === "PRICE_DROP") return "Target";
   if (kind === "REPRICE") return "Reprice";
   return "Cron";
@@ -449,6 +450,7 @@ function alertKindLabel(kind: TodayAppAlert["kind"]): string {
 
 function alertKindTone(kind: TodayAppAlert["kind"]): string {
   if (kind === "CRON_FAILURE") return "danger";
+  if (kind === "EBAY_SALE") return "good";
   if (kind === "PRICE_DROP") return "good";
   return "warn";
 }

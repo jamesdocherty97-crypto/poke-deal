@@ -22,6 +22,23 @@ type EbayStatus = {
   connected: boolean;
 };
 
+type EbaySalesSyncResult = {
+  skipped: boolean;
+  reason?: string;
+  fetchedOrders: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  skippedCount: number;
+  imports: Array<{
+    importKey: string;
+    title: string | null;
+    sku: string | null;
+    status: "MATCHED" | "UNMATCHED" | "SKIPPED";
+    reason: string | null;
+    buyerPaidPence: number | null;
+  }>;
+};
+
 export function ListingsTab({
   dashboard,
   firstDraftListingTarget,
@@ -40,6 +57,7 @@ export function ListingsTab({
   listings,
   busy,
   ebayStatus,
+  ebaySalesSync,
   ebayNeedsReconnect,
   ebayNeedsMerchantLocation,
   ebayLocationName,
@@ -58,6 +76,7 @@ export function ListingsTab({
   ebayLocationCreateAvailable,
   ebayLocationMissingFields,
   ebayLocationMissingRecommendedFields,
+  syncEbaySales,
   createEbaySellerLocation,
   onAddBuy,
   startListingDesk,
@@ -97,6 +116,7 @@ export function ListingsTab({
   listings: Listing[];
   busy: string | null;
   ebayStatus: EbayStatus | null;
+  ebaySalesSync: EbaySalesSyncResult | null;
   ebayNeedsReconnect: boolean;
   ebayNeedsMerchantLocation: boolean;
   ebayLocationName: string;
@@ -115,6 +135,7 @@ export function ListingsTab({
   ebayLocationCreateAvailable: boolean;
   ebayLocationMissingFields: string[];
   ebayLocationMissingRecommendedFields: string[];
+  syncEbaySales: () => void;
   createEbaySellerLocation: (event: FormEvent<HTMLFormElement>) => void;
   onAddBuy: () => void;
   startListingDesk: () => void;
@@ -242,6 +263,51 @@ export function ListingsTab({
               Record sale
             </button>
           </div>
+        </section>
+      )}
+      {ebayStatus?.configured && (
+        <section className="panel ebay-sales-sync-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>eBay sales</h2>
+              <span className="muted">
+                {ebaySalesSync
+                  ? ebaySalesSync.skipped
+                    ? ebaySalesSync.reason ?? "Sync skipped"
+                    : `${ebaySalesSync.matchedCount} matched · ${ebaySalesSync.unmatchedCount} unmatched`
+                  : "Pull paid orders into stock and P&L"}
+              </span>
+            </div>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={syncEbaySales}
+              disabled={busy === "ebay-sales-sync" || !ebayStatus.connected}
+            >
+              {busy === "ebay-sales-sync" ? "Syncing..." : "Sync eBay sales"}
+            </button>
+          </div>
+          {ebaySalesSync && !ebaySalesSync.skipped && (
+            <div className="ebay-sales-sync-summary">
+              <span>{ebaySalesSync.fetchedOrders} orders checked</span>
+              <span>{ebaySalesSync.matchedCount} sales booked</span>
+              <span>{ebaySalesSync.skippedCount} already imported</span>
+              {ebaySalesSync.unmatchedCount > 0 && <span className="warn">{ebaySalesSync.unmatchedCount} need matching</span>}
+            </div>
+          )}
+          {ebaySalesSync?.imports.some((row) => row.status === "UNMATCHED") && (
+            <div className="ebay-unmatched-list">
+              {ebaySalesSync.imports
+                .filter((row) => row.status === "UNMATCHED")
+                .slice(0, 3)
+                .map((row) => (
+                  <div key={row.importKey}>
+                    <strong>{row.title ?? row.sku ?? "Unmatched eBay order"}</strong>
+                    <small>{row.reason ?? "Needs manual stock match"}</small>
+                  </div>
+                ))}
+            </div>
+          )}
         </section>
       )}
       <div className="export-actions" aria-label="Listing exports">

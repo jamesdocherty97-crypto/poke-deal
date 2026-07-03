@@ -4,6 +4,7 @@ import { dailyRunKey, runCronJobOnce } from "@/lib/automation/cronRunLog";
 import { createInboxAlert } from "@/lib/alerts/inbox";
 import { runWatchCheck } from "@/lib/alerts/watchRunner";
 import { getPrisma } from "@/lib/db/prisma";
+import { syncOwnEbaySales } from "@/lib/ebay/orders";
 import { runPortfolioSnapshot } from "@/lib/snapshots/portfolioRunner";
 
 export const runtime = "nodejs";
@@ -47,11 +48,26 @@ export async function GET(request: Request) {
         skippedCount: result.skippedCount,
       }),
     });
+    const ebaySales = await runCronJobOnce(prisma, {
+      job: "daily-ebay-sales-sync",
+      runKey,
+      now,
+      execute: () => syncOwnEbaySales({ db: prisma as any, now, limit: dailyLimit }),
+      summarize: (result) => ({
+        skipped: result.skipped,
+        reason: result.reason,
+        fetchedOrders: result.fetchedOrders,
+        matchedCount: result.matchedCount,
+        unmatchedCount: result.unmatchedCount,
+        skippedCount: result.skippedCount,
+      }),
+    });
 
     await alertFailedCron(snapshot, "Daily portfolio snapshot");
     await alertFailedCron(watches, "Daily buy-watch check");
+    await alertFailedCron(ebaySales, "Daily eBay sales sync");
 
-    const failed = snapshot.status === "FAILED" || watches.status === "FAILED";
+    const failed = snapshot.status === "FAILED" || watches.status === "FAILED" || ebaySales.status === "FAILED";
 
     return NextResponse.json({
       ok: !failed,
@@ -63,6 +79,7 @@ export async function GET(request: Request) {
       },
       snapshot: serializeLoggedJob(snapshot),
       watches: serializeLoggedJob(watches),
+      ebaySales: serializeLoggedJob(ebaySales),
     }, { status: failed ? 500 : 200 });
   } catch (err) {
     await createInboxAlert(getPrisma(), {
