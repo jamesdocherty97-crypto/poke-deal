@@ -110,6 +110,18 @@ test("buildQuickIntakePreview shows typed condition over the current default", (
   );
 });
 
+test("buildQuickIntakePreview shows typed PSA certs as a first-class chip", () => {
+  const preview = buildQuickIntakePreview(
+    parseQuickIntake("Umbreon VMAX Evolving Skies PSA 10 cert 79721014 £900"),
+  );
+
+  assert.equal(preview.readyForComp, true);
+  assert.equal(
+    preview.chips.find((chip) => chip.key === "graderCert")?.value,
+    "79721014",
+  );
+});
+
 test("buildQuickIntakePreview flags missing data and weak matching context", () => {
   const preview = buildQuickIntakePreview(parseQuickIntake("PSA 10 £50"));
 

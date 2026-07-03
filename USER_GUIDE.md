@@ -263,6 +263,35 @@ Intended use:
 - RAW for ungraded cards.
 - Slab grades for graded cards.
 
+### PSA Cert Lookup
+
+For PSA slabs, the cert number can do most of the work.
+
+Use it when:
+
+- You are buying or stocking a PSA slab.
+- You want the app to pull the PSA subject, set hint, card number, certified grade and population.
+- You want the comp to run from the certified PSA grade instead of a manually selected grade.
+
+How it works:
+
+1. Enter the PSA cert in the PSA slab check field, or include it in Quick Fill, such as `Umbreon VMAX Evolving Skies PSA 10 cert 79721014 £900`.
+2. Tap Verify + comp.
+3. The app verifies the cert, fills the card details it can trust, then runs the usual GBP comp.
+4. The comp receipt shows a PSA verified chip when the result was driven by the cert.
+
+Mismatch guard:
+
+- If the typed card and PSA cert disagree, the app pauses.
+- Choose Use PSA details if the cert is right.
+- Choose Keep typed card if PSA is missing nuance but you still want to store the cert and certified grade.
+
+Notes:
+
+- PSA lookup only verifies identity, grade and population. Pricing still comes from the normal comp sources.
+- Without `PSA_API_TOKEN`, the app uses a demo fixture so the flow still works offline.
+- ACE/BGS/CGC certs can still be stored on stock rows, but they do not use the PSA API.
+
 ### Run Comp
 
 Tap the comp lookup button to get a GBP comp.
@@ -1151,11 +1180,12 @@ Purpose:
 
 - Verify slabs.
 - Add cert details.
-- Eventually support pop-aware grading decisions.
+- Feed PSA subject, number, grade and population into the Buy comp flow.
+- Prevent silent mismatches between typed card details and PSA cert data.
 
 Needed:
 
-- PSA API adapter and UI.
+- `PSA_API_TOKEN` in production for live lookups. Without it, the flow uses a demo cert fixture.
 
 ### eBay Sell API
 

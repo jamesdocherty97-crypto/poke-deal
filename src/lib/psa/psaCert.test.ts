@@ -6,6 +6,7 @@ import { PsaCertLookup, mapPsaCertResponse } from "./psaCert.js";
 import {
   buildPsaCompSearchParams,
   buildPsaLookupFields,
+  detectPsaLookupConflicts,
   inferPsaSetName,
   isPsaPokemonTcgCert,
 } from "./lookupFields.js";
@@ -39,6 +40,56 @@ test("mapPsaCertResponse parses a successful PSACert envelope", () => {
   assert.equal(r.live, true);
 });
 
+test("mapPsaCertResponse accepts casing variations from PSA envelopes", () => {
+  const r = mapPsaCertResponse(
+    {
+      isValidRequest: true,
+      psaCert: {
+        certNumber: "98765432",
+        subject: "PIKACHU",
+        brand: "POKEMON SCARLET & VIOLET PALDEA EVOLVED",
+        category: "TCG CARDS",
+        year: 2023,
+        cardNumber: "211",
+        variety: "SPECIAL ILLUSTRATION RARE",
+        gradeDescription: "MINT 9",
+        totalPopulation: "84",
+        populationHigher: "12",
+      },
+    },
+    "98765432",
+    true,
+  );
+
+  assert.equal(r.found, true);
+  assert.equal(r.certNumber, "98765432");
+  assert.equal(r.subject, "PIKACHU");
+  assert.equal(r.grade, "PSA_9");
+  assert.equal(r.totalPopulation, 84);
+  assert.equal(r.populationHigher, 12);
+});
+
+test("mapPsaCertResponse keeps authentic or half-grade PSA labels without forcing an app grade", () => {
+  const authentic = mapPsaCertResponse(
+    {
+      IsValidRequest: true,
+      PSACert: {
+        CertNumber: "11112222",
+        Subject: "CHARIZARD",
+        Brand: "POKEMON BASE SET",
+        Category: "TCG CARDS",
+        CardGrade: "AUTHENTIC",
+      },
+    },
+    "11112222",
+    true,
+  );
+
+  assert.equal(authentic.found, true);
+  assert.equal(authentic.gradeLabel, "AUTHENTIC");
+  assert.equal(authentic.grade, null);
+});
+
 test("buildPsaLookupFields turns a PSA cert into comp-ready lookup fields", () => {
   const r = mapPsaCertResponse(fixture, "79721014", true);
 
@@ -48,6 +99,32 @@ test("buildPsaLookupFields turns a PSA cert into comp-ready lookup fields", () =
     number: "215",
     grade: "PSA_10",
   });
+});
+
+test("detectPsaLookupConflicts allows compatible PSA details and flags real mismatches", () => {
+  const r = mapPsaCertResponse(fixture, "79721014", true);
+  const fields = buildPsaLookupFields(r);
+
+  assert.deepEqual(
+    detectPsaLookupConflicts(
+      { name: "Umbreon VMAX Alt Art", setName: "Evolving Skies", number: "215/203", grade: "PSA_10" },
+      fields,
+    ),
+    [],
+  );
+
+  assert.deepEqual(
+    detectPsaLookupConflicts(
+      { name: "Charizard ex", setName: "151", number: "199/165", grade: "RAW" },
+      fields,
+    ),
+    [
+      { field: "name", typed: "Charizard ex", psa: "Umbreon VMAX" },
+      { field: "setName", typed: "151", psa: "Evolving Skies" },
+      { field: "number", typed: "199/165", psa: "215" },
+      { field: "grade", typed: "RAW", psa: "PSA_10" },
+    ],
+  );
 });
 
 test("isPsaPokemonTcgCert only allows Pokemon TCG certs to drive comps", () => {

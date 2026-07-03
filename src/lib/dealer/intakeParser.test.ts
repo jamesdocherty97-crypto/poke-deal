@@ -158,6 +158,20 @@ test("parseQuickIntake accepts broader slab grades", () => {
   });
 });
 
+test("parseQuickIntake captures PSA cert shorthand for slab lookup", () => {
+  assert.deepEqual(parseQuickIntake("cert 84213567"), {
+    graderCert: "84213567",
+  });
+
+  assert.deepEqual(parseQuickIntake("Umbreon VMAX Evolving Skies PSA 10 cert no 79721014 £900"), {
+    name: "Umbreon VMAX",
+    setName: "Evolving Skies",
+    grade: "PSA_10",
+    cost: "900.00",
+    graderCert: "79721014",
+  });
+});
+
 test("parseQuickIntake parses full art, set aliases, and bridge words", () => {
   assert.deepEqual(parseQuickIntake("Blastoise XY Evolutions"), {
     name: "Blastoise",

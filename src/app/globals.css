@@ -3603,6 +3603,13 @@ label {
   background: rgba(214, 158, 46, 0.1);
 }
 
+.psa-mismatch-card {
+  border-color: rgba(255, 203, 5, 0.46);
+  background:
+    linear-gradient(135deg, rgba(255, 203, 5, 0.12), transparent 58%),
+    rgba(3, 8, 20, 0.42);
+}
+
 .psa-cert-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3662,6 +3669,40 @@ label {
   font-size: 12px;
 }
 
+.psa-mismatch-list {
+  display: grid;
+  gap: 7px;
+}
+
+.psa-mismatch-list div {
+  display: grid;
+  gap: 2px;
+  border: 1px solid rgba(255, 203, 5, 0.22);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.26);
+  padding: 8px;
+}
+
+.psa-mismatch-list span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.psa-mismatch-list strong {
+  overflow-wrap: anywhere;
+  color: var(--yellow);
+  font-size: 13px;
+}
+
+.psa-mismatch-list small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
 .psa-cert-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3683,6 +3724,13 @@ label {
   font-weight: 950;
 }
 
+.psa-mismatch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
 .comp-receipt {
   display: grid;
   gap: 8px;
@@ -3690,6 +3738,31 @@ label {
   border-radius: 8px;
   background: rgba(3, 8, 20, 0.34);
   padding: 10px;
+}
+
+.psa-receipt-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.32);
+  border-radius: 8px;
+  background: rgba(52, 211, 153, 0.1);
+  padding: 7px 9px;
+}
+
+.psa-receipt-chip span {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.psa-receipt-chip strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 12px;
+  text-align: right;
 }
 
 .lookup-progress-card {

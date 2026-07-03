@@ -96,7 +96,14 @@ import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } fr
 import { buildSalePreview } from "@/lib/dealer/unitSale";
 import { buildSalePrompt, type SalePrompt } from "@/lib/dealer/salePrompt";
 import { checkEbayReadiness } from "@/lib/ebay/readiness";
-import { buildPsaLookupFields, isPsaPokemonTcgCert } from "@/lib/psa/lookupFields";
+import {
+  buildPsaLookupFields,
+  detectPsaLookupConflicts,
+  isPsaPokemonTcgCert,
+  type PsaLookupConflict,
+  type PsaLookupFields,
+  type PsaTypedIdentity,
+} from "@/lib/psa/lookupFields";
 import {
   acceptedOfferItemSubtotalPence,
   buyerPaidPostagePence,
@@ -142,6 +149,12 @@ type PsaCertView = {
   isDualCert?: boolean;
   live: boolean;
   reason?: string;
+};
+type PsaPendingDecision = {
+  result: PsaCertView;
+  fields: PsaLookupFields;
+  conflicts: PsaLookupConflict[];
+  lookupAfter: boolean;
 };
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type AcquireListingState = "DRAFT" | "ACTIVE";
@@ -663,6 +676,7 @@ export default function Home() {
   const [condition, setCondition] = useState(DEFAULT_INTAKE_PREFERENCES.condition);
   const [graderCert, setGraderCert] = useState("");
   const [psaResult, setPsaResult] = useState<PsaCertView | null>(null);
+  const [psaPendingDecision, setPsaPendingDecision] = useState<PsaPendingDecision | null>(null);
   const [strategy, setStrategy] = useState<PricingStrategy>(DEFAULT_INTAKE_PREFERENCES.strategy as PricingStrategy);
   const [channel, setChannel] = useState<Channel>(DEFAULT_INTAKE_PREFERENCES.channel as Channel);
   const [listPriceOverride, setListPriceOverride] = useState("");
@@ -2045,6 +2059,7 @@ export default function Home() {
     setCardArtUrl(null);
     setGradeComp(null);
     setListPriceOverride("");
+    setPsaPendingDecision(null);
     clearCheckedComp();
   }
 
@@ -2143,6 +2158,7 @@ export default function Home() {
     clearCheckedComp();
     setGraderCert("");
     setPsaResult(null);
+    setPsaPendingDecision(null);
     window.requestAnimationFrame(() => quickIntakeRef.current?.focus());
   }
 
@@ -2156,6 +2172,7 @@ export default function Home() {
       setName: parsed.setName ?? setNameValue,
       number: parsed.number ?? (identityChanged ? "" : number),
       grade: parsed.grade ?? grade,
+      ...(parsed.graderCert ? { psaCert: parsed.graderCert } : {}),
     };
 
     if (parsed.name) {
@@ -2176,6 +2193,12 @@ export default function Home() {
     if (parsed.grade) {
       setGrade(parsed.grade);
       filled.push("grade");
+    }
+    if (parsed.graderCert) {
+      setGraderCert(parsed.graderCert);
+      setPsaResult(null);
+      setPsaPendingDecision(null);
+      filled.push("cert");
     }
     if (parsed.cost) {
       setCost(parsed.cost);
@@ -2222,6 +2245,19 @@ export default function Home() {
     clearCheckedComp();
     setError(null);
     if (options.lookupAfter) {
+      if (parsed.graderCert) {
+        setNotice(`Filled ${filled.join(", ")}. Verifying PSA cert...`);
+        void verifyPsaCertNumber(parsed.graderCert, {
+          lookupAfter: true,
+          typed: {
+            name: nextLookup.name,
+            setName: nextLookup.setName,
+            number: nextLookup.number,
+            grade: nextLookup.grade,
+          },
+        });
+        return;
+      }
       if (!nextLookup.name.trim()) {
         setError("Quick comp needs a card name.");
         return;
@@ -2336,6 +2372,10 @@ export default function Home() {
 
   async function verifyPsaCert(options: { lookupAfter?: boolean } = {}) {
     const cert = graderCert.trim();
+    await verifyPsaCertNumber(cert, options);
+  }
+
+  async function verifyPsaCertNumber(cert: string, options: { lookupAfter?: boolean; typed?: PsaTypedIdentity } = {}) {
     if (!cert) {
       setError("Enter a PSA cert number first.");
       return;
@@ -2359,46 +2399,100 @@ export default function Home() {
         setNotice("PSA cert verified, but it is not a Pokémon TCG card so it cannot feed comps here.");
         return;
       }
-      // Auto-fill the buy form from the verified slab so a comp can follow.
+      const lookupFields = buildPsaLookupFields(result);
+      const typedIdentity = options.typed ?? { name, setName: setNameValue, number, grade };
+      const conflicts = detectPsaLookupConflicts(
+        typedIdentity,
+        lookupFields,
+      );
+      const identityConflicts = conflicts.filter((conflict) => conflict.field !== "grade");
       clearCompEvidence();
       setGraderCert(result.certNumber);
-      const lookupFields = buildPsaLookupFields(result);
-      const nextName = lookupFields.name ?? name;
-      const nextSetName = lookupFields.setName ?? setNameValue;
-      const nextNumber = lookupFields.number ?? number;
-      const nextGrade = lookupFields.grade ?? grade;
-      if (lookupFields.name) setName(lookupFields.name);
-      if (lookupFields.setName) {
-        setSetNameValue(lookupFields.setName);
-        pinRecentSetName(lookupFields.setName);
-      }
-      if (lookupFields.number) setNumber(lookupFields.number);
-      if (lookupFields.grade) setGrade(lookupFields.grade);
-      if (options.lookupAfter) {
-        if (!nextName.trim()) {
-          setError("PSA verified, but it did not include a card name to comp.");
-          return;
-        }
-        setNotice(`Verified PSA ${result.gradeLabel ?? ""}. Looking up comp...`);
-        await lookupComp({
-          name: nextName,
-          setName: nextSetName,
-          number: nextNumber,
-          grade: nextGrade,
-          psaCert: result.certNumber,
+      if (identityConflicts.length > 0) {
+        setPsaPendingDecision({
+          result,
+          fields: lookupFields,
+          conflicts,
+          lookupAfter: Boolean(options.lookupAfter),
         });
+        setNotice("PSA cert verified. Choose whether to use PSA details or keep your typed card.");
         return;
       }
-      setNotice(
-        `Verified PSA ${result.gradeLabel ?? ""} ${toTitleCase(result.subject ?? "card")}${
-          result.live ? "" : " (demo cert — add PSA_API_TOKEN for live)"
-        }. Card filled — run a comp.`,
-      );
+      await applyPsaCertToBuyForm(result, lookupFields, { lookupAfter: Boolean(options.lookupAfter) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "PSA lookup failed");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function applyPsaCertToBuyForm(
+    result: PsaCertView,
+    fields = buildPsaLookupFields(result),
+    options: { lookupAfter?: boolean } = {},
+  ) {
+    if (!result.found || !isPsaPokemonTcgCert(result)) return;
+    clearCompEvidence();
+    setPsaResult(result);
+    setPsaPendingDecision(null);
+    setGraderCert(result.certNumber);
+    const nextName = fields.name ?? name;
+    const nextSetName = fields.setName ?? setNameValue;
+    const nextNumber = fields.number ?? number;
+    const nextGrade = fields.grade ?? grade;
+    if (fields.name) setName(fields.name);
+    if (fields.setName) {
+      setSetNameValue(fields.setName);
+      pinRecentSetName(fields.setName);
+    }
+    if (fields.number) setNumber(fields.number);
+    if (fields.grade) setGrade(fields.grade);
+    if (options.lookupAfter) {
+      if (!nextName.trim()) {
+        setError("PSA verified, but it did not include a card name to comp.");
+        return;
+      }
+      setNotice(`Verified PSA ${result.gradeLabel ?? ""}. Looking up comp...`);
+      await lookupComp({
+        name: nextName,
+        setName: nextSetName,
+        number: nextNumber,
+        grade: nextGrade,
+        psaCert: result.certNumber,
+      });
+      return;
+    }
+    setNotice(
+      `Verified PSA ${result.gradeLabel ?? ""} ${toTitleCase(result.subject ?? "card")}${
+        result.live ? "" : " (demo cert — add PSA_API_TOKEN for live)"
+      }. Card filled — run a comp.`,
+    );
+  }
+
+  function keepTypedCardForPsaCert() {
+    if (!psaPendingDecision) return;
+    const { result, lookupAfter } = psaPendingDecision;
+    clearCompEvidence();
+    setPsaResult(result);
+    setPsaPendingDecision(null);
+    setGraderCert(result.certNumber);
+    const nextGrade = result.grade ?? grade;
+    if (result.grade) setGrade(result.grade);
+    if (lookupAfter) {
+      if (!name.trim()) {
+        setError("Keep typed card needs a card name before comping.");
+        return;
+      }
+      void lookupComp({
+        name,
+        setName: setNameValue,
+        number,
+        grade: nextGrade,
+        psaCert: result.certNumber,
+      });
+      return;
+    }
+    setNotice("Kept your typed card and saved the PSA cert.");
   }
 
   function lookupCompFromPsaResult(result: PsaCertView) {
@@ -3312,6 +3406,7 @@ export default function Home() {
     }
     setGraderCert(item.graderCert ?? "");
     setPsaResult(null);
+    setPsaPendingDecision(null);
     setQuickIntake("");
     setCardArtUrl(item.card.imageUrl);
     setListPriceOverride(options.repeatBuy && repeatListPrice ? penceToPounds(repeatListPrice) : "");
@@ -5432,7 +5527,19 @@ export default function Home() {
                 </div>
               </label>
             </div>
-            {psaResult && !comp?.psaCert && (
+            {psaPendingDecision && (
+              <PsaCertMismatchCard
+                decision={psaPendingDecision}
+                busy={busy === "lookup"}
+                onUsePsa={() =>
+                  void applyPsaCertToBuyForm(psaPendingDecision.result, psaPendingDecision.fields, {
+                    lookupAfter: psaPendingDecision.lookupAfter,
+                  })
+                }
+                onKeepTyped={keepTypedCardForPsaCert}
+              />
+            )}
+            {!psaPendingDecision && psaResult && !comp?.psaCert && (
               <PsaCertCard
                 result={psaResult}
                 onComp={psaResult.found && isPsaPokemonTcgCert(psaResult) ? () => lookupCompFromPsaResult(psaResult) : undefined}
@@ -5894,6 +6001,15 @@ export default function Home() {
                     <span>Comp receipt</span>
                     <strong>{compSpreadPct == null ? "single signal" : `${compSpreadPct}% spread`}</strong>
                   </div>
+                  {comp?.psaCert?.found && (
+                    <div className="psa-receipt-chip">
+                      <span>PSA verified</span>
+                      <strong>
+                        Cert {comp.psaCert.certNumber}
+                        {comp.psaCert.gradeLabel ? ` · ${comp.psaCert.gradeLabel}` : ""}
+                      </strong>
+                    </div>
+                  )}
                   <div className="receipt-list">
                     {compReceipt.map((row) => (
                       <div className={`receipt-row ${row.tone}`} key={row.key}>
@@ -7241,6 +7357,65 @@ export default function Home() {
       </nav>
     </main>
   );
+}
+
+function PsaCertMismatchCard({
+  decision,
+  busy,
+  onUsePsa,
+  onKeepTyped,
+}: {
+  decision: PsaPendingDecision;
+  busy: boolean;
+  onUsePsa: () => void;
+  onKeepTyped: () => void;
+}) {
+  const { result, fields, conflicts, lookupAfter } = decision;
+  return (
+    <div className="psa-cert-card warn psa-mismatch-card" aria-label="PSA cert mismatch decision">
+      <div className="psa-cert-heading">
+        <div>
+          <span>PSA cert {result.certNumber} verified</span>
+          <strong>{toTitleCase(result.subject ?? "PSA card")}</strong>
+          <small>
+            {[fields.setName, fields.number ? `#${fields.number}` : null, fields.grade?.replace(/_/g, " ")]
+              .filter(Boolean)
+              .join(" · ")}
+          </small>
+        </div>
+        <span className="pill warn">Check match</span>
+      </div>
+      <div className="psa-mismatch-list">
+        {conflicts.map((conflict) => (
+          <div key={conflict.field}>
+            <span>{psaConflictLabel(conflict.field)}</span>
+            <strong>{conflict.psa}</strong>
+            <small>Your entry: {conflict.typed}</small>
+          </div>
+        ))}
+      </div>
+      <div className="psa-cert-actions">
+        <p className="hint">
+          The cert and typed card do not fully agree. Choose before the app fills fields or runs the certified-grade comp.
+        </p>
+        <div className="psa-mismatch-actions">
+          <button type="button" onClick={onUsePsa} disabled={busy}>
+            {busy && lookupAfter ? "Comping..." : "Use PSA details"}
+          </button>
+          <button type="button" onClick={onKeepTyped} disabled={busy}>
+            Keep typed card
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function psaConflictLabel(field: PsaLookupConflict["field"]): string {
+  if (field === "setName") return "Set";
+  if (field === "number") return "Number";
+  if (field === "grade") return "Grade";
+  return "Card";
 }
 
 function ListingPackSheet({

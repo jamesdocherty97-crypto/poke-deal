@@ -10,6 +10,19 @@ export interface PsaLookupFields {
   grade?: Grade | null;
 }
 
+export interface PsaTypedIdentity {
+  name?: string;
+  setName?: string;
+  number?: string;
+  grade?: Grade | string | null;
+}
+
+export interface PsaLookupConflict {
+  field: keyof PsaLookupFields;
+  typed: string;
+  psa: string;
+}
+
 export function buildPsaLookupFields(result: PsaCertResult): PsaLookupFields {
   if (!result.found) return {};
   return {
@@ -18,6 +31,18 @@ export function buildPsaLookupFields(result: PsaCertResult): PsaLookupFields {
     ...(result.cardNumber ? { number: result.cardNumber.trim() } : {}),
     grade: result.grade,
   };
+}
+
+export function detectPsaLookupConflicts(
+  typed: PsaTypedIdentity,
+  psaFields: PsaLookupFields,
+): PsaLookupConflict[] {
+  const conflicts: PsaLookupConflict[] = [];
+  addConflict(conflicts, "name", typed.name, psaFields.name, compatibleName);
+  addConflict(conflicts, "setName", typed.setName, psaFields.setName, compatibleText);
+  addConflict(conflicts, "number", typed.number, psaFields.number, compatibleCollectorNumber);
+  addConflict(conflicts, "grade", typed.grade ?? undefined, psaFields.grade ?? undefined, compatibleGrade);
+  return conflicts;
 }
 
 export function isPsaPokemonTcgCert(result: PsaCertResult): boolean {
@@ -73,6 +98,53 @@ export function inferPsaSetName(brand: string | undefined): string | undefined {
   }
 
   return best?.name;
+}
+
+function addConflict(
+  conflicts: PsaLookupConflict[],
+  field: keyof PsaLookupFields,
+  typedValue: string | undefined | null,
+  psaValue: string | undefined | null,
+  compatible: (typed: string, psa: string) => boolean,
+): void {
+  const typed = typedValue?.trim();
+  const psa = psaValue?.trim();
+  if (!typed || !psa || compatible(typed, psa)) return;
+  conflicts.push({ field, typed, psa });
+}
+
+function compatibleText(typed: string, psa: string): boolean {
+  return normalizeSearchText(typed) === normalizeSearchText(psa);
+}
+
+function compatibleGrade(typed: string, psa: string): boolean {
+  return typed.trim().toUpperCase() === psa.trim().toUpperCase();
+}
+
+function compatibleName(typed: string, psa: string): boolean {
+  const normalizedTyped = normalizeSearchText(typed);
+  const normalizedPsa = normalizeSearchText(psa);
+  return (
+    normalizedTyped === normalizedPsa ||
+    normalizedTyped.startsWith(`${normalizedPsa} `) ||
+    normalizedPsa.startsWith(`${normalizedTyped} `)
+  );
+}
+
+function compatibleCollectorNumber(typed: string, psa: string): boolean {
+  const typedNumbers = collectorNumberCandidates(typed);
+  const psaNumbers = collectorNumberCandidates(psa);
+  return typedNumbers.some((value) => psaNumbers.includes(value));
+}
+
+function collectorNumberCandidates(value: string): string[] {
+  const normalized = value
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/^0+(?=\d)/, "");
+  const front = normalized.split("/")[0]?.replace(/^0+(?=\d)/, "");
+  return Array.from(new Set([normalized, front].filter((candidate): candidate is string => Boolean(candidate))));
 }
 
 function promoSetName(normalizedBrand: string): string | undefined {
