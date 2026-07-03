@@ -9,27 +9,30 @@ import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
 const BASE_URL = "https://api.poketrace.com/v1";
 const DEFAULT_FETCH_TIMEOUT_MS = 2200;
 const DEFAULT_COOLDOWN_MS = 10 * 60 * 1000;
-// Free tier allows only 1 request / 2s. The EU-first then US fallback fires two
-// requests, so without spacing the second call is rate-limited (429) and PokeTrace
-// silently returns nothing. We pause before the fallback market to clear the burst
-// window. Pro tier usually returns on the first (EU) call, so this delay rarely fires.
+const MARKET_DENY_TTL_MS = 6 * 60 * 60 * 1000;
+// Free tier allows only 1 request / 2s. Multi-market fallback can fire two
+// requests, so without spacing the second call is rate-limited (429) and
+// PokeTrace silently returns nothing. We pause before fallback markets to clear
+// the burst window. Free-tier accounts should usually run US only.
 const DEFAULT_INTER_MARKET_DELAY_MS = 2100;
-const MARKET_FALLBACKS: PokeTraceMarket[] = ["EU", "US"];
 let sharedPokeTraceRequestAt = 0;
 let sharedPokeTraceQueue = Promise.resolve();
 let sharedPokeTraceCooldownUntil = 0;
 let sharedPokeTraceCooldownReason: "rate-limit" | "forbidden" | null = null;
 let sharedPokeTraceHadForbiddenCooldown = false;
 let sharedPokeTracePersistentKeyProblem = false;
+let sharedPokeTraceMarketDeniedUntil: Partial<Record<PokeTraceMarket, number>> = {};
 let sharedPokeTraceStats = emptyPokeTraceStats();
 
 type PokeTraceMarket = "US" | "EU";
+type PokeTraceFetchResult = Response | "rate-limit-cooldown" | "market-forbidden";
 
 export type PokeTraceHealth = {
   inCooldown: boolean;
   cooldownUntil: string | null;
   cooldownReason: "rate-limit" | "forbidden" | null;
   persistentKeyProblem: boolean;
+  deniedMarkets: Array<{ market: PokeTraceMarket; until: string }>;
   stats: PokeTraceStats;
 };
 
@@ -107,6 +110,7 @@ export class PokeTraceSource implements CompSource {
     private readonly useSharedThrottle = fetchImpl === fetch,
     private readonly cooldownMs = DEFAULT_COOLDOWN_MS,
     private readonly sleepImpl: (ms: number) => Promise<void> = sleep,
+    private readonly markets: PokeTraceMarket[] = readPokeTraceMarkets(),
   ) {
     this.live = Boolean(apiKey && apiKey.trim().length > 0);
   }
@@ -120,13 +124,25 @@ export class PokeTraceSource implements CompSource {
     if (cooldown) return emptyComp(ctx, `PokeTrace source unavailable: ${cooldown}`);
 
     let lastEmpty: CompResult | null = null;
-    for (let i = 0; i < MARKET_FALLBACKS.length; i += 1) {
-      const market = MARKET_FALLBACKS[i]!;
+    let deniedMarkets = 0;
+    const markets = this.markets;
+    for (let i = 0; i < markets.length; i += 1) {
+      const market = markets[i]!;
+      if (readPokeTraceMarketDeny(market)) {
+        deniedMarkets += 1;
+        lastEmpty = emptyComp(ctx, `PokeTrace ${market} market not permitted`);
+        continue;
+      }
       // Respect the free-tier 1-req/2s burst limit before the fallback market call.
       if (i > 0 && this.interMarketDelayMs > 0) await this.sleepImpl(this.interMarketDelayMs);
       const midRunCooldown = readPokeTraceCooldown();
       if (midRunCooldown) return emptyComp(ctx, `PokeTrace source unavailable: ${midRunCooldown}`);
       const payload = await this.fetchCards(card, market);
+      if (payload === "market-forbidden") {
+        deniedMarkets += 1;
+        lastEmpty = emptyComp(ctx, `PokeTrace ${market} market not permitted`);
+        continue;
+      }
       const rates = await getRates();
       const comp = payload == null
         ? emptyComp(ctx, `PokeTrace ${market} lookup failed or returned no response`)
@@ -135,10 +151,14 @@ export class PokeTraceSource implements CompSource {
       lastEmpty = comp;
     }
 
+    if (markets.length > 0 && deniedMarkets >= markets.length) {
+      enterPokeTraceCooldown("forbidden", this.cooldownMs);
+      return emptyComp(ctx, "PokeTrace source unavailable: key problem");
+    }
     return lastEmpty ?? emptyComp(ctx, "PokeTrace lookup failed or returned no response");
   }
 
-  private async fetchCards(card: CardRef, market: PokeTraceMarket): Promise<unknown | null> {
+  private async fetchCards(card: CardRef, market: PokeTraceMarket): Promise<unknown | "market-forbidden" | null> {
     for (const search of buildPokeTraceSearchVariants(card)) {
       const params = new URLSearchParams({
         search,
@@ -151,13 +171,14 @@ export class PokeTraceSource implements CompSource {
         if (this.useSharedThrottle) await waitForSharedPokeTraceSlot(this.interMarketDelayMs);
         const cooldown = readPokeTraceCooldown();
         if (cooldown) return null;
-        const res = await this.fetchWithRetry(`${BASE_URL}/cards?${params.toString()}`);
-        if (res === "cooldown") return null;
+        const res = await this.fetchWithRetry(`${BASE_URL}/cards?${params.toString()}`, market);
+        if (res === "market-forbidden") return "market-forbidden";
+        if (res === "rate-limit-cooldown") return null;
         if (!res.ok) {
           console.warn(`[${this.name}] HTTP ${res.status} - no comp returned`);
           continue;
         }
-        const json = (await res.json()) as unknown;
+        const json = markPokeTracePayloadMarket((await res.json()) as unknown, market);
         if (findMatchingPokeTraceCard(json, card)) return json;
       } catch (err) {
         console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
@@ -167,7 +188,7 @@ export class PokeTraceSource implements CompSource {
     return null;
   }
 
-  private async fetchWithRetry(url: string): Promise<Response | "cooldown"> {
+  private async fetchWithRetry(url: string, market: PokeTraceMarket): Promise<PokeTraceFetchResult> {
     let rateLimitCount = 0;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       sharedPokeTraceStats.calls += 1;
@@ -177,9 +198,9 @@ export class PokeTraceSource implements CompSource {
       });
       if (res.status === 403) {
         sharedPokeTraceStats.forbidden += 1;
-        enterPokeTraceCooldown("forbidden", this.cooldownMs);
-        console.warn(`[${this.name}] HTTP 403 - cooling source down`);
-        return "cooldown";
+        enterPokeTraceMarketDeny(market);
+        console.warn(`[${this.name}] HTTP 403 - ${market} market not permitted`);
+        return "market-forbidden";
       }
       if (res.status !== 429) return res;
 
@@ -188,11 +209,11 @@ export class PokeTraceSource implements CompSource {
       if (rateLimitCount >= 2) {
         enterPokeTraceCooldown("rate-limit", this.cooldownMs);
         console.warn(`[${this.name}] HTTP 429 - cooling source down`);
-        return "cooldown";
+        return "rate-limit-cooldown";
       }
       await this.sleepImpl(retryDelayMs(res, rateLimitCount));
     }
-    return "cooldown";
+    return "rate-limit-cooldown";
   }
 }
 
@@ -206,6 +227,7 @@ export function resetPokeTraceSourceHealthForTests(): void {
   sharedPokeTraceCooldownReason = null;
   sharedPokeTraceHadForbiddenCooldown = false;
   sharedPokeTracePersistentKeyProblem = false;
+  sharedPokeTraceMarketDeniedUntil = {};
   sharedPokeTraceStats = emptyPokeTraceStats();
 }
 
@@ -220,8 +242,19 @@ export function getPokeTraceHealth(now = Date.now()): PokeTraceHealth {
     cooldownUntil: inCooldown ? new Date(sharedPokeTraceCooldownUntil).toISOString() : null,
     cooldownReason: inCooldown ? sharedPokeTraceCooldownReason : null,
     persistentKeyProblem: sharedPokeTracePersistentKeyProblem,
+    deniedMarkets: Object.entries(sharedPokeTraceMarketDeniedUntil)
+      .filter((entry): entry is [PokeTraceMarket, number] => isPokeTraceMarket(entry[0]) && entry[1] > now)
+      .map(([market, until]) => ({ market, until: new Date(until).toISOString() })),
     stats: { ...sharedPokeTraceStats },
   };
+}
+
+export function readPokeTraceMarkets(raw = process.env.POKETRACE_MARKETS): PokeTraceMarket[] {
+  const markets = (raw?.trim() ? raw : "US,EU")
+    .split(",")
+    .map((part) => part.trim().toUpperCase())
+    .filter(isPokeTraceMarket);
+  return [...new Set(markets)].length > 0 ? [...new Set(markets)] : ["US", "EU"];
 }
 
 export function gradeToPokeTraceTier(grade: Grade): string {
@@ -641,6 +674,15 @@ function readPokeTraceCooldown(now = Date.now()): string | null {
   return sharedPokeTraceCooldownReason === "forbidden" ? "key problem" : "rate limited";
 }
 
+function readPokeTraceMarketDeny(market: PokeTraceMarket, now = Date.now()): string | null {
+  const until = sharedPokeTraceMarketDeniedUntil[market] ?? 0;
+  return until > now ? "market not permitted" : null;
+}
+
+function enterPokeTraceMarketDeny(market: PokeTraceMarket, now = Date.now()): void {
+  sharedPokeTraceMarketDeniedUntil[market] = now + MARKET_DENY_TTL_MS;
+}
+
 function enterPokeTraceCooldown(reason: "rate-limit" | "forbidden", cooldownMs: number): void {
   const now = Date.now();
   if (
@@ -659,4 +701,20 @@ function enterPokeTraceCooldown(reason: "rate-limit" | "forbidden", cooldownMs: 
 
 function emptyPokeTraceStats(): PokeTraceStats {
   return { calls: 0, rateLimited: 0, forbidden: 0, cooldowns: 0 };
+}
+
+function isPokeTraceMarket(value: unknown): value is PokeTraceMarket {
+  return value === "US" || value === "EU";
+}
+
+function markPokeTracePayloadMarket(payload: unknown, market: PokeTraceMarket): unknown {
+  const root = payload as PokeTracePayload | null;
+  const data = root?.data;
+  if (Array.isArray(data)) {
+    return { ...(root as Record<string, unknown>), data: data.map((card) => ({ ...card, market })) };
+  }
+  if (data && typeof data === "object") {
+    return { ...(root as Record<string, unknown>), data: { ...(data as Record<string, unknown>), market } };
+  }
+  return payload;
 }

@@ -82,7 +82,7 @@ export async function GET() {
         : pokeTrace.live && pokeTraceHealth.inCooldown
           ? `PokeTrace is cooling down after ${pokeTraceHealth.cooldownReason === "rate-limit" ? "rate limits" : "authorization errors"} until ${pokeTraceHealth.cooldownUntil}.`
           : pokeTrace.live
-            ? "PokeTrace is configured for RAW cross-checks. Graded coverage depends on account tier and source data."
+            ? `PokeTrace is configured for RAW cross-checks.${pokeTraceHealth.deniedMarkets.length > 0 ? ` Skipping plan-gated markets: ${pokeTraceHealth.deniedMarkets.map((item) => item.market).join(", ")}.` : ""} Graded coverage depends on account tier and source data.`
             : "Add POKETRACE_API_KEY in Vercel for EU/Cardmarket and US cross-checks.",
     },
     {

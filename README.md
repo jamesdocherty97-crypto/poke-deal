@@ -69,7 +69,7 @@ The frame runs without any of these (fixture mode). Add them to `.env` (copy fro
 | **Pokemon Price Tracker** | Primary comps (raw + graded), GBP-capable | Free tier → $9.99/mo | https://www.pokemonpricetracker.com/pricing |
 | **Pokémon TCG API** | Catalog, images, baseline price | Free | https://dev.pokemontcg.io |
 | **PSA Public API** | Cert lookup / slab verification | Free | https://www.psacard.com/publicapi |
-| **PokeTrace** | Secondary comps / EU-first raw cross-check | Free tier → Pro | https://poketrace.com/developers |
+| **PokeTrace** | Secondary comps / US or EU raw cross-check | Free tier → Pro | https://poketrace.com/developers |
 | **eBay Developer** | Push your *own* listings via Sell API; restricted MI adds UK sold comps | Free, MI approval-gated | https://developer.ebay.com |
 | **Discord webhook** | Price/repricing alerts | Free | Server Settings → Integrations → Webhooks |
 | **FX provider** | Daily USD/EUR/JPY → GBP conversion cache | Free tier | exchangeratesapi/freecurrencyapi-style daily rates |
@@ -77,7 +77,7 @@ The frame runs without any of these (fixture mode). Add them to `.env` (copy fro
 
 **Pokemon Price Tracker live path:** set `POKEMON_PRICE_TRACKER_API_KEY` to use the live v2 adapter. The response shape is pinned in `src/lib/comps/sources/__fixtures__/ppt-cards-ebay.json`; the adapter requests `limit=1` to keep credit usage low and maps provider aggregates into GBP `CompResult`s without caching stale prices as truth.
 
-**PokeTrace cross-check path:** set `POKETRACE_API_KEY` in Vercel before relying on bigger raw-card buys. The adapter asks PokeTrace for EU market data first, then falls back to US, and maps Cardmarket/TCGPlayer/eBay tiers into GBP `CompResult`s so noisy RAW buckets can be challenged by a second source.
+**PokeTrace cross-check path:** set `POKETRACE_API_KEY` in Vercel before relying on bigger raw-card buys. The adapter defaults to `POKETRACE_MARKETS=US,EU`, but the current free-tier production account should use `POKETRACE_MARKETS=US` because EU/Cardmarket access can be plan-gated. Pro accounts can switch to `EU,US` for Cardmarket-first cross-checks. The source maps Cardmarket/TCGPlayer/eBay tiers into GBP `CompResult`s so noisy RAW buckets can be challenged by a second source.
 
 **eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and refresh token (`EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` still works as the legacy flag). Until then the source stays out of comp aggregation and the manual UK sold link remains the reliable fallback.
 

@@ -107,7 +107,7 @@ Sources shown today:
 
 - Price Tracker: primary eBay sold-comp source.
 - Pokemon TCG API: catalog, card art and raw market baseline.
-- PokeTrace: EU-first second comp source once enabled.
+- PokeTrace: second comp source. Free tier should use US only; Pro can use EU first.
 - eBay Marketplace Insights: future direct UK sold comps once eBay approval is granted.
 - PSA cert lookup: slab verification and grade/name/set helper.
 - Owned sales: your own sale history after you start selling.
@@ -125,6 +125,7 @@ How to use it:
 Current outstanding setup actions:
 
 - You need to provide a real `POKETRACE_API_KEY`.
+- Set `POKETRACE_MARKETS=US` for the current free-tier account.
 - eBay needs to approve restricted Marketplace Insights access before live UK sold comps can be switched on.
 - After eBay approval, an agent needs to set `EBAY_INSIGHTS_ENABLED=true` in production and redeploy.
 - Check the Neon project restore window. Until that is confirmed, treat cloud recovery as manual backups only.
@@ -1151,6 +1152,7 @@ Low priority:
 High priority:
 
 - Add `POKETRACE_API_KEY` to Vercel production.
+- Add `POKETRACE_MARKETS=US` for free-tier production. Use `EU,US` only after upgrading/confirming EU access.
 - After eBay approval, set `EBAY_INSIGHTS_ENABLED=true` in Vercel production.
 - Redeploy and smoke-test:
   - Setup should show PokeTrace ready.

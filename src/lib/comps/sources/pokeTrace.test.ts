@@ -8,6 +8,7 @@ import {
   gradeToPokeTraceTier,
   mapPokeTraceCardsToComp,
   PokeTraceSource,
+  readPokeTraceMarkets,
   resetPokeTraceSourceHealthForTests,
   resetPokeTraceSharedThrottleForTests,
 } from "./pokeTrace.js";
@@ -319,7 +320,22 @@ test("PokeTrace allows explicitly labelled first-edition provider matches", () =
   assert.equal(comp.medianPence, eurToPence(500));
 });
 
-test("PokeTraceSource tries EU first, then falls back to US", async () => {
+test("PokeTraceSource defaults to US first", async () => {
+  const requestedMarkets: string[] = [];
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const market = new URL(String(url)).searchParams.get("market") ?? "";
+    requestedMarkets.push(market);
+    return Response.json(fixture);
+  }) as typeof fetch;
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0);
+  const comp = await source.lookup(card, { grade: "RAW" });
+
+  assert.deepEqual(requestedMarkets, ["US"]);
+  assert.equal(comp.sampleSize, 73);
+  assert.equal((comp.raw as { market?: string }).market, "US");
+});
+
+test("PokeTraceSource respects configured market order", async () => {
   const requestedMarkets: string[] = [];
   const fetchImpl = (async (url: string | URL | Request) => {
     const market = new URL(String(url)).searchParams.get("market") ?? "";
@@ -327,7 +343,7 @@ test("PokeTraceSource tries EU first, then falls back to US", async () => {
     if (market === "EU") return Response.json({ data: [] });
     return Response.json(fixture);
   }) as typeof fetch;
-  const source = new PokeTraceSource("secret", fetchImpl, 5, 0);
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 1000, async () => undefined, ["EU", "US"]);
   const comp = await source.lookup(card, { grade: "RAW" });
 
   assert.deepEqual(requestedMarkets, ["EU", "US"]);
@@ -358,7 +374,7 @@ test("PokeTraceSource stops after a usable EU market comp", async () => {
       ],
     });
   }) as typeof fetch;
-  const source = new PokeTraceSource("secret", fetchImpl, 5);
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 1000, async () => undefined, ["EU", "US"]);
   const comp = await source.lookup({ name: "Gengar", setName: "Lost Origin", number: "TG06/TG30" }, { grade: "RAW" });
 
   assert.deepEqual(requestedMarkets, ["EU"]);
@@ -419,33 +435,75 @@ test("PokeTraceSource cools down on a second 429", async () => {
   resetPokeTraceSourceHealthForTests();
 });
 
-test("PokeTraceSource cools down after forbidden responses and short-circuits later calls", async () => {
+test("PokeTraceSource falls through from a forbidden EU market to a usable US market", async () => {
   resetPokeTraceSourceHealthForTests();
-  let calls = 0;
-  const fetchImpl = (async () => {
-    calls += 1;
+  const requestedMarkets: string[] = [];
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const market = new URL(String(url)).searchParams.get("market") ?? "";
+    requestedMarkets.push(market);
+    if (market === "EU") return new Response("forbidden", { status: 403 });
+    return Response.json(fixture);
+  }) as typeof fetch;
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 10_000, async () => undefined, ["EU", "US"]);
+  const comp = await source.lookup(card, { grade: "RAW" });
+  const health = getPokeTraceHealth();
+
+  assert.deepEqual(requestedMarkets, ["EU", "US"]);
+  assert.equal(comp.sampleSize, 73);
+  assert.equal((comp.raw as { market?: string }).market, "US");
+  assert.equal(health.inCooldown, false);
+  assert.equal(health.stats.forbidden, 1);
+  assert.equal(health.stats.cooldowns, 0);
+  assert.equal(health.deniedMarkets[0]?.market, "EU");
+  resetPokeTraceSourceHealthForTests();
+});
+
+test("PokeTraceSource skips a denied market on subsequent calls", async () => {
+  resetPokeTraceSourceHealthForTests();
+  const requestedMarkets: string[] = [];
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const market = new URL(String(url)).searchParams.get("market") ?? "";
+    requestedMarkets.push(market);
+    if (market === "EU") return new Response("forbidden", { status: 403 });
+    return Response.json(fixture);
+  }) as typeof fetch;
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 10_000, async () => undefined, ["EU", "US"]);
+
+  await source.lookup(card, { grade: "RAW" });
+  await source.lookup(card, { grade: "RAW" });
+
+  assert.deepEqual(requestedMarkets, ["EU", "US", "US"]);
+  assert.equal(getPokeTraceHealth().inCooldown, false);
+  resetPokeTraceSourceHealthForTests();
+});
+
+test("PokeTraceSource cools down only when all configured markets are forbidden", async () => {
+  resetPokeTraceSourceHealthForTests();
+  const requestedMarkets: string[] = [];
+  const fetchImpl = (async (url: string | URL | Request) => {
+    requestedMarkets.push(new URL(String(url)).searchParams.get("market") ?? "");
     return new Response("forbidden", { status: 403 });
   }) as typeof fetch;
-  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 10_000);
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 10_000, async () => undefined, ["US", "EU"]);
   const first = await source.lookup(card, { grade: "RAW" });
   const second = await source.lookup(card, { grade: "RAW" });
   const health = getPokeTraceHealth();
 
-  assert.equal(calls, 1);
+  assert.deepEqual(requestedMarkets, ["US", "EU"]);
   assert.equal(first.sampleSize, 0);
   assert.equal(second.sampleSize, 0);
   assert.match((second.raw as { reason?: string }).reason ?? "", /source unavailable/);
   assert.equal(health.inCooldown, true);
   assert.equal(health.cooldownReason, "forbidden");
-  assert.equal(health.stats.forbidden, 1);
+  assert.equal(health.stats.forbidden, 2);
   assert.equal(health.stats.cooldowns, 1);
   resetPokeTraceSourceHealthForTests();
 });
 
-test("PokeTraceSource marks a repeated forbidden cooldown as a key problem", async () => {
+test("PokeTraceSource marks repeated all-market forbidden cooldowns as a key problem", async () => {
   resetPokeTraceSourceHealthForTests();
   const fetchImpl = (async () => new Response("forbidden", { status: 403 })) as typeof fetch;
-  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 1);
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 1, async () => undefined, ["US"]);
 
   await source.lookup(card, { grade: "RAW" });
   await new Promise((resolve) => setTimeout(resolve, 5));
@@ -453,6 +511,13 @@ test("PokeTraceSource marks a repeated forbidden cooldown as a key problem", asy
 
   assert.equal(getPokeTraceHealth().persistentKeyProblem, true);
   resetPokeTraceSourceHealthForTests();
+});
+
+test("readPokeTraceMarkets parses env order and ignores invalid values", () => {
+  assert.deepEqual(readPokeTraceMarkets(undefined), ["US", "EU"]);
+  assert.deepEqual(readPokeTraceMarkets("EU,US"), ["EU", "US"]);
+  assert.deepEqual(readPokeTraceMarkets(" eu, nonsense, us, EU "), ["EU", "US"]);
+  assert.deepEqual(readPokeTraceMarkets("nonsense"), ["US", "EU"]);
 });
 
 test("free tier: spaces the fallback US request to clear the 1-req/2s burst window", async () => {
@@ -464,7 +529,9 @@ test("free tier: spaces the fallback US request to clear the 1-req/2s burst wind
     return Response.json(freeTierFixture);
   }) as typeof fetch;
   // 40ms spacing keeps the test fast while still proving the gap is applied.
-  const source = new PokeTraceSource("secret", fetchImpl, 5, 40);
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 40, false, 1000, async (ms) => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }, ["EU", "US"]);
   const comp = await source.lookup(
     { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" },
     { grade: "RAW" },
@@ -532,7 +599,7 @@ test("free tier: EU market request comes back empty, source falls back to US", a
     if (market === "EU") return Response.json({ data: [] });
     return Response.json(freeTierFixture);
   }) as typeof fetch;
-  const source = new PokeTraceSource("secret", fetchImpl, 5, 0);
+  const source = new PokeTraceSource("secret", fetchImpl, 5, 0, false, 1000, async () => undefined, ["EU", "US"]);
   const comp = await source.lookup(
     { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" },
     { grade: "RAW" },
