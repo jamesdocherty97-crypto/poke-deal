@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844" role="img" aria-label="Poke Deal launch">
+  <defs>
+    <linearGradient id="bg" x1="56" y1="40" x2="334" y2="804" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset=".55" stop-color="#080b13"/>
+      <stop offset="1" stop-color="#050713"/>
+    </linearGradient>
+    <linearGradient id="holo" x1="138" y1="474" x2="252" y2="338" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#69e8ff"/>
+      <stop offset=".42" stop-color="#8b5cf6"/>
+      <stop offset=".72" stop-color="#ff72d2"/>
+      <stop offset="1" stop-color="#ffcb05"/>
+    </linearGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="18" flood-color="#69e8ff" flood-opacity=".4"/>
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000000" flood-opacity=".34"/>
+    </filter>
+  </defs>
+  <rect width="390" height="844" fill="url(#bg)"/>
+  <circle cx="66" cy="118" r="116" fill="#69e8ff" opacity=".08"/>
+  <circle cx="340" cy="142" r="132" fill="#ff72d2" opacity=".07"/>
+  <circle cx="284" cy="674" r="160" fill="#ffcb05" opacity=".035"/>
+  <g filter="url(#softGlow)">
+    <circle cx="195" cy="400" r="96" fill="#050713"/>
+    <path d="M99 394a96 96 0 0 1 192 0c-32 11-62 12-88 4-34-10-65-8-104-4Z" fill="#ef3340"/>
+    <path d="M101 410c28-6 55-4 81 5 36 12 69 8 107-5a96 96 0 0 1-188 0Z" fill="#f8fbff"/>
+    <path d="M101 400c41-5 70-4 101 5 27 8 57 7 86-5" fill="none" stroke="#111827" stroke-width="16" stroke-linecap="round"/>
+    <path d="M172 437 233 376l19 19-61 61z" fill="url(#holo)"/>
+    <path d="M172 437 233 376l19 19-61 61z" fill="none" stroke="#f8fbff" stroke-width="6" opacity=".9"/>
+    <circle cx="195" cy="402" r="35" fill="#111827"/>
+    <circle cx="195" cy="402" r="22" fill="#f8fbff"/>
+  </g>
+</svg>

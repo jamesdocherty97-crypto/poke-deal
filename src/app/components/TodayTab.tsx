@@ -4,7 +4,7 @@ import type { LaunchReadinessItem, LaunchReadinessTarget } from "@/lib/dealer/la
 import type { LaunchPlanItem, LaunchPlanTarget, LaunchProgress } from "@/lib/dealer/launchPlan";
 import type { OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
 import type { TodayAction, TodayActionTarget } from "@/lib/dealer/today";
-import { CardImage } from "./UiBits";
+import { CardImage, EmptyState } from "./UiBits";
 
 type TodaySystemSource = {
   id: string;
@@ -238,7 +238,7 @@ export function TodayTab({
             ))}
           </div>
         ) : (
-          <p className="hint">No automation messages yet. Daily checks will appear here if a target hits, stock needs repricing, or a run fails.</p>
+          <EmptyState art="alerts" text="No automation messages yet. Daily checks will appear here if a target hits, stock needs repricing, or a run fails." />
         )}
       </section>
 

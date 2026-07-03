@@ -37,8 +37,35 @@ export function CardImage({
   return <img className={className} src={src} alt={alt} onError={() => setFailedSrc(src)} />;
 }
 
-export function EmptyState({ text }: { text: string }) {
-  return <p className="empty-state">{text}</p>;
+export type EmptyStateArt = "stock" | "sales" | "watches" | "alerts" | "session" | "search";
+
+const emptyStateArtPaths: Record<EmptyStateArt, string> = {
+  stock: "/visual/empty/stock.jpg",
+  sales: "/visual/empty/sales.jpg",
+  watches: "/visual/empty/watches.jpg",
+  alerts: "/visual/empty/alerts.jpg",
+  session: "/visual/empty/session.jpg",
+  search: "/visual/empty/search.jpg",
+};
+
+function inferEmptyStateArt(text: string): EmptyStateArt {
+  const lower = text.toLowerCase();
+  if (lower.includes("watch")) return "watches";
+  if (lower.includes("alert") || lower.includes("automation") || lower.includes("message")) return "alerts";
+  if (lower.includes("sale") || lower.includes("channel") || lower.includes("cost")) return "sales";
+  if (lower.includes("session") || lower.includes("lot")) return "session";
+  if (lower.includes("matching") || lower.includes("search") || lower.includes("clear")) return "search";
+  return "stock";
+}
+
+export function EmptyState({ text, art }: { text: string; art?: EmptyStateArt }) {
+  const artKey = art ?? inferEmptyStateArt(text);
+  return (
+    <div className={`empty-state illustrated art-${artKey}`}>
+      <img src={emptyStateArtPaths[artKey]} alt="" loading="lazy" />
+      <span>{text}</span>
+    </div>
+  );
 }
 
 export const MoneyInput = forwardRef<HTMLInputElement, {

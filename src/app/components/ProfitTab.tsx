@@ -446,7 +446,7 @@ export function ProfitTab({
                 onDelete={() => requestDeleteWatch(watch)}
               />
             ))}
-            {watches.length === 0 && <p className="empty-state">No buy watches yet.</p>}
+            {watches.length === 0 && <EmptyState art="watches" text="No buy watches yet." />}
           </div>
         )}
       </section>

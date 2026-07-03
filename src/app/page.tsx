@@ -8856,8 +8856,61 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button className={active ? "active" : ""} type="button" onClick={onClick}>
-      {label}
+      <TabIcon label={label} />
+      <span>{label}</span>
     </button>
+  );
+}
+
+function TabIcon({ label }: { label: string }) {
+  const common = {
+    className: "tab-icon",
+    viewBox: "0 0 24 24",
+    "aria-hidden": true,
+  } as const;
+  if (label === "Buy") {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M4.5 12h15" />
+        <circle cx="12" cy="12" r="2.5" />
+      </svg>
+    );
+  }
+  if (label === "Inventory") {
+    return (
+      <svg {...common}>
+        <path d="M7 5.5h10a2 2 0 0 1 2 2v10H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" />
+        <path d="M8.5 8.5h7" />
+        <path d="M8.5 12h5" />
+        <path d="M7 17.5v-12" />
+      </svg>
+    );
+  }
+  if (label === "Listings") {
+    return (
+      <svg {...common}>
+        <path d="M5 6.5h9.5l4.5 4.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 17.5v-11Z" />
+        <path d="M14.5 6.5V11H19" />
+        <path d="M8.5 14h7" />
+        <path d="m9 10 1.5-1.5L12 10l-1.5 1.5Z" />
+      </svg>
+    );
+  }
+  if (label === "P&L") {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="7" />
+        <path d="M9.5 10.5c.45-.85 1.25-1.35 2.45-1.35 1.35 0 2.3.64 2.3 1.68 0 2.28-4.75.95-4.75 3.22 0 1.02.94 1.75 2.52 1.75 1.06 0 1.92-.34 2.5-1.05" />
+        <path d="M12 7.5v9" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="m12 3 1.2 4 3.8-1.1-1.1 3.8 4.1 1.3-4.1 1.3L17 16l-3.8-1.1L12 19l-1.2-4.1L7 16l1.1-3.8L4 11l4.1-1.3L7 5.9 10.8 7Z" />
+      <circle cx="12" cy="11" r="2.2" />
+    </svg>
   );
 }
 
