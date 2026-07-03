@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { type FormEvent, type KeyboardEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
 import {
-  isCatalogPhotoEligible,
   orderListingPhotos,
   photoRequirementMessage,
   summarizeListingPhotos,
@@ -8578,12 +8577,20 @@ function InventoryRow({
   const swipeDelta = useRef({ x: 0, y: 0 });
   const canSell = item.status !== "SOLD";
   const photoCount = item.photos?.length ?? 0;
+  const ebayPhotoSummary = listing?.channel === "EBAY"
+    ? summarizeListingPhotos({
+        photos: item.photos ?? [],
+        grade: item.grade,
+        pricePence: listPrice ?? 0,
+      })
+    : null;
   const needsPhotos = item.status !== "SOLD" && photoCount === 0;
-  const needsEbayPhotos = needsPhotos && listing?.channel === "EBAY";
+  const needsEbayPhotos = item.status !== "SOLD" && listing?.channel === "EBAY" && !ebayPhotoSummary?.satisfiesEbayPhotoRequirement;
   const canUseCatalogArt = Boolean(
     needsEbayPhotos &&
     item.card?.imageUrl &&
-    isCatalogPhotoEligible({ grade: item.grade, pricePence: listPrice ?? 0 }),
+    ebayPhotoSummary?.catalogPhotoAllowed &&
+    !ebayPhotoSummary.hasCatalogPhoto,
   );
   const needsListing = item.status !== "SOLD" && !draftListing && !activeListing;
   const stockCost =
@@ -8693,6 +8700,7 @@ function InventoryRow({
             <div className="inventory-row-flags" aria-label="Stock tasks">
               {needsListing && <span>Needs listing</span>}
               {needsPhotos && <span>Needs photos</span>}
+              {!needsPhotos && needsEbayPhotos && <span>Needs real photo</span>}
               {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
             </div>
           )}
