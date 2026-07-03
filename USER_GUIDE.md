@@ -1260,13 +1260,20 @@ Needed:
 
 Purpose:
 
-- Replace static exchange rates with daily cached live rates.
+- Convert USD/EUR/JPY comp evidence into GBP before the app shows or stores prices.
+
+How it works now:
+
+- If `FX_API_KEY` is set, the app fetches GBP-based FX rates once per day and caches them in Neon.
+- If the live provider is down, the app uses cached rates up to seven days old and shows the cache age.
+- If there is no key or the cache is too old, comps still work using the static fallback.
+- Rows affected by fallback show a `static FX` note in the comp evidence, so converted figures are not silently presented as live-rate prices.
+- Setup health shows whether FX is live, cached or static.
 
 Needed:
 
-- FX provider key.
-- Daily cache.
-- Tests around conversion.
+- Add `FX_API_KEY` in Vercel when a provider account is chosen.
+- Optional: set `FX_API_URL` if using a provider other than the default exchangerates-style endpoint.
 
 ### Card Scanning
 

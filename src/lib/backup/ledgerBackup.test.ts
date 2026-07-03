@@ -32,6 +32,7 @@ const delegateByTable = {
   compResults: "compResult",
   priceSnapshots: "priceSnapshot",
   cronRuns: "cronRun",
+  fxRates: "fxRate",
   watches: "watch",
   alerts: "alert",
   appAlerts: "appAlert",
@@ -322,6 +323,18 @@ function seedRows(): Partial<Record<keyof typeof delegateByTable, PlainRow[]>> {
         details: { written: 1 },
         error: null,
         createdAt: "2026-07-02T07:30:00.000Z",
+      },
+    ],
+    fxRates: [
+      {
+        id: "fx-usd-20260702",
+        quote: "USD",
+        perGbp: 1.27,
+        asOf: "2026-07-02T00:00:00.000Z",
+        provider: "exchangeratesapi",
+        fetchedAt: "2026-07-02T07:00:00.000Z",
+        createdAt: "2026-07-02T07:00:00.000Z",
+        updatedAt: "2026-07-02T07:00:00.000Z",
       },
     ],
     watches: [

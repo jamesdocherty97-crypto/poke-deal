@@ -1,5 +1,5 @@
 import type { CardRef } from "../domain/types.js";
-import { STATIC_RATES, toGbpPence, type FxRates } from "../comps/currency.js";
+import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../comps/currency.js";
 import { isApiUnavailableSetId, resolveSetIdForCard } from "./setCatalog.js";
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js";
 import { tokenizeSearchText } from "./fuzzy.js";
@@ -81,18 +81,20 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       return null;
     }
 
+    const rates = await getRates();
+
     if (card.tcgApiId) {
       const json = await this.request(`/cards/${encodeURIComponent(card.tcgApiId)}`, {
         select: MARKET_SELECT_FIELDS,
       });
-      return mapPokemonTcgCard(readDataObject(json));
+      return mapPokemonTcgCard(readDataObject(json), rates);
     }
 
     for (const candidateId of buildPokemonTcgIdCandidates(card)) {
       const json = await this.request(`/cards/${encodeURIComponent(candidateId)}`, {
         select: MARKET_SELECT_FIELDS,
       });
-      const direct = mapPokemonTcgCard(readDataObject(json));
+      const direct = mapPokemonTcgCard(readDataObject(json), rates);
       if (direct) return direct;
     }
 
@@ -116,7 +118,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       });
       const cards = readDataArray(json);
       if (cards.length > 0) {
-        return pickBestPokemonTcgCard(cards, card, resolvedSetId);
+        return pickBestPokemonTcgCard(cards, card, resolvedSetId, rates);
       }
     }
     return null;
@@ -153,7 +155,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     });
     const payload = json as PokemonTcgCardsPagePayload | null;
     const cards = readDataArray(json)
-      .map(mapPokemonTcgCard)
+      .map((card) => mapPokemonTcgCard(card))
       .filter((card): card is CatalogCard => card != null);
     return {
       page: readPositiveInt(payload?.page) ?? safePage,
@@ -293,7 +295,7 @@ export function buildPokemonTcgSearchQuery(card: CardRef): string {
   return buildPokemonTcgSearchQueries(card)[0] ?? "";
 }
 
-export function mapPokemonTcgCard(card: unknown): CatalogCard | null {
+export function mapPokemonTcgCard(card: unknown, rates: FxRates = STATIC_RATES): CatalogCard | null {
   const payload = card as PokemonTcgCardPayload | null;
   const id = readString(payload?.id);
   const name = readString(payload?.name);
@@ -316,7 +318,7 @@ export function mapPokemonTcgCard(card: unknown): CatalogCard | null {
     setLogoUrl: readString(payload?.set?.images?.logo),
     setSymbolUrl: readString(payload?.set?.images?.symbol),
     tcgApiId: id,
-    priceSignals: readCatalogPriceSignals(payload),
+    priceSignals: readCatalogPriceSignals(payload, rates),
   };
 }
 
@@ -355,6 +357,7 @@ function readCatalogPriceSignals(
         variant,
         updatedAt: tcgUpdatedAt,
         url: tcgUrl,
+        fx: fxRateInfo(rates),
       });
     }
   }
@@ -375,6 +378,7 @@ function readCatalogPriceSignals(
       kind,
       updatedAt: cmUpdatedAt,
       url: cmUrl,
+      fx: fxRateInfo(rates),
     });
   }
 
@@ -387,17 +391,19 @@ export function pickBestPokemonTcgCard(
   cards: unknown[],
   target: CardRef,
   resolvedSetId?: string,
+  rates: FxRates = STATIC_RATES,
 ): CatalogCard | null {
-  return rankPokemonTcgCards(cards, target, resolvedSetId)[0] ?? null;
+  return rankPokemonTcgCards(cards, target, resolvedSetId, rates)[0] ?? null;
 }
 
 export function rankPokemonTcgCards(
   cards: unknown[],
   target: CardRef,
   resolvedSetId?: string,
+  rates: FxRates = STATIC_RATES,
 ): CatalogCard[] {
   return cards
-    .map(mapPokemonTcgCard)
+    .map((card) => mapPokemonTcgCard(card, rates))
     .filter((card): card is CatalogCard => card != null)
     .sort((a, b) => scoreCatalogCard(b, target, resolvedSetId) - scoreCatalogCard(a, target, resolvedSetId));
 }

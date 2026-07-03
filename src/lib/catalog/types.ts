@@ -1,4 +1,5 @@
 import type { CardRef, Currency, Game, Language } from "../domain/types.js";
+import type { FxRateInfo } from "../comps/currency.js";
 
 export interface CatalogPriceSignal {
   source: "tcgplayer" | "cardmarket";
@@ -10,6 +11,7 @@ export interface CatalogPriceSignal {
   variant?: string;
   updatedAt?: string;
   url?: string;
+  fx?: FxRateInfo;
 }
 
 export interface CatalogCard {

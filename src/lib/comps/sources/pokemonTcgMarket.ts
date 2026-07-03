@@ -100,6 +100,7 @@ export function mapCatalogCardToMarketComp(
       caveat: "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
       chosenSignal: bestSignal,
       signals: priceSignals ?? [],
+      fx: bestSignal.fx,
     },
   };
 }

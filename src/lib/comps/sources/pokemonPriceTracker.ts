@@ -16,7 +16,7 @@ import { getSetById, resolveSetIdForCard } from "../../catalog/setCatalog.js";
 import { normalizeSearchText, tokenMatches, tokenizeSearchText } from "../../catalog/fuzzy.js";
 import type { CompSource } from "../CompSource.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
-import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
+import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
 import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
 import { sampleRawSales } from "./fixtures.js";
 
@@ -49,13 +49,14 @@ export class PokemonPriceTrackerSource implements CompSource {
 
     if (!this.live) {
       // Offline: clean bundled individual sales. Exercises the cleaning engine.
+      const rates = await getRates();
       return cleanToComp({
         source: this.name,
         card,
         grade,
         sales: sampleRawSales(),
         windowDays,
-        rates: STATIC_RATES,
+        rates,
       });
     }
 
@@ -63,7 +64,8 @@ export class PokemonPriceTrackerSource implements CompSource {
     if (matchedCard == null) {
       return emptyComp({ source: this.name, card, grade, windowDays }, "Price Tracker lookup failed or returned no response");
     }
-    return mapCardAggregateToComp(matchedCard, { source: this.name, card, grade, windowDays });
+    const rates = await getRates();
+    return mapCardAggregateToComp(matchedCard, { source: this.name, card, grade, windowDays }, rates);
   }
 
   /** Fetch one card with eBay graded-sales aggregates. Returns null on any failure. */
@@ -389,6 +391,7 @@ export function mapCardAggregateToComp(
     asOf: String(agg.lastMarketUpdate ?? card?.ebay?.updatedAt ?? new Date().toISOString()),
     raw: {
       ...agg,
+      fx: fxRateInfo(rates),
       prices: card?.prices,
       chosenPriceSource: smartRawPrice ? "smartMarketPrice" : "medianPrice",
       // Full grade ladder from this same single response — no extra credits.

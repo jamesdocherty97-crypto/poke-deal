@@ -16,6 +16,7 @@ export type BackupTableName =
   | "compResults"
   | "priceSnapshots"
   | "cronRuns"
+  | "fxRates"
   | "watches"
   | "alerts"
   | "appAlerts";
@@ -88,6 +89,7 @@ const TABLES: readonly TableDefinition[] = [
   { name: "compResults", delegate: "compResult", dateFields: ["asOf", "createdAt"] },
   { name: "priceSnapshots", delegate: "priceSnapshot", dateFields: ["takenAt"] },
   { name: "cronRuns", delegate: "cronRun", dateFields: ["startedAt", "finishedAt", "createdAt"] },
+  { name: "fxRates", delegate: "fxRate", dateFields: ["asOf", "fetchedAt", "createdAt", "updatedAt"] },
   { name: "watches", delegate: "watch", dateFields: ["createdAt"] },
   { name: "alerts", delegate: "alert", dateFields: ["firedAt"] },
   { name: "appAlerts", delegate: "appAlert", dateFields: ["readAt", "createdAt"] },
@@ -107,6 +109,7 @@ const RESTORE_ORDER: readonly BackupTableName[] = [
   "compResults",
   "priceSnapshots",
   "cronRuns",
+  "fxRates",
   "watches",
   "alerts",
   "appAlerts",

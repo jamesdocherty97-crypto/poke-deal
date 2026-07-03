@@ -3,7 +3,7 @@ import { getSetById, resolveSetId } from "../../catalog/setCatalog.js";
 import { tokenizeSearchText, tokenMatches } from "../../catalog/fuzzy.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
-import { STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
+import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
 import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
 
 const BASE_URL = "https://api.poketrace.com/v1";
@@ -127,9 +127,10 @@ export class PokeTraceSource implements CompSource {
       const midRunCooldown = readPokeTraceCooldown();
       if (midRunCooldown) return emptyComp(ctx, `PokeTrace source unavailable: ${midRunCooldown}`);
       const payload = await this.fetchCards(card, market);
+      const rates = await getRates();
       const comp = payload == null
         ? emptyComp(ctx, `PokeTrace ${market} lookup failed or returned no response`)
-        : mapPokeTraceCardsToComp(payload, ctx);
+        : mapPokeTraceCardsToComp(payload, ctx, rates);
       if (comp.sampleSize > 0 && comp.medianPence > 0) return comp;
       lastEmpty = comp;
     }
@@ -270,6 +271,7 @@ export function mapPokeTraceCardsToComp(
       priceSource: choice.priceSource,
       market: readString(card.market),
       currency,
+      fx: fxRateInfo(rates),
       providerCard: providerCardRef(card),
       approxSaleCount: Boolean(choice.tier.approxSaleCount),
       signals,

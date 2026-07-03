@@ -8,6 +8,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
 import { getEbayConfig, hasEbayRefreshToken } from "@/lib/ebay/config";
 import { PsaCertLookup } from "@/lib/psa/psaCert";
+import { getFxHealth } from "@/lib/comps/currency";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function GET() {
   const pokeTraceHealth = getPokeTraceHealth();
   const ebayMi = new EbayMarketplaceInsightsSource();
   const psa = new PsaCertLookup();
+  const fx = await getFxHealth();
   const ebayConfigured = Boolean(getEbayConfig());
   const ebayConnected = hasEbayRefreshToken();
   const ebayMiEnabled = isEbayMarketplaceInsightsEnabled();
@@ -106,6 +108,17 @@ export async function GET() {
         : "Add PSA_API_TOKEN in Vercel for live cert lookups. Runs on a demo cert until then.",
     },
     {
+      id: "fx-rates",
+      label: "FX rates",
+      role: "USD/EUR/JPY to GBP",
+      status: fx.source === "static" ? "building" : "ready",
+      required: false,
+      setupHint:
+        fx.source === "static"
+          ? "Using static FX fallback. Add FX_API_KEY for daily cached live conversion."
+          : `${fx.source === "live" ? "Live" : "Cached"} rates from ${fx.provider}, ${fx.ageDays && fx.ageDays > 0 ? `${fx.ageDays}d old` : "fresh"}.`,
+    },
+    {
       id: "owned-sales",
       label: "Owned sales",
       role: "James's real sale history",
@@ -157,6 +170,7 @@ export async function GET() {
       secondaryCrossCheck: pokeTrace.live && !pokeTraceHealth.persistentKeyProblem,
       ebayMarketplaceInsights: ebayMi.live,
       psaCertLookup: psa.live,
+      fxRates: fx,
       alertDelivery: webhookReady,
       storedSales: Boolean(process.env.DATABASE_URL?.trim()),
       manualBackups: Boolean(process.env.DATABASE_URL?.trim()),

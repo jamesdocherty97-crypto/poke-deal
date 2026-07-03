@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { GRADE_VALUES, type CardRef, type CompResult, type Grade, type RawSale } from "../domain/types.js";
-import { STATIC_RATES, toGbpPence, type FxRates } from "./currency.js";
+import { fxRateInfo, STATIC_RATES, toGbpPence, type FxRates } from "./currency.js";
 
 // ── Stats helpers (exported for tests) ───────────────────────
 
@@ -149,6 +149,7 @@ export function cleanToComp(params: CleanParams): CompResult {
   // 1. grade match  2. drop lots  3. window  4. → GBP pence  5. drop non-positive
   type Priced = { pence: number; at: number };
   const priced: Priced[] = [];
+  let usedForeignCurrency = false;
   for (const sale of sales) {
     if (!gradeMatches(grade, sale.gradeLabel)) continue;
     if (isLotTitle(sale.title)) continue;
@@ -161,6 +162,7 @@ export function cleanToComp(params: CleanParams): CompResult {
       continue; // unknown currency — skip rather than poison the comp
     }
     if (pence <= 0) continue;
+    if (sale.currency !== "GBP") usedForeignCurrency = true;
     priced.push({ pence, at });
   }
 
@@ -191,6 +193,7 @@ export function cleanToComp(params: CleanParams): CompResult {
       medianPence: 0, meanPence: 0, lowPence: 0, highPence: 0,
       sampleSize: 0, windowDays, trendPct: null, outliersRemoved: removed,
       asOf,
+      raw: usedForeignCurrency ? { fx: fxRateInfo(rates, now) } : undefined,
     };
   }
 
@@ -208,6 +211,7 @@ export function cleanToComp(params: CleanParams): CompResult {
     trendPct: computeTrend(keptRows, now, windowDays),
     outliersRemoved: removed,
     asOf,
+    raw: usedForeignCurrency ? { fx: fxRateInfo(rates, now) } : undefined,
   };
 }
 

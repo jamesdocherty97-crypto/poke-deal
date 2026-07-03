@@ -274,6 +274,7 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
     signals?: PokeTraceSignalView[];
     gradeLadder?: { grade: Grade; medianPence: number; sampleSize: number; source?: string }[];
     reconciliation?: ReconciliationView;
+    fx?: { source?: string; provider?: string; asOf?: string; ageDays?: number | null; note?: string };
   };
 };
 
@@ -8549,11 +8550,21 @@ function compMeta(result: CompResult): string {
     result.source === "pokemon-tcg-market"
       ? "baseline"
       : `${result.sampleSize} sample${result.sampleSize === 1 ? "" : "s"}`;
-  return `${sample} / ${result.windowDays}d · ${ageLabel(result.asOf)}`;
+  return [fxNote(result), `${sample} / ${result.windowDays}d · ${ageLabel(result.asOf)}`]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
 }
 
 function rawReason(result: CompResult): string | null {
   return typeof result.raw?.reason === "string" && result.raw.reason.trim() ? result.raw.reason : null;
+}
+
+function fxNote(result: CompResult): string | null {
+  const fx = result.raw?.fx;
+  if (!fx || result.sampleSize <= 0 || result.medianPence <= 0) return null;
+  if (fx.source === "static") return "static FX";
+  if (fx.source === "cached" && typeof fx.ageDays === "number" && fx.ageDays > 0) return `FX ${fx.ageDays}d old`;
+  return null;
 }
 
 function sourceEmptyReason(result: CompResult): string {
