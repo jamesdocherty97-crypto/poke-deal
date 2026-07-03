@@ -38,6 +38,11 @@ Live today:
 - Manual checked-comp override.
 - Inventory and stock ledger.
 - Listing drafts and active listing tracking.
+- eBay readiness, offer creation and publish flow for your own listings when the seller account/API connection is ready.
+- Phone photo capture/upload for real listing photos, including reorder/delete and slab cert-photo nudges.
+- Live UK asking-price evidence from eBay Browse API, shown as context only.
+- Manual eBay UK solds and Terapeak handoff links.
+- eBay paid-order sync into the normal sales ledger when order SKUs match stock.
 - Mark sold flow.
 - Realized profit, cash position and channel P&L.
 - Operating costs.
@@ -52,6 +57,8 @@ Not live until keys are added:
 - PokeTrace second-source comps in production.
 - eBay Marketplace Insights live UK sold comps until eBay approves the restricted API and the feature flag is enabled.
 - Push-style alert delivery in production.
+- Cardmarket/Vinted direct posting.
+- eBay payout/fee reconciliation from the Finances API.
 
 ## Navigation
 
@@ -91,7 +98,7 @@ This is where you edit stock, create listings, mark cards sold, or delete mistak
 
 Use this to manage listing records.
 
-This does not yet push directly to eBay/Cardmarket/Vinted. It tracks draft, active, ended and sold listings inside the business ledger.
+It tracks draft, active, ended and sold listings inside the business ledger. For eBay, it can also create the inventory item/offer and publish when the connected seller account, policies, location and photos are ready. Cardmarket and Vinted are still manual copy/export flows.
 
 ### Profit
 
@@ -109,6 +116,7 @@ Sources shown today:
 - Pokemon TCG API: catalog, card art and raw market baseline.
 - PokeTrace: second comp source. Free tier should use US only; Pro can use EU first.
 - eBay Marketplace Insights: future direct UK sold comps once eBay approval is granted.
+- eBay Sell API: own-listing publish flow and paid-order sync.
 - PSA cert lookup: slab verification and grade/name/set helper.
 - Owned sales: your own sale history after you start selling.
 - Backups: manual ledger export and restore safety.
@@ -128,6 +136,7 @@ Current outstanding setup actions:
 - Set `POKETRACE_MARKETS=US` for the current free-tier account.
 - eBay needs to approve restricted Marketplace Insights access before live UK sold comps can be switched on.
 - After eBay approval, an agent needs to set `EBAY_INSIGHTS_ENABLED=true` in production and redeploy.
+- eBay seller account setup must stay complete: OAuth connected, business policies available, seller location created and payout/identity prompts cleared.
 - Check the Neon project restore window. Until that is confirmed, treat cloud recovery as manual backups only.
 - Optional alert delivery needs `ALERT_WEBHOOK_URL` if you want off-app notifications later.
 
@@ -362,11 +371,22 @@ Sources can include:
 - Your sales, after you have sold matching cards.
 - Checked comp, if you manually override.
 
+The receipt can also show `UK asks (live)` from eBay Browse.
+
+Important:
+
+- UK asks are active asking prices, not sold prices.
+- They do not change the headline comp.
+- They do not enter reconciliation.
+- They are useful for listing context, especially the undercut price.
+- If the ask row is empty, that means the app did not find a relevant active UK listing after filtering obvious mismatches.
+
 Intended use:
 
 - Check whether the headline is based on strong sold data.
 - Spot disagreement between sources.
 - Decide when to manually check eBay/Cardmarket.
+- Use UK asks to understand current live competition before listing.
 
 ### Cached Comp Badge
 
@@ -700,6 +720,63 @@ Export:
 - Saved listing prices are used first.
 - If no saved listing price exists, the app falls back to the listing-pack price logic.
 
+### Real Photos
+
+Use the photo tools on stock and listing rows before publishing to eBay.
+
+You can:
+
+- Take photos from the phone camera.
+- Upload multiple photos.
+- Paste a public image URL as a fallback.
+- Reorder photos.
+- Delete photos.
+
+Important:
+
+- The first photo is the primary eBay image.
+- eBay publishing requires at least one real card photo.
+- Graded slabs should include a clear cert photo.
+- The app compresses phone photos before upload so fair/mobile-data uploads are less painful.
+
+### eBay Publish Flow
+
+For eBay listings, the app can now walk the live publish path.
+
+Use it like this:
+
+1. Add/stock the card.
+2. Add real photos.
+3. Create or open the eBay listing pack.
+4. Run preflight if you want to check readiness without writing to eBay.
+5. Create offer.
+6. Publish.
+
+Readiness checks cover:
+
+- eBay connection.
+- Seller policies.
+- Seller location.
+- Price.
+- Photos.
+- Already-published state.
+- Seller-registration blocks.
+
+When publish succeeds:
+
+- The listing flips to Active.
+- The live eBay listing id is stored.
+- The live eBay URL is stored.
+- The stock row becomes Listed.
+
+If eBay rejects something, the app shows the real eBay message/error id where available.
+
+Still useful fallback:
+
+- Copy eBay still works.
+- eBay pack CSV still works.
+- Paste live URL can mark a manually published eBay listing active inside Poke Deal.
+
 ### Mark Sold
 
 Use Sell from Stock or List.
@@ -781,10 +858,44 @@ Use Listings to:
 - End active listings.
 - Mark listed cards sold.
 - Edit listing price, state, channel or URL.
+- Create and publish eBay offers when readiness passes.
+- Sync paid eBay orders into the sales ledger.
 
 Important:
 
-The app can create manual copy and eBay-style CSV exports. Direct marketplace publishing still depends on the marketplace API setup being fully approved and live.
+The app can create manual copy, eBay-style CSV exports and live eBay listings. Cardmarket/Vinted direct publishing is not live.
+
+### eBay Sales Sync
+
+Use `Sync eBay sales` on the Listings page after you start selling through eBay.
+
+What it does:
+
+- Pulls paid eBay orders through the Sell Fulfillment API.
+- Matches each order line to Poke Deal stock by SKU.
+- Books matched orders as normal `Sale` rows.
+- Marks stock/listings sold using the same sale logic as the manual Sell button.
+- Adds an inbox alert like `eBay sale imported: <card>`.
+- Feeds your future owned-sales comps automatically because it uses the normal sales table.
+
+What it does not do:
+
+- It does not guess if the SKU does not clearly match stock.
+- It does not reconcile final eBay payout/fees yet.
+- It does not create Cardmarket/Vinted sales.
+
+Manual-match queue:
+
+- Unmatched eBay order lines are stored in an import queue.
+- They show in the sync result as `need matching`.
+- Do not book these manually twice unless you deliberately decide the eBay order is not going to be matched through the app.
+
+Fees/postage:
+
+- Sale price is booked from the eBay buyer-paid total.
+- eBay fees are estimated from the current selling-fee model.
+- Postage cost uses the app's current raw/slab postage estimate.
+- Final payout reconciliation is a later Finances API feature.
 
 ## Profit
 
@@ -1043,6 +1154,7 @@ Role:
 How it works:
 
 - Once you sell matching cards, your own sales become evidence.
+- Manual Sell and eBay Sales Sync both write into the same sales table.
 - One or two recent matching sales corroborate but do not headline.
 - Three or more recent matching sales within the trust window can headline.
 
@@ -1244,13 +1356,24 @@ Needed:
 Purpose:
 
 - Push your own listings to eBay instead of manually copying.
+- Pull paid eBay orders back into Poke Deal.
 
-Needed:
+Live now:
 
-- eBay developer app.
-- OAuth flow.
-- Listing payload builder.
-- Error handling for eBay listing requirements.
+- OAuth connection/status check.
+- Seller policy lookup.
+- Seller-location readiness and one-tap location creation.
+- Inventory item + offer creation.
+- Trading API fallback for publish where needed.
+- Real eBay error messages surfaced in the UI.
+- Paid-order sync by SKU.
+
+Still needed:
+
+- Final eBay seller-account/payment/KYC prompts must be complete in eBay itself.
+- A real listing/photo set should be used for live validation.
+- Finances API pass for exact final fees and payouts.
+- Better manual-match UI for unmatched orders.
 
 ### Set Gap Finder
 
