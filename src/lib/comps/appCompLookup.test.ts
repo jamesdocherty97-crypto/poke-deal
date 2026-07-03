@@ -7,6 +7,7 @@ import {
   findVariantSiblings,
   refreshCachedCatalogPriceSignals,
   requestHasExplicitCardNumber,
+  resolveBareSetAmbiguity,
   resolveCatalogCard,
 } from "./appCompLookup.js";
 import type { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
@@ -455,6 +456,49 @@ test("findAmbiguousCatalogCandidates returns matching variants for a bare same-s
   assert.deepEqual(new Set(candidates.map((card) => card.tcgApiId)), new Set(["swsh7-94", "swsh7-95", "swsh7-215"]));
 });
 
+test("bare name and set remains ambiguous across the full Umbreon candidate set", async () => {
+  const candidates = [
+    catalogCard("Umbreon V", "Evolving Skies", "94/203", "swsh7-94"),
+    catalogCard("Umbreon V", "Evolving Skies", "188/203", "swsh7-188"),
+    catalogCard("Umbreon V", "Evolving Skies", "189/203", "swsh7-189"),
+    catalogCard("Umbreon VMAX", "Evolving Skies", "95/203", "swsh7-95"),
+    catalogCard("Umbreon VMAX", "Evolving Skies", "214/203", "swsh7-214"),
+    catalogCard("Umbreon VMAX", "Evolving Skies", "215/203", "swsh7-215"),
+  ];
+  const source = sourceWithCandidates(candidates, candidates[5]!);
+
+  const resolved = await resolveCatalogCard({ name: "Umbreon", setName: "Evolving Skies" }, source);
+  const ambiguousCandidates = await findAmbiguousCatalogCandidates({ name: "Umbreon", setName: "Evolving Skies" }, source, 12);
+  const ambiguity = resolveBareSetAmbiguity({ name: "Umbreon", setName: "Evolving Skies" }, resolved, ambiguousCandidates);
+
+  assert.equal(resolved?.tcgApiId, "swsh7-215");
+  assert.equal(ambiguity.ambiguous, true);
+  assert.equal(ambiguity.alternatives.length, 5);
+  assert.equal(ambiguity.alternatives.some((card) => card.tcgApiId === "swsh7-215"), false);
+});
+
+test("bare name and set remains ambiguous across the full Blastoise Evolutions candidate set", async () => {
+  const candidates = [
+    catalogCard("Blastoise", "Evolutions", "31/108", "xy12-31"),
+    catalogCard("Blastoise-EX", "Evolutions", "21/108", "xy12-21"),
+    catalogCard("Blastoise Spirit Link", "Evolutions", "73/108", "xy12-73"),
+    catalogCard("M Blastoise-EX", "Evolutions", "22/108", "xy12-22"),
+    catalogCard("M Blastoise-EX", "Evolutions", "102/108", "xy12-102"),
+  ];
+  const source = sourceWithCandidates(candidates, candidates[1]!);
+
+  const resolved = await resolveCatalogCard({ name: "Blastoise", setName: "Evolutions" }, source);
+  const ambiguousCandidates = await findAmbiguousCatalogCandidates({ name: "Blastoise", setName: "Evolutions" }, source, 12);
+  const ambiguity = resolveBareSetAmbiguity({ name: "Blastoise", setName: "Evolutions" }, resolved, ambiguousCandidates);
+
+  assert.equal(resolved?.tcgApiId, "xy12-21");
+  assert.equal(ambiguity.ambiguous, true);
+  assert.deepEqual(
+    new Set(ambiguity.alternatives.map((card) => card.tcgApiId)),
+    new Set(["xy12-31", "xy12-73", "xy12-22", "xy12-102"]),
+  );
+});
+
 test("findAmbiguousCatalogCandidates skips exact-number and selected-id lookups", async () => {
   let searchCalls = 0;
   const source = {
@@ -474,6 +518,29 @@ test("findAmbiguousCatalogCandidates skips exact-number and selected-id lookups"
   );
   assert.equal(searchCalls, 0);
 });
+
+function catalogCard(name: string, setName: string, number: string, tcgApiId: string): CatalogCard {
+  return {
+    game: "POKEMON",
+    language: "EN",
+    name,
+    setName,
+    setCode: tcgApiId.split("-")[0],
+    number,
+    tcgApiId,
+  };
+}
+
+function sourceWithCandidates(candidates: CatalogCard[], resolved: CatalogCard): PokemonTcgApiCatalogSource {
+  return {
+    async resolve() {
+      return resolved;
+    },
+    async search() {
+      return candidates;
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+}
 
 test("requestHasExplicitCardNumber recognises a separate number field and embedded collector numbers", () => {
   assert.equal(requestHasExplicitCardNumber({ name: "Charizard ex", setName: "151", number: "199/165" }), true);

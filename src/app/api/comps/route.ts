@@ -8,6 +8,7 @@ import {
   findAmbiguousCatalogCandidates,
   findCatalogAlternatives,
   requestHasExplicitCardNumber,
+  resolveBareSetAmbiguity,
   resolveCatalogCard,
 } from "@/lib/comps/appCompLookup";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
@@ -65,17 +66,15 @@ export async function GET(request: Request) {
     let alternatives: CatalogCard[] = [];
     let ambiguous = false;
     const ambiguousCandidates = ambiguousCandidatesPromise ? await ambiguousCandidatesPromise : [];
-    let ambiguityAlternatives = catalog
-      ? ambiguousCandidates.filter((candidate) => catalogIdentityKey(candidate) !== catalogIdentityKey(catalog))
-      : ambiguousCandidates;
-    ambiguous = ambiguousCandidates.length > 1 || ambiguityAlternatives.length > 0;
+    let ambiguityState = resolveBareSetAmbiguity(card, catalog, ambiguousCandidates);
+    let ambiguityAlternatives = ambiguityState.alternatives;
+    ambiguous = ambiguityState.ambiguous;
 
     if (ambiguous && ambiguityAlternatives.length < MIN_AMBIGUOUS_ALTERNATIVES) {
       const expandedCandidates = await findAmbiguousCatalogCandidates(card, catalogSource, 12, { timeoutMs: 10000 });
-      ambiguityAlternatives = catalog
-        ? expandedCandidates.filter((candidate) => catalogIdentityKey(candidate) !== catalogIdentityKey(catalog))
-        : expandedCandidates;
-      ambiguous = expandedCandidates.length > 1 || ambiguityAlternatives.length > 0;
+      ambiguityState = resolveBareSetAmbiguity(card, catalog, expandedCandidates);
+      ambiguityAlternatives = ambiguityState.alternatives;
+      ambiguous = ambiguityState.ambiguous;
     }
 
     const result = await compService.lookup(compCard, { grade }, { ambiguous });

@@ -191,6 +191,23 @@ export function findVariantSiblings(resolved: CatalogCard, candidates: CatalogCa
   return siblings;
 }
 
+export function resolveBareSetAmbiguity(
+  card: CardRef,
+  resolvedCatalog: CatalogCard | null,
+  candidates: CatalogCard[],
+): { ambiguous: boolean; alternatives: CatalogCard[] } {
+  if (requestHasExplicitCardNumber(card) || card.tcgApiId) return { ambiguous: false, alternatives: [] };
+  const matchingCandidates = dedupeCatalogCards(candidates.filter((candidate) => catalogCardMatchesLookupContext(candidate, card)));
+  if (matchingCandidates.length <= 1) return { ambiguous: false, alternatives: [] };
+  const resolvedKey = resolvedCatalog ? catalogIdentityKey(resolvedCatalog) : null;
+  return {
+    ambiguous: true,
+    alternatives: resolvedKey
+      ? matchingCandidates.filter((candidate) => catalogIdentityKey(candidate) !== resolvedKey)
+      : matchingCandidates,
+  };
+}
+
 function withOptionalTimeout<T>(promise: Promise<T>, timeoutMs: number | undefined, fallback: T): Promise<T> {
   if (!Number.isFinite(timeoutMs) || !timeoutMs || timeoutMs <= 0) return promise;
   return new Promise((resolve) => {
@@ -258,6 +275,18 @@ function catalogIdentityKey(card: CatalogCard): string {
       (card.number ?? "").trim().toLowerCase(),
     ].join("|")
   );
+}
+
+function dedupeCatalogCards(cards: CatalogCard[]): CatalogCard[] {
+  const seen = new Set<string>();
+  const deduped: CatalogCard[] = [];
+  for (const card of cards) {
+    const key = catalogIdentityKey(card);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(card);
+  }
+  return deduped;
 }
 
 async function findCachedCatalogMatch(card: CardRef): Promise<CatalogCard | null> {
