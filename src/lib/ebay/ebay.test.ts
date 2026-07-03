@@ -12,7 +12,7 @@ import {
   parseTradingApiResult,
   verifyTradingFixedPriceItem,
 } from "./trading.js";
-import { getAccessToken, clearTokenCache } from "./tokens.js";
+import { getAccessToken, getApplicationAccessToken, clearTokenCache } from "./tokens.js";
 import { fetchEbayPolicies } from "./policies.js";
 import { isEbayConfigured, EBAY_UK_CATEGORY_POKEMON } from "./config.js";
 import type { EbayConfig } from "./config.js";
@@ -226,6 +226,29 @@ test("getAccessToken throws when EBAY_REFRESH_TOKEN is missing", async () => {
     () => getAccessToken(TEST_CONFIG),
     /EBAY_REFRESH_TOKEN is not set/,
   );
+});
+
+test("getApplicationAccessToken uses client credentials and caches the token", async () => {
+  let callCount = 0;
+  let capturedBody = "";
+  const fetch: typeof globalThis.fetch = (_url, opts) => {
+    callCount++;
+    capturedBody = String(opts?.body ?? "");
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ access_token: "app-token", expires_in: 7200 }),
+    } as Response);
+  };
+
+  const token = await getApplicationAccessToken(TEST_CONFIG, fetch);
+  const token2 = await getApplicationAccessToken(TEST_CONFIG, fetch);
+
+  assert.equal(token, "app-token");
+  assert.equal(token2, "app-token");
+  assert.equal(callCount, 1);
+  assert.match(capturedBody, /grant_type=client_credentials/);
+  assert.match(capturedBody, /scope=https%3A%2F%2Fapi\.ebay\.com%2Foauth%2Fapi_scope/);
 });
 
 // ── Inventory item payload ────────────────────────────────────────────────────

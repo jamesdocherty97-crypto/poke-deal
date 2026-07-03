@@ -17,6 +17,7 @@ import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import type { CatalogCard } from "@/lib/catalog/types";
 import { buildPsaCompSearchParams, isPsaPokemonTcgCert } from "@/lib/psa/lookupFields";
 import { PsaCertLookup } from "@/lib/psa/psaCert";
+import { attachAskEvidence, fetchEbayAskEvidence } from "@/lib/ebay/browseAsks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,7 +78,9 @@ export async function GET(request: Request) {
       ambiguous = ambiguityState.ambiguous;
     }
 
+    const askEvidencePromise = fetchEbayAskEvidence(compCard, { grade });
     const result = await compService.lookup(compCard, { grade }, { ambiguous });
+    const askEvidence = await askEvidencePromise;
     const needsRecovery = !catalog || !result.headline || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
 
     if (needsRecovery) {
@@ -94,7 +97,7 @@ export async function GET(request: Request) {
         );
       });
     }
-    return NextResponse.json({ ...result, catalog, alternatives, ambiguous, psaCert: psaResult });
+    return NextResponse.json({ ...attachAskEvidence(result, askEvidence), catalog, alternatives, ambiguous, psaCert: psaResult });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "lookup failed" },

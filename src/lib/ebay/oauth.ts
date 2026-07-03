@@ -84,3 +84,26 @@ export async function refreshAccessToken(
   }
   return (await response.json()) as EbayTokenResponse;
 }
+
+export async function fetchApplicationAccessToken(
+  config: EbayConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EbayTokenResponse> {
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    scope: "https://api.ebay.com/oauth/api_scope",
+  });
+  const response = await fetchImpl(config.tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicCredentials(config)}`,
+    },
+    body: body.toString(),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "(unreadable)");
+    throw new Error(`eBay application token failed ${response.status}: ${text}`);
+  }
+  return (await response.json()) as EbayTokenResponse;
+}

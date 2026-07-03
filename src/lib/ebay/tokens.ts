@@ -3,7 +3,7 @@
 // In-memory cache reuses valid tokens within the same lambda invocation.
 
 import type { EbayConfig } from "./config.js";
-import { refreshAccessToken } from "./oauth.js";
+import { fetchApplicationAccessToken, refreshAccessToken } from "./oauth.js";
 
 interface TokenCache {
   value: string;
@@ -11,6 +11,7 @@ interface TokenCache {
 }
 
 let cache: TokenCache | null = null;
+let applicationCache: TokenCache | null = null;
 
 export async function getAccessToken(
   config: EbayConfig,
@@ -35,7 +36,24 @@ export async function getAccessToken(
   return cache.value;
 }
 
+export async function getApplicationAccessToken(
+  config: EbayConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const now = Date.now();
+  if (applicationCache && applicationCache.expiresAt > now + 90_000) {
+    return applicationCache.value;
+  }
+  const tokens = await fetchApplicationAccessToken(config, fetchImpl);
+  applicationCache = {
+    value: tokens.access_token,
+    expiresAt: now + tokens.expires_in * 1000,
+  };
+  return applicationCache.value;
+}
+
 /** Clear the in-memory cache — for tests only. */
 export function clearTokenCache(): void {
   cache = null;
+  applicationCache = null;
 }

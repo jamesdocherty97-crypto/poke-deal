@@ -3813,6 +3813,91 @@ label {
   gap: 7px;
 }
 
+.ask-evidence-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(42, 117, 187, 0.3);
+  border-radius: 8px;
+  background:
+    linear-gradient(120deg, rgba(42, 117, 187, 0.12), transparent 58%),
+    rgba(3, 8, 20, 0.34);
+  padding: 10px;
+}
+
+.ask-evidence-card.muted {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(3, 8, 20, 0.3);
+}
+
+.ask-evidence-card .hint {
+  margin: 0;
+}
+
+.ask-undercut {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+  border: 1px solid rgba(52, 211, 153, 0.32);
+  border-radius: 8px;
+  background: rgba(52, 211, 153, 0.1);
+  padding: 8px;
+}
+
+.ask-undercut span,
+.ask-undercut small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ask-undercut strong {
+  color: var(--green);
+  font-size: 18px;
+  line-height: 1.05;
+}
+
+.ask-undercut small {
+  grid-column: 1 / -1;
+}
+
+.ask-listings {
+  display: grid;
+  gap: 6px;
+}
+
+.ask-listings a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  min-width: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  padding-top: 7px;
+  text-decoration: none;
+}
+
+.ask-listings span {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-listings strong {
+  color: #88c8ff;
+  font-size: 13px;
+}
+
+.ask-listings small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .comp-receipt {
   display: grid;
   gap: 8px;

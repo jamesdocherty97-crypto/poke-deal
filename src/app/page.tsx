@@ -258,6 +258,33 @@ type ReconciliationView = {
   trendPct: number | null;
 };
 
+type EbayAskListing = {
+  itemId: string;
+  title: string;
+  url: string;
+  imageUrl?: string;
+  itemPricePence: number;
+  shippingPence: number;
+  totalPence: number;
+  buyingOptions: string[];
+  condition?: string;
+  seller?: string;
+};
+
+type EbayAskEvidence = {
+  source: "ebay-browse";
+  marketplaceId: string;
+  query: string;
+  asOf: string;
+  count: number;
+  listings: EbayAskListing[];
+  lowestPence: number | null;
+  undercutPence: number | null;
+  cached?: boolean;
+  skipped?: boolean;
+  reason?: string;
+};
+
 type CompResult = Omit<DomainCompResult, "raw"> & {
   raw?: {
     smartMarketPrice?: { confidence?: string; daysUsed?: number; method?: string };
@@ -291,6 +318,7 @@ type Reconciled = {
   catalog?: CatalogCard | null;
   alternatives?: CatalogCard[];
   psaCert?: PsaCertView | null;
+  askEvidence?: EbayAskEvidence | null;
 };
 
 type DealSessionLine = {
@@ -1349,6 +1377,7 @@ export default function Home() {
   const canRunSmartComp = Boolean(quickIntake.trim() || name.trim());
   const selectedCardImage = cardArtUrl ?? catalogCard?.imageUrl ?? matchingQuickHunt?.imageUrl ?? null;
   const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
+  const askEvidence = comp?.askEvidence ?? null;
   const spotlightImage =
     selectedCardImage ??
     (hasActiveCardIdentity
@@ -6206,6 +6235,46 @@ export default function Home() {
                     <button type="button" onClick={() => void listInventoryItem(stockCompItem)} disabled={busy?.startsWith("create-listing-")}>
                       Draft listing
                     </button>
+                  )}
+                </div>
+              )}
+              {askEvidence && (
+                <div className={`ask-evidence-card ${askEvidence.skipped ? "muted" : ""}`}>
+                  <div className="receipt-heading">
+                    <span>UK asks (live)</span>
+                    <strong>
+                      {askEvidence.count > 0 && askEvidence.lowestPence != null
+                        ? `from ${gbp(askEvidence.lowestPence)} · ${askEvidence.count} listing${askEvidence.count === 1 ? "" : "s"}`
+                        : askEvidence.skipped
+                          ? "not checked"
+                          : "none found"}
+                    </strong>
+                  </div>
+                  <p className="hint">
+                    Asking prices only, not sold comps. They are shown for listing context and do not change the headline comp.
+                    {askEvidence.cached ? " Cached for this card." : ""}
+                  </p>
+                  {askEvidence.undercutPence != null && (
+                    <div className="ask-undercut">
+                      <span>Undercut price</span>
+                      <strong>{gbp(askEvidence.undercutPence)}</strong>
+                      <small>lowest relevant UK ask minus one step</small>
+                    </div>
+                  )}
+                  {askEvidence.reason && <p className="hint">{askEvidence.reason}</p>}
+                  {askEvidence.listings.length > 0 && (
+                    <div className="ask-listings">
+                      {askEvidence.listings.slice(0, 3).map((listing) => (
+                        <a key={listing.itemId} href={listing.url} target="_blank" rel="noreferrer">
+                          <span>{listing.title}</span>
+                          <strong>{gbp(listing.totalPence)}</strong>
+                          <small>
+                            {listing.shippingPence > 0 ? `inc. ${gbp(listing.shippingPence)} post` : "free/unknown post"}
+                            {listing.condition ? ` · ${listing.condition}` : ""}
+                          </small>
+                        </a>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}
