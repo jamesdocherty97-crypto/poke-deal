@@ -25,7 +25,7 @@ export async function resolveCatalogCard(
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
   options: { timeoutMs?: number } = {},
 ): Promise<CatalogCard | null> {
-  return withOptionalTimeout(resolveCatalogCardUnbounded(card, catalogSource), options.timeoutMs, findChaseCatalogMatch(card));
+  return withOptionalTimeout(resolveCatalogCardUnbounded(card, catalogSource), options.timeoutMs, findTimeoutCatalogFallback(card));
 }
 
 async function resolveCatalogCardUnbounded(
@@ -94,9 +94,15 @@ export async function findCatalogAlternatives(
   if (!query.trim()) return [];
 
   const chaseCards = searchChaseCards(query, card.setName ?? normalized.setName, Math.max(safeLimit * 2, 8));
+  const cachedCardsPromise = catalogSource.name === "pokemon-tcg-api"
+    ? findCachedCatalogCandidates(card, Math.max(safeLimit * 4, 24)).catch(() => [])
+    : Promise.resolve<CatalogCard[]>([]);
   const liveSearch = catalogSource.search(card, Math.max(safeLimit * 2, 8)).catch(() => []);
-  const liveCards = await withOptionalTimeout(liveSearch, options.timeoutMs, []);
-  const ranked = rankCatalogCards(query, [...liveCards, ...chaseCards], {
+  const [cachedCards, liveCards] = await Promise.all([
+    withOptionalTimeout(cachedCardsPromise, cachedLookupTimeoutMs(options.timeoutMs), []),
+    withOptionalTimeout(liveSearch, options.timeoutMs, []),
+  ]);
+  const ranked = rankCatalogCards(query, [...cachedCards, ...liveCards, ...chaseCards], {
     setName: card.setName ?? normalized.setName,
     limit: Math.max(safeLimit * 3, 12),
   });
@@ -127,9 +133,15 @@ export async function findAmbiguousCatalogCandidates(
   if (!query.trim()) return [];
 
   const chaseCards = searchChaseCards(query, card.setName ?? normalized.setName, Math.max(safeLimit * 2, 12));
+  const cachedCardsPromise = catalogSource.name === "pokemon-tcg-api"
+    ? findCachedCatalogCandidates(card, Math.max(safeLimit * 4, 24)).catch(() => [])
+    : Promise.resolve<CatalogCard[]>([]);
   const liveSearch = catalogSource.search(card, Math.max(safeLimit * 2, 12)).catch(() => []);
-  const liveCards = await withOptionalTimeout(liveSearch, options.timeoutMs, []);
-  const ranked = rankCatalogCards(query, [...liveCards, ...chaseCards], {
+  const [cachedCards, liveCards] = await Promise.all([
+    withOptionalTimeout(cachedCardsPromise, cachedLookupTimeoutMs(options.timeoutMs), []),
+    withOptionalTimeout(liveSearch, options.timeoutMs, []),
+  ]);
+  const ranked = rankCatalogCards(query, [...cachedCards, ...liveCards, ...chaseCards], {
     setName: card.setName ?? normalized.setName,
     limit: Math.max(safeLimit * 3, 16),
   });
@@ -290,10 +302,15 @@ function dedupeCatalogCards(cards: CatalogCard[]): CatalogCard[] {
 }
 
 async function findCachedCatalogMatch(card: CardRef): Promise<CatalogCard | null> {
-  if (!process.env.DATABASE_URL) return null;
+  const ranked = await findCachedCatalogCandidates(card, 8);
+  return ranked.find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null;
+}
+
+async function findCachedCatalogCandidates(card: CardRef, limit: number): Promise<CatalogCard[]> {
+  if (!process.env.DATABASE_URL) return [];
   const normalized = normalizeCatalogCardSearchInput(card.name, card.setName);
   const query = [normalized.name || card.name, normalized.number ?? card.number].filter(Boolean).join(" ");
-  if (!query.trim()) return null;
+  if (!query.trim()) return [];
 
   const rows = await getPrisma().card.findMany({
     where: {
@@ -310,10 +327,10 @@ async function findCachedCatalogMatch(card: CardRef): Promise<CatalogCard | null
       ],
     },
     orderBy: { updatedAt: "desc" },
-    take: 120,
+    take: Math.max(120, limit * 8),
   });
 
-  const ranked = rankCatalogCards(
+  return rankCatalogCards(
     query,
     rows.map((row) => ({
       game: row.game,
@@ -327,10 +344,8 @@ async function findCachedCatalogMatch(card: CardRef): Promise<CatalogCard | null
       tcgApiId: row.tcgApiId ?? undefined,
       tcgDexId: row.tcgDexId ?? undefined,
     })),
-    { setName: normalized.setName ?? card.setName, limit: 8 },
+    { setName: normalized.setName ?? card.setName, limit },
   );
-
-  return ranked.find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null;
 }
 
 function findChaseCatalogMatch(card: CardRef): CatalogCard | null {
@@ -342,4 +357,14 @@ function findChaseCatalogMatch(card: CardRef): CatalogCard | null {
     searchChaseCards(query, card.setName ?? normalized.setName, 5)
       .find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? buildPromoCatalogFallback(card)
   );
+}
+
+function findTimeoutCatalogFallback(card: CardRef): CatalogCard | null {
+  if (!requestHasExplicitCardNumber(card) && !card.tcgApiId) return null;
+  return findChaseCatalogMatch(card);
+}
+
+function cachedLookupTimeoutMs(timeoutMs: number | undefined): number | undefined {
+  if (!Number.isFinite(timeoutMs) || !timeoutMs || timeoutMs <= 0) return 2500;
+  return Math.max(1500, Math.min(timeoutMs, 2500));
 }

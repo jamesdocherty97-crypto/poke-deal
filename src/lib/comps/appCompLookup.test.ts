@@ -214,6 +214,27 @@ test("resolveCatalogCard uses known chase metadata when live catalog times out",
   assert.equal(resolved?.imageUrl, "https://images.pokemontcg.io/sv3pt5/199_hires.png");
 });
 
+test("resolveCatalogCard does not use chase timeout fallback for bare no-number searches", async () => {
+  const source = {
+    async resolve() {
+      return new Promise<CatalogCard | null>(() => undefined);
+    },
+    async search() {
+      return new Promise<CatalogCard[]>(() => undefined);
+    },
+  } as unknown as PokemonTcgApiCatalogSource;
+
+  const started = Date.now();
+  const resolved = await resolveCatalogCard(
+    { name: "Umbreon", setName: "Evolving Skies" },
+    source,
+    { timeoutMs: 10 },
+  );
+
+  assert.ok(Date.now() - started < 500, "slow catalog resolution should not block the comp flow");
+  assert.equal(resolved, null);
+});
+
 test("resolveCatalogCard can fall back to known promo metadata", async () => {
   const source = {
     async resolve() {
