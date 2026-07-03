@@ -3,6 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
 import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
 import {
   conditionAdjustedPricePence,
   rawConditionPriceFactor,
@@ -128,6 +129,7 @@ import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@
 import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
 import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
+import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
 import { CardImage, EmptyState, Metric, MoneyInput } from "./components/UiBits";
 
 const InventoryTab = dynamic(() => import("./components/InventoryTab").then((mod) => mod.InventoryTab));
@@ -1955,7 +1957,7 @@ export default function Home() {
       for (const [index, file] of selected.entries()) {
         const processed = await compressPhotoForUpload(file);
         const blob = await upload(
-          `inventory/${item.id}/${Date.now()}-${index}.jpg`,
+          inventoryPhotoUploadPath(item.id, index),
           processed.blob,
           {
             access: "public",
@@ -1982,6 +1984,86 @@ export default function Home() {
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Photo upload failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function addPhotoUrlToInventory(item: InventoryItem, url: string) {
+    const cleanUrl = url.trim();
+    if (!cleanUrl) return;
+    setBusy(`photo-${item.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const existingCount = item.photos?.length ?? 0;
+      const saveRes = await fetch(`/api/inventory/${item.id}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: cleanUrl,
+          role: inferPhotoRole(existingCount),
+          order: existingCount,
+        }),
+      });
+      const savePayload = await readJson(saveRes);
+      if (!saveRes.ok) throw new Error(savePayload.error ?? "Photo save failed");
+      setNotice("Photo URL added.");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Photo URL save failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteInventoryPhoto(item: InventoryItem, photoId: string) {
+    setBusy(`photo-${item.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/inventory/${item.id}/photos?photoId=${encodeURIComponent(photoId)}`, {
+        method: "DELETE",
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "Photo delete failed");
+      setNotice("Photo removed.");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Photo delete failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function moveInventoryPhoto(item: InventoryItem, photoId: string, direction: -1 | 1) {
+    const photos = item.photos ?? [];
+    const index = photos.findIndex((photo) => photo.id === photoId);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= photos.length) return;
+
+    const orderedIds = photos.map((photo) => photo.id);
+    const currentId = orderedIds[index];
+    const swapId = orderedIds[nextIndex];
+    if (!currentId || !swapId) return;
+    orderedIds[index] = swapId;
+    orderedIds[nextIndex] = currentId;
+
+    setBusy(`photo-${item.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/inventory/${item.id}/photos`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "Photo reorder failed");
+      setNotice("Photo order updated.");
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Photo reorder failed");
     } finally {
       setBusy(null);
     }
@@ -6966,6 +7048,9 @@ export default function Home() {
               onStatus={updateStatus}
               onDelete={requestDeleteItem}
               onPhotos={addPhotosToInventory}
+              onPhotoUrl={addPhotoUrlToInventory}
+              onMovePhoto={moveInventoryPhoto}
+              onDeletePhoto={deleteInventoryPhoto}
               onCopyListingCopy={(target, channel) => void copyInventoryListingCopy(target, channel)}
             />
           )}
@@ -7051,6 +7136,9 @@ export default function Home() {
           openInventoryEditor={openInventoryEditor}
           openSell={openSell}
           addPhotosToInventory={addPhotosToInventory}
+          addPhotoUrlToInventory={addPhotoUrlToInventory}
+          moveInventoryPhoto={moveInventoryPhoto}
+          deleteInventoryPhoto={deleteInventoryPhoto}
           copyStockListingCopy={(item, channel) => void copyInventoryListingCopy(item, channel)}
           copyListingCopy={(listing, channel) => void copyListingCopyForChannel(listing, channel)}
           openListingEditor={openListingEditor}
@@ -7773,6 +7861,7 @@ function ListingPackSheet({
           <strong>{gbp(pack.postage.pricePence)}</strong>
         </div>
       </div>
+      {item && <InventoryPhotoStrip item={item} />}
       {economics && (
         <div className={`listing-economics ${economics.profitPence >= 0 ? "good" : "warn"}`}>
           <div>
@@ -8139,6 +8228,9 @@ function InventoryRow({
   onStatus,
   onDelete,
   onPhotos,
+  onPhotoUrl,
+  onMovePhoto,
+  onDeletePhoto,
   onCopyListingCopy,
 }: {
   item: InventoryItem;
@@ -8151,6 +8243,9 @@ function InventoryRow({
   onStatus: (item: InventoryItem, status: ItemStatus) => void;
   onDelete: (item: InventoryItem) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
+  onPhotoUrl: (item: InventoryItem, url: string) => void;
+  onMovePhoto: (item: InventoryItem, photoId: string, direction: -1 | 1) => void;
+  onDeletePhoto: (item: InventoryItem, photoId: string) => void;
   onCopyListingCopy: (item: InventoryItem, channel: Channel) => void;
 }) {
   const draftListing = item.listings.find((row) => row.state === "DRAFT");
@@ -8297,23 +8392,15 @@ function InventoryRow({
           )}
           <details className="row-more-actions">
             <summary>More</summary>
+            <InventoryPhotoTools
+              item={item}
+              busy={busy}
+              onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
+              onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
+              onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
+              onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
+            />
             <div className="row-actions">
-              {item.status !== "SOLD" && (
-                <label className={`row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
-                  {busy === `photo-${item.id}` ? "Uploading..." : photoCount > 0 ? "Add photos" : "Photos"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    disabled={busy === `photo-${item.id}`}
-                    onChange={(event) => {
-                      const files = event.currentTarget.files;
-                      if (files) onPhotos(item, files);
-                      event.currentTarget.value = "";
-                    }}
-                  />
-                </label>
-              )}
               {item.status !== "SOLD" && (
                 <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
                   Comp
@@ -8758,35 +8845,6 @@ function inferPhotoRole(index: number): CardPhoto["role"] {
   if (index === 1) return "BACK";
   if (index === 2) return "SLAB";
   return "EXTRA";
-}
-
-async function compressPhotoForUpload(file: File): Promise<{ blob: Blob; width: number; height: number }> {
-  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
-  if (Math.max(width, height) < 500) {
-    bitmap.close();
-    throw new Error("Photo is too small for eBay. Use an image at least 500px on the longest side.");
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    bitmap.close();
-    throw new Error("Could not prepare photo.");
-  }
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((output) => {
-      if (output) resolve(output);
-      else reject(new Error("Could not compress photo."));
-    }, "image/jpeg", 0.85);
-  });
-  return { blob, width, height };
 }
 
 function toTitleCase(value: string): string {

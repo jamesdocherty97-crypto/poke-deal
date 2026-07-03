@@ -1,12 +1,14 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
+import {
+  ALLOWED_PHOTO_CONTENT_TYPES,
+  MAX_PHOTO_UPLOAD_BYTES,
+  validateInventoryPhotoUploadPath,
+} from "@/lib/photos/uploadPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
-const ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export async function POST(
   request: Request,
@@ -30,14 +32,11 @@ export async function POST(
           throw new Error("Inventory item not found.");
         }
 
-        const expectedPrefix = `inventory/${params.id}/`;
-        if (!pathname.startsWith(expectedPrefix)) {
-          throw new Error("Photo path does not match this inventory item.");
-        }
+        validateInventoryPhotoUploadPath(params.id, pathname);
 
         return {
-          allowedContentTypes: ALLOWED_CONTENT_TYPES,
-          maximumSizeInBytes: MAX_UPLOAD_BYTES,
+          allowedContentTypes: [...ALLOWED_PHOTO_CONTENT_TYPES],
+          maximumSizeInBytes: MAX_PHOTO_UPLOAD_BYTES,
           addRandomSuffix: true,
           allowOverwrite: false,
         };

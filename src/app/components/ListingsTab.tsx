@@ -3,6 +3,7 @@
 import type { FormEvent, ReactNode } from "react";
 import type { ListingSort, ListingStateFilter } from "@/lib/dealer/tableControls";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
+import { InventoryPhotoTools } from "./InventoryPhotoTools";
 import { CardImage, EmptyState, Metric } from "./UiBits";
 
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
@@ -65,6 +66,9 @@ export function ListingsTab({
   openInventoryEditor,
   openSell,
   addPhotosToInventory,
+  addPhotoUrlToInventory,
+  moveInventoryPhoto,
+  deleteInventoryPhoto,
   copyStockListingCopy,
   copyListingCopy,
   openListingEditor,
@@ -119,6 +123,9 @@ export function ListingsTab({
   openInventoryEditor: (item: InventoryItem) => void;
   openSell: (item: InventoryItem) => void;
   addPhotosToInventory: (item: InventoryItem, files: FileList | File[]) => void;
+  addPhotoUrlToInventory: (item: InventoryItem, url: string) => void;
+  moveInventoryPhoto: (item: InventoryItem, photoId: string, direction: -1 | 1) => void;
+  deleteInventoryPhoto: (item: InventoryItem, photoId: string) => void;
   copyStockListingCopy: (item: InventoryItem, channel: Channel) => void;
   copyListingCopy: (listing: Listing, channel: Channel) => void;
   openListingEditor: (listing: Listing) => void;
@@ -303,6 +310,9 @@ export function ListingsTab({
                 onEdit={openInventoryEditor}
                 onSell={openSell}
                 onPhotos={addPhotosToInventory}
+                onPhotoUrl={addPhotoUrlToInventory}
+                onMovePhoto={moveInventoryPhoto}
+                onDeletePhoto={deleteInventoryPhoto}
                 onCopy={copyStockListingCopy}
               />
             ))}
@@ -442,6 +452,9 @@ function ListingQueueRow({
   onEdit,
   onSell,
   onPhotos,
+  onPhotoUrl,
+  onMovePhoto,
+  onDeletePhoto,
   onCopy,
 }: {
   item: InventoryItem;
@@ -450,6 +463,9 @@ function ListingQueueRow({
   onEdit: (item: InventoryItem) => void;
   onSell: (item: InventoryItem) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
+  onPhotoUrl: (item: InventoryItem, url: string) => void;
+  onMovePhoto: (item: InventoryItem, photoId: string, direction: -1 | 1) => void;
+  onDeletePhoto: (item: InventoryItem, photoId: string) => void;
   onCopy: (item: InventoryItem, channel: Channel) => void;
 }) {
   const stockNotes = [item.condition, item.graderCert ? `cert ${item.graderCert}` : null, item.location]
@@ -474,21 +490,15 @@ function ListingQueueRow({
         </p>
         {stockNotes && <p>{stockNotes}</p>}
         {photoCount > 0 && <p>{photoCount} real photo{photoCount === 1 ? "" : "s"} ready for eBay</p>}
+        <InventoryPhotoTools
+          item={item}
+          busy={busy}
+          onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
+          onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
+          onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
+          onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
+        />
         <div className="row-actions">
-          <label className={`row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
-            {busy === `photo-${item.id}` ? "Uploading..." : photoCount > 0 ? "Add photos" : "Photos"}
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              disabled={busy === `photo-${item.id}`}
-              onChange={(event) => {
-                const files = event.currentTarget.files;
-                if (files) onPhotos(item, files);
-                event.currentTarget.value = "";
-              }}
-            />
-          </label>
           <button
             type="button"
             onClick={() => onDraft(item)}
