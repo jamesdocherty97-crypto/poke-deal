@@ -2,7 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
-import { type FormEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
 import {
   isCatalogPhotoEligible,
@@ -3633,6 +3633,50 @@ export default function Home() {
     setName(value);
   }
 
+  function focusSuggestionList(listboxId: string) {
+    const listbox = document.getElementById(listboxId);
+    const firstOption = listbox?.querySelector<HTMLElement>("[role='option'], button");
+    firstOption?.focus();
+  }
+
+  function handleSuggestionInputKeyDown(
+    event: KeyboardEvent<HTMLInputElement>,
+    listboxId: string,
+    hasOptions: boolean,
+    options: { onEnter?: () => void; onEscape?: () => void } = {},
+  ) {
+    if ((event.key === "ArrowDown" || event.key === "Down") && hasOptions) {
+      event.preventDefault();
+      focusSuggestionList(listboxId);
+      return;
+    }
+    if (event.key === "Escape") {
+      options.onEscape?.();
+      return;
+    }
+    if (event.key === "Enter" && options.onEnter) {
+      event.preventDefault();
+      options.onEnter();
+    }
+  }
+
+  function handleSuggestionListKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "ArrowDown" && event.key !== "Down" && event.key !== "ArrowUp" && event.key !== "Up") {
+      return;
+    }
+    const options = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>("[role='option'], button"),
+    ).filter((element) => !element.hasAttribute("disabled"));
+    if (options.length === 0) return;
+    event.preventDefault();
+    const currentIndex = options.indexOf(document.activeElement as HTMLElement);
+    const direction = event.key === "ArrowUp" || event.key === "Up" ? -1 : 1;
+    const nextIndex = currentIndex < 0
+      ? direction > 0 ? 0 : options.length - 1
+      : (currentIndex + direction + options.length) % options.length;
+    options[nextIndex]?.focus();
+  }
+
   function applyTypedCardIdentity() {
     const parsed = normalizeCatalogCardSearchInput(name, setNameValue);
     const shouldApplyParsedFields = Boolean(
@@ -5528,10 +5572,15 @@ export default function Home() {
                   onFocus={() => setCardSuggestionsOpen(true)}
                   onBlur={() => setTimeout(() => setCardSuggestionsOpen(false), 150)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" && quickIntake.trim()) {
-                      event.preventDefault();
-                      applyQuickIntake({ lookupAfter: true });
-                    }
+                    handleSuggestionInputKeyDown(
+                      event,
+                      "smart-card-suggestions",
+                      cardSuggestionsOpen && (cardSuggestions.length > 0 || Boolean(typedFallbackSuggestion)),
+                      {
+                        onEnter: quickIntake.trim() ? () => applyQuickIntake({ lookupAfter: true }) : undefined,
+                        onEscape: () => setCardSuggestionsOpen(false),
+                      },
+                    );
                   }}
                   placeholder="Umbreon prismatic, Victini promo, Lugia Neo Genesis CGC 1.5..."
                   autoComplete="off"
@@ -5557,22 +5606,30 @@ export default function Home() {
                 )}
               </div>
               {cardSuggestionsOpen && quickIntake.trim() && (cardSuggestions.length > 0 || typedFallbackSuggestion) && (
-                <div className="smart-card-suggestions" role="listbox" aria-label="Card suggestions">
+                <div
+                  id="smart-card-suggestions"
+                  className="suggestion-listbox smart-card-suggestions"
+                  role="listbox"
+                  aria-label="Card suggestions"
+                  onKeyDown={handleSuggestionListKeyDown}
+                >
                   {cardSuggestions.map((card) => (
                     <article
                       key={card.tcgApiId ?? card.tcgDexId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
-                      className="suggestion-item card-option smart-card-suggestion-card"
+                      className="suggestion-row card-suggestion-row smart-card-suggestion-card"
                     >
                       <CardImage src={card.imageUrl ?? null} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
-                      <div className="smart-suggestion-main">
-                        <span>{card.name}</span>
-                        <small>{catalogSuggestionMeta(card)}</small>
-                        <div className="suggestion-badges" aria-label="Candidate details">
-                          {catalogSuggestionBadges(card).map((badge) => (
-                            <em key={badge}>{badge}</em>
-                          ))}
-                        </div>
-                      </div>
+                      <span className="suggestion-name">
+                        <strong>{card.name}</strong>
+                        {card.rarity && <small>{card.rarity}</small>}
+                      </span>
+                      <span className="suggestion-set">
+                        <strong>{card.setName}</strong>
+                        <small>{card.sourceLabel ?? card.matchLabel ?? "Catalog"}</small>
+                      </span>
+                      <span className="suggestion-number">
+                        <strong>{card.number ? `#${card.number}` : "-"}</strong>
+                      </span>
                       <div className="smart-suggestion-actions">
                         <button type="button" onClick={() => chooseCard(card, { lookupAfter: false })}>
                           Fill
@@ -5584,20 +5641,22 @@ export default function Home() {
                     </article>
                   ))}
                   {typedFallbackSuggestion && (
-                    <article className="suggestion-item card-option typed-fallback-option smart-card-suggestion-card" role="presentation">
+                    <article
+                      className="suggestion-row card-suggestion-row typed-fallback-option smart-card-suggestion-card"
+                    >
                       <span className="suggestion-card-art blank" aria-hidden="true" />
-                      <div className="smart-suggestion-main">
-                        <span>{typedFallbackSuggestion.name}</span>
-                        <small>
-                          {typedFallbackSuggestion.setName || "Manual card"}
-                          {typedFallbackSuggestion.number ? ` #${typedFallbackSuggestion.number}` : " · manual identity"} ·{" "}
-                          {typedFallbackSuggestion.grade.replace(/_/g, " ")}
-                        </small>
-                        <div className="suggestion-badges" aria-label="Candidate details">
-                          <em>Manual entry</em>
-                          <em>Can stock</em>
-                        </div>
-                      </div>
+                      <span className="suggestion-name">
+                        <strong>{typedFallbackSuggestion.name}</strong>
+                        <small>{typedFallbackSuggestion.grade.replace(/_/g, " ")}</small>
+                      </span>
+                      <span className="suggestion-set">
+                        <strong>{typedFallbackSuggestion.setName || "Manual card"}</strong>
+                        <small>Manual entry</small>
+                      </span>
+                      <span className="suggestion-number">
+                        <strong>{typedFallbackSuggestion.number ? `#${typedFallbackSuggestion.number}` : "-"}</strong>
+                        <small>Can stock</small>
+                      </span>
                       <div className="smart-suggestion-actions">
                         <button
                           type="button"
@@ -5806,26 +5865,46 @@ export default function Home() {
                   applyTypedCardIdentity();
                   setTimeout(() => setCardSuggestionsOpen(false), 150);
                 }}
+                onKeyDown={(event) => {
+                  handleSuggestionInputKeyDown(
+                    event,
+                    "field-card-suggestions",
+                    cardSuggestionsOpen && cardSuggestions.length > 0,
+                    { onEscape: () => setCardSuggestionsOpen(false) },
+                  );
+                }}
                 placeholder="Charizard, Moonbreon, Mr Mime..."
                 autoComplete="off"
               />
               {cardSuggestionsOpen && cardSuggestions.length > 0 && (
-                <div className="set-suggestions card-suggestions" role="listbox" aria-label="Card suggestions">
+                <div
+                  id="field-card-suggestions"
+                  className="suggestion-listbox set-suggestions card-suggestions"
+                  role="listbox"
+                  aria-label="Card suggestions"
+                  onKeyDown={handleSuggestionListKeyDown}
+                >
                   {cardSuggestions.map((card) => (
                     <button
                       key={card.tcgApiId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
                       type="button"
-                      className="suggestion-item card-option"
+                      className="suggestion-row card-suggestion-row"
+                      role="option"
+                      aria-selected="false"
                       onClick={() => chooseCard(card)}
                     >
-                      {card.imageUrl ? (
-                        <CardImage src={card.imageUrl} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
-                      ) : null}
-                      <span>{card.name}</span>
-                      <small>
-                        {catalogSuggestionMeta(card)}
-                        {card.sourceLabel ? ` · ${card.sourceLabel}` : ""}
-                      </small>
+                      <CardImage src={card.imageUrl ?? null} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
+                      <span className="suggestion-name">
+                        <strong>{card.name}</strong>
+                        {card.rarity && <small>{card.rarity}</small>}
+                      </span>
+                      <span className="suggestion-set">
+                        <strong>{card.setName}</strong>
+                        <small>{card.sourceLabel ?? card.matchLabel ?? "Catalog"}</small>
+                      </span>
+                      <span className="suggestion-number">
+                        <strong>{card.number ? `#${card.number}` : "-"}</strong>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -5842,16 +5921,45 @@ export default function Home() {
                   }}
                   onFocus={() => setSetSuggestionsOpen(true)}
                   onBlur={() => setTimeout(() => setSetSuggestionsOpen(false), 150)}
+                  onKeyDown={(event) => {
+                    handleSuggestionInputKeyDown(
+                      event,
+                      "field-set-suggestions",
+                      setSuggestionsOpen && setSuggestions.length > 0,
+                      { onEscape: () => setSetSuggestionsOpen(false) },
+                    );
+                  }}
                   placeholder="base set, evo skies, PRE..."
                   autoComplete="off"
                 />
                 {setSuggestionsOpen && setSuggestions.length > 0 && (
-                  <div className="set-suggestions" role="listbox" aria-label="Set suggestions">
+                  <div
+                    id="field-set-suggestions"
+                    className="suggestion-listbox set-suggestions"
+                    role="listbox"
+                    aria-label="Set suggestions"
+                    onKeyDown={handleSuggestionListKeyDown}
+                  >
                     {setSuggestions.map((set) => (
-                      <button key={set.id} type="button" className="suggestion-item" onClick={() => chooseSet(set)}>
-                        {set.symbolUrl ? <img src={set.symbolUrl} alt="" onError={hideBrokenImage} /> : null}
-                        <span>{set.name}</span>
-                        <small>{setMetaLabel(set)}</small>
+                      <button
+                        key={set.id}
+                        type="button"
+                        className="suggestion-row set-suggestion-row"
+                        role="option"
+                        aria-selected="false"
+                        onClick={() => chooseSet(set)}
+                      >
+                        <span className="suggestion-card-art set-symbol-cell">
+                          {set.symbolUrl ? <img src={set.symbolUrl} alt="" onError={hideBrokenImage} /> : null}
+                        </span>
+                        <span className="suggestion-name">
+                          <strong>{set.name}</strong>
+                          <small>{set.series ?? "Pokemon TCG"}</small>
+                        </span>
+                        <span className="suggestion-set">
+                          <strong>{set.ptcgoCode ?? set.id}</strong>
+                          <small>{set.releaseDate ?? "Set"}</small>
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -9202,15 +9310,6 @@ function soldAtIso(value: string): string | undefined {
 function setMetaLabel(set: CatalogSet): string {
   const year = set.releaseDate?.slice(0, 4);
   return [set.ptcgoCode, year].filter(Boolean).join(" · ") || set.series || "set";
-}
-
-function catalogSuggestionMeta(card: CatalogCard): string {
-  const variant = "variantLabel" in card && typeof card.variantLabel === "string" ? card.variantLabel : null;
-  return [card.setName, variant ?? (card.number ? `#${card.number}` : "manual identity")].filter(Boolean).join(" · ");
-}
-
-function catalogSuggestionBadges(card: CatalogSuggestion): string[] {
-  return [card.matchLabel, card.sourceLabel, card.rarity].filter((badge): badge is string => Boolean(badge?.trim())).slice(0, 3);
 }
 
 function cardIdentitySearchText(
