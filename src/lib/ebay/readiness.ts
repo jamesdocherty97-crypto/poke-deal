@@ -17,6 +17,9 @@ export interface EbayReadinessInput {
   externalRef: string | null;
   hasImage: boolean;
   sellerRegistrationCompleted?: boolean | null;
+  locationSetupConfigured?: boolean;
+  locationCreateAvailable?: boolean;
+  merchantLocationKey?: string | null;
 }
 
 export interface EbayReadinessResult {
@@ -50,10 +53,7 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
     key: "merchant_location",
     label: "Seller location",
     status: input.hasMerchantLocation === false ? "warn" : "pass",
-    detail:
-      input.hasMerchantLocation === false
-        ? "No merchant location key found; offer creation may ask for one in eBay business settings"
-        : undefined,
+    detail: sellerLocationDetail(input),
   });
 
   if (input.sellerRegistrationCompleted !== undefined) {
@@ -118,4 +118,17 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
       input.sellerRegistrationCompleted !== false,
     checks,
   };
+}
+
+function sellerLocationDetail(input: EbayReadinessInput): string | undefined {
+  if (input.hasMerchantLocation !== false) return undefined;
+  if (!input.locationSetupConfigured) {
+    return "Seller location env vars are missing; add EBAY_LOCATION_* env vars or fill the location form before creating an offer";
+  }
+  if (input.locationCreateAvailable) {
+    return input.merchantLocationKey
+      ? `Merchant location ${input.merchantLocationKey} is configured but not found on eBay; tap Create seller location to create it`
+      : "Seller location details are configured; tap Create seller location before creating an offer";
+  }
+  return "No merchant location key found on eBay; create the seller location before creating an offer";
 }

@@ -6,6 +6,7 @@ import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { upsertInventoryItem } from "@/lib/ebay/inventoryItem";
 import { createEbayOffer, getOfferBySku, updateEbayOffer } from "@/lib/ebay/offer";
 import { buildEbayOfferPreflight } from "@/lib/ebay/preflight";
+import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -114,11 +115,15 @@ export async function POST(
       sku: preflight.sku,
       title: preflight.title,
       priceGbp: preflight.priceGbp,
+      policySummary: preflight.policySummary,
       message: "eBay offer created. Review and publish when ready.",
     });
   } catch (err) {
+    if (isEbayApiError(err)) {
+      console.error("[ebay] offer creation failed", ebayApiErrorLogBody(err));
+    }
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "eBay offer creation failed" },
+      ebayApiErrorResponseBody(err, "eBay offer creation failed"),
       { status: 500 },
     );
   }

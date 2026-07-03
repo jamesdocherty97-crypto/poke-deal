@@ -7,6 +7,7 @@ import { fetchEbaySellingPrivileges } from "@/lib/ebay/policies";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { readEbayLocationSetup } from "@/lib/ebay/location";
 import { addTradingFixedPriceItem } from "@/lib/ebay/trading";
+import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -119,8 +120,11 @@ export async function POST(
       message: "Listing published on eBay.",
     });
   } catch (err) {
+    if (isEbayApiError(err)) {
+      console.error("[ebay] publish failed", ebayApiErrorLogBody(err));
+    }
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "eBay publish failed" },
+      ebayApiErrorResponseBody(err, "eBay publish failed"),
       { status: 500 },
     );
   }
@@ -183,10 +187,10 @@ async function publishViaTradingApiFallback({
   } catch (err) {
     const message = err instanceof Error ? err.message : "eBay publish failed";
     if (/additional information to create a seller'?s account|incomplete account information/i.test(message)) {
+      console.error("[ebay] trading publish seller-account block", { error: message });
       return NextResponse.json(
         {
-          error:
-            "eBay is still blocking API listing until seller-account setup is complete. Publish one real listing manually in eBay, or complete any seller payments/identity prompt eBay shows, then try again in Poke Deal.",
+          error: `${message}. eBay is still blocking API listing until seller-account setup is complete. Publish one real listing manually in eBay, or complete any seller payments/identity prompt eBay shows, then try again in Poke Deal.`,
         },
         { status: 409 },
       );

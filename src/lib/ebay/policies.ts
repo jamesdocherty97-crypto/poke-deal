@@ -3,18 +3,40 @@
 
 import type { EbayConfig } from "./config.js";
 import { ebayJson } from "./client.js";
+import { readEbayLocationSetup } from "./location.js";
+
+export interface EbayPolicySelection {
+  id: string;
+  name?: string;
+  default?: boolean;
+}
+
+export interface EbayMerchantLocationSelection {
+  merchantLocationKey: string;
+  name?: string;
+  status?: string;
+  configuredKeyMatched?: boolean;
+}
 
 export interface EbayPolicies {
   paymentPolicyId: string;
   fulfillmentPolicyId: string;
   returnPolicyId: string;
   merchantLocationKey: string | null;
+  paymentPolicy?: EbayPolicySelection;
+  fulfillmentPolicy?: EbayPolicySelection;
+  returnPolicy?: EbayPolicySelection;
+  merchantLocation?: EbayMerchantLocationSelection | null;
+  configuredMerchantLocationKey?: string | null;
+  configuredMerchantLocationFound?: boolean;
 }
 
 interface PolicyEntry {
   paymentPolicyId?: string;
   fulfillmentPolicyId?: string;
   returnPolicyId?: string;
+  name?: string;
+  categoryTypes?: Array<{ name?: string; default?: boolean }>;
 }
 
 interface PolicyListResponse {
@@ -24,7 +46,7 @@ interface PolicyListResponse {
 }
 
 interface LocationListResponse {
-  locations?: Array<{ merchantLocationKey?: string }>;
+  locations?: Array<{ merchantLocationKey?: string; name?: string; merchantLocationStatus?: string }>;
 }
 
 export async function fetchEbayPolicies(
@@ -65,9 +87,12 @@ export async function fetchEbayPolicies(
     ).catch(() => ({ locations: [] }) as LocationListResponse),
   ]);
 
-  const paymentPolicyId = payment.paymentPolicies?.[0]?.paymentPolicyId;
-  const fulfillmentPolicyId = fulfillment.fulfillmentPolicies?.[0]?.fulfillmentPolicyId;
-  const returnPolicyId = returns.returnPolicies?.[0]?.returnPolicyId;
+  const paymentPolicy = selectPolicy(payment.paymentPolicies ?? [], "paymentPolicyId");
+  const fulfillmentPolicy = selectPolicy(fulfillment.fulfillmentPolicies ?? [], "fulfillmentPolicyId");
+  const returnPolicy = selectPolicy(returns.returnPolicies ?? [], "returnPolicyId");
+  const paymentPolicyId = paymentPolicy?.id;
+  const fulfillmentPolicyId = fulfillmentPolicy?.id;
+  const returnPolicyId = returnPolicy?.id;
 
   if (!paymentPolicyId || !fulfillmentPolicyId || !returnPolicyId) {
     const missing = [
@@ -83,9 +108,61 @@ export async function fetchEbayPolicies(
     );
   }
 
-  const merchantLocationKey = locations.locations?.[0]?.merchantLocationKey ?? null;
+  const configuredMerchantLocationKey =
+    process.env.EBAY_MERCHANT_LOCATION_KEY?.trim() || readEbayLocationSetup()?.merchantLocationKey || null;
+  const merchantLocation = selectMerchantLocation(locations.locations ?? [], configuredMerchantLocationKey);
+  const merchantLocationKey = merchantLocation?.merchantLocationKey ?? null;
 
-  return { paymentPolicyId, fulfillmentPolicyId, returnPolicyId, merchantLocationKey };
+  return {
+    paymentPolicyId,
+    fulfillmentPolicyId,
+    returnPolicyId,
+    merchantLocationKey,
+    paymentPolicy,
+    fulfillmentPolicy,
+    returnPolicy,
+    merchantLocation,
+    configuredMerchantLocationKey,
+    configuredMerchantLocationFound: configuredMerchantLocationKey ? Boolean(merchantLocation?.configuredKeyMatched) : undefined,
+  };
+}
+
+function selectPolicy(entries: PolicyEntry[], idKey: keyof Pick<PolicyEntry, "paymentPolicyId" | "fulfillmentPolicyId" | "returnPolicyId">): EbayPolicySelection | null {
+  const withIds = entries.filter((entry) => entry[idKey]);
+  const selected = withIds.find((entry) => entry.categoryTypes?.some((category) => category.default)) ?? withIds[0];
+  const id = selected?.[idKey];
+  if (!id) return null;
+  return {
+    id,
+    name: selected.name,
+    default: selected.categoryTypes?.some((category) => category.default) ?? false,
+  };
+}
+
+function selectMerchantLocation(
+  locations: NonNullable<LocationListResponse["locations"]>,
+  configuredMerchantLocationKey: string | null,
+): EbayMerchantLocationSelection | null {
+  const enabled = locations.filter((location) => location.merchantLocationKey);
+  if (configuredMerchantLocationKey) {
+    const matched = enabled.find((location) => location.merchantLocationKey === configuredMerchantLocationKey);
+    return matched?.merchantLocationKey
+      ? {
+          merchantLocationKey: matched.merchantLocationKey,
+          name: matched.name,
+          status: matched.merchantLocationStatus,
+          configuredKeyMatched: true,
+        }
+      : null;
+  }
+  const first = enabled[0];
+  return first?.merchantLocationKey
+    ? {
+        merchantLocationKey: first.merchantLocationKey,
+        name: first.name,
+        status: first.merchantLocationStatus,
+      }
+    : null;
 }
 
 export interface EbaySellingPrivileges {

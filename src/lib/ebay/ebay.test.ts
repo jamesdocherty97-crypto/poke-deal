@@ -1,13 +1,16 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { buildAuthUrl, exchangeCodeForTokens, refreshAccessToken } from "./oauth.js";
+import { ebayJson } from "./client.js";
 import { buildInventoryItemPayload, upsertInventoryItem } from "./inventoryItem.js";
 import { buildOfferPayload } from "./offer.js";
 import { buildEbayOfferPreflight, toEbaySku } from "./preflight.js";
 import {
+  EbayTradingApiError,
   buildTradingFixedPriceItemXml,
   buildTradingVerifyFixedPriceItemXml,
   parseTradingApiResult,
+  verifyTradingFixedPriceItem,
 } from "./trading.js";
 import { getAccessToken, clearTokenCache } from "./tokens.js";
 import { fetchEbayPolicies } from "./policies.js";
@@ -55,6 +58,25 @@ function mockFetch(
       text: () => Promise.resolve(JSON.stringify(body)),
     } as Response);
 }
+
+test("ebayJson includes eBay errorId and long message on failure", async () => {
+  const fetch = mockFetch(400, {
+    errors: [
+      {
+        errorId: 25002,
+        domain: "API_INVENTORY",
+        category: "REQUEST",
+        message: "Invalid request",
+        longMessage: "Merchant location key is invalid.",
+      },
+    ],
+  });
+
+  await assert.rejects(
+    () => ebayJson(TEST_CONFIG, "/sell/inventory/v1/offer", "token-xyz", {}, fetch),
+    /Merchant location key is invalid\. \(errorId 25002\)/,
+  );
+});
 
 // ── not-configured mode ───────────────────────────────────────────────────────
 
@@ -365,6 +387,10 @@ test("buildEbayOfferPreflight previews inventory and offer payloads without writ
   assert.equal(preflight.policyKeys.fulfillmentPolicyId, true);
   assert.equal(preflight.policyKeys.returnPolicyId, true);
   assert.equal(preflight.policyKeys.merchantLocationKey, true);
+  assert.equal(preflight.policySummary.payment.id, "pay-001");
+  assert.equal(preflight.policySummary.fulfillment.id, "ship-001");
+  assert.equal(preflight.policySummary.returns.id, "ret-001");
+  assert.equal(preflight.policySummary.merchantLocation.key, "uk-loc-1");
   assert.deepEqual(preflight.inventoryItem.product.imageUrls, ["https://blob.vercel-storage.com/charizard-front.jpg"]);
   assert.equal(preflight.offer.sku, preflight.sku);
   assert.equal(preflight.offer.availableQuantity, 2);
@@ -463,6 +489,45 @@ test("parseTradingApiResult captures ack item id and errors", () => {
   });
 });
 
+test("verifyTradingFixedPriceItem throws Trading API error with eBay error code", async () => {
+  const fetch: typeof globalThis.fetch = () =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve(`
+        <VerifyAddFixedPriceItemResponse>
+          <Ack>Failure</Ack>
+          <Errors>
+            <ShortMessage>Missing picture.</ShortMessage>
+            <LongMessage>Picture URL is required.</LongMessage>
+            <ErrorCode>21916603</ErrorCode>
+            <SeverityCode>Error</SeverityCode>
+          </Errors>
+        </VerifyAddFixedPriceItemResponse>
+      `),
+    } as Response);
+
+  await assert.rejects(
+    () => verifyTradingFixedPriceItem(
+      TEST_CONFIG,
+      "token-xyz",
+      {
+        listingId: "pdos-test",
+        packInput: rawInput,
+        quantity: 1,
+        imageUrls: [],
+        policies: MOCK_POLICIES,
+      },
+      fetch,
+    ),
+    (error) => {
+      assert.equal(error instanceof EbayTradingApiError, true);
+      assert.match((error as Error).message, /Picture URL is required\. \(errorId 21916603\)/);
+      return true;
+    },
+  );
+});
+
 // ── merchant location setup ───────────────────────────────────────────────────
 
 test("readEbayLocationSetup reads the seller location from env-style config", () => {
@@ -488,7 +553,6 @@ test("readEbayLocationSetup reads the seller location from env-style config", ()
 
 test("missingEbayLocationSetupFields reports required setup env vars", () => {
   assert.deepEqual(missingEbayLocationSetupFields({}), [
-    "EBAY_MERCHANT_LOCATION_KEY",
     "EBAY_LOCATION_ADDRESS_LINE1",
     "EBAY_LOCATION_CITY",
     "EBAY_LOCATION_POSTAL_CODE",
@@ -502,6 +566,16 @@ test("missingEbayLocationSetupFields reports required setup env vars", () => {
     }),
     [],
   );
+});
+
+test("readEbayLocationSetup defaults the merchant key when the env key is omitted", () => {
+  const setup = readEbayLocationSetup({
+    EBAY_LOCATION_ADDRESS_LINE1: "10 Test Street",
+    EBAY_LOCATION_CITY: "Manchester",
+    EBAY_LOCATION_POSTAL_CODE: "M1 1AA",
+  });
+
+  assert.equal(setup?.merchantLocationKey, "pdos-main");
 });
 
 test("readEbayLocationSetupInput normalizes app-submitted seller location details", () => {
@@ -612,6 +686,8 @@ test("createInventoryLocation posts to the configured merchant location key", as
 // ── fetchEbayPolicies ─────────────────────────────────────────────────────────
 
 test("fetchEbayPolicies maps first policy of each type", async () => {
+  const savedKey = process.env.EBAY_MERCHANT_LOCATION_KEY;
+  delete process.env.EBAY_MERCHANT_LOCATION_KEY;
   const fetch: typeof globalThis.fetch = (url) => {
     const path = String(url);
     if (path.includes("payment_policy")) {
@@ -646,6 +722,92 @@ test("fetchEbayPolicies maps first policy of each type", async () => {
   assert.equal(policies.fulfillmentPolicyId, "SHIP-456");
   assert.equal(policies.returnPolicyId, "RET-789");
   assert.equal(policies.merchantLocationKey, "LOC-GB");
+  if (savedKey) process.env.EBAY_MERCHANT_LOCATION_KEY = savedKey;
+});
+
+test("fetchEbayPolicies picks eBay default policies and reports names", async () => {
+  const savedKey = process.env.EBAY_MERCHANT_LOCATION_KEY;
+  delete process.env.EBAY_MERCHANT_LOCATION_KEY;
+  const fetch: typeof globalThis.fetch = (url) => {
+    const path = String(url);
+    if (path.includes("payment_policy")) {
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve({
+          paymentPolicies: [
+            { paymentPolicyId: "PAY-OLD", name: "Old payment" },
+            { paymentPolicyId: "PAY-DEFAULT", name: "Default payment", categoryTypes: [{ default: true }] },
+          ],
+        }),
+      } as Response);
+    }
+    if (path.includes("fulfillment_policy")) {
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve({
+          fulfillmentPolicies: [
+            { fulfillmentPolicyId: "SHIP-OLD", name: "Old shipping" },
+            { fulfillmentPolicyId: "SHIP-DEFAULT", name: "Default shipping", categoryTypes: [{ default: true }] },
+          ],
+        }),
+      } as Response);
+    }
+    if (path.includes("return_policy")) {
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve({
+          returnPolicies: [
+            { returnPolicyId: "RET-OLD", name: "Old returns" },
+            { returnPolicyId: "RET-DEFAULT", name: "Default returns", categoryTypes: [{ default: true }] },
+          ],
+        }),
+      } as Response);
+    }
+    return Promise.resolve({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ locations: [{ merchantLocationKey: "LOC-GB", name: "Glasgow", merchantLocationStatus: "ENABLED" }] }),
+    } as Response);
+  };
+
+  const policies = await fetchEbayPolicies(TEST_CONFIG, "token-xyz", fetch);
+
+  assert.equal(policies.paymentPolicyId, "PAY-DEFAULT");
+  assert.equal(policies.paymentPolicy?.name, "Default payment");
+  assert.equal(policies.paymentPolicy?.default, true);
+  assert.equal(policies.fulfillmentPolicyId, "SHIP-DEFAULT");
+  assert.equal(policies.returnPolicyId, "RET-DEFAULT");
+  assert.deepEqual(policies.merchantLocation, {
+    merchantLocationKey: "LOC-GB",
+    name: "Glasgow",
+    status: "ENABLED",
+  });
+  if (savedKey) process.env.EBAY_MERCHANT_LOCATION_KEY = savedKey;
+});
+
+test("fetchEbayPolicies reports when the configured merchant location is absent on eBay", async () => {
+  const savedKey = process.env.EBAY_MERCHANT_LOCATION_KEY;
+  process.env.EBAY_MERCHANT_LOCATION_KEY = "pdos-main";
+  const fetch: typeof globalThis.fetch = (url) => {
+    const path = String(url);
+    if (path.includes("payment_policy")) {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ paymentPolicies: [{ paymentPolicyId: "PAY-123" }] }) } as Response);
+    }
+    if (path.includes("fulfillment_policy")) {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ fulfillmentPolicies: [{ fulfillmentPolicyId: "SHIP-456" }] }) } as Response);
+    }
+    if (path.includes("return_policy")) {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ returnPolicies: [{ returnPolicyId: "RET-789" }] }) } as Response);
+    }
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ locations: [{ merchantLocationKey: "other-location" }] }) } as Response);
+  };
+
+  const policies = await fetchEbayPolicies(TEST_CONFIG, "token-xyz", fetch);
+
+  assert.equal(policies.configuredMerchantLocationKey, "pdos-main");
+  assert.equal(policies.configuredMerchantLocationFound, false);
+  assert.equal(policies.merchantLocationKey, null);
+  if (savedKey) process.env.EBAY_MERCHANT_LOCATION_KEY = savedKey;
+  else delete process.env.EBAY_MERCHANT_LOCATION_KEY;
 });
 
 test("fetchEbayPolicies throws when payment policy is missing", async () => {
@@ -699,14 +861,28 @@ test("checkEbayReadiness returns ready when all checks pass", () => {
 });
 
 test("checkEbayReadiness allows preflight but blocks offer writes when merchant location is missing", () => {
-  const result = checkEbayReadiness({ ...READY_INPUT, hasMerchantLocation: false });
+  const result = checkEbayReadiness({
+    ...READY_INPUT,
+    hasMerchantLocation: false,
+    locationSetupConfigured: true,
+    locationCreateAvailable: true,
+    merchantLocationKey: "pdos-main",
+  });
 
   assert.equal(result.ready, true);
   assert.equal(result.offerReady, false);
   assert.equal(result.publishReady, false);
   const check = result.checks.find((c) => c.key === "merchant_location");
   assert.equal(check?.status, "warn");
-  assert.match(check?.detail ?? "", /merchant location key/);
+  assert.match(check?.detail ?? "", /pdos-main/);
+  assert.match(check?.detail ?? "", /Create seller location/);
+});
+
+test("checkEbayReadiness reports missing seller-location env setup", () => {
+  const result = checkEbayReadiness({ ...READY_INPUT, hasMerchantLocation: false, locationSetupConfigured: false });
+  const check = result.checks.find((c) => c.key === "merchant_location");
+  assert.equal(result.offerReady, false);
+  assert.match(check?.detail ?? "", /env vars are missing/);
 });
 
 test("checkEbayReadiness allows offer prep but blocks publish when seller registration is incomplete", () => {

@@ -2,6 +2,7 @@
 // Adds Authorization + marketplace headers. Throws on non-ok with eBay error detail.
 
 import type { EbayConfig } from "./config.js";
+import { readEbayApiError } from "./errors.js";
 
 export async function ebayFetch(
   config: EbayConfig,
@@ -37,16 +38,7 @@ export async function ebayJson<T>(
 ): Promise<T> {
   const response = await ebayFetch(config, path, accessToken, options, fetchImpl);
   if (!response.ok) {
-    let msg = `HTTP ${response.status}`;
-    try {
-      const body = (await response.json()) as {
-        errors?: Array<{ longMessage?: string; message?: string }>;
-      };
-      msg = body.errors?.[0]?.longMessage ?? body.errors?.[0]?.message ?? msg;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(`eBay API (${path}): ${msg}`);
+    throw await readEbayApiError(response, path);
   }
   return (await response.json()) as T;
 }

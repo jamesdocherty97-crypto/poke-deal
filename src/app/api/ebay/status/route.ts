@@ -3,7 +3,11 @@ import { getEbayConfig, isEbayConfigured, hasEbayRefreshToken } from "@/lib/ebay
 import { getAccessToken } from "@/lib/ebay/tokens";
 import { fetchEbayPolicies, fetchEbaySellingPrivileges } from "@/lib/ebay/policies";
 import { fetchEbayTradingApiUser } from "@/lib/ebay/accountIdentity";
-import { missingEbayLocationSetupFields, readEbayLocationSetup } from "@/lib/ebay/location";
+import {
+  missingEbayLocationSetupFields,
+  missingRecommendedEbayLocationSetupFields,
+  readEbayLocationSetup,
+} from "@/lib/ebay/location";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,7 +63,10 @@ export async function GET() {
       hasPolicies: Boolean(policies.paymentPolicyId && policies.fulfillmentPolicyId && policies.returnPolicyId),
       hasMerchantLocation: Boolean(policies.merchantLocationKey),
       policies,
-      locationSetup,
+      locationSetup: {
+        ...locationSetup,
+        existsOnEbay: policies.configuredMerchantLocationKey ? policies.configuredMerchantLocationFound === true : Boolean(policies.merchantLocationKey),
+      },
       connectedAccount: {
         verified: Boolean(identity.userId),
         registrationDate: identity.registrationDate,
@@ -87,9 +94,13 @@ export async function GET() {
 function locationSetupStatus() {
   const setup = readEbayLocationSetup();
   const missingFields = missingEbayLocationSetupFields();
+  const missingRecommendedFields = missingRecommendedEbayLocationSetupFields();
   return {
     configured: Boolean(setup),
+    createAvailable: Boolean(setup),
     missingFields,
+    missingRecommendedFields,
     merchantLocationKey: setup?.merchantLocationKey ?? null,
+    merchantLocationKeyFromEnv: missingRecommendedFields.length === 0,
   };
 }

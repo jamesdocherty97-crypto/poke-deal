@@ -3,6 +3,7 @@
 
 import type { EbayConfig } from "./config.js";
 import { ebayFetch } from "./client.js";
+import { readEbayApiError } from "./errors.js";
 import type { ListingPackInput } from "../dealer/listingPack.js";
 import { buildListingPack, isGradedGrade } from "../dealer/listingPack.js";
 
@@ -201,15 +202,6 @@ export async function upsertInventoryItem(
   );
   // 204 = updated, 201 = created, both are success
   if (!response.ok && response.status !== 204 && response.status !== 201) {
-    let msg = `HTTP ${response.status}`;
-    try {
-      const body = (await response.json()) as {
-        errors?: Array<{ longMessage?: string; message?: string }>;
-      };
-      msg = body.errors?.[0]?.longMessage ?? body.errors?.[0]?.message ?? msg;
-    } catch {
-      // ignore
-    }
-    throw new Error(`eBay inventory item upsert failed: ${msg}`);
+    throw await readEbayApiError(response, `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`);
   }
 }

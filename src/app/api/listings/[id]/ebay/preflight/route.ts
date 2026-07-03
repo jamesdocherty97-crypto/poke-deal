@@ -5,6 +5,7 @@ import { getAccessToken } from "@/lib/ebay/tokens";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { getOfferBySku } from "@/lib/ebay/offer";
 import { buildEbayOfferPreflight, toEbaySku } from "@/lib/ebay/preflight";
+import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,8 +83,11 @@ export async function GET(
       ...preflight,
     });
   } catch (err) {
+    if (isEbayApiError(err)) {
+      console.error("[ebay] preflight failed", ebayApiErrorLogBody(err));
+    }
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "eBay preflight failed" },
+      ebayApiErrorResponseBody(err, "eBay preflight failed"),
       { status: 500 },
     );
   }

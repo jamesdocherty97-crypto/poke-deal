@@ -7,6 +7,13 @@ import type { EbayOfferPayload } from "./offer.js";
 import { buildOfferPayload } from "./offer.js";
 import type { EbayPolicies } from "./policies.js";
 
+export interface EbayPolicySummary {
+  payment: { id: string; name?: string; default?: boolean };
+  fulfillment: { id: string; name?: string; default?: boolean };
+  returns: { id: string; name?: string; default?: boolean };
+  merchantLocation: { key: string | null; name?: string; status?: string; configuredKeyMatched?: boolean };
+}
+
 export interface EbayOfferPreflightInput {
   listingId: string;
   packInput: ListingPackInput;
@@ -30,6 +37,7 @@ export interface EbayOfferPreflight {
     returnPolicyId: boolean;
     merchantLocationKey: boolean;
   };
+  policySummary: EbayPolicySummary;
   inventoryItem: EbayInventoryItem;
   offer: EbayOfferPayload;
 }
@@ -59,6 +67,29 @@ export function buildEbayOfferPreflight(input: EbayOfferPreflightInput): EbayOff
       fulfillmentPolicyId: Boolean(input.policies.fulfillmentPolicyId),
       returnPolicyId: Boolean(input.policies.returnPolicyId),
       merchantLocationKey: Boolean(input.policies.merchantLocationKey),
+    },
+    policySummary: {
+      payment: {
+        id: input.policies.paymentPolicyId,
+        name: input.policies.paymentPolicy?.name,
+        default: input.policies.paymentPolicy?.default,
+      },
+      fulfillment: {
+        id: input.policies.fulfillmentPolicyId,
+        name: input.policies.fulfillmentPolicy?.name,
+        default: input.policies.fulfillmentPolicy?.default,
+      },
+      returns: {
+        id: input.policies.returnPolicyId,
+        name: input.policies.returnPolicy?.name,
+        default: input.policies.returnPolicy?.default,
+      },
+      merchantLocation: {
+        key: input.policies.merchantLocationKey,
+        name: input.policies.merchantLocation?.name,
+        status: input.policies.merchantLocation?.status,
+        configuredKeyMatched: input.policies.merchantLocation?.configuredKeyMatched,
+      },
     },
     inventoryItem,
     offer,

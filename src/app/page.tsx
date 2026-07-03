@@ -397,11 +397,21 @@ type EbayStatus = {
     fulfillmentPolicyId?: string;
     returnPolicyId?: string;
     merchantLocationKey?: string | null;
+    paymentPolicy?: EbayPolicyChoice;
+    fulfillmentPolicy?: EbayPolicyChoice;
+    returnPolicy?: EbayPolicyChoice;
+    merchantLocation?: { merchantLocationKey: string; name?: string; status?: string; configuredKeyMatched?: boolean } | null;
+    configuredMerchantLocationKey?: string | null;
+    configuredMerchantLocationFound?: boolean;
   };
   locationSetup?: {
     configured: boolean;
+    createAvailable?: boolean;
     missingFields?: string[];
+    missingRecommendedFields?: string[];
     merchantLocationKey?: string | null;
+    merchantLocationKeyFromEnv?: boolean;
+    existsOnEbay?: boolean;
   };
   sellerRegistration?: {
     completed: boolean | null;
@@ -409,6 +419,19 @@ type EbayStatus = {
     checkError?: string;
   };
   error?: string;
+};
+
+type EbayPolicyChoice = {
+  id: string;
+  name?: string;
+  default?: boolean;
+};
+
+type EbayPolicySummary = {
+  payment: EbayPolicyChoice;
+  fulfillment: EbayPolicyChoice;
+  returns: EbayPolicyChoice;
+  merchantLocation: { key: string | null; name?: string; status?: string; configuredKeyMatched?: boolean };
 };
 
 type EbayPreflight = {
@@ -428,6 +451,7 @@ type EbayPreflight = {
     returnPolicyId: boolean;
     merchantLocationKey: boolean;
   };
+  policySummary?: EbayPolicySummary;
 };
 
 type Sale = {
@@ -1659,11 +1683,13 @@ export default function Home() {
   );
   const ebayHasMerchantLocation = Boolean(ebayStatus?.hasMerchantLocation || ebayPolicies?.merchantLocationKey);
   const ebayNeedsMerchantLocation = Boolean(ebayStatus?.connected && ebayHasPolicies && !ebayHasMerchantLocation);
+  const ebayLocationEnvCreateReady = Boolean(ebayStatus?.locationSetup?.createAvailable);
   const ebayLocationFormReady = Boolean(
-    ebayLocationAddress1.trim() &&
+    ebayLocationEnvCreateReady ||
+      (ebayLocationAddress1.trim() &&
       ebayLocationCity.trim() &&
       ebayLocationPostcode.trim() &&
-      ebayLocationCountry.trim().length === 2,
+      ebayLocationCountry.trim().length === 2),
   );
   const ebayNeedsReconnect = Boolean(
     ebayStatus?.configured &&
@@ -4385,7 +4411,7 @@ export default function Home() {
     try {
       const res = await fetch(`/api/listings/${listingId}/ebay/preflight`);
       const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "eBay preflight failed");
+      if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay preflight failed"));
       setEbayPreflight({ ...payload, listingId });
       setNotice("eBay preflight passed. No offer was created.");
     } catch (err) {
@@ -4402,8 +4428,12 @@ export default function Home() {
     try {
       const res = await fetch(`/api/listings/${listingId}/ebay/offer`, { method: "POST" });
       const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "eBay offer creation failed");
-      setEbayPreflight(null);
+      if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay offer creation failed"));
+      setEbayPreflight((current) =>
+        current?.listingId === listingId
+          ? { ...current, writesToEbay: true, existingOfferId: payload.offerId ?? current.existingOfferId, policySummary: payload.policySummary ?? current.policySummary }
+          : null,
+      );
       setNotice(payload.message ?? "eBay offer created.");
       await refreshAll();
     } catch (err) {
@@ -4419,20 +4449,30 @@ export default function Home() {
     setError(null);
     setNotice(null);
     try {
+      const useEnvLocationSetup = Boolean(
+        ebayStatus?.locationSetup?.createAvailable &&
+          !ebayLocationAddress1.trim() &&
+          !ebayLocationCity.trim() &&
+          !ebayLocationPostcode.trim(),
+      );
       const res = await fetch("/api/ebay/location", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: ebayLocationName,
-          addressLine1: ebayLocationAddress1,
-          addressLine2: ebayLocationAddress2,
-          city: ebayLocationCity,
-          postalCode: ebayLocationPostcode,
-          country: ebayLocationCountry,
-        }),
+        ...(useEnvLocationSetup
+          ? {}
+          : {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: ebayLocationName,
+                addressLine1: ebayLocationAddress1,
+                addressLine2: ebayLocationAddress2,
+                city: ebayLocationCity,
+                postalCode: ebayLocationPostcode,
+                country: ebayLocationCountry,
+              }),
+            }),
       });
       const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "eBay seller location setup failed");
+      if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay seller location setup failed"));
       setNotice(payload.message ?? "eBay seller location is ready.");
       const statusRes = await fetch("/api/ebay/status");
       const statusPayload = await readJson(statusRes);
@@ -4453,7 +4493,7 @@ export default function Home() {
     try {
       const res = await fetch(`/api/listings/${listingId}/ebay/publish`, { method: "POST" });
       const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "eBay publish failed");
+      if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay publish failed"));
       setNotice(payload.message ?? "Published on eBay.");
       await refreshAll();
     } catch (err) {
@@ -7000,6 +7040,9 @@ export default function Home() {
           ebayLocationCountry={ebayLocationCountry}
           setEbayLocationCountry={setEbayLocationCountry}
           ebayLocationFormReady={ebayLocationFormReady}
+          ebayLocationCreateAvailable={ebayLocationEnvCreateReady}
+          ebayLocationMissingFields={ebayStatus?.locationSetup?.missingFields ?? []}
+          ebayLocationMissingRecommendedFields={ebayStatus?.locationSetup?.missingRecommendedFields ?? []}
           createEbaySellerLocation={(event) => void createEbaySellerLocation(event)}
           onAddBuy={() => setView("acquire")}
           startListingDesk={startListingDesk}
@@ -7018,6 +7061,10 @@ export default function Home() {
           ebayPublishOverlay={
             ebayPublishTarget !== null ? (() => {
               const pl = listings.find((listing) => listing.id === ebayPublishTarget);
+              const policySummary =
+                ebayPreflight?.listingId === ebayPublishTarget
+                  ? ebayPreflight.policySummary
+                  : ebayStatusPolicySummary(ebayStatus);
               return pl ? (
                 <div className="ebay-publish-overlay">
                   <div className="ebay-publish-confirm">
@@ -7040,6 +7087,7 @@ export default function Home() {
                         </span>
                       </p>
                     </div>
+                    {policySummary && <EbayPolicySummaryList summary={policySummary} />}
                     <div>
                       <button
                         className="primary-action"
@@ -7643,6 +7691,9 @@ function ListingPackSheet({
         hasMerchantLocation: Boolean(ebayStatus?.hasMerchantLocation || ebayStatus?.policies?.merchantLocationKey),
         hasImage: Boolean(listing.item?.photos?.length),
         sellerRegistrationCompleted: ebayStatus?.sellerRegistration?.completed,
+        locationSetupConfigured: ebayStatus?.locationSetup?.configured,
+        locationCreateAvailable: ebayStatus?.locationSetup?.createAvailable,
+        merchantLocationKey: ebayStatus?.locationSetup?.merchantLocationKey ?? ebayStatus?.policies?.merchantLocationKey ?? null,
       })
     : null;
   const ebayOfferReady = ebayReadiness?.offerReady ?? false;
@@ -7954,6 +8005,7 @@ function EbayPreflightCard({ preflight }: { preflight: EbayPreflight }) {
           <dd>{preflight.policyKeys.merchantLocationKey ? "ready" : "not returned"}</dd>
         </div>
       </dl>
+      {preflight.policySummary && <EbayPolicySummaryList summary={preflight.policySummary} />}
       <p>
         {preflight.existingOfferId ? "An existing eBay offer was found for this SKU." : "Ready to create a new eBay offer."}
         {!preflight.policyKeys.merchantLocationKey
@@ -7962,6 +8014,49 @@ function EbayPreflightCard({ preflight }: { preflight: EbayPreflight }) {
       </p>
     </div>
   );
+}
+
+function ebayStatusPolicySummary(status: EbayStatus | null): EbayPolicySummary | null {
+  const policies = status?.policies;
+  if (!policies?.paymentPolicyId || !policies.fulfillmentPolicyId || !policies.returnPolicyId) return null;
+  return {
+    payment: {
+      id: policies.paymentPolicy?.id ?? policies.paymentPolicyId,
+      name: policies.paymentPolicy?.name,
+      default: policies.paymentPolicy?.default,
+    },
+    fulfillment: {
+      id: policies.fulfillmentPolicy?.id ?? policies.fulfillmentPolicyId,
+      name: policies.fulfillmentPolicy?.name,
+      default: policies.fulfillmentPolicy?.default,
+    },
+    returns: {
+      id: policies.returnPolicy?.id ?? policies.returnPolicyId,
+      name: policies.returnPolicy?.name,
+      default: policies.returnPolicy?.default,
+    },
+    merchantLocation: {
+      key: policies.merchantLocation?.merchantLocationKey ?? policies.merchantLocationKey ?? status?.locationSetup?.merchantLocationKey ?? null,
+      name: policies.merchantLocation?.name,
+      status: policies.merchantLocation?.status,
+      configuredKeyMatched: policies.merchantLocation?.configuredKeyMatched,
+    },
+  };
+}
+
+function EbayPolicySummaryList({ summary }: { summary: EbayPolicySummary }) {
+  return (
+    <div className="ebay-policy-summary" aria-label="Selected eBay policies">
+      <span>Payment: {policySummaryLabel(summary.payment)}</span>
+      <span>Postage: {policySummaryLabel(summary.fulfillment)}</span>
+      <span>Returns: {policySummaryLabel(summary.returns)}</span>
+      <span>Location: {summary.merchantLocation.key ?? "not found"}</span>
+    </div>
+  );
+}
+
+function policySummaryLabel(policy: EbayPolicyChoice): string {
+  return `${policy.name || policy.id}${policy.default ? " (default)" : ""}`;
 }
 
 function ListingNextActionCard({
@@ -8886,4 +8981,11 @@ async function readJson(response: Response): Promise<any> {
     const path = new URL(response.url).pathname;
     throw new Error(`${path} returned ${response.status}. Retrying usually fixes this after a dev refresh.`);
   }
+}
+
+function apiErrorMessage(payload: any, fallback: string): string {
+  const message = typeof payload?.error === "string" && payload.error.trim() ? payload.error.trim() : fallback;
+  const errorId = payload?.ebayError?.errorId;
+  if (!errorId || message.includes(String(errorId))) return message;
+  return `${message} (errorId ${errorId})`;
 }

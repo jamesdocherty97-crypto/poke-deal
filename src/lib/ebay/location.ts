@@ -4,6 +4,7 @@
 
 import type { EbayConfig } from "./config.js";
 import { ebayFetch } from "./client.js";
+import { readEbayApiError } from "./errors.js";
 
 export interface EbayLocationAddress {
   addressLine1: string;
@@ -46,10 +47,13 @@ export interface EbayLocationSetupParseResult {
 }
 
 const requiredLocationEnv = [
-  "EBAY_MERCHANT_LOCATION_KEY",
   "EBAY_LOCATION_ADDRESS_LINE1",
   "EBAY_LOCATION_CITY",
   "EBAY_LOCATION_POSTAL_CODE",
+] as const;
+
+const recommendedLocationEnv = [
+  "EBAY_MERCHANT_LOCATION_KEY",
 ] as const;
 
 type LocationEnv = Record<string, string | undefined>;
@@ -58,11 +62,15 @@ export function missingEbayLocationSetupFields(env: LocationEnv = process.env): 
   return requiredLocationEnv.filter((key) => !env[key]?.trim());
 }
 
+export function missingRecommendedEbayLocationSetupFields(env: LocationEnv = process.env): string[] {
+  return recommendedLocationEnv.filter((key) => !env[key]?.trim());
+}
+
 export function readEbayLocationSetup(env: LocationEnv = process.env): EbayLocationSetup | null {
   if (missingEbayLocationSetupFields(env).length > 0) return null;
 
   return {
-    merchantLocationKey: env.EBAY_MERCHANT_LOCATION_KEY!.trim(),
+    merchantLocationKey: env.EBAY_MERCHANT_LOCATION_KEY?.trim() || "pdos-main",
     name: env.EBAY_LOCATION_NAME?.trim() || "Poke Deal",
     address: {
       addressLine1: env.EBAY_LOCATION_ADDRESS_LINE1!.trim(),
@@ -143,16 +151,7 @@ export async function createInventoryLocation(
   );
 
   if (!response.ok) {
-    let msg = `HTTP ${response.status}`;
-    try {
-      const body = (await response.json()) as {
-        errors?: Array<{ longMessage?: string; message?: string }>;
-      };
-      msg = body.errors?.[0]?.longMessage ?? body.errors?.[0]?.message ?? msg;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(`eBay location setup failed: ${msg}`);
+    throw await readEbayApiError(response, `/sell/inventory/v1/location/${encodeURIComponent(setup.merchantLocationKey)}`);
   }
 
   return { merchantLocationKey: setup.merchantLocationKey };

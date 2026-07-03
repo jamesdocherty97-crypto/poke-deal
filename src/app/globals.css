@@ -6612,6 +6612,18 @@ label {
   color: rgba(255, 230, 170, 0.55);
 }
 
+.ebay-location-form.compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ebay-location-form small {
+  color: rgba(255, 230, 170, 0.72);
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .ebay-setup-banner a {
   color: rgba(255, 200, 80, 0.9);
   text-decoration: underline;
@@ -6682,6 +6694,24 @@ label {
 .ebay-publish-confirm > div:last-child {
   display: flex;
   gap: 8px;
+}
+
+.ebay-policy-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  border: 1px solid rgba(255, 200, 80, 0.22);
+  border-radius: 8px;
+  background: rgba(3, 8, 20, 0.24);
+  padding: 8px;
+}
+
+.ebay-policy-summary span {
+  min-width: 0;
+  color: rgba(255, 240, 190, 0.86);
+  font-size: 12px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 759px) {
@@ -6782,6 +6812,10 @@ label {
   }
 
   .ebay-preflight-card dl {
+    grid-template-columns: 1fr;
+  }
+
+  .ebay-policy-summary {
     grid-template-columns: 1fr;
   }
 

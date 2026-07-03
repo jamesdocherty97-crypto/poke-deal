@@ -3,6 +3,7 @@
 
 import type { EbayConfig } from "./config.js";
 import { ebayFetch, ebayJson } from "./client.js";
+import { readEbayApiError } from "./errors.js";
 import type { ListingPack } from "../dealer/listingPack.js";
 import type { EbayPolicies } from "./policies.js";
 import { EBAY_UK_CATEGORY_POKEMON } from "./config.js";
@@ -102,16 +103,7 @@ export async function updateEbayOffer(
     fetchImpl,
   );
   if (!response.ok && response.status !== 204) {
-    let msg = `HTTP ${response.status}`;
-    try {
-      const body = (await response.json()) as {
-        errors?: Array<{ longMessage?: string; message?: string }>;
-      };
-      msg = body.errors?.[0]?.longMessage ?? body.errors?.[0]?.message ?? msg;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(`eBay offer update failed: ${msg}`);
+    throw await readEbayApiError(response, `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}`);
   }
 }
 

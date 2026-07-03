@@ -8,6 +8,7 @@ import {
 } from "@/lib/ebay/location";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { getAccessToken } from "@/lib/ebay/tokens";
+import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,8 +52,11 @@ export async function POST(request: Request) {
       message: "eBay seller location is ready.",
     });
   } catch (err) {
+    if (isEbayApiError(err)) {
+      console.error("[ebay] seller location setup failed", ebayApiErrorLogBody(err));
+    }
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "eBay seller location setup failed" },
+      ebayApiErrorResponseBody(err, "eBay seller location setup failed"),
       { status: 500 },
     );
   }

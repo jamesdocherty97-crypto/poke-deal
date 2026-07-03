@@ -29,6 +29,30 @@ export interface TradingApiResult {
   raw: string;
 }
 
+export class EbayTradingApiError extends Error {
+  readonly callName: string;
+  readonly status: number;
+  readonly errors: TradingApiError[];
+  readonly rawBody: string;
+
+  constructor(input: {
+    callName: string;
+    status: number;
+    errors: TradingApiError[];
+    rawBody: string;
+    fallback?: string;
+  }) {
+    const primary = input.errors.find((error) => error.severity === "Error") ?? input.errors[0];
+    const message = primary?.longMessage ?? primary?.shortMessage ?? input.fallback ?? `HTTP ${input.status}`;
+    super(`eBay Trading API ${input.callName} failed: ${message}${primary?.code ? ` (errorId ${primary.code})` : ""}`);
+    this.name = "EbayTradingApiError";
+    this.callName = input.callName;
+    this.status = input.status;
+    this.errors = input.errors;
+    this.rawBody = input.rawBody;
+  }
+}
+
 const TRADING_API_COMPATIBILITY_LEVEL = "1231";
 const EBAY_UK_SITE_ID = "3";
 
@@ -127,8 +151,13 @@ async function callTradingApi(
   const result = parseTradingApiResult(raw);
   const hardErrors = result.errors.filter((error) => error.severity === "Error");
   if (!response.ok || hardErrors.length > 0 || (result.ack !== "Success" && result.ack !== "Warning")) {
-    const detail = hardErrors[0]?.longMessage ?? hardErrors[0]?.shortMessage ?? `HTTP ${response.status}`;
-    throw new Error(`eBay Trading API ${callName} failed: ${detail}`);
+    throw new EbayTradingApiError({
+      callName,
+      status: response.status,
+      errors: hardErrors.length > 0 ? hardErrors : result.errors,
+      rawBody: raw,
+      fallback: `HTTP ${response.status}`,
+    });
   }
   return result;
 }

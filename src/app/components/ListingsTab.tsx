@@ -54,6 +54,9 @@ export function ListingsTab({
   ebayLocationCountry,
   setEbayLocationCountry,
   ebayLocationFormReady,
+  ebayLocationCreateAvailable,
+  ebayLocationMissingFields,
+  ebayLocationMissingRecommendedFields,
   createEbaySellerLocation,
   onAddBuy,
   startListingDesk,
@@ -105,6 +108,9 @@ export function ListingsTab({
   ebayLocationCountry: string;
   setEbayLocationCountry: (value: string) => void;
   ebayLocationFormReady: boolean;
+  ebayLocationCreateAvailable: boolean;
+  ebayLocationMissingFields: string[];
+  ebayLocationMissingRecommendedFields: string[];
   createEbaySellerLocation: (event: FormEvent<HTMLFormElement>) => void;
   onAddBuy: () => void;
   startListingDesk: () => void;
@@ -333,50 +339,64 @@ export function ListingsTab({
       {ebayNeedsMerchantLocation && listings.some((listing) => listing.channel === "EBAY") && (
         <div className="ebay-setup-banner">
           <span>
-            eBay is connected and policies are ready. Add your dispatch location once, then offer creation can run from listing packs.
+            eBay is connected and policies are ready. Create your dispatch location once, then offer creation can run from listing packs.
           </span>
-          <form className="ebay-location-form" onSubmit={createEbaySellerLocation}>
-            <input
-              value={ebayLocationName}
-              onChange={(event) => setEbayLocationName(event.target.value)}
-              placeholder="Location name"
-              autoComplete="organization"
-            />
-            <input
-              value={ebayLocationAddress1}
-              onChange={(event) => setEbayLocationAddress1(event.target.value)}
-              placeholder="Address line 1"
-              autoComplete="address-line1"
-            />
-            <input
-              value={ebayLocationAddress2}
-              onChange={(event) => setEbayLocationAddress2(event.target.value)}
-              placeholder="Address line 2"
-              autoComplete="address-line2"
-            />
-            <input
-              value={ebayLocationCity}
-              onChange={(event) => setEbayLocationCity(event.target.value)}
-              placeholder="City"
-              autoComplete="address-level2"
-            />
-            <input
-              value={ebayLocationPostcode}
-              onChange={(event) => setEbayLocationPostcode(event.target.value)}
-              placeholder="Postcode"
-              autoComplete="postal-code"
-            />
-            <input
-              value={ebayLocationCountry}
-              onChange={(event) => setEbayLocationCountry(event.target.value.toUpperCase().slice(0, 2))}
-              placeholder="GB"
-              autoComplete="country"
-              inputMode="text"
-            />
-            <button type="submit" disabled={busy === "ebay-location" || !ebayLocationFormReady}>
-              {busy === "ebay-location" ? "Creating location..." : "Create seller location"}
-            </button>
-          </form>
+          {ebayLocationCreateAvailable ? (
+            <form className="ebay-location-form compact" onSubmit={createEbaySellerLocation}>
+              <button type="submit" disabled={busy === "ebay-location"}>
+                {busy === "ebay-location" ? "Creating location..." : "Create seller location"}
+              </button>
+              {ebayLocationMissingRecommendedFields.length > 0 && (
+                <small>Using default key pdos-main; optional env missing: {ebayLocationMissingRecommendedFields.join(", ")}.</small>
+              )}
+            </form>
+          ) : (
+            <form className="ebay-location-form" onSubmit={createEbaySellerLocation}>
+              <input
+                value={ebayLocationName}
+                onChange={(event) => setEbayLocationName(event.target.value)}
+                placeholder="Location name"
+                autoComplete="organization"
+              />
+              <input
+                value={ebayLocationAddress1}
+                onChange={(event) => setEbayLocationAddress1(event.target.value)}
+                placeholder="Address line 1"
+                autoComplete="address-line1"
+              />
+              <input
+                value={ebayLocationAddress2}
+                onChange={(event) => setEbayLocationAddress2(event.target.value)}
+                placeholder="Address line 2"
+                autoComplete="address-line2"
+              />
+              <input
+                value={ebayLocationCity}
+                onChange={(event) => setEbayLocationCity(event.target.value)}
+                placeholder="City"
+                autoComplete="address-level2"
+              />
+              <input
+                value={ebayLocationPostcode}
+                onChange={(event) => setEbayLocationPostcode(event.target.value)}
+                placeholder="Postcode"
+                autoComplete="postal-code"
+              />
+              <input
+                value={ebayLocationCountry}
+                onChange={(event) => setEbayLocationCountry(event.target.value.toUpperCase().slice(0, 2))}
+                placeholder="GB"
+                autoComplete="country"
+                inputMode="text"
+              />
+              <button type="submit" disabled={busy === "ebay-location" || !ebayLocationFormReady}>
+                {busy === "ebay-location" ? "Creating location..." : "Create seller location"}
+              </button>
+              {ebayLocationMissingFields.length > 0 && (
+                <small>Server env missing: {ebayLocationMissingFields.join(", ")}.</small>
+              )}
+            </form>
+          )}
           <a href="https://www.ebay.co.uk/sh/landing" target="_blank" rel="noreferrer">
             Open Seller Hub
           </a>
