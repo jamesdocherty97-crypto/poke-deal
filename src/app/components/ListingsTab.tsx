@@ -62,6 +62,8 @@ export function ListingsTab({
   openInventoryEditor,
   openSell,
   addPhotosToInventory,
+  copyStockListingCopy,
+  copyListingCopy,
   openListingEditor,
   openListingPack,
   pasteListingUrlForListing,
@@ -111,6 +113,8 @@ export function ListingsTab({
   openInventoryEditor: (item: InventoryItem) => void;
   openSell: (item: InventoryItem) => void;
   addPhotosToInventory: (item: InventoryItem, files: FileList | File[]) => void;
+  copyStockListingCopy: (item: InventoryItem, channel: Channel) => void;
+  copyListingCopy: (listing: Listing, channel: Channel) => void;
   openListingEditor: (listing: Listing) => void;
   openListingPack: (listing: Listing) => void;
   pasteListingUrlForListing: (listing: Listing) => void;
@@ -293,6 +297,7 @@ export function ListingsTab({
                 onEdit={openInventoryEditor}
                 onSell={openSell}
                 onPhotos={addPhotosToInventory}
+                onCopy={copyStockListingCopy}
               />
             ))}
           </div>
@@ -386,6 +391,7 @@ export function ListingsTab({
           ebayConnected={Boolean(ebayStatus?.connected)}
           onEdit={openListingEditor}
           onPack={openListingPack}
+          onCopy={copyListingCopy}
           onSell={openSellFromListing}
           onPasteUrl={() => pasteListingUrlForListing(listing)}
           onState={(state) =>
@@ -416,6 +422,7 @@ function ListingQueueRow({
   onEdit,
   onSell,
   onPhotos,
+  onCopy,
 }: {
   item: InventoryItem;
   busy: string | null;
@@ -423,6 +430,7 @@ function ListingQueueRow({
   onEdit: (item: InventoryItem) => void;
   onSell: (item: InventoryItem) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
+  onCopy: (item: InventoryItem, channel: Channel) => void;
 }) {
   const stockNotes = [item.condition, item.graderCert ? `cert ${item.graderCert}` : null, item.location]
     .filter(Boolean)
@@ -471,6 +479,15 @@ function ListingQueueRow({
           <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
             Sell
           </button>
+          <button type="button" onClick={() => onCopy(item, "EBAY")}>
+            Copy eBay
+          </button>
+          <button type="button" onClick={() => onCopy(item, "CARDMARKET")}>
+            Copy CM
+          </button>
+          <button type="button" onClick={() => onCopy(item, "VINTED")}>
+            Copy Vinted
+          </button>
           <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
             Edit
           </button>
@@ -486,6 +503,7 @@ function ListingRow({
   ebayConnected,
   onEdit,
   onPack,
+  onCopy,
   onSell,
   onPasteUrl,
   onState,
@@ -496,6 +514,7 @@ function ListingRow({
   ebayConnected: boolean;
   onEdit: (listing: Listing) => void;
   onPack: (listing: Listing) => void;
+  onCopy: (listing: Listing, channel: Channel) => void;
   onSell: (listing: Listing) => void;
   onPasteUrl: () => void;
   onState: (state: Exclude<ListingState, "SOLD">) => void;
@@ -599,6 +618,19 @@ function ListingRow({
             <button type="button" onClick={() => onPack(listing)} disabled={isBusy}>
               Pack
             </button>
+          )}
+          {listing.item && listing.state !== "SOLD" && (
+            <>
+              <button type="button" onClick={() => onCopy(listing, "EBAY")}>
+                Copy eBay
+              </button>
+              <button type="button" onClick={() => onCopy(listing, "CARDMARKET")}>
+                Copy CM
+              </button>
+              <button type="button" onClick={() => onCopy(listing, "VINTED")}>
+                Copy Vinted
+              </button>
+            </>
           )}
           {listing.state !== "ACTIVE" && listing.state !== "SOLD" && !(isEbay && !isPublished) && (
             <button type="button" onClick={() => onState("ACTIVE")} disabled={isBusy}>

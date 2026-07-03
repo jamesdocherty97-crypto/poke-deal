@@ -6,17 +6,67 @@ import {
   normalizeDealCalcSettings,
   type DealCalcSettings,
 } from "@/lib/dealer/dealCalc";
+import {
+  DEFAULT_LISTING_COPY_SETTINGS,
+  type ListingCopySettings,
+} from "@/lib/dealer/listingPack";
 import { MoneyInput } from "./UiBits";
 
 export function SettingsTab({
   dealSettings,
   setDealSettings,
+  listingCopySettings,
+  setListingCopySettings,
 }: {
   dealSettings: DealCalcSettings;
   setDealSettings: Dispatch<SetStateAction<DealCalcSettings>>;
+  listingCopySettings: ListingCopySettings;
+  setListingCopySettings: Dispatch<SetStateAction<ListingCopySettings>>;
 }) {
   return (
     <section className="workspace settings-workspace">
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Listing copy</h2>
+            <span className="muted">Used in eBay, Cardmarket, Vinted and CSV listing drafts.</span>
+          </div>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => setListingCopySettings(DEFAULT_LISTING_COPY_SETTINGS)}
+          >
+            Reset
+          </button>
+        </div>
+        <label>
+          Postage terms
+          <textarea
+            rows={4}
+            value={listingCopySettings.postageTerms}
+            onChange={(event) =>
+              setListingCopySettings((settings) => ({
+                ...settings,
+                postageTerms: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label>
+          Returns line
+          <textarea
+            rows={3}
+            value={listingCopySettings.returnsLine}
+            onChange={(event) =>
+              setListingCopySettings((settings) => ({
+                ...settings,
+                returnsLine: event.target.value,
+              }))
+            }
+          />
+        </label>
+      </section>
+
       <section className="panel">
         <div className="panel-heading">
           <div>

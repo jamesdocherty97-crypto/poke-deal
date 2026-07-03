@@ -67,9 +67,13 @@ import {
 } from "@/lib/dealer/checkedComp";
 import {
   buildListingPack,
+  DEFAULT_LISTING_COPY_SETTINGS,
   listingPackCopyFields,
+  resolveListingCopySettings,
   type ListingPack,
   type ListingPackCopyField,
+  type ListingCopySettings,
+  type ListingPackInput,
 } from "@/lib/dealer/listingPack";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
 import {
@@ -633,6 +637,7 @@ const RECENT_SETS_STORAGE_KEY = "pokemon-dealer-os.recent-sets.v1";
 const RECENT_COMPS_STORAGE_KEY = "pokemon-dealer-os.recent-comps.v1";
 const INTAKE_PREFERENCES_STORAGE_KEY = "pokemon-dealer-os.intake-preferences.v1";
 const DEAL_SETTINGS_STORAGE_KEY = "pokemon-dealer-os.deal-settings.v1";
+const LISTING_COPY_SETTINGS_STORAGE_KEY = "pokemon-dealer-os.listing-copy-settings.v1";
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
@@ -749,6 +754,8 @@ export default function Home() {
   const [listingPackId, setListingPackId] = useState<string | null>(null);
   const [listingPackCopied, setListingPackCopied] = useState(false);
   const [listingPackCopiedField, setListingPackCopiedField] = useState<string | null>(null);
+  const [listingCopySettings, setListingCopySettings] = useState<ListingCopySettings>(DEFAULT_LISTING_COPY_SETTINGS);
+  const [listingCopySettingsLoaded, setListingCopySettingsLoaded] = useState(false);
   const [lastStocked, setLastStocked] = useState<LastStockedCard | null>(null);
   const [ebayStatus, setEbayStatus] = useState<EbayStatus | null>(null);
   const [ebayPreflight, setEbayPreflight] = useState<EbayPreflight | null>(null);
@@ -852,6 +859,26 @@ export default function Home() {
       // Device storage is optional; the active session still uses the settings.
     }
   }, [dealSettings, dealSettingsLoaded]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LISTING_COPY_SETTINGS_STORAGE_KEY);
+      setListingCopySettings(raw ? resolveListingCopySettings(JSON.parse(raw) as Partial<ListingCopySettings>) : DEFAULT_LISTING_COPY_SETTINGS);
+    } catch {
+      setListingCopySettings(DEFAULT_LISTING_COPY_SETTINGS);
+    } finally {
+      setListingCopySettingsLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!listingCopySettingsLoaded) return;
+    try {
+      window.localStorage.setItem(LISTING_COPY_SETTINGS_STORAGE_KEY, JSON.stringify(resolveListingCopySettings(listingCopySettings)));
+    } catch {
+      // Device storage is optional; the active session still uses the settings.
+    }
+  }, [listingCopySettings, listingCopySettingsLoaded]);
 
   useEffect(() => {
     try {
@@ -1067,8 +1094,9 @@ export default function Home() {
       costBasisPence: item.costBasis,
       condition: item.condition,
       certNumber: item.graderCert,
+      copySettings: listingCopySettings,
     });
-  }, [listingPackTarget]);
+  }, [listingCopySettings, listingPackTarget]);
   const recentIntake = useMemo(() => inventory.slice(0, 4), [inventory]);
   const recentIntakeCostPence = useMemo(
     () => recentIntake.reduce((sum, item) => sum + item.costBasis * item.quantity, 0),
@@ -4194,6 +4222,44 @@ export default function Home() {
     }
   }
 
+  async function copyInventoryListingCopy(item: InventoryItem, channel: Channel) {
+    const listing = item.listings.find((row) => row.state === "ACTIVE") ?? item.listings.find((row) => row.state === "DRAFT") ?? item.listings[0];
+    await copyGeneratedListingCopy(
+      buildListingPackInputFromItem(item, {
+        channel,
+        listPricePence: listing?.listPrice ?? listing?.suggestedPrice ?? undefined,
+        copySettings: listingCopySettings,
+      }),
+      channel,
+    );
+  }
+
+  async function copyListingCopyForChannel(listing: Listing, channel: Channel) {
+    if (!listing.item) {
+      setError("This listing is missing its stock row.");
+      return;
+    }
+    await copyGeneratedListingCopy(
+      buildListingPackInputFromItem(listing.item, {
+        channel,
+        listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
+        copySettings: listingCopySettings,
+      }),
+      channel,
+    );
+  }
+
+  async function copyGeneratedListingCopy(input: ListingPackInput, channel: Channel) {
+    try {
+      const pack = buildListingPack(input);
+      await navigator.clipboard.writeText(pack.copyReady);
+      setNotice(`${channelLabel(channel)} listing copy copied.`);
+      setError(null);
+    } catch {
+      setError("Copy failed. Open the listing pack and copy it manually.");
+    }
+  }
+
   function openNextListingPack() {
     if (!nextListingPackTarget) return;
     setListingPackId(nextListingPackTarget.id);
@@ -6784,6 +6850,7 @@ export default function Home() {
               onStatus={updateStatus}
               onDelete={requestDeleteItem}
               onPhotos={addPhotosToInventory}
+              onCopyListingCopy={(target, channel) => void copyInventoryListingCopy(target, channel)}
             />
           )}
           emptyInventoryFilterText={emptyInventoryFilterText}
@@ -6865,6 +6932,8 @@ export default function Home() {
           openInventoryEditor={openInventoryEditor}
           openSell={openSell}
           addPhotosToInventory={addPhotosToInventory}
+          copyStockListingCopy={(item, channel) => void copyInventoryListingCopy(item, channel)}
+          copyListingCopy={(listing, channel) => void copyListingCopyForChannel(listing, channel)}
           openListingEditor={openListingEditor}
           openListingPack={openListingPack}
           pasteListingUrlForListing={(listing) => void pasteListingUrlForListing(listing)}
@@ -6990,7 +7059,14 @@ export default function Home() {
         />
       )}
 
-      {view === "settings" && <SettingsTab dealSettings={dealSettings} setDealSettings={setDealSettings} />}
+      {view === "settings" && (
+        <SettingsTab
+          dealSettings={dealSettings}
+          setDealSettings={setDealSettings}
+          listingCopySettings={listingCopySettings}
+          setListingCopySettings={setListingCopySettings}
+        />
+      )}
 
       {view === "pnl" && (
         <ProfitTab
@@ -7734,6 +7810,31 @@ function listingPackSearchQuery(listing: Listing, pack: ListingPack): string {
   return [card?.name, card?.number, card?.setName].filter(Boolean).join(" ").trim() || pack.title;
 }
 
+function buildListingPackInputFromItem(
+  item: InventoryItem,
+  options: {
+    channel: Channel;
+    listPricePence?: number;
+    copySettings?: Partial<ListingCopySettings>;
+  },
+): ListingPackInput {
+  return {
+    channel: options.channel,
+    card: {
+      name: item.card.name,
+      setName: item.card.setName,
+      number: item.card.number,
+      language: "EN",
+    },
+    grade: item.grade,
+    listPricePence: options.listPricePence,
+    costBasisPence: item.costBasis,
+    condition: item.condition,
+    certNumber: item.graderCert,
+    copySettings: options.copySettings,
+  };
+}
+
 function EbayPreflightCard({ preflight }: { preflight: EbayPreflight }) {
   const policyCount = [
     preflight.policyKeys.paymentPolicyId,
@@ -7867,6 +7968,7 @@ function InventoryRow({
   onStatus,
   onDelete,
   onPhotos,
+  onCopyListingCopy,
 }: {
   item: InventoryItem;
   busy: string | null;
@@ -7878,6 +7980,7 @@ function InventoryRow({
   onStatus: (item: InventoryItem, status: ItemStatus) => void;
   onDelete: (item: InventoryItem) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
+  onCopyListingCopy: (item: InventoryItem, channel: Channel) => void;
 }) {
   const draftListing = item.listings.find((row) => row.state === "DRAFT");
   const activeListing = item.listings.find((row) => row.state === "ACTIVE");
@@ -8044,6 +8147,19 @@ function InventoryRow({
                 <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
                   Comp
                 </button>
+              )}
+              {item.status !== "SOLD" && (
+                <>
+                  <button type="button" onClick={() => onCopyListingCopy(item, "EBAY")}>
+                    Copy eBay
+                  </button>
+                  <button type="button" onClick={() => onCopyListingCopy(item, "CARDMARKET")}>
+                    Copy CM
+                  </button>
+                  <button type="button" onClick={() => onCopyListingCopy(item, "VINTED")}>
+                    Copy Vinted
+                  </button>
+                </>
               )}
               {item.status !== "SOLD" && (
                 <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>

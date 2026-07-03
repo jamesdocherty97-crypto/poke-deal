@@ -453,6 +453,8 @@ Settings:
 - Go to Setup.
 - Open Deal calculator.
 - Adjust target margin, trade premium, selling fees, postage tiers, confidence haircuts and grading assumptions.
+- Open Listing copy.
+- Adjust the postage and returns wording used in manual listing copy and exports.
 
 Intended use:
 
@@ -659,6 +661,36 @@ Intended use:
 - Track where it is listed.
 - Keep manual channels organized.
 
+### Listing Copy
+
+Use the copy buttons when you want to list manually without rewriting the same text.
+
+Where to find it:
+
+- Stock rows: More -> Copy eBay, Copy CM or Copy Vinted.
+- Listing queue rows: Copy eBay, Copy CM or Copy Vinted.
+- Listing rows: Copy eBay, Copy CM or Copy Vinted.
+- Listing pack: Copy the whole pack or individual title, price, description and specifics fields.
+
+What it creates:
+
+- eBay: an 80-character max title in the format `Pokemon TCG card set number grade/condition`, exact slab wording such as `PSA 10 GEM MINT`, item specifics, description, price and postage.
+- Cardmarket: title/comment copy plus a simple condition code: NM, EX or GD.
+- Vinted: a more casual title and description.
+
+Setup:
+
+- Go to Setup.
+- Open Listing copy.
+- Edit postage terms and returns line.
+- The app saves this on the device and uses it for future copy.
+
+Export:
+
+- Listings -> eBay pack CSV exports active/draft stock into an eBay bulk-listing style CSV.
+- Saved listing prices are used first.
+- If no saved listing price exists, the app falls back to the listing-pack price logic.
+
 ### Mark Sold
 
 Use Sell from Stock or List.
@@ -743,7 +775,7 @@ Use Listings to:
 
 Important:
 
-The app currently tracks listings. It does not yet publish listings directly to eBay/Cardmarket/Vinted.
+The app can create manual copy and eBay-style CSV exports. Direct marketplace publishing still depends on the marketplace API setup being fully approved and live.
 
 ## Profit
 
@@ -1056,7 +1088,8 @@ Best mobile flows:
 3. Tap List.
 4. Confirm channel and price.
 5. Save as Draft or Active.
-6. Export drafts if needed.
+6. Use Copy eBay/CM/Vinted for manual listing.
+7. Export eBay pack CSV if needed.
 
 ### Selling a card
 

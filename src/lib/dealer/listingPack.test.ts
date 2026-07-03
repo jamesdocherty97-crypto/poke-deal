@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildEbayTitle,
+  cardmarketConditionCode,
+  DEFAULT_LISTING_COPY_SETTINGS,
+  gradeListingPhrase,
   buildItemSpecifics,
   buildListingPack,
   buildListingPackCsv,
@@ -30,16 +33,22 @@ const slab = {
 test("eBay title stays within 80 chars and keeps whole words", () => {
   const title = buildEbayTitle(moonbreon);
   assert.ok(title.length <= 80, `title too long: ${title.length}`);
+  assert.match(title, /^Pokemon TCG Umbreon VMAX Evolving Skies 215\/203/);
   assert.match(title, /Umbreon VMAX/);
   assert.match(title, /215\/203/);
-  assert.match(title, /Pokemon/);
   assert.ok(!title.endsWith(" "), "no trailing space");
 });
 
-test("graded title includes the grade", () => {
+test("graded title includes exact slab wording", () => {
   const title = buildEbayTitle(slab);
-  assert.match(title, /PSA 10/);
+  assert.match(title, /PSA 10 GEM MINT/);
   assert.ok(title.length <= 80);
+});
+
+test("grade listing phrase handles common whole and half grades", () => {
+  assert.equal(gradeListingPhrase("PSA_10"), "PSA 10 GEM MINT");
+  assert.equal(gradeListingPhrase("BGS_9.5"), "BGS 9.5 GEM MINT");
+  assert.equal(gradeListingPhrase("CGC_8"), "CGC 8 NM-MT");
 });
 
 test("condition differs for raw vs graded", () => {
@@ -62,7 +71,7 @@ test("ACE slabs produce ACE listing titles and specifics", () => {
   const title = buildEbayTitle(aceSlab);
   const specifics = buildItemSpecifics(aceSlab);
 
-  assert.match(title, /ACE 10/);
+  assert.match(title, /ACE 10 GEM MINT/);
   assert.equal(specifics["Professional Grader"], "ACE");
   assert.equal(specifics.Grade, "10");
   assert.equal(specifics.Certification, "ACE12345");
@@ -116,7 +125,27 @@ test("manual marketplace packs use channel-specific copy and postage assumptions
 
   assert.match(cardmarketPack.copyReady, /CHANNEL: Cardmarket/);
   assert.match(cardmarketPack.copyReady, /Buyer pays Cardmarket postage/);
-  assert.match(cardmarketPack.description, /Packed securely from the UK/);
+  assert.match(cardmarketPack.description, /Cardmarket condition: NM/);
+});
+
+test("listing copy settings replace default eBay boilerplate", () => {
+  const pack = buildListingPack({
+    ...slab,
+    copySettings: {
+      postageTerms: "Buyer pays postage; slabs ship boxed and tracked.",
+      returnsLine: "No returns unless the listing is materially wrong.",
+    },
+  });
+
+  assert.match(pack.description, /Buyer pays postage; slabs ship boxed and tracked/);
+  assert.match(pack.description, /No returns unless/);
+  assert.equal(pack.description.includes(DEFAULT_LISTING_COPY_SETTINGS.postageTerms), false);
+});
+
+test("Cardmarket condition mapping normalises common raw grades", () => {
+  assert.equal(cardmarketConditionCode("Near Mint"), "NM");
+  assert.equal(cardmarketConditionCode("LP"), "EX");
+  assert.equal(cardmarketConditionCode("Moderately Played"), "GD");
 });
 
 test("listing pack produces a copy-ready block", () => {
@@ -139,10 +168,16 @@ test("listing pack exposes field-level copy values for manual listing", () => {
 });
 
 test("CSV export has a header and one row per item, with quoting", () => {
-  const csv = buildListingPackCsv([moonbreon, slab]);
+  const quoteCard = {
+    ...moonbreon,
+    card: { ...moonbreon.card, name: 'Pikachu "Promo"', setName: "Scarlet, Violet Promos" },
+  };
+  const csv = buildListingPackCsv([quoteCard, slab]);
   const lines = csv.split("\n");
   assert.equal(lines.length, 3); // header + 2
-  assert.match(lines[0]!, /^Title,Card Name,Set/);
-  assert.match(lines[1]!, /Umbreon VMAX/);
+  assert.match(lines[0]!, /^Action\(SiteID=UK\|Country=GB\|Currency=GBP\|Version=1193\),Category,Title/);
+  assert.match(lines[0]!, /StartPrice/);
+  assert.match(lines[1]!, /"Pikachu ""Promo""/);
+  assert.match(lines[1]!, /"Scarlet, Violet Promos/);
   assert.match(lines[2]!, /Charizard ex/);
 });
