@@ -279,7 +279,7 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
 };
 
 type Reconciled = {
-  headline: CompResult;
+  headline: CompResult | null;
   all: CompResult[];
   sourcesDisagree: boolean;
   reconciliation?: ReconciliationView;
@@ -1191,6 +1191,7 @@ export default function Home() {
     ],
   );
   const headline = checkedComp ?? apiHeadline;
+  const isAmbiguousComp = Boolean(comp?.ambiguous && !checkedComp);
   const sourceMatchedCard = !catalogCard && apiHeadline?.card ? apiHeadline.card : null;
   const sourceMatchTypedMeta = [name.trim(), setNameValue.trim(), number.trim() ? `#${number.trim()}` : ""]
     .filter(Boolean)
@@ -1350,7 +1351,7 @@ export default function Home() {
   );
   const dealCalcInput = useMemo<DealCalcCompInput | null>(
     () =>
-      headline
+      headline && !isAmbiguousComp
         ? buildDealCalcInput({
             headline,
             comp: compForReceipt,
@@ -1358,7 +1359,7 @@ export default function Home() {
             gradeLadder,
           })
         : null,
-    [compForReceipt, grade, gradeLadder, headline],
+    [compForReceipt, grade, gradeLadder, headline, isAmbiguousComp],
   );
   const offerCalc = useMemo(
     () => (dealCalcInput ? dealCalc(dealCalcInput, dealSettings) : null),
@@ -1393,11 +1394,12 @@ export default function Home() {
   );
   const compSpreadPct = useMemo(() => (compForReceipt ? medianSpreadPct(compForReceipt.all) : null), [compForReceipt]);
   const dealerVerdict = useMemo(
-    () => (checkedComp ? null : compForReceipt ? buildDealerCompVerdict(compForReceipt) : null),
-    [checkedComp, compForReceipt],
+    () => (checkedComp || isAmbiguousComp || !compForReceipt?.headline ? null : buildDealerCompVerdict(compForReceipt as Reconciled & { headline: CompResult })),
+    [checkedComp, compForReceipt, isAmbiguousComp],
   );
   const shouldOfferManualComp = Boolean(
     headline &&
+      !isAmbiguousComp &&
       !checkedComp &&
       (needsManualComp || !catalogCard || comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
   );
@@ -1482,12 +1484,14 @@ export default function Home() {
         : null,
     [quickStockCostPence, quickStockQuantity],
   );
-  const quickStockReady = Boolean(headline && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
+  const quickStockReady = Boolean(headline && !isAmbiguousComp && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
   const quickStockCanSubmit = quickStockReady && !requiresCheckedCompBeforeStock;
   const mobileNeedsCheckedComp = needsManualComp || requiresCheckedCompBeforeStock;
   const mobileCanStockLater = mobileNeedsCheckedComp && manualStockReady;
   const acquireButtonLabel = busy === "acquire"
     ? "Stocking..."
+    : isAmbiguousComp
+      ? "Choose exact card"
     : !headline
       ? "Look up comp first"
       : !quickStockReady
@@ -1565,12 +1569,14 @@ export default function Home() {
       : `Max ${gbp(offerCalc.maxCashOfferPence)} cash / ${
           offerCalc.maxTradeOfferPence == null ? "n/a" : gbp(offerCalc.maxTradeOfferPence)
         } trade`
-    : deal?.targetBuyPence
+    : isAmbiguousComp
+      ? "Choose exact card"
+      : deal?.targetBuyPence
       ? `Target ${gbp(deal.targetBuyPence)}`
       : "Add cost for buy maths";
   const buyFlowSteps = useMemo<BuyFlowStep[]>(() => {
     const cardReady = Boolean(name.trim() && (setNameValue.trim() || number.trim()));
-    const compReady = Boolean(headline);
+    const compReady = Boolean(headline && !isAmbiguousComp);
     const costPence = poundsToPence(cost);
     const qty = parseIntakeQuantity(quantity) ?? 0;
     const stockReady = costPence > 0 && qty > 0;
@@ -1586,13 +1592,17 @@ export default function Home() {
       },
       {
         label: "Comp",
-        detail: headline ? `${gbp(headline.medianPence)} · ${confidenceLabel?.label ?? "priced"}` : "lookup",
-        state: compReady ? "done" : cardReady ? "current" : "wait",
+        detail: isAmbiguousComp
+          ? "Choose exact card"
+          : headline
+            ? `${gbp(headline.medianPence)} · ${confidenceLabel?.label ?? "priced"}`
+            : "lookup",
+        state: isAmbiguousComp ? "current" : compReady ? "done" : cardReady ? "current" : "wait",
       },
       {
         label: "Decision",
-        detail: deal?.label ?? confidenceLabel?.label ?? "target",
-        state: !compReady ? "wait" : decisionTone === "good" ? "done" : "warn",
+        detail: isAmbiguousComp ? "Choose exact card" : deal?.label ?? confidenceLabel?.label ?? "target",
+        state: isAmbiguousComp ? "wait" : !compReady ? "wait" : decisionTone === "good" ? "done" : "warn",
       },
       {
         label: "Stock",
@@ -1608,6 +1618,7 @@ export default function Home() {
     displayNumber,
     displaySetName,
     headline,
+    isAmbiguousComp,
     name,
     number,
     quantity,
@@ -2152,7 +2163,7 @@ export default function Home() {
   function rememberRecentComp(payload: Reconciled, input: LookupInput) {
     const result = payload.headline;
     if (!result) return;
-    const verdict = buildDealerCompVerdict(payload);
+    const verdict = buildDealerCompVerdict({ ...payload, headline: result });
     const confidence = { label: verdict.label, tone: verdict.tone };
     const catalog = payload.catalog;
     const entry: RecentCompEntry = {
@@ -8427,7 +8438,7 @@ function buildCompReceipt(comp: Reconciled): Array<{
     .sort((a, b) => receiptRank(a, comp.headline) - receiptRank(b, comp.headline))
     .map((result) => ({
       key: `${result.source}-${result.grade}-${result.asOf}`,
-      name: sourceLabel(result.source, result.source === comp.headline.source),
+      name: sourceLabel(result.source, result.source === comp.headline?.source),
       basis: compBasis(result),
       price: result.sampleSize > 0 && result.medianPence > 0 ? gbp(result.medianPence) : "No data",
       meta: compMeta(result),
@@ -8446,7 +8457,7 @@ function buildCompLimitations(comp: Reconciled): Array<{ key: string; reason: st
 }
 
 function buildReconciliationReasons(comp: Reconciled): Array<{ key: string; label: string }> {
-  const reconciliation = comp.reconciliation ?? comp.headline.raw?.reconciliation;
+  const reconciliation = comp.reconciliation ?? comp.headline?.raw?.reconciliation;
   if (!reconciliation?.manualCheck && reconciliation?.confidence !== "low") return [];
   return (reconciliation?.reasons ?? [])
     .filter((reason) => reason !== "reconciled-cleanly")
@@ -8468,13 +8479,13 @@ function humanReconciliationReason(reason: string): string {
   if (reason.includes("penalty-raw-bucket-spread")) return "Raw eBay bucket is wide enough to suggest graded leakage.";
   if (reason.includes("penalty-graded-bucket-spread")) return "Graded bucket has a wide sale spread.";
   if (reason.includes("trend-suppressed")) return "Impossible trend was hidden.";
-  if (reason.includes("corroboration-fallback")) return "Only fallback evidence was available.";
+  if (reason.includes("corroboration-fallback") || reason.includes("corroboration-only")) return "Only fallback evidence was available.";
   if (reason.includes("no-eligible-candidates")) return "No source passed the quality gates.";
   return reason.replace(/[-:]/g, " ");
 }
 
-function receiptRank(result: CompResult, headline: CompResult): number {
-  if (result.source === headline.source) return 0;
+function receiptRank(result: CompResult, headline: CompResult | null): number {
+  if (headline && result.source === headline.source) return 0;
   if (result.source === "owned-sales") return 1;
   if (result.source === "poketrace") return 2;
   if (result.source === "pokemon-tcg-market") return 3;
@@ -8607,10 +8618,10 @@ function catalogPriceHint(card: CatalogCard): string | null {
   return `${source} ${gbp(signal.pricePence)}`;
 }
 
-function receiptTone(result: CompResult, headline: CompResult, sourcesDisagree: boolean): string {
+function receiptTone(result: CompResult, headline: CompResult | null, sourcesDisagree: boolean): string {
   if (result.sampleSize === 0 || result.medianPence <= 0) return "danger";
-  if (result.source === headline.source && !sourcesDisagree) return "good";
-  if (sourcesDisagree && result.source === headline.source) return "warn";
+  if (headline && result.source === headline.source && !sourcesDisagree) return "good";
+  if (headline && sourcesDisagree && result.source === headline.source) return "warn";
   if (result.sampleSize < 3) return "warn";
   if (result.source === "pokemon-tcg-market" || result.source === "poketrace") return "info";
   return "";

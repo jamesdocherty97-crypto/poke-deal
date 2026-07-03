@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     }
 
     const result = await compService.lookup(compCard, { grade }, { ambiguous });
-    const needsRecovery = !catalog || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
+    const needsRecovery = !catalog || !result.headline || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
 
     if (needsRecovery) {
       const recovery = await findCatalogAlternatives(card, catalogSource, 4, { timeoutMs: RECOVERY_ALTERNATIVES_TIMEOUT_MS });
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
     } else if (ambiguous) {
       alternatives = ambiguityAlternatives;
     }
-    if (process.env.DATABASE_URL) {
+    if (process.env.DATABASE_URL && result.headline) {
       await new PrismaCompResultRepo().create(result.headline).catch((err) => {
         console.warn(
           "[comps] comp persistence skipped:",

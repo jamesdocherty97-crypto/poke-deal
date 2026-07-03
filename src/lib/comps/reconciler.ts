@@ -106,13 +106,12 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
 
   const eligible = states.filter((state) => !state.excluded && !state.corroborationOnly && state.weight >= 0.1);
   if (eligible.length === 0) {
-    const fallback = bestCorroborationOnly(states);
+    const corroboration = bestCorroborationOnly(states);
     return {
-      headlinePence: fallback?.valuePence ?? null,
+      headlinePence: null,
       confidence: "low",
       manualCheck: true,
-      reasons: [...reasons, fallback ? reasonFor(fallback, "corroboration-fallback") : "no-eligible-candidates"],
-      chosenSource: fallback?.candidate.source,
+      reasons: [...reasons, corroboration ? reasonFor(corroboration, "corroboration-only") : "no-eligible-candidates"],
       trendPct: null,
     };
   }

@@ -38,7 +38,7 @@ export interface AcquireInput {
   location?: string;
   condition?: string;
   graderCert?: string;
-  comp: CompResult;
+  comp: CompResult | null;
   strategy?: PricingStrategy;
   minMargin?: number;
 }

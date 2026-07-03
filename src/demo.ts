@@ -37,7 +37,7 @@ async function main() {
     const { headline, sourcesDisagree } = await comps.lookup(card, { grade });
     const h = headline;
     console.log(`${card.name} ${card.number} — ${grade}`);
-    if (h.sampleSize === 0) {
+    if (!h || h.sampleSize === 0) {
       console.log("  no usable comps");
     } else {
       console.log(

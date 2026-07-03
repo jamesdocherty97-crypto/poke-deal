@@ -150,6 +150,7 @@ test("UK eBay Marketplace Insights headline beats an agreeing broad PokeTrace si
   const result = pickHeadlineForQuery([broadPokeTrace, ebay], victini, { grade: "ACE_10" });
 
   assert.equal(result.reconciliation.chosenSource, "ebay-insights");
+  assert.ok(result.headline);
   assert.equal(result.headline.source, "ebay-marketplace-insights");
   assert.equal(result.reconciliation.headlinePence, 4500);
 });

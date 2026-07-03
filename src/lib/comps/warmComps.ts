@@ -49,7 +49,7 @@ export interface WarmCompSourceStats {
 
 export async function warmComps(
   items: WarmCompItem[],
-  lookup: (item: WarmCompItem) => Promise<CompResult>,
+  lookup: (item: WarmCompItem) => Promise<CompResult | null>,
   options: WarmCompOptions = {},
 ): Promise<WarmCompSummary> {
   const limit = clampPositiveInt(options.limit, DEFAULT_LIMIT);
@@ -66,7 +66,7 @@ export async function warmComps(
       if (!item) continue;
       try {
         const headline = await withTimeout(lookup(item), timeoutMs);
-        if (headline.sampleSize <= 0 || headline.medianPence <= 0) {
+        if (!headline || headline.sampleSize <= 0 || headline.medianPence <= 0) {
           failures.push({ itemId: item.id, reason: "no priced comp returned" });
           continue;
         }

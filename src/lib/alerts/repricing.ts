@@ -8,7 +8,7 @@ export interface RepriceInput {
   grade: string;
   currentPricePence: number;
   costBasisPence: number;
-  comp: CompResult;
+  comp: CompResult | null;
   condition?: string | null;
   strategy?: PricingStrategy;
   thresholdPct?: number;
@@ -28,7 +28,7 @@ export interface RepriceRecommendation {
 
 export function recommendReprice(input: RepriceInput): RepriceRecommendation | null {
   const thresholdPct = input.thresholdPct ?? 10;
-  if (input.currentPricePence <= 0 || input.comp.sampleSize === 0) return null;
+  if (input.currentPricePence <= 0 || !input.comp || input.comp.sampleSize === 0 || input.comp.medianPence <= 0) return null;
 
   const suggestion = suggestListPrice({
     comp: input.comp,

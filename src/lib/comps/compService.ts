@@ -38,7 +38,7 @@ export interface LastKnownCompCache {
 
 export interface ReconciledComp {
   /** The single comp to act on. */
-  headline: CompResult;
+  headline: CompResult | null;
   /** Every source's result, for transparency / disagreement display. */
   all: CompResult[];
   /** True when sources disagree materially on the median (>15%). */
@@ -88,7 +88,7 @@ export class CompService {
 
     if (!hasPricedSignal(all)) {
       const cached = await this.readWarmCache(card, query);
-      if (cached) {
+      if (cached && hasPricedSignal([cached.headline])) {
         const cachedAtMs = new Date(cached.cachedAt).getTime();
         const ageHours = Number.isFinite(cachedAtMs)
           ? Math.max(0, Math.round((Date.now() - cachedAtMs) / (60 * 60 * 1000)))
@@ -241,14 +241,17 @@ export function pickHeadlineForQuery(
   card: CardRef,
   query: CompQuery = {},
   options: { ambiguous?: boolean } = {},
-): { headline: CompResult; reconciliation: ReconResult } {
+): { headline: CompResult | null; reconciliation: ReconResult } {
   const reconQuery = buildReconQuery(card, query, options);
   const candidates = results.map((result) => resultToReconCandidate(result)).filter((candidate): candidate is ReconCandidate => candidate != null);
   const reconciliation = reconcileComps(reconQuery, candidates);
+  if (reconciliation.headlinePence == null || !reconciliation.chosenSource) {
+    return { headline: null, reconciliation };
+  }
   const chosen = reconciliation.chosenSource
     ? pickCompForReconSource(results, reconciliation.chosenSource, reconciliation.headlinePence)
     : null;
-  const headline = chosen ? applyReconciliation(chosen, reconciliation) : applyReconciliation(pickHeadline(results), reconciliation);
+  const headline = chosen ? applyReconciliation(chosen, reconciliation) : null;
   return { headline, reconciliation };
 }
 

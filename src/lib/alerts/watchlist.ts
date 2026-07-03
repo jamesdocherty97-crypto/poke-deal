@@ -6,7 +6,7 @@ export interface WatchCheckInput {
   cardName: string;
   grade: string;
   targetPence: number;
-  comp: CompResult;
+  comp: CompResult | null;
 }
 
 export interface WatchHit {
@@ -28,7 +28,7 @@ export interface PreviousWatchAlert {
 const DEFAULT_REPEAT_ALERT_COOLDOWN_HOURS = 24;
 
 export function checkWatch(input: WatchCheckInput): WatchHit | null {
-  if (input.targetPence <= 0 || input.comp.sampleSize === 0 || input.comp.medianPence <= 0) return null;
+  if (input.targetPence <= 0 || !input.comp || input.comp.sampleSize === 0 || input.comp.medianPence <= 0) return null;
   if (input.comp.medianPence > input.targetPence) return null;
 
   return {

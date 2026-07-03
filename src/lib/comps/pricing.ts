@@ -11,7 +11,7 @@ export type PricingStrategy =
   | "quick"; // move it fast (40th pct)
 
 export interface PriceSuggestionInput {
-  comp: CompResult;
+  comp: CompResult | null;
   strategy?: PricingStrategy;
   /** What I paid per unit (GBP pence). Used to enforce a minimum margin. */
   costBasisPence?: number;
@@ -52,7 +52,7 @@ const RAW_CONDITION_FACTORS: Record<string, number> = {
 export function suggestListPrice(input: PriceSuggestionInput): PriceSuggestion {
   const { comp, strategy = "market", costBasisPence, minMargin = 0.1, condition } = input;
 
-  if (comp.sampleSize === 0) {
+  if (!comp || comp.sampleSize === 0) {
     return {
       pricePence: costBasisPence ? Math.round(costBasisPence * (1 + minMargin)) : 0,
       strategy,

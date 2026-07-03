@@ -250,10 +250,12 @@ test("CompService degrades a hanging source into a visible empty comp", async ()
 
   const result = await service.lookup({ name: "Gengar" }, { grade: "RAW", windowDays: 30 });
 
-  assert.equal(result.headline.source, "slow-source");
-  assert.equal(result.headline.sampleSize, 0);
-  assert.equal(result.headline.windowDays, 30);
-  assert.match((result.headline.raw as { reason?: string }).reason ?? "", /timed out/);
+  assert.equal(result.headline, null);
+  assert.equal(result.all[0]?.source, "slow-source");
+  assert.equal(result.all[0]?.sampleSize, 0);
+  assert.equal(result.all[0]?.windowDays, 30);
+  assert.match((result.all[0]?.raw as { reason?: string }).reason ?? "", /timed out/);
+  assert.equal(result.reconciliation?.manualCheck, true);
 });
 
 test("CompService records a timed-out source while using remaining priced sources", async () => {
@@ -263,15 +265,16 @@ test("CompService records a timed-out source while using remaining priced source
     lookup: () => new Promise<CompResult>(() => undefined),
   };
   const pricedSource: CompSource = {
-    name: "priced-source",
+    name: "poketrace",
     live: true,
-    lookup: async () => comp({ source: "priced-source", medianPence: 4200, sampleSize: 12 }),
+    lookup: async () => comp({ source: "poketrace", medianPence: 4200, sampleSize: 12 }),
   };
   const service = new CompService([hangingSource, pricedSource], 5);
 
   const result = await service.lookup({ name: "Gengar" }, { grade: "RAW", windowDays: 30 });
 
-  assert.equal(result.headline.source, "priced-source");
+  assert.ok(result.headline);
+  assert.equal(result.headline.source, "poketrace");
   assert.equal(result.headline.medianPence, 4200);
   assert.equal(result.unavailableSources?.[0]?.name, "slow-source");
   assert.match(result.unavailableSources?.[0]?.reason ?? "", /timed out/);
@@ -297,9 +300,39 @@ test("CompService serves a warm cached comp when every source fails", async () =
 
   const result = await service.lookup(cachedHeadline.card, { grade: "RAW", windowDays: 30 });
 
+  assert.ok(result.headline);
   assert.equal(result.headline.medianPence, 2500);
   assert.equal(result.cached?.ageHours, 3);
   assert.equal((result.headline.raw as { cached?: boolean }).cached, true);
+  assert.equal(result.unavailableSources?.[0]?.name, "failing-source");
+});
+
+test("CompService ignores a warm cached row with no price", async () => {
+  const failingSource: CompSource = {
+    name: "failing-source",
+    live: true,
+    lookup: async () => {
+      throw new Error("network down");
+    },
+  };
+  const cachedAt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  const cachedHeadline = comp({
+    source: "pokemon-price-tracker",
+    card: { name: "Gengar", setName: "Lost Origin", number: "TG06/TG30" },
+    medianPence: 0,
+    meanPence: 0,
+    lowPence: 0,
+    highPence: 0,
+    sampleSize: 0,
+  });
+  const cache = new MemoryLastKnownCompCache([{ headline: cachedHeadline, cachedAt }]);
+  const service = new CompService([failingSource], 5, cache);
+
+  const result = await service.lookup(cachedHeadline.card, { grade: "RAW", windowDays: 30 });
+
+  assert.equal(result.headline, null);
+  assert.equal(result.cached, undefined);
+  assert.equal(result.reconciliation?.manualCheck, true);
   assert.equal(result.unavailableSources?.[0]?.name, "failing-source");
 });
 
@@ -315,7 +348,7 @@ test("CompService returns a clean no-data result when every source fails cold", 
 
   const result = await service.lookup({ name: "Gengar" }, { grade: "RAW", windowDays: 30 });
 
-  assert.equal(result.headline.sampleSize, 0);
+  assert.equal(result.headline, null);
   assert.equal(result.cached, undefined);
   assert.equal(result.reconciliation?.manualCheck, true);
   assert.equal(result.unavailableSources?.[0]?.name, "failing-source");

@@ -23,6 +23,7 @@ type Fixture = {
 type FixtureExpectation = {
   file: string;
   band: [number, number];
+  headlineNull?: boolean;
   confidence: "high" | "medium" | "low";
   manualCheck: boolean;
   ambiguous?: boolean;
@@ -41,6 +42,7 @@ const expectations: FixtureExpectation[] = [
   {
     file: "alakazam-mep-0079-raw.json",
     band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     catalog: { name: "Alakazam", setName: "Mega Evolution Promos", number: "MEP0079" },
@@ -64,13 +66,14 @@ const expectations: FixtureExpectation[] = [
   },
   {
     file: "blastoise-xy-evolutions-raw.json",
-    band: [500, 900],
+    band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     ambiguous: true,
     minAlternatives: 3,
     catalog: { name: "Blastoise-EX", setName: "Evolutions", number: "21/108" },
-    rationale: "Bare Blastoise + Evolutions has several plausible printings, so it must show ambiguity instead of silently pretending certainty.",
+    rationale: "Bare Blastoise + Evolutions has several plausible printings, so it must show ambiguity and no headline when no source passes quality gates.",
   },
   {
     file: "umbreon-evolving-skies-raw-ambiguous.json",
@@ -107,6 +110,7 @@ const expectations: FixtureExpectation[] = [
   {
     file: "charizard-gx-hidden-fates-sv49-psa9.json",
     band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     catalog: { name: "Charizard-GX", setName: "Hidden Fates Shiny Vault", number: "SV49/SV94" },
@@ -114,33 +118,37 @@ const expectations: FixtureExpectation[] = [
   },
   {
     file: "dark-charizard-team-rocket-4-82-raw.json",
-    band: [35000, 43000],
+    band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     catalog: { name: "Dark Charizard", setName: "Team Rocket", number: "4/82" },
-    rationale: "WOTC non-Base chase cards should resolve identity but stay manual-check on single-source raw market data.",
+    rationale: "WOTC non-Base chase cards should resolve identity but not headline excluded vintage raw catalog data.",
   },
   {
     file: "flittle-paldean-fates-raw.json",
-    band: [100, 250],
+    band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     ambiguous: true,
     minAlternatives: 1,
     catalog: { name: "Flittle", setName: "Paldean Fates", number: "164/91" },
-    rationale: "Small modern raw cards should resolve identity but remain cautious when only catalog-market baselines are present.",
+    rationale: "Small modern raw cards should resolve identity but show no headline when only stale catalog-market baselines are present.",
   },
   {
     file: "gengar-lost-origin-tg06-raw.json",
-    band: [12000, 15000],
+    band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     catalog: { name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" },
-    rationale: "Trainer Gallery numbers typed against the parent set must resolve to the gallery subset identity.",
+    rationale: "Trainer Gallery numbers typed against the parent set must resolve identity and show no headline when every source fails quality gates.",
   },
   {
     file: "hitmontop-neo-genesis-first-edition-raw.json",
     band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     minAlternatives: 4,
@@ -150,6 +158,7 @@ const expectations: FixtureExpectation[] = [
   {
     file: "japanese-vstar-universe-pikachu-205-raw.json",
     band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     minAlternatives: 4,
@@ -158,15 +167,17 @@ const expectations: FixtureExpectation[] = [
   },
   {
     file: "lugia-neo-genesis-cgc10.json",
-    band: [800000, 870000],
+    band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     catalog: { name: "Lugia", setName: "Neo Genesis", number: "9/111" },
-    rationale: "CGC 10 vintage slabs can resolve but remain low-confidence when a single sale drives the result.",
+    rationale: "CGC 10 vintage slabs can resolve but should not headline a single source that failed the quality threshold.",
   },
   {
     file: "lugia-neo-genesis-cgc15.json",
     band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     catalog: { name: "Lugia", setName: "Neo Genesis", number: "9/111" },
@@ -199,6 +210,7 @@ const expectations: FixtureExpectation[] = [
   {
     file: "rough-blstoise-xy-evolutons-psa9.json",
     band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     ambiguous: true,
@@ -208,11 +220,12 @@ const expectations: FixtureExpectation[] = [
   },
   {
     file: "rough-gengarr-lor-tg06-raw.json",
-    band: [12000, 15000],
+    band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     catalog: { name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" },
-    rationale: "Rough Quick Fill should strip source/location noise and recover the Trainer Gallery identity.",
+    rationale: "Rough Quick Fill should strip source/location noise and recover identity, but no headline when every source fails quality gates.",
   },
   {
     file: "rough-victni-promo-208-raw.json",
@@ -251,6 +264,7 @@ const expectations: FixtureExpectation[] = [
   {
     file: "victini-svp-208-ace10.json",
     band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     minAlternatives: 1,
@@ -260,6 +274,7 @@ const expectations: FixtureExpectation[] = [
   {
     file: "zapdos-151-192-bgs95.json",
     band: [0, 0],
+    headlineNull: true,
     confidence: "low",
     manualCheck: true,
     catalog: { name: "Zapdos ex", setName: "151", number: "192/165" },
@@ -292,11 +307,16 @@ for (const expectation of expectations) {
         ambiguous: Boolean(fixture.response.ambiguous),
       });
 
-      const headlinePence = result.reconciliation.headlinePence ?? result.headline.medianPence;
-      assert.ok(
-        headlinePence >= expectation.band[0] && headlinePence <= expectation.band[1],
-        `${headlinePence} was outside ${expectation.band.join("-")}`,
-      );
+      const headlinePence = result.reconciliation.headlinePence ?? result.headline?.medianPence ?? null;
+      if (expectation.headlineNull) {
+        assert.equal(result.headline, null);
+        assert.equal(headlinePence, null);
+      } else {
+        assert.ok(
+          headlinePence != null && headlinePence >= expectation.band[0] && headlinePence <= expectation.band[1],
+          `${headlinePence} was outside ${expectation.band.join("-")}`,
+        );
+      }
       assert.equal(result.reconciliation.confidence, expectation.confidence);
       assert.equal(result.reconciliation.manualCheck, expectation.manualCheck);
       assert.equal(Boolean(fixture.response.ambiguous), Boolean(expectation.ambiguous));

@@ -41,11 +41,11 @@ export async function runPortfolioSnapshot({ limit = 25 }: { limit?: number } = 
 
   for (const group of groups) {
     const comps = await compService.lookup(group.card, { grade: group.grade });
-    const marketPence = comps.headline.medianPence;
-    if (comps.headline.sampleSize === 0 || marketPence <= 0) {
+    if (!comps.headline || comps.headline.sampleSize === 0 || comps.headline.medianPence <= 0) {
       skipped += 1;
       continue;
     }
+    const marketPence = comps.headline.medianPence;
 
     await prisma.priceSnapshot.upsert({
       where: {

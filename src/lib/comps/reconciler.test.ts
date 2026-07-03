@@ -143,14 +143,15 @@ test("T7: UK eBay MI beats broad PokeTrace but disagreement makes it low confide
   assert.equal(result.manualCheck, true);
 });
 
-test("T8: stale-only data can fallback but always needs manual check", () => {
+test("T8: stale-only data does not headline", () => {
   const result = reconcileComps(baseQuery, [
     candidate({ source: "tcg-market", valuePence: 50000, n: 1, ageDays: 200, region: "EU" }),
   ]);
 
-  assert.equal(result.headlinePence, 50000);
+  assert.equal(result.headlinePence, null);
   assert.equal(result.confidence, "low");
   assert.equal(result.manualCheck, true);
+  assert.equal(result.chosenSource, undefined);
 });
 
 test("T9: non-thin owned sales anchor over external baselines", () => {
@@ -192,6 +193,18 @@ test("T10: no candidates returns no headline and a low-confidence manual check",
   assert.equal(result.headlinePence, null);
   assert.equal(result.confidence, "low");
   assert.equal(result.manualCheck, true);
+});
+
+test("T10b: stale corroboration-only data does not become a headline", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "tcg-market", valuePence: 156, n: 1, ageDays: 220, region: "EU" }),
+  ]);
+
+  assert.equal(result.headlinePence, null);
+  assert.equal(result.chosenSource, undefined);
+  assert.equal(result.confidence, "low");
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /corroboration-only:tcg-market/);
 });
 
 test("T11: agreeing sources are still low-confidence when every eligible source is heavily penalized", () => {

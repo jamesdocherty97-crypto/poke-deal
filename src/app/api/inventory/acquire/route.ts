@@ -97,9 +97,11 @@ export async function POST(request: Request) {
     // 2. persist comp history (best-effort)
     if (process.env.DATABASE_URL) {
       const compRepo = new PrismaCompResultRepo();
-      await compRepo.create(comps.headline).catch((err) =>
-        console.warn("[acquire] comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
-      );
+      if (comps.headline) {
+        await compRepo.create(comps.headline).catch((err) =>
+          console.warn("[acquire] comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
+        );
+      }
       if (checkedComp) {
         await compRepo.create(checkedComp).catch((err) =>
           console.warn("[acquire] checked comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
