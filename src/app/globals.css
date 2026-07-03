@@ -4267,6 +4267,18 @@ label {
   color: #c7f7df;
 }
 
+.manual-comp-links a.terapeak-link {
+  border-style: dashed;
+}
+
+.manual-comp-links.priority a.terapeak-link,
+.manual-comp-links a.terapeak-link.primary-link {
+  border-style: solid;
+  border-color: rgba(255, 203, 5, 0.52);
+  background: rgba(255, 203, 5, 0.16);
+  color: #fff2a6;
+}
+
 .checked-comp-card {
   display: grid;
   gap: 10px;

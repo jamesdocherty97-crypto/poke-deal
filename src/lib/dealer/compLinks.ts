@@ -1,7 +1,7 @@
 import type { CardRef, Grade } from "../domain/types.js";
 import { textMentionsFirstEdition } from "../comps/variants.js";
 
-export type ManualCompLinkKind = "EBAY_UK_SOLD" | "EBAY_ALL_SOLD" | "CARDMARKET" | "TCGPLAYER";
+export type ManualCompLinkKind = "EBAY_UK_SOLD" | "TERAPEAK_SOLD" | "EBAY_ALL_SOLD" | "CARDMARKET" | "TCGPLAYER";
 
 export interface ManualCompLink {
   kind: ManualCompLinkKind;
@@ -32,6 +32,12 @@ export function buildManualCompLinks(card: CardRef, grade: Grade, options: Manua
       url: ebaySoldUrl(ebayQuery, { ukOnly: true }),
       query: ebayQuery,
       primary: true,
+    },
+    {
+      kind: "TERAPEAK_SOLD",
+      label: "Terapeak solds",
+      url: terapeakSoldUrl(ebayQuery),
+      query: ebayQuery,
     },
     {
       kind: "EBAY_ALL_SOLD",
@@ -163,6 +169,16 @@ function ebaySoldUrl(query: string, options: { ukOnly: boolean }): string {
   });
   if (options.ukOnly) params.set("LH_PrefLoc", "1");
   return `https://www.ebay.co.uk/sch/i.html?${params.toString()}`;
+}
+
+function terapeakSoldUrl(query: string): string {
+  const params = new URLSearchParams({
+    marketplace: "EBAY-GB",
+    keywords: query,
+    dayRange: "90",
+    tabName: "SOLD",
+  });
+  return `https://www.ebay.co.uk/sh/research?${params.toString()}`;
 }
 
 function cardmarketUrl(query: string): string {

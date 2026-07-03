@@ -22,6 +22,7 @@ test("cardSearchQuery builds the exact dealer search string", () => {
 test("buildManualCompLinks creates UK-relevant raw comp links", () => {
   const links = buildManualCompLinks(card, "RAW");
   const ebay = new URL(links[0]!.url);
+  const terapeak = new URL(links[1]!.url);
 
   assert.equal(links[0]?.label, "eBay UK");
   assert.equal(ebay.hostname, "www.ebay.co.uk");
@@ -29,10 +30,17 @@ test("buildManualCompLinks creates UK-relevant raw comp links", () => {
   assert.equal(ebay.searchParams.get("LH_PrefLoc"), "1");
   assert.equal(ebay.searchParams.get("_nkw"), "Gengar TG06/TG30 Lost Origin Trainer Gallery -PSA -BGS -CGC -ACE -SGC -graded");
   assert.equal(links[0]?.primary, true);
-  assert.equal(links[1]?.label, "Widen");
-  assert.equal(new URL(links[1]!.url).searchParams.get("LH_PrefLoc"), null);
-  assert.equal(new URL(links[2]!.url).hostname, "www.cardmarket.com");
-  assert.equal(new URL(links[3]!.url).hostname, "www.tcgplayer.com");
+  assert.equal(links[1]?.label, "Terapeak solds");
+  assert.equal(terapeak.hostname, "www.ebay.co.uk");
+  assert.equal(terapeak.pathname, "/sh/research");
+  assert.equal(terapeak.searchParams.get("marketplace"), "EBAY-GB");
+  assert.equal(terapeak.searchParams.get("keywords"), "Gengar TG06/TG30 Lost Origin Trainer Gallery -PSA -BGS -CGC -ACE -SGC -graded");
+  assert.equal(terapeak.searchParams.get("dayRange"), "90");
+  assert.equal(terapeak.searchParams.get("tabName"), "SOLD");
+  assert.equal(links[2]?.label, "Widen");
+  assert.equal(new URL(links[2]!.url).searchParams.get("LH_PrefLoc"), null);
+  assert.equal(new URL(links[3]!.url).hostname, "www.cardmarket.com");
+  assert.equal(new URL(links[4]!.url).hostname, "www.tcgplayer.com");
 });
 
 test("buildManualCompLinks adds slab grade only to eBay sold searches", () => {
@@ -42,9 +50,13 @@ test("buildManualCompLinks adds slab grade only to eBay sold searches", () => {
     new URL(links[0]!.url).searchParams.get("_nkw"),
     "Gengar TG06/TG30 Lost Origin Trainer Gallery BGS 9.5",
   );
+  assert.equal(
+    new URL(links[1]!.url).searchParams.get("keywords"),
+    "Gengar TG06/TG30 Lost Origin Trainer Gallery BGS 9.5",
+  );
   assert.doesNotMatch(new URL(links[0]!.url).searchParams.get("_nkw") ?? "", /-PSA/);
-  assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /BGS/);
-  assert.doesNotMatch(new URL(links[3]!.url).searchParams.get("q") ?? "", /BGS/);
+  assert.doesNotMatch(new URL(links[3]!.url).searchParams.get("searchString") ?? "", /BGS/);
+  assert.doesNotMatch(new URL(links[4]!.url).searchParams.get("q") ?? "", /BGS/);
 });
 
 test("buildManualCompLinks adds ACE slab grades to eBay sold searches using plain human wording", () => {
@@ -54,7 +66,26 @@ test("buildManualCompLinks adds ACE slab grades to eBay sold searches using plai
     new URL(links[0]!.url).searchParams.get("_nkw"),
     "Gengar TG06/TG30 Lost Origin Trainer Gallery ACE 10",
   );
-  assert.doesNotMatch(new URL(links[2]!.url).searchParams.get("searchString") ?? "", /ACE/);
+  assert.doesNotMatch(new URL(links[3]!.url).searchParams.get("searchString") ?? "", /ACE/);
+});
+
+test("buildManualCompLinks encodes Terapeak seller hub sold-search params", () => {
+  const links = buildManualCompLinks(
+    { name: "Mew's Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" },
+    "PSA_10",
+  );
+  const link = links.find((candidate) => candidate.kind === "TERAPEAK_SOLD");
+  assert.ok(link);
+
+  const url = new URL(link.url);
+  assert.equal(url.href.startsWith("https://www.ebay.co.uk/sh/research?"), true);
+  assert.equal(url.searchParams.get("marketplace"), "EBAY-GB");
+  assert.equal(url.searchParams.get("keywords"), "Mew's Gengar TG06/TG30 Lost Origin Trainer Gallery PSA 10");
+  assert.equal(url.searchParams.get("dayRange"), "90");
+  assert.equal(url.searchParams.get("tabName"), "SOLD");
+  assert.match(link.url, /Mew%27s/);
+  assert.match(link.url, /TG06%2FTG30/);
+  assert.match(link.url, /PSA\+10/);
 });
 
 test("buildManualCompLinks formats low CGC half grades for eBay sold searches", () => {

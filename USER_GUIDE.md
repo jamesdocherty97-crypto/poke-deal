@@ -476,6 +476,13 @@ Use them when:
 - Sample size is thin.
 - You are spending meaningful money.
 
+Buttons:
+
+- eBay UK opens normal UK sold listings.
+- Terapeak solds opens eBay Seller Hub research for the same search text, set to UK marketplace and 90-day solds. Use this as the preferred manual UK sold check while eBay Marketplace Insights approval is still closed.
+- Widen removes the UK-only filter when UK solds are thin.
+- Cardmarket and TCGPlayer are secondary checks, not replacements for cleaned sold comps.
+
 ### Checked Comp
 
 Checked Comp lets you manually override the API headline with a real sold price you trust.

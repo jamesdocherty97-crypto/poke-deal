@@ -4781,6 +4781,12 @@ export default function Home() {
 
   function renderManualCompLinks(variant: "compact" | "full" | "priority" = "full") {
     const ebayQuery = manualCompLinks.find((link) => link.kind === "EBAY_UK_SOLD")?.query ?? manualCompFallbackQuery;
+    const emphasizeTerapeak = Boolean(
+      needsManualComp ||
+        compForReceipt?.reconciliation?.manualCheck ||
+        requiresCheckedCompBeforeStock ||
+        (dealerVerdict && dealerVerdict.tone !== "good"),
+    );
     return (
       <div className={`manual-comp-links ${variant}`} aria-label="Manual comp checks">
         <div className="manual-comp-heading">
@@ -4819,11 +4825,20 @@ export default function Home() {
         </div>
         {ebayQuery && <div className="manual-comp-query">{ebayQuery}</div>}
         {ebayQuery
-          ? manualCompLinks.map((link) => (
-              <a key={link.kind} className={link.primary ? "primary-link" : ""} href={link.url} target="_blank" rel="noreferrer">
-                {link.label}
-              </a>
-            ))
+          ? manualCompLinks.map((link) => {
+              const linkClassName = [
+                link.primary || (link.kind === "TERAPEAK_SOLD" && emphasizeTerapeak) ? "primary-link" : "",
+                link.kind === "TERAPEAK_SOLD" ? "terapeak-link" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <a key={link.kind} className={linkClassName} href={link.url} target="_blank" rel="noreferrer">
+                  {link.label}
+                </a>
+              );
+            })
           : null}
       </div>
     );
