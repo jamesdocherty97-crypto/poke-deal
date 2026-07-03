@@ -3,7 +3,7 @@
 import type { FormEvent, ReactNode } from "react";
 import type { ListingSort, ListingStateFilter } from "@/lib/dealer/tableControls";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
-import { orderListingPhotos } from "@/lib/photos/listingPhotoPolicy";
+import { isCatalogPhotoEligible, orderListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { InventoryPhotoTools } from "./InventoryPhotoTools";
 import { CardImage, EmptyState, Metric } from "./UiBits";
 
@@ -501,6 +501,8 @@ export function ListingsTab({
               state === "ACTIVE" ? "Listing activated." : "Listing ended.",
             )
           }
+          onPhotos={addPhotosToInventory}
+          onCatalogArt={addCatalogArtToInventory}
           onEbayPublish={() => setEbayPublishTarget(listing.id)}
         />
       ))}
@@ -619,6 +621,8 @@ function ListingRow({
   onSell,
   onPasteUrl,
   onState,
+  onPhotos,
+  onCatalogArt,
   onEbayPublish,
 }: {
   listing: Listing;
@@ -630,6 +634,8 @@ function ListingRow({
   onSell: (listing: Listing) => void;
   onPasteUrl: () => void;
   onState: (state: Exclude<ListingState, "SOLD">) => void;
+  onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
+  onCatalogArt: (item: InventoryItem) => void;
   onEbayPublish: () => void;
 }) {
   const card = listing.item?.card;
@@ -655,6 +661,13 @@ function ListingRow({
   const hasOffer = listing.externalRef?.startsWith("offer:");
   const isPublished = listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl;
   const canPasteUrl = listing.state !== "SOLD" && !listing.externalUrl;
+  const photoCount = listing.item?.photos?.length ?? 0;
+  const needsEbayPhotos = Boolean(isEbay && listing.item && listing.state !== "SOLD" && !isPublished && photoCount === 0);
+  const canUseCatalogArt = Boolean(
+    needsEbayPhotos &&
+    listing.item?.card?.imageUrl &&
+    isCatalogPhotoEligible({ grade: listing.item.grade, pricePence: price }),
+  );
   const ebayStatusLabel = hasOffer
     ? " · offer pending"
     : isPublished
@@ -688,7 +701,35 @@ function ListingRow({
         )}
         {listing.state !== "SOLD" && (
           <div className="next-action-strip listing-next-action">
-            {isEbay && ebayConnected && hasOffer && !isPublished ? (
+            {needsEbayPhotos && listing.item ? (
+              <>
+                <label className={`next-action-button row-file-action ${busy === `photo-${listing.item.id}` ? "disabled" : ""}`}>
+                  {busy === `photo-${listing.item.id}` ? "Uploading..." : "Add photos"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    multiple
+                    disabled={busy === `photo-${listing.item.id}`}
+                    onChange={(event) => {
+                      const files = event.currentTarget.files;
+                      if (files) onPhotos(listing.item, files);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+                {canUseCatalogArt && (
+                  <button
+                    className="next-action-button"
+                    type="button"
+                    onClick={() => onCatalogArt(listing.item)}
+                    disabled={busy === `photo-${listing.item.id}`}
+                  >
+                    Use catalog art
+                  </button>
+                )}
+              </>
+            ) : isEbay && ebayConnected && hasOffer && !isPublished ? (
               <button className="next-action-button" type="button" onClick={onEbayPublish} disabled={isEbayPublishBusy}>
                 {isEbayPublishBusy ? "Publishing..." : "Publish to eBay"}
               </button>
@@ -710,8 +751,12 @@ function ListingRow({
               </button>
             )}
             <span>
-              {listing.state === "DRAFT"
-                ? "copy fields, create offer, or activate"
+              {needsEbayPhotos
+                ? canUseCatalogArt
+                  ? "eBay needs images. Low-value raw stock can use catalog art."
+                  : "eBay needs real photos before publish."
+                : listing.state === "DRAFT"
+                  ? "copy fields, create offer, or activate"
                 : hasOffer
                   ? "offer created, publish when ready"
                   : isPublished
