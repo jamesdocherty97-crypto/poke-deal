@@ -107,6 +107,18 @@ test("buildOwnedSalesWhere prefers exact tcgApiId when available", () => {
   assert.equal(where.item?.card?.tcgApiId, "base1-4");
 });
 
+test("buildOwnedSalesWhere matches canonical numeric collector numbers", () => {
+  const where = buildOwnedSalesWhere(
+    { name: "Tauros", setName: "Chaos Rising", number: "069/086", game: "POKEMON", language: "EN" },
+    "RAW",
+    90,
+  ) as {
+    item?: { card?: { OR?: Array<{ number: string }> } };
+  };
+
+  assert.deepEqual(where.item?.card?.OR, [{ number: "069/086" }, { number: "69/86" }]);
+});
+
 function ownedSale(
   id: string,
   salePrice: number,

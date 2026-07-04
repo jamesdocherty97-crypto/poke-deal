@@ -111,6 +111,16 @@ test("PokeTrace search variants strip known promo prefixes for lookup", () => {
   assert.equal(variants.size >= 3, true);
 });
 
+test("PokeTrace search variants include canonical numeric slash form for zero-padded scans", () => {
+  const variants = new Set(buildPokeTraceSearchVariants({ name: "Tauros", setName: "Chaos Rising", number: "069/086" }));
+  assert.equal(variants.has("Tauros 069/086"), true);
+  assert.equal(variants.has("Tauros 69/86"), true);
+
+  const catalogVariants = new Set(buildPokeTraceSearchVariants({ name: "Tauros", setName: "Chaos Rising", number: "69/86" }));
+  assert.equal(catalogVariants.has("Tauros 69/86"), true);
+  assert.equal(catalogVariants.has("Tauros 069/086"), true);
+});
+
 test("PokeTrace chooses the matching promo card from multiple results", () => {
   const comp = mapPokeTraceCardsToComp(
     {
@@ -213,6 +223,39 @@ test("PokeTrace matches long set aliases when provider set text is abbreviated",
   assert.equal(comp.sampleSize, 16);
   assert.equal(comp.medianPence, usdToPence(34));
   assert.equal(comp.card.setName, "Scarlet & Violet Black Star Promos");
+});
+
+test("PokeTrace matches ME-era provider set prefixes and zero-padded numbers", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Tauros",
+          cardNumber: "096/086",
+          set: { name: "ME04: Chaos Rising" },
+          market: "US",
+          currency: "USD",
+          prices: {
+            tcgplayer: {
+              NEAR_MINT: { avg: 6.25, low: 5, high: 8, saleCount: 18 },
+            },
+          },
+          lastUpdated: "2026-07-04T10:00:00Z",
+        },
+      ],
+    },
+    {
+      source: "poketrace",
+      card: { name: "Tauros", setName: "Chaos Rising", number: "96/86" },
+      grade: "RAW",
+      windowDays: 90,
+    },
+  );
+
+  assert.equal(comp.sampleSize, 18);
+  assert.equal(comp.medianPence, usdToPence(6.25));
+  assert.equal(comp.card.setName, "ME04: Chaos Rising");
+  assert.equal(comp.card.number, "096/086");
 });
 
 test("PokeTrace rejects wrong-set cards for unavailable promo sets", () => {

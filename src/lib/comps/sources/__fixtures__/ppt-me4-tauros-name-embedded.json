@@ -1,0 +1,121 @@
+{
+  "_note": "Captured from Pokemon Price Tracker API v2 on 2026-07-05. Query: search=Tauros 069/086, set=Chaos Rising, includeEbay=true, limit=1. API key omitted.",
+  "status": 200,
+  "capturedAt": "2026-07-04T23:14:02.052Z",
+  "request": {
+    "language": "english",
+    "includeEbay": true,
+    "days": 90,
+    "limit": 1,
+    "search": "Tauros 069/086",
+    "set": "Chaos Rising"
+  },
+  "data": [
+    {
+      "id": "6a022c471a877c4911d54f16",
+      "tcgPlayerId": "693552",
+      "setId": 24655,
+      "setName": "ME04: Chaos Rising",
+      "name": "Tauros - 069/086",
+      "cardNumber": "069/086",
+      "totalSetNumber": null,
+      "rarity": "Uncommon",
+      "cardType": null,
+      "hp": null,
+      "stage": null,
+      "attacks": null,
+      "weakness": null,
+      "resistance": null,
+      "retreatCost": null,
+      "artist": null,
+      "pokemonType": null,
+      "energyType": null,
+      "flavorText": null,
+      "tcgPlayerUrl": "https://www.tcgplayer.com/product/693552",
+      "prices": {
+        "market": 0.08,
+        "low": 0.01,
+        "sellers": null,
+        "listings": 0,
+        "primaryPrinting": "Normal",
+        "lastUpdated": "2026-07-04T13:07:18.138Z",
+        "variants": {
+          "Normal": {
+            "Near Mint": {
+              "price": 0.08,
+              "listings": null,
+              "priceString": "$0.08",
+              "lastUpdated": "2026-07-04T23:14:02.009Z"
+            }
+          },
+          "Reverse Holofoil": {
+            "Near Mint Reverse Holofoil": {
+              "price": 0.21,
+              "listings": null,
+              "priceString": "$0.21",
+              "lastUpdated": "2026-07-04T23:14:02.009Z"
+            }
+          }
+        }
+      },
+      "imageCdnUrl": "https://tcgplayer-cdn.tcgplayer.com/product/693552_in_800x800.jpg",
+      "imageCdnUrl200": "https://tcgplayer-cdn.tcgplayer.com/product/693552_in_200x200.jpg",
+      "imageCdnUrl400": "https://tcgplayer-cdn.tcgplayer.com/product/693552_in_400x400.jpg",
+      "imageCdnUrl800": "https://tcgplayer-cdn.tcgplayer.com/product/693552_in_800x800.jpg",
+      "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/693552_in_200x200.jpg",
+      "needsDetailedScrape": false,
+      "dataCompleteness": "complete",
+      "lastScrapedAt": "2026-07-04T13:07:18.138Z",
+      "createdAt": "2026-05-11T19:21:43.515Z",
+      "updatedAt": "2026-07-04T13:07:24.110Z",
+      "variants": {
+        "Normal": {
+          "printing": "Normal",
+          "marketPrice": 0.08,
+          "lowPrice": 0.01,
+          "conditionUsed": "Near Mint"
+        },
+        "Reverse Holofoil": {
+          "printing": "Reverse Holofoil",
+          "marketPrice": 0.21,
+          "lowPrice": 0.01,
+          "conditionUsed": "Near Mint Reverse Holofoil"
+        }
+      },
+      "printingsAvailable": [
+        "Reverse Holofoil",
+        "Normal"
+      ],
+      "externalCatalogId": null
+    }
+  ],
+  "metadata": {
+    "total": 41,
+    "count": 1,
+    "limit": 1,
+    "offset": 0,
+    "hasMore": true,
+    "language": "english",
+    "includes": {
+      "priceHistory": false,
+      "ebayData": true,
+      "cardmarketData": false
+    },
+    "historyWindow": {
+      "days": 90,
+      "from": "2026-04-05",
+      "to": "2026-07-04",
+      "maxDataPoints": 180,
+      "granularityNote": "Data points limited to 180. Use ?maxDataPoints=N for higher granularity (plan limits apply)."
+    },
+    "apiCallsConsumed": {
+      "total": 2,
+      "breakdown": {
+        "cards": 1,
+        "history": 0,
+        "ebay": 1
+      },
+      "costPerCard": 2
+    }
+  }
+}

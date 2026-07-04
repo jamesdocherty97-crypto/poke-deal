@@ -1,4 +1,5 @@
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
+import { normalizeCollectorNumberForCompare } from "../../cards/identity.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { mean, median } from "../cleaning.js";
@@ -129,13 +130,7 @@ export function buildOwnedSalesWhere(card: CardRef, grade: Grade, windowDays: nu
   const cardWhere =
     card.tcgApiId
       ? { tcgApiId: card.tcgApiId }
-      : {
-          game: card.game ?? "POKEMON",
-          language: card.language ?? "EN",
-          name: card.name,
-          ...(card.setName ? { setName: card.setName } : {}),
-          ...(card.number ? { number: card.number } : {}),
-        };
+      : ownedSalesCardWhere(card);
 
   return {
     soldAt: { gte: soldAfter },
@@ -144,6 +139,19 @@ export function buildOwnedSalesWhere(card: CardRef, grade: Grade, windowDays: nu
       card: cardWhere,
     },
   };
+}
+
+function ownedSalesCardWhere(card: CardRef): unknown {
+  const base = {
+    game: card.game ?? "POKEMON",
+    language: card.language ?? "EN",
+    name: card.name,
+    ...(card.setName ? { setName: card.setName } : {}),
+  };
+  if (!card.number) return base;
+  const comparableNumber = normalizeCollectorNumberForCompare(card.number);
+  if (!comparableNumber || comparableNumber === card.number.trim()) return { ...base, number: card.number };
+  return { ...base, OR: [{ number: card.number }, { number: comparableNumber }] };
 }
 
 function emptyOwnedSalesComp(ctx: OwnedSalesContext, reason: string): CompResult {

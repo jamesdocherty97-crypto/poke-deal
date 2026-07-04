@@ -1,0 +1,394 @@
+{
+  "capturedAt": "2026-07-04T23:13:13.492Z",
+  "url": "https://poke-deal.vercel.app/api/comps",
+  "params": {
+    "name": "Antique Sail Fossil",
+    "setName": "Perfect Order",
+    "number": "69/88",
+    "grade": "RAW"
+  },
+  "status": 200,
+  "durationMs": 11173,
+  "response": {
+    "headline": {
+      "source": "poketrace",
+      "card": {
+        "name": "Antique Sail Fossil",
+        "setName": "ME03: Perfect Order",
+        "number": "069/088",
+        "game": "POKEMON",
+        "language": "EN"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 9,
+      "meanPence": 9,
+      "lowPence": 1,
+      "highPence": 30,
+      "sampleSize": 1284,
+      "windowDays": 90,
+      "trendPct": -21.2,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-04T20:49:29.731Z",
+      "raw": {
+        "kind": "market-baseline",
+        "tier": "NEAR_MINT",
+        "priceSource": "tcgplayer",
+        "market": "US",
+        "currency": "USD",
+        "fx": {
+          "source": "cached",
+          "provider": "freecurrencyapi",
+          "asOf": "2026-07-04T00:00:00.000Z",
+          "ageDays": 0
+        },
+        "providerCard": {
+          "name": "Antique Sail Fossil",
+          "setName": "ME03: Perfect Order",
+          "number": "069/088",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "approxSaleCount": false,
+        "signals": [
+          {
+            "priceSource": "tcgplayer",
+            "tier": "NEAR_MINT",
+            "kind": "market-baseline",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 9,
+            "lowPence": 1,
+            "highPence": 30,
+            "sampleSize": 1284,
+            "trendPct": -21.2,
+            "approxSaleCount": false
+          },
+          {
+            "priceSource": "ebay",
+            "tier": "NEAR_MINT",
+            "kind": "sold-aggregate",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 134,
+            "lowPence": 134,
+            "highPence": 134,
+            "sampleSize": 12,
+            "trendPct": 32.1,
+            "approxSaleCount": true
+          }
+        ],
+        "avg": 0.12,
+        "low": 0.01,
+        "high": 0.4,
+        "lastUpdated": "2026-07-04T00:00:00.000Z",
+        "avg1d": 0.12,
+        "avg7d": 0.13285714,
+        "avg30d": 0.15225807,
+        "median3d": null,
+        "median7d": null,
+        "median30d": null,
+        "saleCount": 1284,
+        "reconciliation": {
+          "headlinePence": 9,
+          "confidence": "high",
+          "manualCheck": false,
+          "reasons": [
+            "penalty-region-us:poketrace"
+          ],
+          "chosenSource": "poketrace",
+          "trendPct": -21.2
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Antique Sail Fossil",
+          "setName": "Perfect Order",
+          "number": "69/88",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:13:08.137Z",
+        "raw": {
+          "reason": "no eBay grade aggregate returned"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Antique Sail Fossil",
+          "setName": "Perfect Order",
+          "number": "69/88",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:13:10.078Z",
+        "raw": {
+          "reason": "pokemon-tcg-market timed out"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Antique Sail Fossil",
+          "setName": "ME03: Perfect Order",
+          "number": "069/088",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 9,
+        "meanPence": 9,
+        "lowPence": 1,
+        "highPence": 30,
+        "sampleSize": 1284,
+        "windowDays": 90,
+        "trendPct": -21.2,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T20:49:29.731Z",
+        "raw": {
+          "kind": "market-baseline",
+          "tier": "NEAR_MINT",
+          "priceSource": "tcgplayer",
+          "market": "US",
+          "currency": "USD",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          },
+          "providerCard": {
+            "name": "Antique Sail Fossil",
+            "setName": "ME03: Perfect Order",
+            "number": "069/088",
+            "game": "POKEMON",
+            "language": "EN"
+          },
+          "approxSaleCount": false,
+          "signals": [
+            {
+              "priceSource": "tcgplayer",
+              "tier": "NEAR_MINT",
+              "kind": "market-baseline",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 9,
+              "lowPence": 1,
+              "highPence": 30,
+              "sampleSize": 1284,
+              "trendPct": -21.2,
+              "approxSaleCount": false
+            },
+            {
+              "priceSource": "ebay",
+              "tier": "NEAR_MINT",
+              "kind": "sold-aggregate",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 134,
+              "lowPence": 134,
+              "highPence": 134,
+              "sampleSize": 12,
+              "trendPct": 32.1,
+              "approxSaleCount": true
+            }
+          ],
+          "avg": 0.12,
+          "low": 0.01,
+          "high": 0.4,
+          "lastUpdated": "2026-07-04T00:00:00.000Z",
+          "avg1d": 0.12,
+          "avg7d": 0.13285714,
+          "avg30d": 0.15225807,
+          "median3d": null,
+          "median7d": null,
+          "median30d": null,
+          "saleCount": 1284
+        }
+      },
+      {
+        "source": "checked-comps",
+        "card": {
+          "name": "Antique Sail Fossil",
+          "setName": "Perfect Order",
+          "number": "69/88",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:13:06.906Z",
+        "raw": {
+          "kind": "checked-comps",
+          "reason": "no matching checked comps"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Antique Sail Fossil",
+          "setName": "Perfect Order",
+          "number": "69/88",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:13:06.894Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": 9,
+      "confidence": "high",
+      "manualCheck": false,
+      "reasons": [
+        "penalty-region-us:poketrace"
+      ],
+      "chosenSource": "poketrace",
+      "trendPct": -21.2
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-tcg-market",
+        "reason": "pokemon-tcg-market timed out"
+      }
+    ],
+    "askEvidence": {
+      "source": "ebay-browse",
+      "marketplaceId": "EBAY_GB",
+      "query": "Antique Sail Fossil 69/88 Perfect Order -PSA -BGS -CGC -ACE -SGC -graded",
+      "asOf": "2026-07-04T23:13:06.077Z",
+      "count": 3,
+      "listings": [
+        {
+          "itemId": "v1|168402458154|0",
+          "title": "Pokemon TCG Antique Sail Fossil 69/88 Perfect Order ME3 Reverse Holo NM",
+          "url": "https://www.ebay.co.uk/itm/168402458154?_skw=Antique+Sail+Fossil+69%2F88+Perfect+Order+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item273591962a:g:KykAAeSweM9qFJMY",
+          "imageUrl": "https://i.ebayimg.com/images/g/KykAAeSweM9qFJMY/s-l225.jpg",
+          "itemPricePence": 173,
+          "shippingPence": 91,
+          "totalPence": 264,
+          "buyingOptions": [
+            "FIXED_PRICE",
+            "BEST_OFFER"
+          ],
+          "condition": "Ungraded",
+          "seller": "bobbytonstore"
+        },
+        {
+          "itemId": "v1|307015936853|0",
+          "title": "Pokémon TCG Antique Sail Fossil Perfect Order 69/88 X4 Playset",
+          "url": "https://www.ebay.co.uk/itm/307015936853?_skw=Antique+Sail+Fossil+69%2F88+Perfect+Order+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item477b936b55:g:XqwAAeSwBO5qN~n6",
+          "imageUrl": "https://i.ebayimg.com/images/g/XqwAAeSwBO5qN~n6/s-l225.jpg",
+          "itemPricePence": 250,
+          "shippingPence": 91,
+          "totalPence": 341,
+          "buyingOptions": [
+            "FIXED_PRICE"
+          ],
+          "condition": "Ungraded",
+          "seller": "k_p_collectables"
+        },
+        {
+          "itemId": "v1|206316006912|0",
+          "title": "Antique Sail Fossil Pokemon Card 69/88 Perfect Order Near Mint Trainer Card TCG",
+          "url": "https://www.ebay.co.uk/itm/206316006912?_skw=Antique+Sail+Fossil+69%2F88+Perfect+Order+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item3009646e00:g:tR0AAeSwTAhqHnfB",
+          "imageUrl": "https://i.ebayimg.com/images/g/tR0AAeSwTAhqHnfB/s-l225.jpg",
+          "itemPricePence": 120,
+          "shippingPence": 272,
+          "totalPence": 392,
+          "buyingOptions": [
+            "FIXED_PRICE",
+            "BEST_OFFER"
+          ],
+          "condition": "Ungraded",
+          "seller": "vaultc0llects"
+        }
+      ],
+      "lowestPence": 264,
+      "undercutPence": 214
+    },
+    "catalog": null,
+    "alternatives": [
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Antique Sail Fossil",
+        "setName": "Perfect Order",
+        "setCode": "me03",
+        "number": "069",
+        "imageUrl": "https://assets.tcgdex.net/en/me/me03/069/high.webp",
+        "tcgDexId": "me03-069"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Antique Jaw Fossil",
+        "setName": "Perfect Order",
+        "setCode": "me3",
+        "number": "68/88",
+        "rarity": "Common",
+        "imageUrl": "https://images.scrydex.com/pokemon/me3-68/large",
+        "tcgApiId": "me3-68"
+      },
+      {
+        "game": "POKEMON",
+        "language": "EN",
+        "name": "Antique Jaw Fossil",
+        "setName": "Perfect Order",
+        "setCode": "me03",
+        "number": "068",
+        "imageUrl": "https://assets.tcgdex.net/en/me/me03/068/high.webp",
+        "tcgDexId": "me03-068"
+      }
+    ],
+    "ambiguous": false,
+    "psaCert": null
+  }
+}

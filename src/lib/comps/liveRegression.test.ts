@@ -244,6 +244,14 @@ const expectations: FixtureExpectation[] = [
     rationale: "Future MEP promos should resolve from local identity fallback and use PokeTrace when available.",
   },
   {
+    file: "tauros-chaos-rising-69-86-raw.json",
+    band: [1, 50],
+    confidence: "medium",
+    manualCheck: false,
+    catalog: { name: "Tauros", setName: "Chaos Rising", number: "69/86" },
+    rationale: "ME-era zero-padded provider identities should resolve and headline from PokeTrace instead of being identity-gated out.",
+  },
+  {
     file: "umbreon-prismatic-evolutions-raw.json",
     band: [65000, 78000],
     confidence: "low",

@@ -24,6 +24,7 @@
 // To freshen the snapshot later, re-fetch /v2/sets and regenerate the
 // SET_SNAPSHOT array below -- no other code needs to change.
 
+import { stripProviderSetCodePrefix } from "../cards/identity.js";
 import { normalizeSearchText, scoreSearchText, tokenizeSearchText, tokenMatches } from "./fuzzy.js";
 
 export interface CatalogSet {
@@ -299,6 +300,17 @@ const SET_ALIASES: Record<string, string> = {
   "evolutions xy": "xy12",
   "destined rivals team rocket": "sv10",
   "team rocket destined rivals": "sv10",
+  meg: "me1",
+  "mega evolution": "me1",
+  "me01": "me1",
+  "phantasmal flames": "me2",
+  "me02": "me2",
+  "ascended heroes": "me2pt5",
+  "me025": "me2pt5",
+  "perfect order": "me3",
+  "me03": "me3",
+  "chaos rising": "me4",
+  "me04": "me4",
 
   // Subsets / galleries that share codes with their parent sets.
   "hidden fates sv": "sma",
@@ -533,7 +545,7 @@ const SET_NAME_TOKENS = new Map<string, string[]>(
  * rewards longer set names for happening to contain the query).
  */
 export function searchSets(query: string, limit = 8): CatalogSet[] {
-  const trimmed = query.trim();
+  const trimmed = stripProviderSetCodePrefix(query);
   if (!trimmed) return [];
 
   const norm = normalizeSearchText(trimmed);
@@ -600,13 +612,13 @@ export function resolveSetId(query: string | undefined): string | undefined {
 /** Exact curated alias lookup for dealer shorthand that cannot be inferred from literal set tokens. */
 export function resolveSetAliasId(query: string | undefined): string | undefined {
   if (!query?.trim()) return undefined;
-  return SET_ALIASES[normalizeSearchText(query)];
+  return SET_ALIASES[normalizeSearchText(stripProviderSetCodePrefix(query))];
 }
 
 /** Exact set lookup only: id, literal name, PTCGO code, or curated alias. No fuzzy/token fallback. */
 export function resolveExactSetId(query: string | undefined): string | undefined {
   if (!query?.trim()) return undefined;
-  const trimmed = query.trim();
+  const trimmed = stripProviderSetCodePrefix(query);
   const normalized = normalizeSearchText(trimmed);
   const aliasId = SET_ALIASES[normalized];
   if (aliasId) return aliasId;

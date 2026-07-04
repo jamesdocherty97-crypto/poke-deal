@@ -1,0 +1,347 @@
+{
+  "capturedAt": "2026-07-04T23:33:50.283Z",
+  "request": {
+    "card": {
+      "name": "Tauros",
+      "setName": "Chaos Rising",
+      "number": "69/86",
+      "game": "POKEMON",
+      "language": "EN"
+    },
+    "grade": "RAW"
+  },
+  "response": {
+    "headline": {
+      "source": "poketrace",
+      "card": {
+        "name": "Tauros",
+        "setName": "ME04: Chaos Rising",
+        "number": "069/086",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "me4-69"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 7,
+      "meanPence": 7,
+      "lowPence": 1,
+      "highPence": 15,
+      "sampleSize": 552,
+      "windowDays": 90,
+      "trendPct": 15.3,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-04T23:11:40.752Z",
+      "raw": {
+        "kind": "market-baseline",
+        "tier": "NEAR_MINT",
+        "priceSource": "tcgplayer",
+        "market": "US",
+        "currency": "USD",
+        "fx": {
+          "source": "cached",
+          "provider": "freecurrencyapi",
+          "asOf": "2026-07-04T00:00:00.000Z",
+          "ageDays": 0
+        },
+        "providerCard": {
+          "name": "Tauros",
+          "setName": "ME04: Chaos Rising",
+          "number": "069/086",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "approxSaleCount": false,
+        "signals": [
+          {
+            "priceSource": "tcgplayer",
+            "tier": "NEAR_MINT",
+            "kind": "market-baseline",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 7,
+            "lowPence": 1,
+            "highPence": 15,
+            "sampleSize": 552,
+            "trendPct": 15.3,
+            "approxSaleCount": false
+          },
+          {
+            "priceSource": "ebay",
+            "tier": "NEAR_MINT",
+            "kind": "sold-aggregate",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 112,
+            "lowPence": 112,
+            "highPence": 112,
+            "sampleSize": 9,
+            "trendPct": -1.2,
+            "approxSaleCount": true
+          }
+        ],
+        "avg": 0.09,
+        "low": 0.01,
+        "high": 0.2,
+        "lastUpdated": "2026-07-04T00:00:00.000Z",
+        "avg1d": 0.08,
+        "avg7d": 0.08142857,
+        "avg30d": 0.078064516,
+        "median3d": null,
+        "median7d": null,
+        "median30d": null,
+        "saleCount": 552,
+        "reconciliation": {
+          "headlinePence": 7,
+          "confidence": "medium",
+          "manualCheck": false,
+          "reasons": [
+            "penalty-region-us:poketrace"
+          ],
+          "chosenSource": "poketrace",
+          "trendPct": 15.3
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Tauros",
+          "setName": "Chaos Rising",
+          "number": "69/86",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me4-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:33:46.543Z",
+        "raw": {
+          "reason": "no eBay grade aggregate returned"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Tauros",
+          "setName": "Chaos Rising",
+          "number": "69/86",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me4-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:33:45.191Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "no catalog market price"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Tauros",
+          "setName": "ME04: Chaos Rising",
+          "number": "069/086",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me4-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 7,
+        "meanPence": 7,
+        "lowPence": 1,
+        "highPence": 15,
+        "sampleSize": 552,
+        "windowDays": 90,
+        "trendPct": 15.3,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:11:40.752Z",
+        "raw": {
+          "kind": "market-baseline",
+          "tier": "NEAR_MINT",
+          "priceSource": "tcgplayer",
+          "market": "US",
+          "currency": "USD",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          },
+          "providerCard": {
+            "name": "Tauros",
+            "setName": "ME04: Chaos Rising",
+            "number": "069/086",
+            "game": "POKEMON",
+            "language": "EN"
+          },
+          "approxSaleCount": false,
+          "signals": [
+            {
+              "priceSource": "tcgplayer",
+              "tier": "NEAR_MINT",
+              "kind": "market-baseline",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 7,
+              "lowPence": 1,
+              "highPence": 15,
+              "sampleSize": 552,
+              "trendPct": 15.3,
+              "approxSaleCount": false
+            },
+            {
+              "priceSource": "ebay",
+              "tier": "NEAR_MINT",
+              "kind": "sold-aggregate",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 112,
+              "lowPence": 112,
+              "highPence": 112,
+              "sampleSize": 9,
+              "trendPct": -1.2,
+              "approxSaleCount": true
+            }
+          ],
+          "avg": 0.09,
+          "low": 0.01,
+          "high": 0.2,
+          "lastUpdated": "2026-07-04T00:00:00.000Z",
+          "avg1d": 0.08,
+          "avg7d": 0.08142857,
+          "avg30d": 0.078064516,
+          "median3d": null,
+          "median7d": null,
+          "median30d": null,
+          "saleCount": 552
+        }
+      },
+      {
+        "source": "checked-comps",
+        "card": {
+          "name": "Tauros",
+          "setName": "Chaos Rising",
+          "number": "69/86",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me4-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:33:46.059Z",
+        "raw": {
+          "kind": "checked-comps",
+          "reason": "no matching checked comps"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Tauros",
+          "setName": "Chaos Rising",
+          "number": "69/86",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me4-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:33:46.059Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": 7,
+      "confidence": "medium",
+      "manualCheck": false,
+      "reasons": [
+        "penalty-region-us:poketrace"
+      ],
+      "chosenSource": "poketrace",
+      "trendPct": 15.3
+    },
+    "unavailableSources": [],
+    "askEvidence": {
+      "source": "ebay-browse",
+      "marketplaceId": "EBAY_GB",
+      "query": "Tauros 69/86 Chaos Rising -PSA -BGS -CGC -ACE -SGC -graded",
+      "asOf": "2026-07-04T23:33:45.159Z",
+      "count": 1,
+      "listings": [
+        {
+          "itemId": "v1|307030347358|0",
+          "title": "Pokémon TCG Tauros Chaos Rising 69/86 Reverse Holo",
+          "url": "https://www.ebay.co.uk/itm/307030347358?_skw=Tauros+69%2F86+Chaos+Rising+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item477c6f4e5e:g:n7MAAeSwTXFqQSPt",
+          "imageUrl": "https://i.ebayimg.com/images/g/n7MAAeSwTXFqQSPt/s-l225.jpg",
+          "itemPricePence": 117,
+          "shippingPence": 91,
+          "totalPence": 208,
+          "buyingOptions": [
+            "FIXED_PRICE"
+          ],
+          "condition": "Ungraded",
+          "seller": "k_p_collectables"
+        }
+      ],
+      "lowestPence": 208,
+      "undercutPence": 158
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Tauros",
+      "setName": "Chaos Rising",
+      "setCode": "me4",
+      "number": "69/86",
+      "rarity": "Uncommon",
+      "imageUrl": "https://images.scrydex.com/pokemon/me4-69/large",
+      "setLogoUrl": "https://images.scrydex.com/pokemon/me4-logo/logo",
+      "setSymbolUrl": "https://images.scrydex.com/pokemon/me4-symbol/symbol",
+      "tcgApiId": "me4-69"
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  }
+}

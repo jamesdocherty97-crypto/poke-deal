@@ -1,4 +1,5 @@
 import type { Grade } from "../domain/types.js";
+import { collectorNumbersEquivalent } from "../cards/identity.js";
 
 export type ReconSource =
   | "owned-sales"
@@ -446,13 +447,5 @@ function candidateIsGradeScoped(candidate: ReconCandidate): boolean {
 }
 
 function numbersMatch(actual: string, expected: string): boolean {
-  return numberForms(actual).some((form) => numberForms(expected).includes(form));
-}
-
-function numberForms(value: string): string[] {
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, "");
-  const left = normalized.split("/")[0] ?? normalized;
-  const stripLeading = (part: string) => part.replace(/^([A-Z]*?)0+(\d)/, "$1$2");
-  const prefixless = left.replace(/^(?:SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)0*(\d+)$/, "$1");
-  return [...new Set([normalized, left, stripLeading(left), prefixless, stripLeading(prefixless)].filter(Boolean))];
+  return collectorNumbersEquivalent(actual, expected);
 }

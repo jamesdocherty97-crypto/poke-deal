@@ -1,6 +1,7 @@
 import { PrismaCardCache, toCardRef, type PrismaCardDb, type PrismaCard } from "../../catalog/prismaCardCache.js";
 import type { CatalogSource } from "../../catalog/types.js";
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
+import { normalizeCollectorNumberForCompare } from "../../cards/identity.js";
 import type { CompSource } from "../CompSource.js";
 import { mean, median } from "../cleaning.js";
 
@@ -210,13 +211,16 @@ function cardLookupWhere(card: CardRef): unknown {
   if (card.id) return { id: card.id };
   if (card.tcgApiId) return { tcgApiId: card.tcgApiId };
   if (card.tcgDexId) return { tcgDexId: card.tcgDexId };
-  return {
+  const base = {
     game: card.game ?? "POKEMON",
     language: card.language ?? "EN",
     name: card.name,
     ...(card.setName ? { setName: card.setName } : {}),
-    ...(card.number ? { number: card.number } : {}),
   };
+  if (!card.number) return base;
+  const comparableNumber = normalizeCollectorNumberForCompare(card.number);
+  if (!comparableNumber || comparableNumber === card.number.trim()) return { ...base, number: card.number };
+  return { ...base, OR: [{ number: card.number }, { number: comparableNumber }] };
 }
 
 function emptyCheckedCompsComp(ctx: CheckedCompsContext, reason: string): CompResult {

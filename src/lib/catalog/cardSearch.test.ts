@@ -51,6 +51,17 @@ test("rankCatalogCards understands collector numbers typed alongside names", () 
   assert.equal(scoreCatalogCardForSearch("TG06", mixed[1]!), 1100);
 });
 
+test("rankCatalogCards treats ME-era zero-padded numeric numbers as equivalent", () => {
+  const mixed: CatalogCard[] = [
+    { game: "POKEMON", language: "EN", name: "Tauros", setName: "Chaos Rising", setCode: "me4", number: "69/86" },
+    { game: "POKEMON", language: "EN", name: "Tauros", setName: "Mega Evolution", setCode: "me1", number: "69/132" },
+  ];
+
+  assert.equal(rankCatalogCards("Tauros 069/086", mixed, { setName: "ME04: Chaos Rising" })[0]?.setCode, "me4");
+  assert.ok(scoreCatalogCardForSearch("Tauros 069/086", mixed[0]!) > scoreCatalogCardForSearch("Tauros", mixed[0]!));
+  assert.equal(catalogCardMatchesLookupContext(mixed[0]!, { name: "Tauros", setName: "Chaos Rising", number: "100/086" }), false);
+});
+
 test("parseCardSearchQuery removes bridge noise that breaks number parsing", () => {
   assert.deepEqual(parseCardSearchQuery("Full art Zapdos from 151"), {
     name: "Zapdos",

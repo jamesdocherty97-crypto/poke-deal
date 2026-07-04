@@ -1,0 +1,745 @@
+{
+  "capturedAt": "2026-07-04T23:34:09.035Z",
+  "environment": "production",
+  "url": "https://poke-deal.vercel.app/api/comps?name=Eternatus&set=Phantasmal+Flames&number=69%2F94&grade=RAW",
+  "params": {
+    "file": "after-eternatus-me2-69-raw.json",
+    "name": "Eternatus",
+    "set": "Phantasmal Flames",
+    "number": "69/94",
+    "grade": "RAW"
+  },
+  "status": 200,
+  "latencyMs": 4927,
+  "summary": {
+    "headline": {
+      "source": "poketrace",
+      "medianPence": 16,
+      "sampleSize": 3078,
+      "grade": "RAW"
+    },
+    "reconciliation": {
+      "confidence": "high",
+      "manualCheck": false,
+      "chosenSource": "poketrace",
+      "headlinePence": 16,
+      "reasons": [
+        "penalty-region-us:tcg-market",
+        "penalty-region-us:poketrace"
+      ]
+    },
+    "catalog": {
+      "name": "Eternatus",
+      "setName": "Phantasmal Flames",
+      "number": "69/94",
+      "imageUrl": "https://images.pokemontcg.io/me2/69_hires.png"
+    },
+    "sources": [
+      {
+        "source": "pokemon-price-tracker",
+        "medianPence": 0,
+        "sampleSize": 0,
+        "grade": "RAW",
+        "reason": "no eBay grade aggregate returned",
+        "kind": null
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "medianPence": 11,
+        "sampleSize": 1,
+        "grade": "RAW",
+        "reason": null,
+        "kind": "catalog-market-baseline"
+      },
+      {
+        "source": "poketrace",
+        "medianPence": 16,
+        "sampleSize": 3078,
+        "grade": "RAW",
+        "reason": null,
+        "kind": "market-baseline"
+      },
+      {
+        "source": "checked-comps",
+        "medianPence": 0,
+        "sampleSize": 0,
+        "grade": "RAW",
+        "reason": "no matching checked comps",
+        "kind": "checked-comps"
+      },
+      {
+        "source": "owned-sales",
+        "medianPence": 0,
+        "sampleSize": 0,
+        "grade": "RAW",
+        "reason": "no matching owned sales",
+        "kind": "owned-sales"
+      }
+    ]
+  },
+  "response": {
+    "headline": {
+      "source": "poketrace",
+      "card": {
+        "name": "Eternatus",
+        "setName": "ME02: Phantasmal Flames",
+        "number": "069/094",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "me2-69"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 16,
+      "meanPence": 16,
+      "lowPence": 16,
+      "highPence": 16,
+      "sampleSize": 3078,
+      "windowDays": 90,
+      "trendPct": -12,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-04T20:49:29.731Z",
+      "raw": {
+        "kind": "market-baseline",
+        "tier": "NEAR_MINT",
+        "priceSource": "tcgplayer",
+        "market": "US",
+        "currency": "USD",
+        "fx": {
+          "source": "cached",
+          "provider": "freecurrencyapi",
+          "asOf": "2026-07-04T00:00:00.000Z",
+          "ageDays": 0
+        },
+        "providerCard": {
+          "name": "Eternatus",
+          "setName": "ME02: Phantasmal Flames",
+          "number": "069/094",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "approxSaleCount": false,
+        "signals": [
+          {
+            "priceSource": "tcgplayer",
+            "tier": "NEAR_MINT",
+            "kind": "market-baseline",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 16,
+            "lowPence": 16,
+            "highPence": 16,
+            "sampleSize": 3078,
+            "trendPct": -12,
+            "approxSaleCount": false
+          },
+          {
+            "priceSource": "ebay",
+            "tier": "NEAR_MINT",
+            "kind": "sold-aggregate",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 149,
+            "lowPence": 149,
+            "highPence": 149,
+            "sampleSize": 64,
+            "trendPct": 29.2,
+            "approxSaleCount": true
+          }
+        ],
+        "avg": 0.21,
+        "low": 0.21,
+        "high": 0.21,
+        "lastUpdated": "2026-07-04T00:00:00.000Z",
+        "avg1d": 0.21,
+        "avg7d": 0.22285715,
+        "avg30d": 0.23870967,
+        "median3d": null,
+        "median7d": null,
+        "median30d": null,
+        "saleCount": 3078,
+        "reconciliation": {
+          "headlinePence": 16,
+          "confidence": "high",
+          "manualCheck": false,
+          "reasons": [
+            "penalty-region-us:tcg-market",
+            "penalty-region-us:poketrace"
+          ],
+          "chosenSource": "poketrace",
+          "trendPct": -12
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Eternatus",
+          "setName": "Phantasmal Flames",
+          "number": "69/94",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me2-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:34:07.178Z",
+        "raw": {
+          "reason": "no eBay grade aggregate returned"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Eternatus",
+          "setName": "Phantasmal Flames",
+          "number": "69/94",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me2-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 11,
+        "meanPence": 11,
+        "lowPence": 11,
+        "highPence": 11,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Normal market",
+            "pricePence": 11,
+            "originalAmount": 0.15,
+            "originalCurrency": "USD",
+            "kind": "market",
+            "variant": "normal",
+            "updatedAt": "2026/07/04",
+            "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+            "fx": {
+              "source": "cached",
+              "provider": "freecurrencyapi",
+              "asOf": "2026-07-04T00:00:00.000Z",
+              "ageDays": 0
+            }
+          },
+          "signals": [
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Normal market",
+              "pricePence": 11,
+              "originalAmount": 0.15,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "normal",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Reverse Holofoil market",
+              "pricePence": 15,
+              "originalAmount": 0.2,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "reverseHolofoil",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Normal mid",
+              "pricePence": 11,
+              "originalAmount": 0.15,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "normal",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Reverse Holofoil mid",
+              "pricePence": 19,
+              "originalAmount": 0.25,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "reverseHolofoil",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Normal low",
+              "pricePence": 1,
+              "originalAmount": 0.01,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "normal",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Normal directLow",
+              "pricePence": 1,
+              "originalAmount": 0.01,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "normal",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Reverse Holofoil low",
+              "pricePence": 3,
+              "originalAmount": 0.04,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "reverseHolofoil",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Reverse Holofoil directLow",
+              "pricePence": 3,
+              "originalAmount": 0.04,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "reverseHolofoil",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            }
+          ],
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Eternatus",
+          "setName": "ME02: Phantasmal Flames",
+          "number": "069/094",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me2-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 16,
+        "meanPence": 16,
+        "lowPence": 16,
+        "highPence": 16,
+        "sampleSize": 3078,
+        "windowDays": 90,
+        "trendPct": -12,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T20:49:29.731Z",
+        "raw": {
+          "kind": "market-baseline",
+          "tier": "NEAR_MINT",
+          "priceSource": "tcgplayer",
+          "market": "US",
+          "currency": "USD",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          },
+          "providerCard": {
+            "name": "Eternatus",
+            "setName": "ME02: Phantasmal Flames",
+            "number": "069/094",
+            "game": "POKEMON",
+            "language": "EN"
+          },
+          "approxSaleCount": false,
+          "signals": [
+            {
+              "priceSource": "tcgplayer",
+              "tier": "NEAR_MINT",
+              "kind": "market-baseline",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 16,
+              "lowPence": 16,
+              "highPence": 16,
+              "sampleSize": 3078,
+              "trendPct": -12,
+              "approxSaleCount": false
+            },
+            {
+              "priceSource": "ebay",
+              "tier": "NEAR_MINT",
+              "kind": "sold-aggregate",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 149,
+              "lowPence": 149,
+              "highPence": 149,
+              "sampleSize": 64,
+              "trendPct": 29.2,
+              "approxSaleCount": true
+            }
+          ],
+          "avg": 0.21,
+          "low": 0.21,
+          "high": 0.21,
+          "lastUpdated": "2026-07-04T00:00:00.000Z",
+          "avg1d": 0.21,
+          "avg7d": 0.22285715,
+          "avg30d": 0.23870967,
+          "median3d": null,
+          "median7d": null,
+          "median30d": null,
+          "saleCount": 3078
+        }
+      },
+      {
+        "source": "checked-comps",
+        "card": {
+          "name": "Eternatus",
+          "setName": "Phantasmal Flames",
+          "number": "69/94",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me2-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:34:06.843Z",
+        "raw": {
+          "kind": "checked-comps",
+          "reason": "no matching checked comps"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Eternatus",
+          "setName": "Phantasmal Flames",
+          "number": "69/94",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me2-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:34:06.833Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": 16,
+      "confidence": "high",
+      "manualCheck": false,
+      "reasons": [
+        "penalty-region-us:tcg-market",
+        "penalty-region-us:poketrace"
+      ],
+      "chosenSource": "poketrace",
+      "trendPct": -12
+    },
+    "unavailableSources": [],
+    "askEvidence": {
+      "source": "ebay-browse",
+      "marketplaceId": "EBAY_GB",
+      "query": "Eternatus 69/94 Phantasmal Flames -PSA -BGS -CGC -ACE -SGC -graded",
+      "asOf": "2026-07-04T23:34:05.991Z",
+      "count": 3,
+      "listings": [
+        {
+          "itemId": "v1|366353202648|0",
+          "title": "Pokémon Cards: Eternatus 69/94 Uncommon Regular ME: Phantasmal Flames - Pokémon",
+          "url": "https://www.ebay.co.uk/itm/366353202648?_skw=Eternatus+69%2F94+Phantasmal+Flames+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item554c5a3dd8:g:qYcAAeSw5zhp4pss",
+          "imageUrl": "https://i.ebayimg.com/images/g/qYcAAeSw5zhp4pss/s-l225.jpg",
+          "itemPricePence": 116,
+          "shippingPence": 0,
+          "totalPence": 116,
+          "buyingOptions": [
+            "FIXED_PRICE",
+            "BEST_OFFER"
+          ],
+          "condition": "Ungraded",
+          "seller": "viriord-0"
+        },
+        {
+          "itemId": "v1|287390234892|0",
+          "title": "Pokemon TCG * Phantasmal Flames * 69/94 Eternatus Uncommon * FRESH PK",
+          "url": "https://www.ebay.co.uk/itm/287390234892?_skw=Eternatus+69%2F94+Phantasmal+Flames+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item42e9caf90c:g:QZoAAeSwEGZprQ16",
+          "imageUrl": "https://i.ebayimg.com/images/g/QZoAAeSwEGZprQ16/s-l225.jpg",
+          "itemPricePence": 99,
+          "shippingPence": 30,
+          "totalPence": 129,
+          "buyingOptions": [
+            "FIXED_PRICE"
+          ],
+          "condition": "Ungraded",
+          "seller": "1_moment_in_time"
+        },
+        {
+          "itemId": "v1|397922638801|0",
+          "title": "Pokemon TCG * Phantasmal Flames * 69/94 Eternatus Uncommon * FRESH PK",
+          "url": "https://www.ebay.co.uk/itm/397922638801?_skw=Eternatus+69%2F94+Phantasmal+Flames+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item5ca6099bd1:g:Q5EAAeSw~9Bp~LFs",
+          "imageUrl": "https://i.ebayimg.com/images/g/Q5EAAeSw~9Bp~LFs/s-l225.jpg",
+          "itemPricePence": 116,
+          "shippingPence": 91,
+          "totalPence": 207,
+          "buyingOptions": [
+            "FIXED_PRICE",
+            "BEST_OFFER"
+          ],
+          "condition": "Ungraded",
+          "seller": "seba8726"
+        }
+      ],
+      "lowestPence": 116,
+      "undercutPence": 66
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Eternatus",
+      "setName": "Phantasmal Flames",
+      "setCode": "me2",
+      "number": "69/94",
+      "rarity": "Uncommon",
+      "imageUrl": "https://images.pokemontcg.io/me2/69_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/me2/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/me2/symbol.png",
+      "tcgApiId": "me2-69",
+      "priceSignals": [
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Normal market",
+          "pricePence": 11,
+          "originalAmount": 0.15,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "normal",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Reverse Holofoil market",
+          "pricePence": 15,
+          "originalAmount": 0.2,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "reverseHolofoil",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Normal mid",
+          "pricePence": 11,
+          "originalAmount": 0.15,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "normal",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Reverse Holofoil mid",
+          "pricePence": 19,
+          "originalAmount": 0.25,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "reverseHolofoil",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Normal low",
+          "pricePence": 1,
+          "originalAmount": 0.01,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "normal",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Normal directLow",
+          "pricePence": 1,
+          "originalAmount": 0.01,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "normal",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Reverse Holofoil low",
+          "pricePence": 3,
+          "originalAmount": 0.04,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "reverseHolofoil",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Reverse Holofoil directLow",
+          "pricePence": 3,
+          "originalAmount": 0.04,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "reverseHolofoil",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me2-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  }
+}

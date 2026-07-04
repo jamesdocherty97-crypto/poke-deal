@@ -1,6 +1,12 @@
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
 import { getSetById, resolveSetId } from "../../catalog/setCatalog.js";
 import { tokenizeSearchText, tokenMatches } from "../../catalog/fuzzy.js";
+import {
+  collectorNumbersEquivalent,
+  normalizeCollectorNumberForCompare,
+  stripLeadingZerosFromNumericSegment,
+  stripProviderSetCodePrefix,
+} from "../../cards/identity.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
@@ -325,6 +331,11 @@ export function buildPokeTraceSearchVariants(card: CardRef): string[] {
 
   if (number) {
     variants.add([name, number].join(" "));
+    const comparableNumber = normalizeCollectorNumberForCompare(number);
+    if (comparableNumber && comparableNumber !== number) variants.add([name, comparableNumber].join(" "));
+    for (const padded of numericSlashPaddedForms(number)) {
+      variants.add([name, padded].join(" "));
+    }
     if (!hasSlash) {
       if (strippedPromo) {
         variants.add([name, strippedPromo].join(" "));
@@ -337,6 +348,14 @@ export function buildPokeTraceSearchVariants(card: CardRef): string[] {
   }
   if (!hasSlash) variants.add(name);
   return [...variants];
+}
+
+function numericSlashPaddedForms(number: string): string[] {
+  const match = number.match(/^(\d{1,4})\/(\d{1,4})$/);
+  if (!match?.[1] || !match[2]) return [];
+  const left = match[1].padStart(3, "0");
+  const right = match[2].padStart(3, "0");
+  return [...new Set([`${left}/${match[2]}`, `${left}/${right}`].filter((candidate) => candidate !== number))];
 }
 
 function chooseTier(card: PokeTraceCard, grade: Grade): PokeTraceTierChoice | null {
@@ -514,10 +533,12 @@ function pokeTraceProviderMentionsFirstEdition(card: PokeTraceCard): boolean {
 }
 
 function setMatchesRequest(providerSet: string, requestedSet: string): boolean {
-  const requestedTokens = tokenizeSearchText(requestedSet)
+  const normalizedProviderSet = stripProviderSetCodePrefix(providerSet);
+  const normalizedRequestedSet = stripProviderSetCodePrefix(requestedSet);
+  const requestedTokens = tokenizeSearchText(normalizedRequestedSet)
     .map((token) => token.toLowerCase())
     .filter((token) => token.length >= 3 && !["set", "promo", "promos", "pokemon", "card"].includes(token));
-  const providerTokens = tokenizeSearchText(providerSet)
+  const providerTokens = tokenizeSearchText(normalizedProviderSet)
     .map((token) => token.toLowerCase())
     .filter((token) => token.length >= 3 && !["set", "promo", "promos", "pokemon", "card"].includes(token));
   if (requestedTokens.length === 0 || providerTokens.length === 0) return true;
@@ -537,13 +558,13 @@ function setMatchesRequest(providerSet: string, requestedSet: string): boolean {
     return matchingTokens.length === requestedTokens.length;
   }
 
-  const candidates = [requestedSet];
-  const resolvedSetId = resolveSetId(requestedSet);
+  const candidates = [normalizedRequestedSet];
+  const resolvedSetId = resolveSetId(normalizedRequestedSet);
   const resolvedSet = resolvedSetId ? getSetById(resolvedSetId) : undefined;
   if (resolvedSet?.name) candidates.push(resolvedSet.name);
   if (resolvedSet?.ptcgoCode) candidates.push(resolvedSet.ptcgoCode);
 
-  return matchingTokens.length >= Math.ceil(requestedTokens.length * 0.6) || candidates.some((candidate) => tokensMatch(candidate, providerSet));
+  return matchingTokens.length >= Math.ceil(requestedTokens.length * 0.6) || candidates.some((candidate) => tokensMatch(candidate, normalizedProviderSet));
 }
 
 function tokensMatch(needle: string, haystack: string): boolean {
@@ -557,31 +578,7 @@ function tokensMatch(needle: string, haystack: string): boolean {
 }
 
 function collectorNumberMatches(providerNumber: string, requestedNumber: string): boolean {
-  const providerForms = collectorNumberForms(providerNumber);
-  const requestedForms = collectorNumberForms(requestedNumber);
-  return [...requestedForms].some((requested) => providerForms.has(requested));
-}
-
-function collectorNumberForms(number: string): Set<string> {
-  const normalized = normalizeComparableCollectorNumber(number);
-  const left = normalized.split("/")[0] ?? normalized;
-  const stripped = stripPromoCollectorPrefix(left);
-  const strippedLeading = stripLeadingZeros(left);
-  return new Set(
-    [normalized, left, stripped, stripped ? normalizeComparableCollectorNumber(stripped) : null, strippedLeading].filter(
-      (value): value is string => Boolean(value),
-    ),
-  );
-}
-
-function normalizeComparableCollectorNumber(number: string): string {
-  return number
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "")
-    .split("/")
-    .map((part) => part.replace(/^0+(\d)/, "$1"))
-    .join("/");
+  return collectorNumbersEquivalent(providerNumber, requestedNumber);
 }
 
 function stripPromoCollectorPrefix(number: string | undefined): string | null {
@@ -592,11 +589,7 @@ function stripPromoCollectorPrefix(number: string | undefined): string | null {
 }
 
 function stripLeadingZeros(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const match = value.match(/^\d+$/);
-  if (!match) return null;
-  const normalized = String(Number.parseInt(match[0], 10));
-  return normalized !== "NaN" ? normalized : null;
+  return stripLeadingZerosFromNumericSegment(value);
 }
 
 function singularizeToken(token: string): string {

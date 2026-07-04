@@ -1,0 +1,517 @@
+{
+  "capturedAt": "2026-07-04T23:12:56.130Z",
+  "url": "https://poke-deal.vercel.app/api/comps",
+  "params": {
+    "name": "Sandslash",
+    "setName": "Mega Evolution",
+    "number": "69/132",
+    "grade": "RAW"
+  },
+  "status": 200,
+  "durationMs": 5242,
+  "response": {
+    "headline": null,
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Sandslash",
+          "setName": "Mega Evolution",
+          "number": "69/132",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me1-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:12:54.988Z",
+        "raw": {
+          "reason": "no eBay grade aggregate returned"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Sandslash",
+          "setName": "Mega Evolution",
+          "number": "69/132",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me1-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 6,
+        "meanPence": 6,
+        "lowPence": 6,
+        "highPence": 6,
+        "sampleSize": 1,
+        "windowDays": 30,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T00:00:00.000Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "caveat": "TCGPlayer/Cardmarket market data, not a cleaned sold-comps sample.",
+          "chosenSignal": {
+            "source": "tcgplayer",
+            "label": "TCGPlayer Normal market",
+            "pricePence": 6,
+            "originalAmount": 0.08,
+            "originalCurrency": "USD",
+            "kind": "market",
+            "variant": "normal",
+            "updatedAt": "2026/07/04",
+            "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+            "fx": {
+              "source": "cached",
+              "provider": "freecurrencyapi",
+              "asOf": "2026-07-04T00:00:00.000Z",
+              "ageDays": 0
+            }
+          },
+          "signals": [
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Normal market",
+              "pricePence": 6,
+              "originalAmount": 0.08,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "normal",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Reverse Holofoil market",
+              "pricePence": 16,
+              "originalAmount": 0.22,
+              "originalCurrency": "USD",
+              "kind": "market",
+              "variant": "reverseHolofoil",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Normal mid",
+              "pricePence": 11,
+              "originalAmount": 0.15,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "normal",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Reverse Holofoil mid",
+              "pricePence": 17,
+              "originalAmount": 0.23,
+              "originalCurrency": "USD",
+              "kind": "mid",
+              "variant": "reverseHolofoil",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Normal low",
+              "pricePence": 1,
+              "originalAmount": 0.01,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "normal",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Normal directLow",
+              "pricePence": 1,
+              "originalAmount": 0.01,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "normal",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Reverse Holofoil low",
+              "pricePence": 1,
+              "originalAmount": 0.01,
+              "originalCurrency": "USD",
+              "kind": "low",
+              "variant": "reverseHolofoil",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            },
+            {
+              "source": "tcgplayer",
+              "label": "TCGPlayer Reverse Holofoil directLow",
+              "pricePence": 4,
+              "originalAmount": 0.06,
+              "originalCurrency": "USD",
+              "kind": "directLow",
+              "variant": "reverseHolofoil",
+              "updatedAt": "2026/07/04",
+              "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+              "fx": {
+                "source": "cached",
+                "provider": "freecurrencyapi",
+                "asOf": "2026-07-04T00:00:00.000Z",
+                "ageDays": 0
+              }
+            }
+          ],
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Sandslash",
+          "setName": "Mega Evolution",
+          "number": "69/132",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me1-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:12:54.410Z",
+        "raw": {
+          "reason": "PokeTrace US lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "checked-comps",
+        "card": {
+          "name": "Sandslash",
+          "setName": "Mega Evolution",
+          "number": "69/132",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me1-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:12:53.818Z",
+        "raw": {
+          "kind": "checked-comps",
+          "reason": "no matching checked comps"
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Sandslash",
+          "setName": "Mega Evolution",
+          "number": "69/132",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "me1-69"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:12:53.835Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": true,
+    "reconciliation": {
+      "headlinePence": null,
+      "confidence": "low",
+      "manualCheck": true,
+      "reasons": [
+        "penalty-region-us:tcg-market",
+        "no-eligible-candidates"
+      ],
+      "trendPct": null
+    },
+    "unavailableSources": [
+      {
+        "name": "poketrace",
+        "reason": "PokeTrace US lookup failed or returned no response"
+      }
+    ],
+    "askEvidence": {
+      "source": "ebay-browse",
+      "marketplaceId": "EBAY_GB",
+      "query": "Sandslash 69/132 Mega Evolution -PSA -BGS -CGC -ACE -SGC -graded",
+      "asOf": "2026-07-04T23:12:52.993Z",
+      "count": 2,
+      "listings": [
+        {
+          "itemId": "v1|278113550387|0",
+          "title": "Pokemon TCG * Mega Evolution * 69/132 Sandslash Common * FRESH PK",
+          "url": "https://www.ebay.co.uk/itm/278113550387?_skw=Sandslash+69%2F132+Mega+Evolution+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item40c0dc0033:g:SbIAAeSworppAv2e",
+          "imageUrl": "https://i.ebayimg.com/images/g/SbIAAeSworppAv2e/s-l225.jpg",
+          "itemPricePence": 99,
+          "shippingPence": 30,
+          "totalPence": 129,
+          "buyingOptions": [
+            "FIXED_PRICE"
+          ],
+          "condition": "Ungraded",
+          "seller": "1_moment_in_time"
+        },
+        {
+          "itemId": "v1|117189877703|0",
+          "title": "Pokemon TCG * Mega Evolution * 69/132 Sandslash Common * FRESH PK",
+          "url": "https://www.ebay.co.uk/itm/117189877703?_skw=Sandslash+69%2F132+Mega+Evolution+-PSA+-BGS+-CGC+-ACE+-SGC+-graded&hash=item1b490f9fc7:g:OT8AAeSwqClqAe-P",
+          "imageUrl": "https://i.ebayimg.com/images/g/OT8AAeSwqClqAe-P/s-l225.jpg",
+          "itemPricePence": 124,
+          "shippingPence": 91,
+          "totalPence": 215,
+          "buyingOptions": [
+            "FIXED_PRICE",
+            "BEST_OFFER"
+          ],
+          "condition": "Ungraded",
+          "seller": "dea-crei"
+        }
+      ],
+      "lowestPence": 129,
+      "undercutPence": 79
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Sandslash",
+      "setName": "Mega Evolution",
+      "setCode": "me1",
+      "number": "69/132",
+      "rarity": "Common",
+      "imageUrl": "https://images.pokemontcg.io/me1/69_hires.png",
+      "setLogoUrl": "https://images.pokemontcg.io/me1/logo.png",
+      "setSymbolUrl": "https://images.pokemontcg.io/me1/symbol.png",
+      "tcgApiId": "me1-69",
+      "priceSignals": [
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Normal market",
+          "pricePence": 6,
+          "originalAmount": 0.08,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "normal",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Reverse Holofoil market",
+          "pricePence": 16,
+          "originalAmount": 0.22,
+          "originalCurrency": "USD",
+          "kind": "market",
+          "variant": "reverseHolofoil",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Normal mid",
+          "pricePence": 11,
+          "originalAmount": 0.15,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "normal",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Reverse Holofoil mid",
+          "pricePence": 17,
+          "originalAmount": 0.23,
+          "originalCurrency": "USD",
+          "kind": "mid",
+          "variant": "reverseHolofoil",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Normal low",
+          "pricePence": 1,
+          "originalAmount": 0.01,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "normal",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Normal directLow",
+          "pricePence": 1,
+          "originalAmount": 0.01,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "normal",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Reverse Holofoil low",
+          "pricePence": 1,
+          "originalAmount": 0.01,
+          "originalCurrency": "USD",
+          "kind": "low",
+          "variant": "reverseHolofoil",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        },
+        {
+          "source": "tcgplayer",
+          "label": "TCGPlayer Reverse Holofoil directLow",
+          "pricePence": 4,
+          "originalAmount": 0.06,
+          "originalCurrency": "USD",
+          "kind": "directLow",
+          "variant": "reverseHolofoil",
+          "updatedAt": "2026/07/04",
+          "url": "https://prices.pokemontcg.io/tcgplayer/me1-69",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          }
+        }
+      ]
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  }
+}

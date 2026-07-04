@@ -1,0 +1,324 @@
+{
+  "capturedAt": "2026-07-04T23:12:14.089Z",
+  "url": "https://poke-deal.vercel.app/api/comps",
+  "params": {
+    "name": "Snivy",
+    "setName": "Mega Evolution Promos",
+    "number": "MEP049",
+    "grade": "RAW"
+  },
+  "status": 200,
+  "durationMs": 6813,
+  "response": {
+    "headline": {
+      "source": "poketrace",
+      "card": {
+        "name": "Snivy",
+        "setName": "Mega Evolution Promos",
+        "number": "MEP049",
+        "game": "POKEMON",
+        "language": "EN",
+        "tcgApiId": "mep-49"
+      },
+      "grade": "RAW",
+      "currency": "GBP",
+      "medianPence": 920,
+      "meanPence": 920,
+      "lowPence": 920,
+      "highPence": 920,
+      "sampleSize": 848,
+      "windowDays": 90,
+      "trendPct": -19.7,
+      "outliersRemoved": 0,
+      "asOf": "2026-07-04T15:04:52.018Z",
+      "raw": {
+        "kind": "market-baseline",
+        "tier": "NEAR_MINT",
+        "priceSource": "tcgplayer",
+        "market": "US",
+        "currency": "USD",
+        "fx": {
+          "source": "cached",
+          "provider": "freecurrencyapi",
+          "asOf": "2026-07-04T00:00:00.000Z",
+          "ageDays": 0
+        },
+        "providerCard": {
+          "name": "Snivy - 049",
+          "setName": "ME: Mega Evolution Promo",
+          "number": "049",
+          "game": "POKEMON",
+          "language": "EN"
+        },
+        "approxSaleCount": false,
+        "signals": [
+          {
+            "priceSource": "tcgplayer",
+            "tier": "NEAR_MINT",
+            "kind": "market-baseline",
+            "market": "US",
+            "currency": "USD",
+            "medianPence": 920,
+            "lowPence": 920,
+            "highPence": 920,
+            "sampleSize": 848,
+            "trendPct": -19.7,
+            "approxSaleCount": false
+          }
+        ],
+        "avg": 12.28,
+        "low": 12.28,
+        "high": 12.28,
+        "lastUpdated": "2026-07-04T00:00:00.000Z",
+        "avg1d": 12.28,
+        "avg7d": 12.9328575,
+        "avg30d": 15.291667,
+        "median3d": null,
+        "median7d": null,
+        "median30d": null,
+        "saleCount": 848,
+        "reconciliation": {
+          "headlinePence": 920,
+          "confidence": "high",
+          "manualCheck": false,
+          "reasons": [
+            "penalty-region-us:poketrace",
+            "corroboration-thin-checked-comps"
+          ],
+          "chosenSource": "poketrace",
+          "trendPct": -19.7
+        }
+      }
+    },
+    "all": [
+      {
+        "source": "pokemon-price-tracker",
+        "card": {
+          "name": "Snivy",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP049",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "mep-49"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:12:09.719Z",
+        "raw": {
+          "reason": "Price Tracker lookup failed or returned no response"
+        }
+      },
+      {
+        "source": "pokemon-tcg-market",
+        "card": {
+          "name": "Snivy",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP049",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "mep-49"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:12:09.259Z",
+        "raw": {
+          "kind": "catalog-market-baseline",
+          "reason": "no catalog market price"
+        }
+      },
+      {
+        "source": "poketrace",
+        "card": {
+          "name": "Snivy",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP049",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "mep-49"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 920,
+        "meanPence": 920,
+        "lowPence": 920,
+        "highPence": 920,
+        "sampleSize": 848,
+        "windowDays": 90,
+        "trendPct": -19.7,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T15:04:52.018Z",
+        "raw": {
+          "kind": "market-baseline",
+          "tier": "NEAR_MINT",
+          "priceSource": "tcgplayer",
+          "market": "US",
+          "currency": "USD",
+          "fx": {
+            "source": "cached",
+            "provider": "freecurrencyapi",
+            "asOf": "2026-07-04T00:00:00.000Z",
+            "ageDays": 0
+          },
+          "providerCard": {
+            "name": "Snivy - 049",
+            "setName": "ME: Mega Evolution Promo",
+            "number": "049",
+            "game": "POKEMON",
+            "language": "EN"
+          },
+          "approxSaleCount": false,
+          "signals": [
+            {
+              "priceSource": "tcgplayer",
+              "tier": "NEAR_MINT",
+              "kind": "market-baseline",
+              "market": "US",
+              "currency": "USD",
+              "medianPence": 920,
+              "lowPence": 920,
+              "highPence": 920,
+              "sampleSize": 848,
+              "trendPct": -19.7,
+              "approxSaleCount": false
+            }
+          ],
+          "avg": 12.28,
+          "low": 12.28,
+          "high": 12.28,
+          "lastUpdated": "2026-07-04T00:00:00.000Z",
+          "avg1d": 12.28,
+          "avg7d": 12.9328575,
+          "avg30d": 15.291667,
+          "median3d": null,
+          "median7d": null,
+          "median30d": null,
+          "saleCount": 848
+        }
+      },
+      {
+        "source": "checked-comps",
+        "card": {
+          "id": "cmqutgqad0000xaamfujvncqx",
+          "game": "POKEMON",
+          "language": "EN",
+          "name": "Snivy",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP049",
+          "tcgApiId": "mep-49"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 1000,
+        "meanPence": 1000,
+        "lowPence": 1000,
+        "highPence": 1000,
+        "sampleSize": 1,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T00:00:00.000Z",
+        "raw": {
+          "kind": "checked-comps",
+          "caveat": "Dealer-logged sold prices for this exact card and grade.",
+          "region": "UK",
+          "entries": [
+            {
+              "id": "cmr6da6xw0005gdpe1mfj2t6h",
+              "cardId": "cmqutgqad0000xaamfujvncqx",
+              "grade": "RAW",
+              "pricePence": 1000,
+              "soldDate": "2026-07-04T00:00:00.000Z",
+              "platform": "ebay-uk",
+              "sourceUrl": "https://www.ebay.co.uk/sch/i.html?_nkw=Snivy%2C+Mega+Evolution+Promos%2C+MEP+049+PSA+BGS+CGC+ACE+SGC+graded&LH_Complete=1&LH_Sold=1&_sop=13&LH_PrefLoc=1",
+              "createdAt": "2026-07-04T12:57:20.805Z"
+            }
+          ]
+        }
+      },
+      {
+        "source": "owned-sales",
+        "card": {
+          "name": "Snivy",
+          "setName": "Mega Evolution Promos",
+          "number": "MEP049",
+          "game": "POKEMON",
+          "language": "EN",
+          "tcgApiId": "mep-49"
+        },
+        "grade": "RAW",
+        "currency": "GBP",
+        "medianPence": 0,
+        "meanPence": 0,
+        "lowPence": 0,
+        "highPence": 0,
+        "sampleSize": 0,
+        "windowDays": 90,
+        "trendPct": null,
+        "outliersRemoved": 0,
+        "asOf": "2026-07-04T23:12:10.080Z",
+        "raw": {
+          "kind": "owned-sales",
+          "reason": "no matching owned sales"
+        }
+      }
+    ],
+    "sourcesDisagree": false,
+    "reconciliation": {
+      "headlinePence": 920,
+      "confidence": "high",
+      "manualCheck": false,
+      "reasons": [
+        "penalty-region-us:poketrace",
+        "corroboration-thin-checked-comps"
+      ],
+      "chosenSource": "poketrace",
+      "trendPct": -19.7
+    },
+    "unavailableSources": [
+      {
+        "name": "pokemon-price-tracker",
+        "reason": "Price Tracker lookup failed or returned no response"
+      }
+    ],
+    "askEvidence": {
+      "source": "ebay-browse",
+      "marketplaceId": "EBAY_GB",
+      "query": "Snivy MEP 049 Mega Evolution Promos -PSA -BGS -CGC -ACE -SGC -graded",
+      "asOf": "2026-07-04T23:12:09.227Z",
+      "count": 0,
+      "listings": [],
+      "lowestPence": null,
+      "undercutPence": null
+    },
+    "catalog": {
+      "game": "POKEMON",
+      "language": "EN",
+      "name": "Snivy",
+      "setName": "Mega Evolution Promos",
+      "setCode": "mep",
+      "number": "MEP049",
+      "rarity": "Promo",
+      "imageUrl": "https://images.scrydex.com/pokemon/mep-49/large",
+      "tcgApiId": "mep-49"
+    },
+    "alternatives": [],
+    "ambiguous": false,
+    "psaCert": null
+  }
+}

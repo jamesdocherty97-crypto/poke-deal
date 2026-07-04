@@ -46,6 +46,20 @@ test("scanIdentityToQuery maps a standard set-code scan to an existing comp quer
   assert.equal(mapped.query.grade, "RAW");
 });
 
+test("scanIdentityToQuery canonicalizes ME-era zero-padded numeric numbers", () => {
+  const mapped = scanIdentityToQuery(identity({
+    name: "Tauros",
+    setName: "ME04: Chaos Rising",
+    setCode: null,
+    number: "069/086",
+  }));
+  assert.equal(mapped.status, "ready");
+  if (mapped.status !== "ready") throw new Error("expected ready");
+  assert.equal(mapped.query.name, "Tauros");
+  assert.equal(mapped.query.setName, "Chaos Rising");
+  assert.equal(mapped.query.number, "69/86");
+});
+
 test("scanIdentityToQuery preserves TG/GG collector numbers and resolves gallery sets from set code", () => {
   const mapped = scanIdentityToQuery(identity({
     name: "Gengar",
@@ -163,4 +177,6 @@ test("normalizePrintedNumber formats promo and gallery scans", () => {
   assert.equal(normalizePrintedNumber("SVP EN 208"), "SVP 208");
   assert.equal(normalizePrintedNumber("MEP049"), "MEP 049");
   assert.equal(normalizePrintedNumber("GG 30 / GG 70"), "GG30/GG70");
+  assert.equal(normalizePrintedNumber("069/086"), "69/86");
+  assert.equal(normalizePrintedNumber("096/086"), "96/86");
 });

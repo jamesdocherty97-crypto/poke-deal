@@ -17,6 +17,9 @@ import type { CardRef } from "../../domain/types.js";
 const fixture = JSON.parse(
   readFileSync(fileURLToPath(new URL("./__fixtures__/ppt-cards-ebay.json", import.meta.url)), "utf8"),
 );
+const taurosMeFixture = JSON.parse(
+  readFileSync(fileURLToPath(new URL("./__fixtures__/ppt-me4-tauros-name-embedded.json", import.meta.url)), "utf8"),
+);
 
 const card: CardRef = { name: "Charizard ex", number: "199/165", setName: "151" };
 const ctx = (grade: any) => ({ source: "pokemon-price-tracker", card, grade, windowDays: 90 });
@@ -282,6 +285,43 @@ test("providerPayloadMatchesRequest validates fallback provider cards", () => {
       },
     ),
     true,
+  );
+});
+
+test("providerPayloadMatchesRequest accepts ME-era zero-padded PPT identity", () => {
+  assert.equal(
+    providerPayloadMatchesRequest(taurosMeFixture, { name: "Tauros", setName: "Chaos Rising", number: "69/86" }),
+    true,
+  );
+  assert.equal(
+    providerPayloadMatchesRequest(
+      {
+        data: [
+          {
+            name: "Tauros - 069/086",
+            setName: "ME04: Chaos Rising",
+            ebay: { salesByGrade: {} },
+          },
+        ],
+      },
+      { name: "Tauros", setName: "Chaos Rising", number: "69/86" },
+    ),
+    true,
+  );
+  assert.equal(
+    providerPayloadMatchesRequest(
+      {
+        data: [
+          {
+            name: "Charizard",
+            setName: "Celebrations: Classic Collection",
+            cardNumber: "4/102",
+          },
+        ],
+      },
+      { name: "Charizard", setName: "Base", number: "4/102" },
+    ),
+    false,
   );
 });
 

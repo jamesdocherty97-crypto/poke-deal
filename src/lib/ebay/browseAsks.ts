@@ -1,5 +1,6 @@
 import { getRates, toGbpPence, type FxRates } from "../comps/currency.js";
 import type { CardRef, Currency, Grade } from "../domain/types.js";
+import { collectorNumbersEquivalent } from "../cards/identity.js";
 import { cardSearchQuery, ebaySoldSearchQuery } from "../dealer/compLinks.js";
 import { EBAY_UK_CATEGORY_POKEMON, getEbayConfig } from "./config.js";
 import { ebayJson } from "./client.js";
@@ -183,8 +184,7 @@ export function titleMatchesAskContext(title: string, card: CardRef, grade: Grad
   const nameTokens = meaningfulTokens(card.name);
   if (nameTokens.length > 0 && !nameTokens.every((token) => normalizedTitle.includes(token))) return false;
 
-  const numberTokens = collectorNumberTokens(card.number);
-  if (numberTokens.length > 0 && !numberTokens.every((token) => normalizedTitle.includes(token))) return false;
+  if (card.number && !titleMentionsCollectorNumber(title, normalizedTitle, card.number)) return false;
 
   const isDamaged = /\b(?:damaged|damage|dmg|poor|crease|creased|heavily played|hp)\b/.test(normalizedTitle);
   if (isDamaged) return false;
@@ -273,6 +273,19 @@ function askCacheKey(card: CardRef, grade: Grade, query: string): string {
     grade,
     query.trim().toLowerCase(),
   ].join("|");
+}
+
+function titleMentionsCollectorNumber(title: string, normalizedTitle: string, number: string): boolean {
+  const candidates = [
+    ...(title.match(/\b\d{1,4}\s*\/\s*\d{1,4}\b/g) ?? []),
+    ...(title.match(
+      /\b(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*\d{1,4}\s*\/\s*(?:(?:TG|GG|SVP|MEP|SWSH|SM|XY|BW|DP|HGSS)\s*)?\d{1,4}\b/gi,
+    ) ?? []),
+  ];
+  if (candidates.some((candidate) => collectorNumbersEquivalent(candidate, number))) return true;
+  if (candidates.length > 0) return false;
+  const numberTokens = collectorNumberTokens(number);
+  return numberTokens.length > 0 && numberTokens.every((token) => normalizedTitle.includes(token));
 }
 
 function collectorNumberTokens(number: string | undefined): string[] {

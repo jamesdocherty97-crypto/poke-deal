@@ -14,6 +14,12 @@
 import { GRADE_VALUES, type CardRef, type CompQuery, type CompResult, type Grade } from "../../domain/types.js";
 import { getSetById, resolveSetIdForCard } from "../../catalog/setCatalog.js";
 import { normalizeSearchText, tokenMatches, tokenizeSearchText } from "../../catalog/fuzzy.js";
+import {
+  collectorNumbersEquivalent,
+  normalizeCollectorNumberForCompare,
+  stripLeadingZerosFromNumericSegment,
+  stripProviderSetCodePrefix,
+} from "../../cards/identity.js";
 import type { CompSource } from "../CompSource.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
@@ -259,7 +265,7 @@ function buildProviderCollectorNumberVariants(number: string | undefined, setNam
   const [leftPart, rightPart] = normalized.split("/");
   const trimmedLeft = leftPart?.trim();
   if (trimmedLeft) {
-    const unpaddedLeft = stripLeadingZeros(trimmedLeft);
+    const unpaddedLeft = stripLeadingZerosFromNumericSegment(trimmedLeft);
     if (unpaddedLeft && unpaddedLeft !== trimmedLeft) {
       const strippedPrefix = /^([A-Za-z]{2,5})(\d+)$/.exec(trimmedLeft);
       if (strippedPrefix?.[1]) {
@@ -530,16 +536,11 @@ function providerPayloadMatchesRequestProfile(providerCard: Record<string, unkno
     if (!requestedTokens.every((token) => providerName.includes(token))) return false;
   }
 
-  const providerNumber = normalizeComparableCollectorNumber(
-    readProviderString(providerCard, "number") ??
-      readProviderString(providerCard, "cardNumber") ??
-      readProviderString(providerCard, "collectorNumber") ??
-      undefined,
-  );
-  const requestedNumber = normalizeComparableCollectorNumber(normalizeProviderCollectorNumber(request.number, request.setName));
-  if (providerNumber && requestedNumber && !collectorNumbersMatch(providerNumber, requestedNumber)) return false;
+  const providerNumber = readProviderCollectorNumber(providerCard);
+  const requestedNumber = normalizeProviderCollectorNumber(request.number, request.setName);
+  if (providerNumber && requestedNumber && !collectorNumbersEquivalent(providerNumber, requestedNumber)) return false;
 
-  const providerSet = normalizeSearchText(readProviderSetName(providerCard) ?? "");
+  const providerSet = normalizeSearchText(stripProviderSetCodePrefix(readProviderSetName(providerCard)));
   if (request.setName && providerSet) {
     if (!providerSetMatchesRequest(request.setName, providerSet)) {
       return false;
@@ -552,6 +553,7 @@ function providerPayloadMatchesRequestProfile(providerCard: Record<string, unkno
 const ignoredSetTokens = new Set(["set", "promo", "pokemon", "card"]);
 
 function providerSetMatchesRequest(requestedSetName: string, providerSet: string): boolean {
+  const normalizedProviderSet = stripProviderSetCodePrefix(providerSet);
   const requestedTokens = tokenizeSearchText(requestedSetName)
     .map((token) => token.toLowerCase())
     .filter(
@@ -562,7 +564,7 @@ function providerSetMatchesRequest(requestedSetName: string, providerSet: string
     );
   if (requestedTokens.length === 0) return true;
 
-  const providerTokens = tokenizeSearchText(providerSet).map((token) => token.toLowerCase());
+  const providerTokens = tokenizeSearchText(normalizedProviderSet).map((token) => token.toLowerCase());
   if (providerTokens.length === 0) return true;
 
   const providerSubsetMatchesRequested = providerTokens.every((providerToken) =>
@@ -585,7 +587,7 @@ function providerSetMatchesRequest(requestedSetName: string, providerSet: string
 function buildRequestMatchProfiles(request: CardRef, options: { allowSetless: boolean } = { allowSetless: false }): CardRef[] {
   const number = request.number?.trim();
   const normalizedSetName = request.setName?.trim();
-  const requestedNumber = normalizeComparableCollectorNumber(normalizeProviderCollectorNumber(number, request.setName));
+  const requestedNumber = normalizeCollectorNumberForCompare(normalizeProviderCollectorNumber(number, request.setName));
   const leftNumber = requestedNumber?.split("/")[0];
 
   const profiles: CardRef[] = [{ ...request }];
@@ -605,7 +607,7 @@ function buildRequestMatchProfiles(request: CardRef, options: { allowSetless: bo
     const key = JSON.stringify({
       name: profile.name.trim(),
       setName: profile.setName?.trim() ?? "",
-      number: normalizeComparableCollectorNumber(normalizeProviderCollectorNumber(profile.number, profile.setName)) ?? profile.number,
+      number: normalizeCollectorNumberForCompare(normalizeProviderCollectorNumber(profile.number, profile.setName)) ?? profile.number,
     });
     deduped.set(key, profile);
   }
@@ -646,53 +648,13 @@ function readProviderSetName(card: Record<string, unknown>): string | null {
   return null;
 }
 
-function normalizeComparableCollectorNumber(value: string | undefined): string | null {
-  const normalized = value
-    ?.trim()
-    .toUpperCase()
-    .replace(/\s+/g, "")
-    .split("/")
-    .map(normalizeCollectorPartForCompare)
-    .join("/");
-  return normalized && normalized.length > 0 ? normalized : null;
-}
-
-function normalizeCollectorPartForCompare(value: string): string {
-  const match = value.match(/^([A-Z]*)(\d+)$/);
-  if (!match) return value;
-  const prefix = match[1] ?? "";
-  const number = Number.parseInt(match[2]!, 10);
-  return Number.isFinite(number) ? `${prefix}${number}` : value;
-}
-
-function collectorNumbersMatch(providerNumber: string, requestedNumber: string): boolean {
-  const providerForms = collectorNumberForms(providerNumber);
-  const requestedForms = collectorNumberForms(requestedNumber);
-  return [...requestedForms].some((requested) => providerForms.has(requested));
-}
-
-function collectorNumberForms(number: string): Set<string> {
-  const normalized = number.trim().toUpperCase();
-  const left = normalized.split("/")[0] ?? normalized;
-  const strippedLeading = stripLeadingZeros(left);
-  const prefixless = stripPromoCollectorPrefix(left);
-  return new Set(
-    [normalized, left, prefixless, strippedLeading, prefixless ? stripLeadingZeros(prefixless) : null].filter(
-      (value): value is string => Boolean(value),
-    ),
-  );
-}
-
-function stripLeadingZeros(value: string): string | null {
-  const match = value.match(/^\d+$/);
-  if (!match) return null;
-  const normalized = Number.parseInt(match[0], 10);
-  if (!Number.isFinite(normalized)) return null;
-  return String(normalized);
-}
-
-function stripPromoCollectorPrefix(value: string): string | null {
-  const match = value.match(/^[A-Za-z]{2,5}(\d+)$/);
-  if (!match) return null;
-  return match[1]!;
+function readProviderCollectorNumber(card: Record<string, unknown>): string | undefined {
+  const direct =
+    readProviderString(card, "number") ??
+    readProviderString(card, "cardNumber") ??
+    readProviderString(card, "collectorNumber") ??
+    undefined;
+  if (direct) return direct;
+  const name = readProviderString(card, "name") ?? "";
+  return name.match(/\b([A-Z]{0,5}\d{1,4}\s*\/\s*[A-Z]{0,5}\d{1,4})\b/i)?.[1];
 }

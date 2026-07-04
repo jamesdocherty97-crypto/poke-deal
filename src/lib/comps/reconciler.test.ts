@@ -120,6 +120,38 @@ test("T5: strong unambiguous PokeTrace baseline can be high confidence", () => {
   assert.equal(result.manualCheck, false);
 });
 
+test("T5b: identity gate accepts ME-era zero-padded numeric card numbers", () => {
+  const result = reconcileComps({ ...baseQuery, setId: "me4", cardNumber: "96/86" }, [
+    candidate({
+      source: "poketrace",
+      valuePence: 625,
+      n: 18,
+      matchedSetId: "me4",
+      matchedCardNumber: "096/086",
+      region: "US",
+    }),
+  ]);
+
+  assert.equal(result.headlinePence, 625);
+  assert.doesNotMatch(result.reasons.join(" "), /identity-number/);
+});
+
+test("T5c: identity gate does not merge distinct numeric card numbers", () => {
+  const result = reconcileComps({ ...baseQuery, setId: "me4", cardNumber: "10/86" }, [
+    candidate({
+      source: "poketrace",
+      valuePence: 625,
+      n: 18,
+      matchedSetId: "me4",
+      matchedCardNumber: "100/086",
+      region: "US",
+    }),
+  ]);
+
+  assert.equal(result.headlinePence, null);
+  assert.match(result.reasons.join(" "), /identity-number/);
+});
+
 test("T6: contaminated Moonbreon raw bucket loses to PokeTrace and stale corroboration keeps confidence medium", () => {
   const result = reconcileComps({ ...baseQuery, setId: "swsh7", cardNumber: "215/203" }, [
     candidate({ source: "pt-smart", valuePence: 120900, n: 93, raw: { min: 35400, max: 393700, median: 110000 }, matchedCardNumber: "215/203" }),

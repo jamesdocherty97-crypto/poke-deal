@@ -55,6 +55,12 @@ test("resolveSetId handles dealer shorthand for current chase sets and subsets",
   assert.equal(resolveSetId("swsh promo"), "swshp");
   assert.equal(resolveSetId("mep"), "mep");
   assert.equal(resolveSetId("mega evolution promos"), "mep");
+  assert.equal(resolveSetId("ME04: Chaos Rising"), "me4");
+  assert.equal(resolveExactSetId("ME04: Chaos Rising"), "me4");
+  assert.equal(resolveSetAliasId("ME04: Chaos Rising"), "me4");
+  assert.equal(resolveSetId("ME01: Mega Evolution"), "me1");
+  assert.equal(resolveSetId("ME02: Phantasmal Flames"), "me2");
+  assert.equal(resolveSetId("ME03: Perfect Order"), "me3");
 });
 
 test("resolveSetAliasId only returns curated exact aliases", () => {

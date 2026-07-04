@@ -1,4 +1,5 @@
 import type { CatalogCard } from "./types.js";
+import { collectorNumbersEquivalent } from "../cards/identity.js";
 import { normalizeSearchText, scoreSearchText } from "./fuzzy.js";
 import {
   getSetById,
@@ -437,6 +438,7 @@ function dedupeCards(cards: CatalogCard[]): CatalogCard[] {
 }
 
 function sameCollectorNumber(queryNumber: string, cardNumber: string): boolean {
+  if (collectorNumbersEquivalent(queryNumber, cardNumber)) return true;
   const queryForms = collectorNumberForms(queryNumber);
   const cardForms = collectorNumberForms(cardNumber);
   return [...queryForms].some((query) =>

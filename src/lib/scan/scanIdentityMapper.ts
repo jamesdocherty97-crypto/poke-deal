@@ -1,5 +1,6 @@
 import { getAllSets, getSetById, resolveExactSetId, resolveSetIdForCard } from "../catalog/setCatalog.js";
 import type { CatalogCard } from "../catalog/types.js";
+import { normalizeCollectorNumberForCompare } from "../cards/identity.js";
 import { GRADE_VALUES, type Grade } from "../domain/types.js";
 import type { ScanIdentity } from "./cardScan.js";
 
@@ -164,7 +165,7 @@ export function normalizePrintedNumber(value: string | null | undefined): string
     return `${left}${right}`;
   }
 
-  return cleaned.toUpperCase().replace(/^0+(\d)/, "$1");
+  return normalizeCollectorNumberForCompare(cleaned) ?? cleaned.toUpperCase().replace(/^0+(\d)/, "$1");
 }
 
 function resolveScannedSetName(

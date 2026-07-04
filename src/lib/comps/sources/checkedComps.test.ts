@@ -103,6 +103,18 @@ test("buildCheckedCompsWhere pins the exact card id and grade when available", (
   assert.equal(where.card?.id, "card_1");
 });
 
+test("buildCheckedCompsWhere matches canonical numeric collector numbers", () => {
+  const where = buildCheckedCompsWhere(
+    { name: "Tauros", setName: "Chaos Rising", number: "069/086", game: "POKEMON", language: "EN" },
+    "RAW",
+    90,
+  ) as {
+    card?: { OR?: Array<{ number: string }> };
+  };
+
+  assert.deepEqual(where.card?.OR, [{ number: "069/086" }, { number: "69/86" }]);
+});
+
 test("checked comp platform normalization keeps regions UK-first", () => {
   assert.equal(normalizeCheckedCompPlatform("ebay-uk"), "ebay-uk");
   assert.equal(normalizeCheckedCompPlatform("cardmarket"), "cardmarket");

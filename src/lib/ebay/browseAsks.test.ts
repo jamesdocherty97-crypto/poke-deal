@@ -81,6 +81,8 @@ test("buildEbayAskSearchPath targets eBay GB Pokemon category and live ask filte
 test("titleMatchesAskContext filters number, raw slab leakage and obvious bad listings", () => {
   assert.equal(titleMatchesAskContext("Pokemon Umbreon VMAX 215/203 Evolving Skies NM", moonbreon, "RAW"), true);
   assert.equal(titleMatchesAskContext("Pokemon Umbreon VMAX 214/203 Evolving Skies NM", moonbreon, "RAW"), false);
+  assert.equal(titleMatchesAskContext("Pokemon Tauros 069/086 Chaos Rising NM", { name: "Tauros", number: "69/86" }, "RAW"), true);
+  assert.equal(titleMatchesAskContext("Pokemon Tauros 100/086 Chaos Rising NM", { name: "Tauros", number: "10/86" }, "RAW"), false);
   assert.equal(titleMatchesAskContext("PSA 10 Umbreon VMAX 215/203 Evolving Skies", moonbreon, "RAW"), false);
   assert.equal(titleMatchesAskContext("Custom proxy Umbreon VMAX 215/203", moonbreon, "RAW"), false);
   assert.equal(titleMatchesAskContext("Umbreon VMAX 215/203 Evolving Skies Extended Binder Inserts", moonbreon, "RAW"), false);
