@@ -67,6 +67,7 @@ import { buildBuyPlan, buildBuyTargetOptions, buildBuyTargetSuggestion } from "@
 import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
 import {
   buildCheckedComp,
+  checkedCompSourceFromPlatform,
   checkedCompSourceLabel,
   parseCheckedCompPriceText,
   type CheckedCompSource,
@@ -5181,7 +5182,18 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "checked comp log failed");
       const entries = Array.isArray(payload.entries) ? (payload.entries as CheckedCompEntry[]) : [];
-      setLoggedCheckedComps(entries.length > 0 ? entries : payload.entry ? [payload.entry as CheckedCompEntry] : []);
+      const nextLoggedEntries = entries.length > 0 ? entries : payload.entry ? [payload.entry as CheckedCompEntry] : [];
+      const aggregate = payload.aggregate as CompResult | null | undefined;
+      const activeCheckedPricePence =
+        aggregate && aggregate.sampleSize > 0 && aggregate.medianPence > 0 ? aggregate.medianPence : pricePence;
+      const activeCheckedSample =
+        aggregate && aggregate.sampleSize > 0 ? aggregate.sampleSize : Math.max(1, nextLoggedEntries.length);
+
+      setLoggedCheckedComps(nextLoggedEntries);
+      setCheckedCompPrice(penceToPounds(activeCheckedPricePence));
+      setCheckedCompSample(String(activeCheckedSample));
+      setCheckedCompSource(checkedCompSourceFromPlatform(checkedCompLogPlatform));
+      setCheckedCompNote(checkedCompLogNote.trim());
       setCheckedCompLogPrice("");
       setCheckedCompLogNote("");
       setManualCompReturnArmed(false);
@@ -5205,7 +5217,7 @@ export default function Home() {
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) return;
-      setComp(payload);
+      setComp((current) => (current?.headline && !payload.headline ? current : payload));
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
       rememberRecentComp(payload, { name: card.name, setName: card.setName ?? "", number: card.number ?? "", grade });
     } catch {

@@ -52,6 +52,12 @@ export function checkedCompSourceLabel(source: CheckedCompSource | string | unde
   return "Checked comp";
 }
 
+export function checkedCompSourceFromPlatform(platform: string | undefined): CheckedCompSource {
+  if (platform === "ebay-uk") return "EBAY_SOLD";
+  if (platform === "cardmarket") return "CARDMARKET";
+  return "OTHER";
+}
+
 export function parseCheckedCompPriceText(text: string | undefined): number | null {
   const normalized = text?.trim().replace(/\s+/g, " ");
   if (!normalized) return null;

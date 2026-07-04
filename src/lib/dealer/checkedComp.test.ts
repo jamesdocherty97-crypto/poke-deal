@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildCheckedComp, checkedCompSourceLabel, parseCheckedCompPriceText } from "./checkedComp.js";
+import {
+  buildCheckedComp,
+  checkedCompSourceFromPlatform,
+  checkedCompSourceLabel,
+  parseCheckedCompPriceText,
+} from "./checkedComp.js";
 
 const card = {
   name: "Gengar",
@@ -67,6 +72,13 @@ test("checkedCompSourceLabel uses dealer-facing source names", () => {
   assert.equal(checkedCompSourceLabel("EBAY_SOLD"), "eBay sold");
   assert.equal(checkedCompSourceLabel("TCGPLAYER"), "TCGPlayer");
   assert.equal(checkedCompSourceLabel("OTHER"), "Checked comp");
+});
+
+test("checkedCompSourceFromPlatform keeps logged comps in the active checked-comp flow", () => {
+  assert.equal(checkedCompSourceFromPlatform("ebay-uk"), "EBAY_SOLD");
+  assert.equal(checkedCompSourceFromPlatform("cardmarket"), "CARDMARKET");
+  assert.equal(checkedCompSourceFromPlatform("vinted"), "OTHER");
+  assert.equal(checkedCompSourceFromPlatform(undefined), "OTHER");
 });
 
 test("parseCheckedCompPriceText reads copied marketplace prices", () => {
