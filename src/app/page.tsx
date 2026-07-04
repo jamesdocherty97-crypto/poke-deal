@@ -502,6 +502,7 @@ type EbayStatus = {
     checkError?: string;
   };
   error?: string;
+  reconnectUrl?: string;
 };
 
 type EbayPolicyChoice = {
@@ -718,6 +719,19 @@ type SystemStatus = {
   };
 };
 
+type DeepHealthReport = {
+  checkedAt: string;
+  sources: DeepHealthSource[];
+};
+
+type DeepHealthSource = {
+  id: string;
+  status: "ok" | "fail" | "skipped";
+  latencyMs: number;
+  detail: string;
+  checkedAt: string;
+};
+
 type SystemSource = {
   id: string;
   label: string;
@@ -725,6 +739,7 @@ type SystemSource = {
   status: "ready" | "public" | "fixture" | "missing" | "building" | "problem" | "info";
   required: boolean;
   setupHint?: string;
+  deepCheck?: DeepHealthSource;
 };
 
 const quickGrades: Grade[] = [
@@ -843,6 +858,7 @@ export default function Home() {
   const [appAlertUnreadCount, setAppAlertUnreadCount] = useState(0);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [deepHealth, setDeepHealth] = useState<DeepHealthReport | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [userRefreshing, setUserRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -852,6 +868,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
   const [sellingListingId, setSellingListingId] = useState<string | null>(null);
+  const [inventoryActionSheetId, setInventoryActionSheetId] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemQuantity, setItemQuantity] = useState("1");
   const [itemCost, setItemCost] = useState("");
@@ -1149,6 +1166,10 @@ export default function Home() {
   const sellingItem = useMemo(
     () => inventory.find((item) => item.id === sellingId) ?? null,
     [inventory, sellingId],
+  );
+  const inventoryActionSheetItem = useMemo(
+    () => inventory.find((item) => item.id === inventoryActionSheetId) ?? null,
+    [inventory, inventoryActionSheetId],
   );
   const sellingListing = useMemo(
     () => listings.find((listing) => listing.id === sellingListingId) ?? null,
@@ -1511,18 +1532,29 @@ export default function Home() {
     ],
   );
   const compForReceipt = useMemo<Reconciled | null>(() => {
-    if (!comp) return null;
+    const baseComp =
+      comp ??
+      (checkedComp
+        ? {
+            headline: checkedComp,
+            all: [checkedComp],
+            sourcesDisagree: false,
+            catalog: catalogCard,
+            psaCert: psaResult,
+          }
+        : null);
+    if (!baseComp) return null;
     const withLogged = localCheckedCompResult
-      ? { ...comp, all: upsertCompResult(comp.all, localCheckedCompResult) }
-      : comp;
+      ? { ...baseComp, all: upsertCompResult(baseComp.all, localCheckedCompResult) }
+      : baseComp;
     if (!checkedComp) return withLogged;
     return {
       ...withLogged,
       headline: checkedComp,
-      all: [checkedComp, ...withLogged.all],
+      all: [checkedComp, ...withLogged.all.filter((result) => result.source !== checkedComp.source)],
       sourcesDisagree: false,
     };
-  }, [checkedComp, comp, localCheckedCompResult]);
+  }, [catalogCard, checkedComp, comp, localCheckedCompResult, psaResult]);
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
   const compLimitations = useMemo(() => (compForReceipt ? buildCompLimitations(compForReceipt) : []), [compForReceipt]);
   const reconciliationReasons = useMemo(
@@ -1886,8 +1918,15 @@ export default function Home() {
     [ebayHasMerchantLocation, ebayHasPolicies, ebayNeedsReconnect, ebayStatus?.configured, ebayStatus?.connected, ebayStatus?.tokenSource],
   );
   const setupSources = useMemo(
-    () => (systemStatus ? [...systemStatus.sources.filter((source) => source.id !== "push-alerts"), ebayHealthSource] : []),
-    [ebayHealthSource, systemStatus],
+    () => {
+      if (!systemStatus) return [];
+      const deepHealthById = new Map((deepHealth?.sources ?? []).map((source) => [source.id, source]));
+      return [...systemStatus.sources.filter((source) => source.id !== "push-alerts"), ebayHealthSource].map((source) => ({
+        ...source,
+        deepCheck: deepHealthById.get(source.id),
+      }));
+    },
+    [deepHealth, ebayHealthSource, systemStatus],
   );
   const unlistedStock = useMemo(
     () =>
@@ -2106,10 +2145,14 @@ export default function Home() {
 
   async function addPhotosToInventory(item: InventoryItem, files: FileList | File[]) {
     const selected = Array.from(files).filter((file) => file.type.startsWith("image/"));
-    if (selected.length === 0) return;
+    if (selected.length === 0) {
+      setNotice("No photos selected.");
+      setError(null);
+      return;
+    }
     setBusy(`photo-${item.id}`);
     setError(null);
-    setNotice(null);
+    setNotice(selected.length === 1 ? "Uploading photo..." : `Uploading ${selected.length} photos...`);
     try {
       const existingCount = item.photos?.length ?? 0;
       for (const [index, file] of selected.entries()) {
@@ -2370,6 +2413,7 @@ export default function Home() {
   }
 
   function startPullRefresh(event: TouchEvent<HTMLElement>) {
+    if (isInteractiveTarget(event.target)) return;
     if (refreshing || window.scrollY > 0) return;
     const touch = event.touches[0];
     if (!touch) return;
@@ -4508,6 +4552,7 @@ export default function Home() {
     setEditingListingId(null);
     setListingPackId(null);
     setEbayPublishTarget(null);
+    setInventoryActionSheetId(null);
     setSellingId(null);
     setSellingListingId(null);
     setDeleteTarget({ kind: "inventory", item });
@@ -5026,6 +5071,27 @@ export default function Home() {
     }
   }
 
+  async function runDeepHealthCheck() {
+    setBusy("deep-health");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/system/health");
+      const payload = await readJson(res);
+      setDeepHealth(payload as DeepHealthReport);
+      const failed = ((payload.sources ?? []) as DeepHealthSource[]).filter((source) => source.status === "fail");
+      if (failed.length > 0) {
+        setError(`${failed.length} source${failed.length === 1 ? "" : "s"} failed the deep check.`);
+      } else {
+        setNotice("Deep source check complete.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "deep source check failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function markAppAlertsRead(ids?: string[]) {
     try {
       const res = await fetch("/api/alerts/inbox", {
@@ -5198,6 +5264,7 @@ export default function Home() {
       setCheckedCompLogNote("");
       setManualCompReturnArmed(false);
       setNotice(`Logged ${gbp(pricePence)}. Add the next sold price, or close the logger.`);
+      setScrollToComp(true);
       void refreshCurrentCompAfterCheckedComp(card);
       window.requestAnimationFrame(() => checkedCompLogPriceRef.current?.focus());
     } catch (err) {
@@ -5217,7 +5284,10 @@ export default function Home() {
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) return;
-      setComp((current) => (current?.headline && !payload.headline ? current : payload));
+      setComp((current) => {
+        if (!isUsefulCompPayload(payload)) return current;
+        return current?.headline && !payload.headline ? current : payload;
+      });
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
       rememberRecentComp(payload, { name: card.name, setName: card.setName ?? "", number: card.number ?? "", grade });
     } catch {
@@ -5378,7 +5448,14 @@ export default function Home() {
           </button>
         </div>
         {checkedCompLogOpen && (
-          <form className="checked-comp-log-sheet" onSubmit={(event) => void logCheckedCompEntry(event)}>
+          <div
+            className="checked-comp-log-sheet"
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              void logCheckedCompEntry();
+            }}
+          >
             <div className="form-grid">
               <label>
                 Sold price
@@ -5428,14 +5505,18 @@ export default function Home() {
               />
             </details>
             <div className="checked-comp-log-actions">
-              <button type="submit" disabled={busy === "checked-comp-log" || !checkedCompLogPrice.trim()}>
+              <button
+                type="button"
+                onClick={() => void logCheckedCompEntry()}
+                disabled={busy === "checked-comp-log" || !checkedCompLogPrice.trim()}
+              >
                 {busy === "checked-comp-log" ? "Logging..." : "Log price"}
               </button>
               <button type="button" className="ghost-button" onClick={() => setCheckedCompLogOpen(false)}>
                 Done
               </button>
             </div>
-          </form>
+          </div>
         )}
         {hasLoggedEntries && (
           <div className="checked-comp-entry-list">
@@ -5513,12 +5594,12 @@ export default function Home() {
               onChange={(event) => setQuantity(event.target.value)}
             />
           </label>
-          <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
           <Metric
             label="Profit"
             value={quickStockCostPence > 0 && buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
             tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
           />
+          <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
         </div>
         <details className="buy-advanced-details optional-listing-details">
           <summary>Optional listing after stock</summary>
@@ -5770,6 +5851,7 @@ export default function Home() {
           onTakePortfolioSnapshot={takePortfolioSnapshot}
           onCheckWatches={() => void checkWatches()}
           onCheckReprices={checkReprices}
+          onDeepCheck={() => void runDeepHealthCheck()}
           appAlerts={appAlerts}
           appAlertUnreadCount={appAlertUnreadCount}
           onMarkAlertsRead={() => void markAppAlertsRead()}
@@ -5809,7 +5891,7 @@ export default function Home() {
                       },
                     );
                   }}
-                  placeholder="Umbreon prismatic, Victini promo, Lugia Neo Genesis CGC 1.5..."
+                  placeholder="Umbreon prismatic, Victini promo..."
                   autoComplete="off"
                 />
                 <button
@@ -5930,39 +6012,41 @@ export default function Home() {
                 )}
               </div>
             )}
-            <div className="selected-card-strip" aria-label="Selected card">
-              <CardImage
-                src={selectedCardImage}
-                className="selected-card-art"
-                fallbackClassName="selected-card-art blank"
-                alt={`${selectedCardTitle} card art`}
-              />
-              <div>
-                <span>Current card</span>
-                <strong>{selectedCardTitle}</strong>
-                <small>{selectedCardMeta}</small>
+            {hasBuyContext && (
+              <div className="selected-card-strip" aria-label="Selected card">
+                <CardImage
+                  src={selectedCardImage}
+                  className="selected-card-art"
+                  fallbackClassName="selected-card-art blank"
+                  alt={`${selectedCardTitle} card art`}
+                />
+                <div>
+                  <span>Current card</span>
+                  <strong>{selectedCardTitle}</strong>
+                  <small>{selectedCardMeta}</small>
+                </div>
+                <div className="selected-card-actions">
+                  {selectedCardMarkUrl && (
+                    <img
+                      className="selected-set-mark"
+                      src={selectedCardMarkUrl}
+                      alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+                      onError={hideBrokenImage}
+                    />
+                  )}
+                  <button
+                    className="clear-comp-button"
+                    type="button"
+                    onClick={() => clearCurrentComp()}
+                    aria-label="Clear and comp another card"
+                    title="Clear and comp another card"
+                    disabled={busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
+                  >
+                    X
+                  </button>
+                </div>
               </div>
-              <div className="selected-card-actions">
-                {selectedCardMarkUrl && (
-                  <img
-                    className="selected-set-mark"
-                    src={selectedCardMarkUrl}
-                    alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
-                    onError={hideBrokenImage}
-                  />
-                )}
-                <button
-                  className="clear-comp-button"
-                  type="button"
-                  onClick={() => clearCurrentComp()}
-                  aria-label="Clear and comp another card"
-                  title="Clear and comp another card"
-                  disabled={busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
-                >
-                  X
-                </button>
-              </div>
-            </div>
+            )}
             {pendingLookup && busy === "lookup" && !headline && (
               <div className="lookup-progress-card" aria-live="polite" aria-label="Comp lookup progress">
                 <div className="lookup-progress-heading">
@@ -7550,19 +7634,14 @@ export default function Home() {
               key={item.id}
               item={item as InventoryItem}
               busy={busy}
-              onEdit={openInventoryEditor}
               onSell={openSell}
               onComp={compInventoryItem}
               onList={listInventoryItem}
               onPack={openRecentListingWork}
-              onStatus={updateStatus}
-              onDelete={requestDeleteItem}
               onPhotos={addPhotosToInventory}
-              onPhotoUrl={addPhotoUrlToInventory}
               onCatalogArt={addCatalogArtToInventory}
-              onMovePhoto={moveInventoryPhoto}
-              onDeletePhoto={deleteInventoryPhoto}
-              onCopyListingCopy={(target, channel) => void copyInventoryListingCopy(target, channel)}
+              onDelete={requestDeleteItem}
+              onMoreActions={(target) => setInventoryActionSheetId(target.id)}
             />
           )}
           emptyInventoryFilterText={emptyInventoryFilterText}
@@ -7788,6 +7867,44 @@ export default function Home() {
           checkReprices={() => void checkReprices()}
           applyReprice={(recommendation) => void applyReprice(recommendation)}
           requestUndoSale={requestUndoSale}
+        />
+      )}
+
+      {inventoryActionSheetItem && (
+        <InventoryActionSheet
+          item={inventoryActionSheetItem}
+          busy={busy}
+          onClose={() => setInventoryActionSheetId(null)}
+          onComp={(item) => {
+            setInventoryActionSheetId(null);
+            compInventoryItem(item);
+          }}
+          onSell={(item) => {
+            setInventoryActionSheetId(null);
+            openSell(item);
+          }}
+          onEdit={(item) => {
+            setInventoryActionSheetId(null);
+            openInventoryEditor(item);
+          }}
+          onList={(item) => {
+            setInventoryActionSheetId(null);
+            void listInventoryItem(item);
+          }}
+          onStatus={(item, status) => {
+            setInventoryActionSheetId(null);
+            void updateStatus(item, status);
+          }}
+          onDelete={(item) => {
+            setInventoryActionSheetId(null);
+            requestDeleteItem(item);
+          }}
+          onPhotos={addPhotosToInventory}
+          onPhotoUrl={addPhotoUrlToInventory}
+          onCatalogArt={addCatalogArtToInventory}
+          onMovePhoto={moveInventoryPhoto}
+          onDeletePhoto={deleteInventoryPhoto}
+          onCopyListingCopy={(item, targetChannel) => void copyInventoryListingCopy(item, targetChannel)}
         />
       )}
 
@@ -8529,6 +8646,15 @@ function ListingPackSheet({
       </div>
       {isEbayListing && ebayReadiness && (
         <div className="listing-pack-ebay-actions">
+          {ebayStatus?.configured && !ebayStatus.connected && (
+            <p className="hint danger-text ebay-reconnect-callout">
+              eBay automation is unavailable because the seller connection is stale
+              {ebayStatus.error ? `: ${ebayStatus.error}` : "."}{" "}
+              <a href={ebayStatus.reconnectUrl ?? "/api/ebay/connect?force=1"} target="_blank" rel="noreferrer">
+                Reconnect eBay
+              </a>
+            </p>
+          )}
           {!isPublished && (
             <button
               className="ghost-button"
@@ -8784,9 +8910,10 @@ function ListingFlowSteps({ steps }: { steps: ListingFlowStep[] }) {
     <ol className="listing-flow-steps" aria-label="Selling steps">
       {steps.map((step, index) => (
         <li key={step.id} className={`listing-flow-step ${step.state}`}>
-          <span>{index + 1}</span>
+          <span aria-hidden="true">{index + 1}</span>
           <div>
             <strong>{step.label}</strong>
+            <em>{listingStepStateLabel(step.state)}</em>
             <small>{step.detail}</small>
           </div>
         </li>
@@ -8795,38 +8922,35 @@ function ListingFlowSteps({ steps }: { steps: ListingFlowStep[] }) {
   );
 }
 
+function listingStepStateLabel(state: ListingFlowStep["state"]): string {
+  if (state === "done") return "Done";
+  if (state === "current") return "Next";
+  if (state === "blocked") return "Blocked";
+  return "Later";
+}
+
 function InventoryRow({
   item,
   busy,
-  onEdit,
   onSell,
   onComp,
   onList,
   onPack,
-  onStatus,
-  onDelete,
   onPhotos,
-  onPhotoUrl,
   onCatalogArt,
-  onMovePhoto,
-  onDeletePhoto,
-  onCopyListingCopy,
+  onDelete,
+  onMoreActions,
 }: {
   item: InventoryItem;
   busy: string | null;
-  onEdit: (item: InventoryItem) => void;
   onSell: (item: InventoryItem) => void;
   onComp: (item: InventoryItem) => void;
   onList: (item: InventoryItem) => void;
   onPack: (item: InventoryItem) => void;
-  onStatus: (item: InventoryItem, status: ItemStatus) => void;
-  onDelete: (item: InventoryItem) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
-  onPhotoUrl: (item: InventoryItem, url: string) => void;
   onCatalogArt: (item: InventoryItem) => void;
-  onMovePhoto: (item: InventoryItem, photoId: string, direction: -1 | 1) => void;
-  onDeletePhoto: (item: InventoryItem, photoId: string) => void;
-  onCopyListingCopy: (item: InventoryItem, channel: Channel) => void;
+  onDelete: (item: InventoryItem) => void;
+  onMoreActions: (item: InventoryItem) => void;
 }) {
   const draftListing = item.listings.find((row) => row.state === "DRAFT");
   const activeListing = item.listings.find((row) => row.state === "ACTIVE");
@@ -9018,68 +9142,145 @@ function InventoryRow({
               <span>{primaryAction.detail}</span>
             </div>
           )}
-          <details className="row-more-actions">
-            <summary>More</summary>
-            <InventoryPhotoTools
-              item={item}
-              busy={busy}
-              onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
-              onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
-              onCatalogArt={(target) => onCatalogArt(target as InventoryItem)}
-              onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
-              onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
-            />
-            <div className="row-actions">
-              {item.status !== "SOLD" && (
-                <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
-                  Comp
-                </button>
-              )}
-              {item.status !== "SOLD" && (
-                <>
-                  <button type="button" onClick={() => onCopyListingCopy(item, "EBAY")}>
-                    Copy eBay
-                  </button>
-                  <button type="button" onClick={() => onCopyListingCopy(item, "CARDMARKET")}>
-                    Copy CM
-                  </button>
-                  <button type="button" onClick={() => onCopyListingCopy(item, "VINTED")}>
-                    Copy Vinted
-                  </button>
-                </>
-              )}
-              {item.status !== "SOLD" && (
-                <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
-                  Edit
-                </button>
-              )}
-              {item.status !== "SOLD" && (
-                <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
-                  Sell
-                </button>
-              )}
-              {item.status === "IN_STOCK" && (
-                <button
-                  type="button"
-                  onClick={() => onList(item)}
-                  disabled={busy === `status-${item.id}` || busy?.startsWith("listing-") || busy?.startsWith("create-listing-")}
-                >
-                  {listing ? "Activate" : "Draft"}
-                </button>
-              )}
-              {item.status !== "RESERVED" && item.status !== "SOLD" && (
-                <button type="button" onClick={() => onStatus(item, "RESERVED")} disabled={busy === `status-${item.id}`}>
-                  Hold
-                </button>
-              )}
-              <button className="danger-button" type="button" onClick={() => onDelete(item)} disabled={busy === `delete-${item.id}`}>
-                Delete
+          <div className="row-primary-actions" aria-label="Quick row actions">
+            {item.status !== "SOLD" && (
+              <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
+                Comp
               </button>
-            </div>
-          </details>
+            )}
+            {canSell && primaryAction?.label !== "Record sale" && (
+              <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
+                Sell
+              </button>
+            )}
+            <button type="button" onClick={() => onMoreActions(item)}>
+              More actions
+            </button>
+          </div>
         </div>
       </div>
     </article>
+  );
+}
+
+function InventoryActionSheet({
+  item,
+  busy,
+  onClose,
+  onComp,
+  onSell,
+  onEdit,
+  onList,
+  onStatus,
+  onDelete,
+  onPhotos,
+  onPhotoUrl,
+  onCatalogArt,
+  onMovePhoto,
+  onDeletePhoto,
+  onCopyListingCopy,
+}: {
+  item: InventoryItem;
+  busy: string | null;
+  onClose: () => void;
+  onComp: (item: InventoryItem) => void;
+  onSell: (item: InventoryItem) => void;
+  onEdit: (item: InventoryItem) => void;
+  onList: (item: InventoryItem) => void;
+  onStatus: (item: InventoryItem, status: ItemStatus) => void;
+  onDelete: (item: InventoryItem) => void;
+  onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
+  onPhotoUrl: (item: InventoryItem, url: string) => void;
+  onCatalogArt: (item: InventoryItem) => void;
+  onMovePhoto: (item: InventoryItem, photoId: string, direction: -1 | 1) => void;
+  onDeletePhoto: (item: InventoryItem, photoId: string) => void;
+  onCopyListingCopy: (item: InventoryItem, channel: Channel) => void;
+}) {
+  const isSold = item.status === "SOLD";
+  const hasOpenListing = item.listings.some((listing) => listing.state === "DRAFT" || listing.state === "ACTIVE");
+
+  return (
+    <section className="sell-sheet row-action-sheet" role="dialog" aria-modal="true" aria-label={`${item.card.name} actions`}>
+      <div className="sheet-drag-handle" aria-hidden="true" />
+      <div className="panel-heading">
+        <div>
+          <h2>More actions</h2>
+          <span className="muted">
+            {item.card.name} · {item.grade.replace(/_/g, " ")} · qty {item.quantity}
+          </span>
+        </div>
+        <button className="ghost-button" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <InventoryPhotoTools
+        item={item}
+        busy={busy}
+        onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
+        onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
+        onCatalogArt={(target) => onCatalogArt(target as InventoryItem)}
+        onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
+        onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
+      />
+      <div className="row-action-sheet-list">
+        {!isSold && (
+          <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
+            <span>Comp this card</span>
+            <small>Recheck live comps and repricing</small>
+          </button>
+        )}
+        {!isSold && (
+          <button type="button" onClick={() => onCopyListingCopy(item, "EBAY")}>
+            <span>Copy eBay listing text</span>
+            <small>Title, price and description pack</small>
+          </button>
+        )}
+        {!isSold && (
+          <button type="button" onClick={() => onCopyListingCopy(item, "CARDMARKET")}>
+            <span>Copy Cardmarket text</span>
+            <small>Manual listing handoff</small>
+          </button>
+        )}
+        {!isSold && (
+          <button type="button" onClick={() => onCopyListingCopy(item, "VINTED")}>
+            <span>Copy Vinted text</span>
+            <small>Manual listing handoff</small>
+          </button>
+        )}
+        {!isSold && (
+          <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
+            <span>Edit stock details</span>
+            <small>Cost, condition, location and status</small>
+          </button>
+        )}
+        {!isSold && (
+          <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
+            <span>Record sale</span>
+            <small>Book profit and close stock</small>
+          </button>
+        )}
+        {item.status === "IN_STOCK" && (
+          <button
+            type="button"
+            onClick={() => onList(item)}
+            disabled={busy === `status-${item.id}` || busy?.startsWith("listing-") || busy?.startsWith("create-listing-")}
+          >
+            <span>{hasOpenListing ? "Open listing workflow" : "Draft listing"}</span>
+            <small>{hasOpenListing ? "Continue the existing listing" : "Create a fresh listing draft"}</small>
+          </button>
+        )}
+        {item.status !== "RESERVED" && !isSold && (
+          <button type="button" onClick={() => onStatus(item, "RESERVED")} disabled={busy === `status-${item.id}`}>
+            <span>Put on hold</span>
+            <small>Keep it out of the sell queue</small>
+          </button>
+        )}
+        <button className="danger-button" type="button" onClick={() => onDelete(item)} disabled={busy === `delete-${item.id}`}>
+          <span>Delete stock row</span>
+          <small>Removes this item, drafts and linked records</small>
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -9470,6 +9671,14 @@ function buildLocalCheckedCompResult(entries: CheckedCompEntry[], card: CompResu
 
 function upsertCompResult(results: CompResult[], next: CompResult): CompResult[] {
   return [next, ...results.filter((result) => result.source !== next.source)];
+}
+
+function isUsefulCompPayload(value: unknown): value is Reconciled {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as Partial<Reconciled>;
+  if (payload.headline) return true;
+  if (payload.catalog) return true;
+  return Array.isArray(payload.all) && payload.all.some((result) => result.sampleSize > 0 && result.medianPence > 0);
 }
 
 function isCheckedCompEntry(value: unknown): value is CheckedCompEntry {

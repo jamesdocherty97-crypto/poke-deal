@@ -4,6 +4,7 @@
 
 html {
   min-height: 100%;
+  scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom));
   background:
     linear-gradient(135deg, rgba(42, 117, 187, 0.18), transparent 34%),
     linear-gradient(225deg, rgba(239, 51, 64, 0.16), transparent 42%),
@@ -22,6 +23,15 @@ body {
   color: var(--ink);
   font-family: ui-rounded, "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-variant-numeric: tabular-nums;
+}
+
+input,
+select,
+textarea,
+button,
+a,
+summary {
+  scroll-margin-bottom: calc(220px + env(safe-area-inset-bottom));
 }
 
 body::before {
@@ -278,7 +288,8 @@ label {
 
 .topbar h1 {
   max-width: min(240px, 44vw);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: keep-all;
   font-size: 28px;
   line-height: 1.04;
 }
@@ -433,6 +444,7 @@ label {
   content: "";
   border: 20px solid rgba(255, 255, 255, 0.16);
   border-radius: 50%;
+  pointer-events: none;
 }
 
 .hero-copy {
@@ -459,6 +471,7 @@ label {
   display: grid;
   place-items: center;
   align-self: stretch;
+  pointer-events: none;
 }
 
 .hero-card-art img {

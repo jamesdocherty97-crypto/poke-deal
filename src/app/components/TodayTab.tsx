@@ -14,6 +14,12 @@ type TodaySystemSource = {
   status: "ready" | "public" | "fixture" | "missing" | "building" | "problem" | "info";
   required: boolean;
   setupHint?: string;
+  deepCheck?: {
+    status: "ok" | "fail" | "skipped";
+    latencyMs: number;
+    detail: string;
+    checkedAt: string;
+  };
 };
 
 type TodayDashboard = {
@@ -97,6 +103,7 @@ export function TodayTab({
   onTakePortfolioSnapshot,
   onCheckWatches,
   onCheckReprices,
+  onDeepCheck,
   appAlerts,
   appAlertUnreadCount,
   onMarkAlertsRead,
@@ -133,6 +140,7 @@ export function TodayTab({
   onTakePortfolioSnapshot: () => void;
   onCheckWatches: () => void;
   onCheckReprices: () => void;
+  onDeepCheck: () => void;
   appAlerts: TodayAppAlert[];
   appAlertUnreadCount: number;
   onMarkAlertsRead: () => void;
@@ -286,18 +294,23 @@ export function TodayTab({
             <h2>Setup</h2>
             <span className="muted">{systemStatus?.summary.livePrimaryComps ? "live comps" : "fixture comps"}</span>
           </div>
+          <button className="ghost-button" type="button" onClick={onDeepCheck} disabled={busy === "deep-health"}>
+            {busy === "deep-health" ? "Checking..." : "Deep check"}
+          </button>
+        </div>
+        <div className="setup-action-row">
           <span className={`pill ${systemStatus?.summary.secondaryCrossCheck ? "good" : "warn"}`}>
             {systemStatus?.summary.secondaryCrossCheck ? "cross-check" : "single source"}
           </span>
+          <button
+            className="ghost-button setup-backup-button"
+            type="button"
+            onClick={onDownloadBackup}
+            disabled={busy === "backup"}
+          >
+            {busy === "backup" ? "Preparing..." : "Backup"}
+          </button>
         </div>
-        <button
-          className="ghost-button setup-backup-button"
-          type="button"
-          onClick={onDownloadBackup}
-          disabled={busy === "backup"}
-        >
-          {busy === "backup" ? "Preparing..." : "Download backup"}
-        </button>
         <div className="source-health-list">
           {setupSources.map((source) => (
             <SourceHealthRow key={source.id} source={source} />
@@ -450,14 +463,20 @@ function TodayActionButton({
 }
 
 function SourceHealthRow({ source }: { source: TodaySystemSource }) {
+  const deepCheck = source.deepCheck;
   return (
-    <div className={`source-health-row ${sourceStatusTone(source.status)}`}>
+    <div className={`source-health-row ${deepCheck ? deepStatusTone(deepCheck.status) : sourceStatusTone(source.status)}`}>
       <div>
         <strong>{source.label}</strong>
         <span>{source.role}</span>
+        {deepCheck && (
+          <small>
+            Last deep check {ageLabel(deepCheck.checkedAt)} · {deepCheck.latencyMs}ms · {deepCheck.detail}
+          </small>
+        )}
         {source.setupHint && <small>{source.setupHint}</small>}
       </div>
-      <span>{sourceStatusLabel(source.status)}</span>
+      <span>{deepCheck ? deepStatusLabel(deepCheck.status) : sourceStatusLabel(source.status)}</span>
     </div>
   );
 }
@@ -589,6 +608,18 @@ function sourceStatusTone(status: TodaySystemSource["status"]): string {
   if (status === "public" || status === "info") return "info";
   if (status === "fixture") return "warn";
   if (status === "problem") return "danger";
+  return "danger";
+}
+
+function deepStatusLabel(status: NonNullable<TodaySystemSource["deepCheck"]>["status"]): string {
+  if (status === "ok") return "ok";
+  if (status === "skipped") return "skip";
+  return "fail";
+}
+
+function deepStatusTone(status: NonNullable<TodaySystemSource["deepCheck"]>["status"]): string {
+  if (status === "ok") return "good";
+  if (status === "skipped") return "info";
   return "danger";
 }
 

@@ -211,6 +211,37 @@ test("parseQuickIntake parses full art, set aliases, and bridge words", () => {
   });
 });
 
+test("parseQuickIntake removes resolved set-alias residue from the card name", () => {
+  assert.deepEqual(parseQuickIntake("Pikachu, Crown Zenith Galarian Gallery, GG30/GG70, PSA 9"), {
+    name: "Pikachu",
+    setName: "Crown Zenith Galarian Gallery",
+    number: "GG30/GG70",
+    grade: "PSA_9",
+  });
+
+  assert.deepEqual(parseQuickIntake("Snivy, Scarlet and Violet 151, 6/165 raw"), {
+    name: "Snivy",
+    setName: "151",
+    number: "6/165",
+    grade: "RAW",
+  });
+
+  assert.deepEqual(parseQuickIntake("Umbreon Prismatic Evolutions PSA 9"), {
+    name: "Umbreon",
+    setName: "Prismatic Evolutions",
+    grade: "PSA_9",
+  });
+});
+
+test("parseQuickIntake recovers a dropped leading P from PSA grade input", () => {
+  assert.deepEqual(parseQuickIntake("Pikachu, Crown Zenith Galarian Gallery, GG30/GG70, SA 9"), {
+    name: "Pikachu",
+    setName: "Crown Zenith Galarian Gallery",
+    number: "GG30/GG70",
+    grade: "PSA_9",
+  });
+});
+
 test("parseQuickIntake captures fair-flow source, location and condition", () => {
   assert.deepEqual(parseQuickIntake("Gengar lor tg TG06 raw £10 LP vinted binder"), {
     name: "Gengar",

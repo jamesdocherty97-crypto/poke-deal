@@ -314,6 +314,8 @@ label,
 .next-move-main > *,
 .next-action-strip > *,
 .row-actions > *,
+.row-primary-actions > *,
+.row-action-sheet-list > *,
 .listing-pack-actions > *,
 .listing-pack-ebay-actions > *,
 .comp-hero > *,
@@ -1731,8 +1733,19 @@ label,
   gap: 8px;
 }
 
+.setup-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.setup-action-row .pill {
+  width: fit-content;
+}
+
 .setup-backup-button {
-  width: 100%;
+  min-width: 86px;
 }
 
 .next-move-card {
@@ -3120,6 +3133,11 @@ label,
 .danger-text,
 .danger-button {
   color: var(--danger);
+}
+
+.ebay-reconnect-callout a {
+  color: #fff4b0;
+  font-weight: 950;
 }
 
 .deal-banner {
@@ -5149,6 +5167,32 @@ label,
   gap: 6px;
 }
 
+.row-primary-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.row-primary-actions button {
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 9px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.row-primary-actions button:first-child {
+  border-color: rgba(105, 232, 255, 0.36);
+  background: rgba(105, 232, 255, 0.1);
+  color: #c9f6ff;
+}
+
+.row-primary-actions button:last-child {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
 .row-more-actions {
   display: grid;
   gap: 7px;
@@ -5262,6 +5306,55 @@ label,
   padding: 8px 11px;
   font-size: 12px;
   font-weight: 900;
+}
+
+.row-action-sheet {
+  gap: 12px;
+}
+
+.sheet-drag-handle {
+  width: 42px;
+  height: 5px;
+  justify-self: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.row-action-sheet-list {
+  display: grid;
+  gap: 7px;
+}
+
+.row-action-sheet-list button {
+  display: grid;
+  min-height: 54px;
+  align-content: center;
+  justify-items: start;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.row-action-sheet-list button span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.row-action-sheet-list button small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.row-action-sheet-list .danger-button {
+  margin-top: 4px;
+  border-color: rgba(251, 113, 133, 0.48);
+}
+
+.row-action-sheet-list .danger-button span {
+  color: #ffd6dc;
 }
 
 .row-file-action {
@@ -5730,6 +5823,24 @@ label,
   overscroll-behavior: contain;
   transform-origin: bottom center;
   animation: sheetIn var(--motion-sheet) both;
+  padding-top: 22px;
+}
+
+.sell-sheet::after,
+.confirm-sheet::before {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: var(--z-nav);
+  display: block;
+  width: 44px;
+  height: 4px;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(220, 226, 240, 0.42);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .listing-pack-sheet {
@@ -6031,25 +6142,25 @@ label,
 
 .listing-flow-step {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(0, 1fr);
   align-items: start;
   gap: 8px;
   min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--r-md);
-  background: rgba(3, 8, 20, 0.3);
-  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--r-sm);
+  background: rgba(3, 8, 20, 0.18);
+  padding: 8px 9px;
 }
 
 .listing-flow-step > span {
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   place-items: center;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 1000;
 }
 
@@ -6063,6 +6174,19 @@ label,
   color: var(--ink);
   font-size: 12px;
   line-height: 1.12;
+}
+
+.listing-flow-step em {
+  width: max-content;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 2px 6px;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 1000;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .listing-flow-step small {
@@ -6081,6 +6205,11 @@ label,
   color: var(--green);
 }
 
+.listing-flow-step.done em {
+  border-color: rgba(52, 211, 153, 0.32);
+  color: var(--green);
+}
+
 .listing-flow-step.current {
   border-color: rgba(255, 203, 5, 0.38);
   background:
@@ -6093,12 +6222,22 @@ label,
   color: var(--yellow);
 }
 
+.listing-flow-step.current em {
+  border-color: rgba(255, 203, 5, 0.38);
+  color: var(--yellow);
+}
+
 .listing-flow-step.blocked {
   border-color: rgba(251, 113, 133, 0.34);
 }
 
 .listing-flow-step.blocked > span {
   background: rgba(251, 113, 133, 0.16);
+  color: var(--danger);
+}
+
+.listing-flow-step.blocked em {
+  border-color: rgba(251, 113, 133, 0.34);
   color: var(--danger);
 }
 
@@ -6781,7 +6920,7 @@ label,
   border: 1px solid rgba(251, 113, 133, 0.34);
   border-radius: var(--r-lg) var(--r-lg) 0 0;
   background: rgba(13, 20, 36, 0.985);
-  padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+  padding: 22px var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
   box-shadow: var(--shadow-2), 0 0 0 100vmax rgba(0, 0, 0, 0.48);
   overscroll-behavior: contain;
   transform-origin: bottom center;
@@ -6923,7 +7062,7 @@ label,
   right: 10px;
   bottom: max(10px, env(safe-area-inset-bottom));
   left: 10px;
-  z-index: var(--z-nav);
+  z-index: var(--z-overlay);
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;

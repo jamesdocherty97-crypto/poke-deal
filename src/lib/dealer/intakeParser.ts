@@ -161,11 +161,15 @@ export function parseQuickIntake(input: string): ParsedQuickIntake {
     const trimmedRight = setMatch.end < tokens.length && isDetachedSetSuffixToken(tokens[setMatch.end] ?? "", setMatch.setName)
       ? setMatch.end + 1
       : setMatch.end;
-    working = [...tokens.slice(0, trimmedLeft), ...tokens.slice(trimmedRight)].join(" ");
+    working = removeResidualSetAliasTokens(
+      [...tokens.slice(0, trimmedLeft), ...tokens.slice(trimmedRight)].join(" "),
+      parsed.setName,
+    );
   } else if (parsed.number) {
     const inferredSetName = inferSetNameFromCollectorNumber(parsed.number);
     if (inferredSetName) {
       parsed.setName = inferredSetName;
+      working = removeResidualSetAliasTokens(working, parsed.setName);
     }
   }
 
@@ -289,6 +293,13 @@ function extractGrade(input: string): { value: ParsedQuickIntakeGrade; match: st
     const numeric = slab[2].replace(",", ".").replace(".", "_");
     const grade = `${company}_${numeric}` as ParsedQuickIntakeGrade;
     if (SUPPORTED_QUICK_GRADES.has(grade)) return { value: grade, match: slab[0] };
+  }
+
+  const droppedPsaPrefix = input.match(/\bSA\s*(10|9[.,]5|9|[1-8][.,]5|[1-8])\b/i);
+  if (droppedPsaPrefix?.[0] && droppedPsaPrefix[1]) {
+    const numeric = droppedPsaPrefix[1].replace(",", ".").replace(".", "_");
+    const grade = `PSA_${numeric}` as ParsedQuickIntakeGrade;
+    if (SUPPORTED_QUICK_GRADES.has(grade)) return { value: grade, match: droppedPsaPrefix[0] };
   }
 
   const raw = input.match(/\b(?:raw|ungraded|nm|near mint)\b/i);
@@ -460,6 +471,26 @@ function cleanupName(input: string): string {
       .replace(/\b1st\s+ed(?:ition)?\b/gi, "1st Edition"),
   );
   return cleaned.replace(/^1st Edition\s+(.+)$/i, "$1 1st Edition");
+}
+
+function removeResidualSetAliasTokens(input: string, setName: string): string {
+  let next = input;
+  const normalized = normalizeSearchText(setName);
+  const aliases =
+    normalized === "crown zenith galarian gallery"
+      ? ["crown zenith", "galarian gallery", "cz gg"]
+      : normalized === "prismatic evolutions"
+        ? ["prismatic", "evolutions", "prismatic evolutions"]
+        : normalized === "151"
+          ? ["scarlet and violet", "scarlet & violet", "sv 151"]
+          : normalized === "evolutions"
+            ? ["xy", "evolutions", "xy evolutions"]
+            : [setName];
+
+  for (const alias of aliases.sort((a, b) => b.length - a.length)) {
+    next = removePhrase(next, alias);
+  }
+  return normalizeSpacing(next);
 }
 
 function normalizeSpacing(input: string): string {

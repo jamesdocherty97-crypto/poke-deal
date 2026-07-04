@@ -280,6 +280,38 @@ test("CompService records a timed-out source while using remaining priced source
   assert.match(result.unavailableSources?.[0]?.reason ?? "", /timed out/);
 });
 
+test("CompService keeps unavailable reasons visible for every comp source family", async () => {
+  const unavailableNames = [
+    "pokemon-price-tracker",
+    "ebay-marketplace-insights",
+    "poketrace",
+    "pokemon-tcg-market",
+    "checked-comps",
+  ];
+  const failingSources: CompSource[] = unavailableNames.map((name) => ({
+    name,
+    live: true,
+    lookup: async () => {
+      throw new Error(`${name} provider down`);
+    },
+  }));
+  const ownedSales: CompSource = {
+    name: "owned-sales",
+    live: true,
+    lookup: async () => comp({ source: "owned-sales", medianPence: 1800, sampleSize: 2 }),
+  };
+  const service = new CompService([...failingSources, ownedSales], 25);
+
+  const result = await service.lookup({ name: "Victini", setName: "Scarlet & Violet Promos", number: "SVP 208" }, { grade: "RAW", windowDays: 30 });
+
+  assert.equal(result.all.some((candidate) => candidate.source === "owned-sales" && candidate.medianPence === 1800), true);
+  assert.deepEqual(result.unavailableSources?.map((source) => source.name).sort(), unavailableNames.sort());
+  for (const source of result.unavailableSources ?? []) {
+    assert.match(source.reason, /failed|provider down/);
+  }
+  assert.equal(result.all.length, unavailableNames.length + 1);
+});
+
 test("CompService serves a warm cached comp when every source fails", async () => {
   const failingSource: CompSource = {
     name: "failing-source",
