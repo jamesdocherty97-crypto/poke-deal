@@ -4,7 +4,7 @@
 
 import type { EbayConfig } from "./config.js";
 
-export const EBAY_RECONNECT_HINT = "Reconnect eBay to grant new permissions - /api/ebay/connect";
+export const EBAY_RECONNECT_HINT = "Reconnect eBay to grant new permissions — /api/ebay/connect";
 
 export const EBAY_USER_SCOPES = [
   "https://api.ebay.com/oauth/api_scope",

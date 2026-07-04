@@ -1,4 +1,4 @@
-# eBay OAuth Scope Audit - 2026-07-04
+# eBay OAuth Scope Audit — 2026-07-04
 
 ## Result
 

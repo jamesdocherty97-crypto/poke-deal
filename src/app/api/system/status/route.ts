@@ -89,7 +89,7 @@ export async function GET() {
       required: false,
       setupHint: ebayMi.live
         ? "Programmatic UK eBay sold comps are enabled. If lookups still return authorization errors, eBay has not granted the restricted MI access yet."
-        : "Awaiting eBay approval - program currently closed to new applicants; support ticket pending. Code is ready; enable EBAY_MARKETPLACE_INSIGHTS_ENABLED=true on approval.",
+        : "Awaiting eBay approval — program currently closed to new applicants; support ticket pending. Code is ready; enable EBAY_MARKETPLACE_INSIGHTS_ENABLED=true on approval.",
     },
     {
       id: "psa-public-api",

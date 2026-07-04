@@ -1791,7 +1791,7 @@ export default function Home() {
           : ebayStatus?.connected
             ? "Seller account is connected; finish business policies before offer creation."
             : ebayNeedsReconnect
-              ? "Reconnect eBay to grant new permissions - /api/ebay/connect"
+              ? "Reconnect eBay to grant new permissions — /api/ebay/connect"
             : ebayStatus?.configured
               ? "Seller credentials are present; connect the eBay account to create offers."
               : "Add production eBay credentials when you are ready to automate listing offers.",
