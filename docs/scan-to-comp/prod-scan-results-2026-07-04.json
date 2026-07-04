@@ -1,0 +1,95 @@
+{
+  "checkedAt": "2026-07-04T22:31:20.314Z",
+  "baseUrl": "https://poke-deal.vercel.app",
+  "results": [
+    {
+      "id": "raw-charizard-base1-4",
+      "label": "Raw card: Charizard Base Set 4/102",
+      "sourceUrl": "https://images.pokemontcg.io/base1/4_hires.png",
+      "mimeType": "image/png",
+      "sourceStatus": 200,
+      "imageBytes": 844907,
+      "imageFetchMs": 156,
+      "scanStatus": 200,
+      "scanOk": true,
+      "scanMs": 6982,
+      "response": {
+        "identity": {
+          "name": "Charizard",
+          "setName": null,
+          "setCode": null,
+          "number": "4/102",
+          "language": "English",
+          "isSlab": false,
+          "grader": null,
+          "grade": null,
+          "certNumber": null,
+          "stamps": [
+            "1st Edition"
+          ],
+          "readable": true,
+          "notes": ""
+        },
+        "model": "gemini-flash-latest"
+      }
+    },
+    {
+      "id": "raw-victini-svp-208",
+      "label": "Raw card: Victini SVP 208",
+      "sourceUrl": "https://images.pokemontcg.io/svp/208_hires.png",
+      "mimeType": "image/png",
+      "sourceStatus": 404,
+      "imageBytes": 186316,
+      "imageFetchMs": 172,
+      "scanStatus": 200,
+      "scanOk": true,
+      "scanMs": 3239,
+      "response": {
+        "identity": {
+          "name": null,
+          "setName": null,
+          "setCode": null,
+          "number": null,
+          "language": "English",
+          "isSlab": false,
+          "grader": null,
+          "grade": null,
+          "certNumber": null,
+          "stamps": [],
+          "readable": false,
+          "notes": "The image shows only the back of a standard Pokémon card, so specific card details like name, set, and number cannot be read."
+        },
+        "model": "gemini-flash-latest"
+      }
+    },
+    {
+      "id": "slab-psa-87295457-charizard-ex",
+      "label": "Slab: PSA 87295457 Charizard ex Obsidian Flames #215 MINT 9",
+      "sourceUrl": "https://d1htnxwo4o0jhw.cloudfront.net/cert/153987355/small/qlMWbO94U0iNUUkKNxdekg.jpg",
+      "mimeType": "image/jpeg",
+      "sourceStatus": 200,
+      "imageBytes": 70679,
+      "imageFetchMs": 1513,
+      "scanStatus": 200,
+      "scanOk": true,
+      "scanMs": 7142,
+      "response": {
+        "identity": {
+          "name": "Charizard ex",
+          "setName": null,
+          "setCode": "OBF",
+          "number": "215/197",
+          "language": "English",
+          "isSlab": true,
+          "grader": "PSA",
+          "grade": "9",
+          "certNumber": "87295457",
+          "stamps": [],
+          "readable": true,
+          "notes": ""
+        },
+        "model": "gemini-flash-latest"
+      }
+    }
+  ]
+}
