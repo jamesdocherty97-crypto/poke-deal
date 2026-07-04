@@ -61,6 +61,11 @@ button {
   cursor: pointer;
 }
 
+button:active:not(:disabled),
+a:active {
+  transform: translateY(1px) scale(0.99);
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
@@ -84,6 +89,17 @@ select:focus,
 textarea:focus {
   border-color: var(--yellow);
   box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.16);
+}
+
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(105, 232, 255, 0.95);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(105, 232, 255, 0.14);
 }
 
 textarea {
@@ -257,11 +273,11 @@ label {
 
 .topbar-secondary {
   position: relative;
-  min-height: 38px;
+  min-height: 44px;
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
-  padding: 7px 10px;
+  padding: 9px 10px;
   font-size: 12px;
   font-weight: 950;
 }
@@ -302,6 +318,7 @@ label {
   display: grid;
   width: 44px;
   min-width: 44px;
+  min-height: 44px;
   place-items: center;
   border-color: rgba(255, 203, 5, 0.36);
   background: rgba(255, 203, 5, 0.12);
