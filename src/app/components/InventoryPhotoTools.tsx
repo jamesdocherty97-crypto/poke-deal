@@ -124,7 +124,6 @@ export function InventoryPhotoTools({
             <input
               type="file"
               accept="image/*"
-              capture="environment"
               multiple
               disabled={isBusy}
               onChange={(event) => {

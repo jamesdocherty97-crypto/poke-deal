@@ -8909,7 +8909,6 @@ function InventoryRow({
                 <input
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   multiple
                   disabled={busy === `photo-${item.id}`}
                   onChange={(event) => {

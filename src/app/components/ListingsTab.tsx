@@ -729,7 +729,6 @@ function ListingRow({
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     multiple
                     disabled={busy === `photo-${listing.item.id}`}
                     onChange={(event) => {
