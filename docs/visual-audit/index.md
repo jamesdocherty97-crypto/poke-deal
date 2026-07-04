@@ -13,6 +13,7 @@ All galleries were captured at 390x844 with deviceScaleFactor 3 unless a focused
 | V4 - screen sweep | `c0b4565` | `docs/visual-audit/v4/report.md` | `docs/visual-audit/v4/before/` | `docs/visual-audit/v4/after/` | confident, manual-check and ambiguous decision bars |
 | V5 - motion and feel | `b5005cf` | `docs/visual-audit/v5/report.md` | `docs/visual-audit/v5/before/` | `docs/visual-audit/v5/after/` | tab-switch skeleton proof |
 | V6 - verify and ship | final V6 commit | `docs/visual-audit/v6/report.md` | `docs/visual-audit/v6/before/` | `docs/visual-audit/v6/after/` | actual-Pokemon empty-state proof |
+| Art V2 - recognizable Pokemon pass | pending | `docs/visual-audit/art-v2/report.md` | `docs/visual-audit/art-v2/before/` | `docs/visual-audit/art-v2/after/` | all-art focused proof |
 
 ## Final Evidence Highlights
 
