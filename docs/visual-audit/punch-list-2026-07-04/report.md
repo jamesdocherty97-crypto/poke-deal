@@ -44,9 +44,9 @@ Extra proof: `after-chromium-390x844-manual-checked-comp-retained.jpg` proves th
 
 ## Health And Drift
 
-- Deep source health: `docs/HEALTH_CHECK_2026-07-04.md`.
-- Production comp drift: `docs/COMPS_DRIFT_2026-07-04.md`.
-- Cron health: `docs/CRON_HEALTH_2026-07-04.md`.
+- Deep source health: production check passed for Price Tracker, PokeTrace, Pokemon TCG API, FX, eBay Browse, eBay Sell, Neon DB and Blob. PSA cert lookup returned PSA HTTP 429 during this run; eBay Marketplace Insights is intentionally skipped until approval. See `docs/HEALTH_CHECK_2026-07-04.md` when present and the latest terminal run.
+- Production comp drift: `docs/COMPS_DRIFT_2026-07-04.md`. Several rows drift because live PokeTrace signals now headline; `umbreon-evolving-skies-raw-ambiguous.json` still needs human review because production matched Umbreon V 94/203 instead of the pinned 188/203 candidate.
+- Cron health: `docs/CRON_HEALTH_2026-07-04.md`. Daily snapshot, buy-watch and weekly reprice are healthy; daily eBay sales sync is failing with eBay fulfillment permission error and is landing in the automation inbox.
 
 ## Remaining External Blockers
 

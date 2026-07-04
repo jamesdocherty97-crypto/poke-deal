@@ -14,6 +14,7 @@ coverage/
 .vercel
 APP_LOGIN_PASSWORD.txt
 output/backups/
+output/playwright/
 .playwright-cli/
 
 # sandbox-only artifacts

@@ -923,8 +923,16 @@ label,
   grid-template-columns: minmax(0, 1fr) 72px;
 }
 
+.quick-intake-actions.has-scan {
+  grid-template-columns: minmax(0, 1fr) 64px 72px;
+}
+
 .quick-intake-actions.has-next {
   grid-template-columns: minmax(0, 1fr) 72px 64px;
+}
+
+.quick-intake-actions.has-scan.has-next {
+  grid-template-columns: minmax(0, 1fr) 64px 72px 64px;
 }
 
 .quick-intake-row button {
@@ -967,6 +975,12 @@ label,
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.08);
   color: var(--muted);
+}
+
+.quick-intake-actions .scan-card-button {
+  border-color: rgba(85, 214, 190, 0.45);
+  background: rgba(85, 214, 190, 0.14);
+  color: #c7fff4;
 }
 
 .suggestion-listbox {
@@ -5826,6 +5840,256 @@ label,
   padding-top: 22px;
 }
 
+.scan-sheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 400;
+  display: grid;
+  width: min(720px, calc(100% - var(--space-5)));
+  max-height: 88dvh;
+  gap: 12px;
+  overflow-y: auto;
+  margin: 0 auto;
+  padding: 18px 14px max(96px, calc(16px + env(safe-area-inset-bottom)));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--surface-floating);
+  box-shadow: var(--elevation-floating), 0 0 0 100vmax rgba(0, 0, 0, 0.52);
+  overscroll-behavior: contain;
+  animation: sheetIn var(--motion-sheet) both;
+}
+
+.scan-sheet-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.scan-sheet-heading div,
+.scan-confirm-card,
+.scan-manual-card {
+  display: grid;
+  gap: 3px;
+}
+
+.scan-sheet-heading span,
+.scan-confirm-card span {
+  color: var(--yellow);
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.scan-sheet-heading strong,
+.scan-confirm-card strong,
+.scan-manual-card strong {
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.scan-sheet-heading small,
+.scan-confirm-card small,
+.scan-manual-card small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scan-preview-frame {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  min-height: 300px;
+  aspect-ratio: 3 / 4;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-md);
+  background: #050915;
+}
+
+.scan-preview-frame video,
+.scan-preview-frame > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scan-reading-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  background: rgba(5, 9, 21, 0.58);
+  color: var(--ink);
+  text-align: center;
+}
+
+.scan-pokeball {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border: 4px solid #111827;
+  border-radius: 50%;
+  background:
+    linear-gradient(#ef4444 0 48%, #111827 48% 55%, #f8fafc 55% 100%);
+  animation: scanWobble 0.82s ease-in-out infinite;
+}
+
+.scan-pokeball::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  border: 4px solid #111827;
+  border-radius: 50%;
+  background: #f8fafc;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.scan-identity-chips,
+.scan-warning-list,
+.scan-sheet-actions,
+.scan-candidate-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.scan-identity-chips {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scan-identity-chips span {
+  overflow: hidden;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-warning-list p {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 203, 5, 0.32);
+  border-radius: var(--r-sm);
+  background: rgba(255, 203, 5, 0.1);
+  color: #fff4b0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scan-reference-photo {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+}
+
+.scan-candidate-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scan-candidate-grid button {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-height: 74px;
+  padding: 8px;
+  text-align: left;
+}
+
+.scan-candidate-art {
+  width: 52px;
+  height: 72px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+}
+
+.scan-candidate-grid span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.scan-candidate-grid strong,
+.scan-candidate-grid small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-candidate-grid strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.scan-candidate-grid small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.scan-confirm-card,
+.scan-manual-card {
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.scan-confirm-card button {
+  margin-top: 6px;
+}
+
+.scan-sheet-actions {
+  grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+}
+
+.scan-shutter-button {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  border-radius: 50%;
+  border-color: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.scan-shutter-button span {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #f8fafc;
+  box-shadow: inset 0 0 0 4px rgba(5, 9, 21, 0.18);
+}
+
+.scan-next-action {
+  grid-column: 1 / -1;
+  min-height: 56px;
+}
+
+.visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .sell-sheet::after,
 .confirm-sheet::before {
   position: absolute;
@@ -5841,6 +6105,15 @@ label,
   content: "";
   pointer-events: none;
   transform: translateX(-50%);
+}
+
+@keyframes scanWobble {
+  0%, 100% {
+    transform: rotate(-7deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
 }
 
 .listing-pack-sheet {

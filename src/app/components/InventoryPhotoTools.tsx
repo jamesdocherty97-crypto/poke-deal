@@ -8,7 +8,7 @@ type CardPhoto = {
   id: string;
   url: string;
   role?: "FRONT" | "BACK" | "SLAB" | "EXTRA";
-  origin?: "REAL" | "CATALOG";
+  origin?: "REAL" | "SCAN" | "CATALOG";
 };
 
 type PhotoItem = {
@@ -48,6 +48,7 @@ export function InventoryPhotoStrip({
           <span>
             {index === 0 ? "Primary" : photo.role?.toLowerCase() ?? `#${index + 1}`}
             {photo.origin === "CATALOG" ? " · stock" : ""}
+            {photo.origin === "SCAN" ? " · scan" : ""}
           </span>
           {controls && (
             <div className="inventory-photo-actions" aria-label={`Photo ${index + 1} actions`}>

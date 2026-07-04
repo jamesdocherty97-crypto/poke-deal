@@ -49,9 +49,23 @@ body::before {
 }
 
 body:has(.sell-sheet),
+body:has(.scan-sheet),
 body:has(.confirm-sheet),
 body:has(.ebay-publish-overlay) {
   overflow: hidden;
+}
+
+body:has(.sell-sheet) .bottom-nav,
+body:has(.scan-sheet) .bottom-nav,
+body:has(.confirm-sheet) .bottom-nav,
+body:has(.ebay-publish-overlay) .bottom-nav,
+body:has(.sell-sheet) .mobile-buy-action,
+body:has(.scan-sheet) .mobile-buy-action,
+body:has(.confirm-sheet) .mobile-buy-action,
+body:has(.ebay-publish-overlay) .mobile-buy-action {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(18px);
 }
 
 .app-shell:not(:has(.workspace)):not(:has(.today-workspace))::after {

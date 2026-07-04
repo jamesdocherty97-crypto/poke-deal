@@ -21,10 +21,11 @@ test("real photos are always ordered before catalog art", () => {
   const ordered = orderListingPhotos([
     { id: "catalog-1", url: "https://img.test/catalog.png", origin: "CATALOG", order: 0 },
     { id: "real-1", url: "https://img.test/front.jpg", origin: "REAL", order: 1 },
+    { id: "scan-1", url: "https://img.test/scan.jpg", origin: "SCAN", order: 2 },
     { id: "catalog-2", url: "https://img.test/catalog-large.png", origin: "CATALOG", order: 2 },
   ]);
 
-  assert.deepEqual(ordered.map((photo) => photo.id), ["real-1", "catalog-1", "catalog-2"]);
+  assert.deepEqual(ordered.map((photo) => photo.id), ["real-1", "scan-1", "catalog-1", "catalog-2"]);
 });
 
 test("catalog-only photos satisfy eBay only for raw stock below the threshold", () => {
@@ -51,6 +52,11 @@ test("photo origin flag distinguishes stock images from real photos", () => {
     grade: "RAW",
     pricePence: 5000,
   });
+  const scanPhoto = summarizeListingPhotos({
+    photos: [{ id: "scan-1", url: "https://img.test/scan.jpg", origin: "SCAN" }],
+    grade: "PSA_10",
+    pricePence: 100000,
+  });
 
   assert.equal(catalogOnly.hasCatalogPhoto, true);
   assert.equal(catalogOnly.hasRealPhoto, false);
@@ -58,6 +64,10 @@ test("photo origin flag distinguishes stock images from real photos", () => {
   assert.equal(realPhoto.hasCatalogPhoto, false);
   assert.equal(realPhoto.hasRealPhoto, true);
   assert.equal(realPhoto.catalogOnly, false);
+  assert.equal(scanPhoto.hasCatalogPhoto, false);
+  assert.equal(scanPhoto.hasRealPhoto, true);
+  assert.equal(scanPhoto.catalogOnly, false);
+  assert.equal(scanPhoto.satisfiesEbayPhotoRequirement, true);
 });
 
 test("catalog-only photos do not satisfy eBay at or above the threshold", () => {

@@ -35,7 +35,7 @@ type PublishListing = {
       rarity: string | null;
       language: string;
     };
-    photos: Array<{ url: string; origin?: "REAL" | "CATALOG" | null; order?: number | null; createdAt?: Date | string | null }>;
+    photos: Array<{ url: string; origin?: "REAL" | "SCAN" | "CATALOG" | null; order?: number | null; createdAt?: Date | string | null }>;
   };
 };
 

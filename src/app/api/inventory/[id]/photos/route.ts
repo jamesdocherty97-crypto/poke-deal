@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const photoRoleSchema = z.enum(["FRONT", "BACK", "SLAB", "EXTRA"]);
-const photoOriginSchema = z.enum(["REAL", "CATALOG"]);
+const photoOriginSchema = z.enum(["REAL", "SCAN", "CATALOG"]);
 
 const photoCreateSchema = z.object({
   url: z.string().trim().url().refine((url) => url.startsWith("https://"), "Photo URL must be HTTPS."),

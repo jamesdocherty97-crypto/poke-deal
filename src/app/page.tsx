@@ -3,7 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
 import { type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
-import { compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
+import { compressPhotoForScan, compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
 import {
   orderListingPhotos,
   photoRequirementMessage,
@@ -133,6 +133,8 @@ import { buildTodayActions, type TodayActionTarget } from "@/lib/dealer/today";
 import { textMentionsFirstEdition } from "@/lib/comps/variants";
 import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@/lib/catalog/cardSearch";
 import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
+import type { ScanIdentity } from "@/lib/scan/cardScan";
+import { scanIdentityToQuery, type ScanIdentityMapping, type ScanCompQuery } from "@/lib/scan/scanIdentityMapper";
 import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
 import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
@@ -196,6 +198,23 @@ type PendingLookup = {
   number: string;
   grade: Grade;
   startedAt: number;
+};
+
+type ScanMode =
+  | "idle"
+  | "starting"
+  | "camera"
+  | "reading"
+  | "identity"
+  | "ambiguous"
+  | "confirm-slab"
+  | "manual"
+  | "stocked";
+
+type ScanPhotoPayload = {
+  blob: Blob;
+  width: number;
+  height: number;
 };
 
 type LastStockedCard = {
@@ -423,7 +442,7 @@ type CardPhoto = {
   id: string;
   url: string;
   role: "FRONT" | "BACK" | "SLAB" | "EXTRA";
-  origin: "REAL" | "CATALOG";
+  origin: "REAL" | "SCAN" | "CATALOG";
   width: number | null;
   height: number | null;
   order: number;
@@ -941,6 +960,15 @@ export default function Home() {
   const [cardSuggestionsOpen, setCardSuggestionsOpen] = useState(false);
   const [cardSuggestionsLoading, setCardSuggestionsLoading] = useState(false);
   const [pendingLookup, setPendingLookup] = useState<PendingLookup | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanMode, setScanMode] = useState<ScanMode>("idle");
+  const [scanCameraAvailable, setScanCameraAvailable] = useState(true);
+  const [scanIdentity, setScanIdentity] = useState<ScanIdentity | null>(null);
+  const [scanMapping, setScanMapping] = useState<ScanIdentityMapping | null>(null);
+  const [scanPhotoPreview, setScanPhotoPreview] = useState<string | null>(null);
+  const [scanPhotoPayload, setScanPhotoPayload] = useState<ScanPhotoPayload | null>(null);
+  const [scanModel, setScanModel] = useState<string | null>(null);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("all");
   const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
@@ -961,6 +989,11 @@ export default function Home() {
   const stockImportDetailsRef = useRef<HTMLDetailsElement | null>(null);
   const stockImportRef = useRef<HTMLFormElement | null>(null);
   const stockImportTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const scanVideoRef = useRef<HTMLVideoElement | null>(null);
+  const scanStreamRef = useRef<MediaStream | null>(null);
+  const scanFileInputRef = useRef<HTMLInputElement | null>(null);
+  const scanAttemptTimesRef = useRef<number[]>([]);
+  const scanModeRef = useRef<ScanMode>("idle");
   const expensePanelRef = useRef<HTMLElement | null>(null);
   const expenseDescriptionRef = useRef<HTMLInputElement | null>(null);
   const pnlWatchPanelRef = useRef<HTMLElement | null>(null);
@@ -978,6 +1011,23 @@ export default function Home() {
     if (!checkedCompLogOpen) return;
     window.requestAnimationFrame(() => checkedCompLogPriceRef.current?.focus());
   }, [checkedCompLogOpen]);
+
+  useEffect(() => {
+    if (!scanOpen || scanMode !== "starting") return;
+    void startScanCamera();
+  }, [scanOpen, scanMode]);
+
+  useEffect(() => {
+    return () => stopScanCamera();
+  }, []);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) stopScanCamera();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
 
   useEffect(() => {
     try {
@@ -1470,6 +1520,10 @@ export default function Home() {
   const canRunSmartComp = Boolean(quickIntake.trim() || name.trim());
   const selectedCardImage = cardArtUrl ?? catalogCard?.imageUrl ?? matchingQuickHunt?.imageUrl ?? null;
   const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
+  const scannedQuery = scanMapping && "query" in scanMapping ? scanMapping.query : null;
+  const scanWarnings = scanMapping?.warnings ?? [];
+  const scanAlternatives = scanMapping?.status === "ambiguous" ? scanMapping.alternatives : [];
+  const scanCompReady = Boolean(scanIdentity && headline && scanMode === "identity");
   const askEvidence = comp?.askEvidence ?? null;
   const spotlightImage =
     selectedCardImage ??
@@ -2448,6 +2502,313 @@ export default function Home() {
     if (shouldRefresh) void refreshAll({ toast: true, user: true });
   }
 
+  function updateScanMode(nextMode: ScanMode) {
+    scanModeRef.current = nextMode;
+    setScanMode(nextMode);
+  }
+
+  function openScanCamera() {
+    setView("acquire");
+    setScanOpen(true);
+    updateScanMode("starting");
+    setScanCameraAvailable(true);
+    setScanMessage(null);
+    setError(null);
+  }
+
+  function closeScanCamera() {
+    stopScanCamera();
+    setScanOpen(false);
+    updateScanMode("idle");
+  }
+
+  async function startScanCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScanCameraAvailable(false);
+      updateScanMode("camera");
+      setScanMessage("Camera is unavailable here. Choose a photo instead.");
+      return;
+    }
+    stopScanCamera();
+    updateScanMode("starting");
+    setScanMessage("Opening camera...");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 1600 },
+        },
+        audio: false,
+      });
+      scanStreamRef.current = stream;
+      if (scanVideoRef.current) {
+        scanVideoRef.current.srcObject = stream;
+        await scanVideoRef.current.play().catch(() => undefined);
+      }
+      setScanCameraAvailable(true);
+      if (scanModeRef.current === "starting") {
+        updateScanMode("camera");
+        setScanMessage("Line up the name, number and slab label if present.");
+      }
+    } catch {
+      setScanCameraAvailable(false);
+      if (scanModeRef.current === "starting") {
+        updateScanMode("camera");
+        setScanMessage("Camera permission was blocked. Choose a photo instead.");
+      }
+    }
+  }
+
+  function stopScanCamera() {
+    scanStreamRef.current?.getTracks().forEach((track) => track.stop());
+    scanStreamRef.current = null;
+    if (scanVideoRef.current) scanVideoRef.current.srcObject = null;
+  }
+
+  function resetScanResult(options: { keepPreview?: boolean } = {}) {
+    setScanIdentity(null);
+    setScanMapping(null);
+    setScanModel(null);
+    setScanMessage(null);
+    setScanPhotoPayload(null);
+    if (!options.keepPreview) setScanPhotoPreview(null);
+  }
+
+  function scanNext() {
+    clearCurrentComp("Ready to scan the next card.");
+    resetScanResult();
+    setScanOpen(true);
+    updateScanMode(scanStreamRef.current ? "camera" : "starting");
+  }
+
+  function finishScannedCardDecision(message: string) {
+    if (!scanIdentity && !scanPhotoPreview) return;
+    setScanPhotoPayload(null);
+    updateScanMode("stocked");
+    setScanMessage(message);
+  }
+
+  function scanQueueAllowsRequest() {
+    const now = Date.now();
+    scanAttemptTimesRef.current = scanAttemptTimesRef.current.filter((timestamp) => now - timestamp < 60_000);
+    if (scanAttemptTimesRef.current.length >= 10) return false;
+    scanAttemptTimesRef.current.push(now);
+    return true;
+  }
+
+  async function captureScanFrame() {
+    if (!scanQueueAllowsRequest()) {
+      setScanMessage("one sec...");
+      return;
+    }
+    const video = scanVideoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      scanFileInputRef.current?.click();
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setError("Camera capture failed. Choose a photo instead.");
+      return;
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
+    if (!blob) {
+      setError("Camera capture failed. Choose a photo instead.");
+      return;
+    }
+    await scanImageBlob(blob);
+  }
+
+  async function handleScanFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!scanQueueAllowsRequest()) {
+      setScanMessage("one sec...");
+      return;
+    }
+    await scanImageBlob(file);
+  }
+
+  async function scanImageBlob(blob: Blob) {
+    updateScanMode("reading");
+    setBusy("scan");
+    setError(null);
+    setScanMessage("Reading card...");
+    try {
+      const processed = await compressPhotoForScan(blob);
+      const dataUrl = await blobToDataUrl(processed.blob);
+      setScanPhotoPreview(dataUrl);
+      setScanPhotoPayload({ blob: processed.blob, width: processed.width, height: processed.height });
+      const imageBase64 = dataUrl.split(",")[1] ?? "";
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64, mimeType: "image/jpeg" }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) {
+        if (res.status === 429) {
+          updateScanMode("camera");
+          setScanMessage("Scan budget paused until the daily reset around 8am UK. Typed comp still works.");
+          return;
+        }
+        throw new Error(payload.error ?? "scan failed");
+      }
+      const identity = payload.identity as ScanIdentity | undefined;
+      if (!identity) throw new Error("Scan returned no card identity.");
+      await handleScanIdentity(identity, String(payload.model ?? ""));
+    } catch (err) {
+      updateScanMode("manual");
+      setScanMessage("Couldn't read it — retake or type.");
+      setError(err instanceof Error ? err.message : "scan failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleScanIdentity(identity: ScanIdentity, model: string) {
+    setScanIdentity(identity);
+    setScanModel(model || null);
+    const initial = scanIdentityToQuery(identity);
+    if (initial.status === "ready" && initial.needsAmbiguityCheck) {
+      const alternatives = await fetchScanAlternatives(initial.query);
+      const mapped = scanIdentityToQuery(identity, { alternatives });
+      if (mapped.status === "ambiguous") {
+        applyScanMapping(mapped);
+        return;
+      }
+      if (alternatives.length === 1) {
+        applyScannedCandidate(alternatives[0]!, initial.query.grade);
+        return;
+      }
+    }
+    applyScanMapping(initial);
+  }
+
+  async function fetchScanAlternatives(query: ScanCompQuery): Promise<CatalogCard[]> {
+    const qs = new URLSearchParams({
+      q: [query.name, query.number].filter(Boolean).join(" "),
+      limit: "8",
+    });
+    const res = await fetch(`/api/catalog/cards?${qs}`);
+    if (!res.ok) return [];
+    const payload = await readJson(res);
+    return Array.isArray(payload.cards) ? payload.cards : [];
+  }
+
+  function applyScanMapping(mapping: ScanIdentityMapping) {
+    setScanMapping(mapping);
+    if (mapping.status === "manual") {
+      if (mapping.quickFill) setQuickIntake(mapping.quickFill);
+      updateScanMode("manual");
+      setScanMessage(mapping.reason);
+      return;
+    }
+    applyScanQueryFields(mapping.query, mapping.quickFill);
+    if (mapping.status === "ambiguous") {
+      updateScanMode("ambiguous");
+      setScanMessage("More than one card matches. Pick the exact artwork before comping.");
+      return;
+    }
+    if (mapping.status === "confirm-slab") {
+      updateScanMode("confirm-slab");
+      setScanMessage(`${mapping.gradeLabel} read from ${mapping.grader}. Confirm before comping.`);
+      return;
+    }
+    if (mapping.status === "psa-cert") {
+      updateScanMode("identity");
+      setScanMessage("PSA cert read. Verifying with PSA, then comping.");
+      void verifyPsaCertNumber(mapping.certNumber, {
+        lookupAfter: true,
+        typed: {
+          name: mapping.query.name,
+          setName: mapping.query.setName,
+          number: mapping.query.number,
+          grade: mapping.query.grade,
+        },
+      });
+      return;
+    }
+    updateScanMode("identity");
+    setScanMessage(mapping.warnings[0] ?? "Card read. Comp loading...");
+    void lookupComp(mapping.query);
+  }
+
+  function applyScanQueryFields(query: ScanCompQuery, quickFill?: string) {
+    clearCompEvidence();
+    setQuickIntake(quickFill || cardIdentitySearchText({ name: query.name, setName: query.setName, number: query.number }, query.grade));
+    setName(query.name);
+    setSetNameValue(query.setName);
+    if (query.setName) pinRecentSetName(query.setName);
+    setNumber(query.number);
+    setGrade(query.grade);
+    setGraderCert(query.psaCert ?? "");
+    setError(null);
+  }
+
+  function confirmScannedSlab() {
+    if (!scanMapping || scanMapping.status !== "confirm-slab") return;
+    updateScanMode("identity");
+    setScanMessage("Grade confirmed. Comp loading...");
+    void lookupComp(scanMapping.query);
+  }
+
+  function applyScannedCandidate(card: CatalogCard, nextGrade = grade) {
+    const lookup: LookupInput = {
+      name: card.name,
+      setName: card.setName,
+      number: card.number ?? "",
+      grade: nextGrade,
+      ...(card.tcgApiId ? { tcgApiId: card.tcgApiId } : {}),
+      ...(card.tcgDexId ? { tcgDexId: card.tcgDexId } : {}),
+    };
+    clearCompEvidence();
+    updateScanMode("identity");
+    setScanMessage("Exact card chosen. Comp loading...");
+    setQuickIntake(cardIdentitySearchText({ name: card.name, setName: card.setName, number: card.number }, nextGrade));
+    setName(card.name);
+    setSetNameValue(card.setName);
+    pinRecentSetName(card.setName);
+    setNumber(card.number ?? "");
+    setGrade(nextGrade);
+    setCardArtUrl(card.imageUrl ?? null);
+    setError(null);
+    void lookupComp(lookup);
+  }
+
+  async function attachScannedPhotoToInventory(itemId: string, role: "FRONT" | "SLAB" = grade === "RAW" ? "FRONT" : "SLAB") {
+    if (!scanPhotoPayload) return false;
+    const blob = await upload(
+      inventoryPhotoUploadPath(itemId, 0),
+      scanPhotoPayload.blob,
+      {
+        access: "public",
+        contentType: "image/jpeg",
+        handleUploadUrl: `/api/inventory/${itemId}/photos/upload-token`,
+      },
+    );
+    const saveRes = await fetch(`/api/inventory/${itemId}/photos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: blob.url,
+        role,
+        origin: "SCAN",
+        width: scanPhotoPayload.width,
+        height: scanPhotoPayload.height,
+        order: 0,
+      }),
+    });
+    const savePayload = await readJson(saveRes);
+    if (!saveRes.ok) throw new Error(savePayload.error ?? "Scan photo save failed");
+    return true;
+  }
+
   function clearCheckedComp() {
     setCheckedCompPrice("");
     setCheckedCompSample("1");
@@ -2499,6 +2860,7 @@ export default function Home() {
 
   function skipCurrentComp() {
     clearCurrentComp("Skipped. Ready for next comp.");
+    finishScannedCardDecision("Skipped. Scan next?");
   }
 
   function openOpeningStockImport(options: { example?: boolean } = {}) {
@@ -2966,6 +3328,7 @@ export default function Home() {
       if (!res.ok) throw new Error(payload.error ?? "deal session add failed");
       setDealSession(payload);
       setNotice("Added to current lot.");
+      finishScannedCardDecision("Added to lot. Scan next?");
     } catch (err) {
       setError(err instanceof Error ? err.message : "deal session add failed");
     } finally {
@@ -3155,6 +3518,16 @@ export default function Home() {
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "acquire failed");
+      const wasScanned = Boolean(scanIdentity || scanPhotoPreview);
+      let scanPhotoSaved = false;
+      let scanPhotoWarning = "";
+      if (scanPhotoPayload && payload.item?.id) {
+        try {
+          scanPhotoSaved = await attachScannedPhotoToInventory(payload.item.id);
+        } catch (photoErr) {
+          scanPhotoWarning = photoErr instanceof Error ? ` Scan photo not saved: ${photoErr.message}` : " Scan photo not saved.";
+        }
+      }
       setSuggestion(payload.suggestion);
       const acquiredComps = payload.comps ?? (payload.comp ? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false } : null);
       if (acquiredComps) {
@@ -3185,10 +3558,14 @@ export default function Home() {
       setNotice(
         `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${
           payload.listing ? `${listingVerb} at ${gbp(listedPence)}.` : "Listing skipped."
-        }`,
+        }${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
       );
       await refreshAll();
       applyPostStockFlow();
+      if (wasScanned) {
+        if (keepBuying) finishScannedCardDecision(scanPhotoSaved ? "Stocked with scan photo. Scan next?" : "Stocked. Scan next?");
+        else closeScanCamera();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "acquire failed");
     } finally {
@@ -3250,6 +3627,17 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "manual stock failed");
 
+      const wasScanned = Boolean(scanIdentity || scanPhotoPreview);
+      let scanPhotoSaved = false;
+      let scanPhotoWarning = "";
+      if (scanPhotoPayload && payload.item?.id) {
+        try {
+          scanPhotoSaved = await attachScannedPhotoToInventory(payload.item.id);
+        } catch (photoErr) {
+          scanPhotoWarning = photoErr instanceof Error ? ` Scan photo not saved: ${photoErr.message}` : " Scan photo not saved.";
+        }
+      }
+
       let createdListing: Listing | null = null;
       if (shouldCreateListing && payload.item?.id) {
         const listPricePence = overrideListPricePence ?? draftDefaults.listPricePence;
@@ -3288,11 +3676,15 @@ export default function Home() {
       });
       setNotice(
         createdListing
-          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${acquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(overrideListPricePence ?? draftDefaults.listPricePence)}.`
-          : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.`,
+          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${acquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(overrideListPricePence ?? draftDefaults.listPricePence)}.${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`
+          : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
       );
       await refreshAll();
       applyPostStockFlow();
+      if (wasScanned) {
+        if (keepBuying) finishScannedCardDecision(scanPhotoSaved ? "Stocked with scan photo. Scan next?" : "Stocked. Scan next?");
+        else closeScanCamera();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "manual stock failed");
     } finally {
@@ -3454,6 +3846,7 @@ export default function Home() {
         setWatchEdits((current) => ({ ...current, [payload.watch.id]: penceToPounds(payload.watch.targetPence) }));
       }
       await refreshAll();
+      finishScannedCardDecision("Watch created. Scan next?");
     } catch (err) {
       setError(err instanceof Error ? err.message : "watch create failed");
     } finally {
@@ -5263,6 +5656,7 @@ export default function Home() {
       setCheckedCompLogPrice("");
       setCheckedCompLogNote("");
       setManualCompReturnArmed(false);
+      pinCheckedCompEvidence(nextLoggedEntries, aggregate ?? null, card);
       setNotice(`Logged ${gbp(pricePence)}. Add the next sold price, or close the logger.`);
       setScrollToComp(true);
       void refreshCurrentCompAfterCheckedComp(card);
@@ -5272,6 +5666,46 @@ export default function Home() {
     } finally {
       setBusy(null);
     }
+  }
+
+  function pinCheckedCompEvidence(
+    entries: CheckedCompEntry[],
+    aggregate: CompResult | null,
+    card: { name: string; setName?: string; number?: string; tcgApiId?: string; tcgDexId?: string },
+  ) {
+    const checkedSource =
+      aggregate && aggregate.sampleSize > 0 && aggregate.medianPence > 0
+        ? aggregate
+        : buildLocalCheckedCompResult(
+            entries,
+            {
+              name: card.name,
+              setName: card.setName,
+              number: card.number,
+              tcgApiId: card.tcgApiId,
+              tcgDexId: card.tcgDexId,
+              game: "POKEMON",
+              language: "EN",
+            },
+            grade,
+          );
+    if (!checkedSource) return;
+
+    setComp((current) => {
+      const base: Reconciled = current ?? {
+        headline: null,
+        all: [],
+        sourcesDisagree: false,
+        catalog: catalogCard,
+        psaCert: psaResult,
+      };
+      return {
+        ...base,
+        all: upsertCompResult(base.all, checkedSource),
+        catalog: base.catalog ?? catalogCard,
+        psaCert: base.psaCert ?? psaResult,
+      };
+    });
   }
 
   async function refreshCurrentCompAfterCheckedComp(card: { name: string; setName?: string; number?: string; tcgApiId?: string; tcgDexId?: string }) {
@@ -5286,7 +5720,15 @@ export default function Home() {
       if (!res.ok) return;
       setComp((current) => {
         if (!isUsefulCompPayload(payload)) return current;
-        return current?.headline && !payload.headline ? current : payload;
+        if (!current) return payload;
+        const checkedSource = current.all.find((result) => result.source === "checked-comps");
+        return {
+          ...payload,
+          headline: payload.headline ?? current.headline,
+          all: checkedSource ? upsertCompResult(payload.all ?? [], checkedSource) : payload.all,
+          catalog: payload.catalog ?? current.catalog,
+          psaCert: payload.psaCert ?? current.psaCert,
+        };
       });
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
       rememberRecentComp(payload, { name: card.name, setName: card.setName ?? "", number: card.number ?? "", grade });
@@ -5453,6 +5895,7 @@ export default function Home() {
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
               event.preventDefault();
+              event.stopPropagation();
               void logCheckedCompEntry();
             }}
           >
@@ -5867,7 +6310,7 @@ export default function Home() {
             </div>
             <div className="quick-intake-field">
               <label htmlFor="quick-intake">Smart comp search</label>
-              <div className={`quick-intake-row quick-intake-actions ${canClearCurrentComp ? "has-next" : ""}`}>
+              <div className={`quick-intake-row quick-intake-actions has-scan ${canClearCurrentComp ? "has-next" : ""}`}>
                 <input
                   id="quick-intake"
                   ref={quickIntakeRef}
@@ -5894,6 +6337,15 @@ export default function Home() {
                   placeholder="Umbreon prismatic, Victini promo..."
                   autoComplete="off"
                 />
+                <button
+                  className="scan-card-button"
+                  type="button"
+                  onClick={openScanCamera}
+                  disabled={busy === "scan" || busy === "lookup" || busy === "acquire" || busy === "manual-stock"}
+                  aria-label="Scan card with camera"
+                >
+                  Scan
+                </button>
                 <button
                   type="button"
                   onClick={runSmartComp}
@@ -6489,6 +6941,147 @@ export default function Home() {
               </details>
             )}
           </form>
+          {scanOpen && (
+            <section className={`scan-sheet ${scanMode}`} role="dialog" aria-modal="true" aria-label="Scan a card">
+              <div className="sheet-drag-handle" aria-hidden="true" />
+              <div className="scan-sheet-heading">
+                <div>
+                  <span>Camera comp</span>
+                  <strong>
+                    {scanMode === "reading"
+                      ? "Reading card..."
+                      : scanMode === "ambiguous"
+                        ? "Choose exact card"
+                        : scanMode === "confirm-slab"
+                          ? "Confirm slab grade"
+                          : scanMode === "stocked"
+                            ? "Ready for the next one"
+                            : "Scan one card"}
+                  </strong>
+                  <small>{scanMessage ?? "Use the rear camera and fill the frame with the printed text."}</small>
+                </div>
+                <button className="ghost-button" type="button" onClick={closeScanCamera}>
+                  Close
+                </button>
+              </div>
+
+              <div className="scan-preview-frame">
+                {scanPhotoPreview && scanMode !== "camera" && scanMode !== "starting" ? (
+                  <img src={scanPhotoPreview} alt="Scanned card" />
+                ) : (
+                  <video ref={scanVideoRef} muted playsInline autoPlay aria-label="Live card camera preview" />
+                )}
+                {(scanMode === "reading" || busy === "scan") && (
+                  <div className="scan-reading-overlay" aria-live="polite">
+                    <span className="scan-pokeball" aria-hidden="true" />
+                    <strong>Reading card...</strong>
+                  </div>
+                )}
+              </div>
+
+              <input
+                ref={scanFileInputRef}
+                className="visually-hidden"
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  void handleScanFile(event.currentTarget.files);
+                  event.currentTarget.value = "";
+                }}
+              />
+
+              {scannedQuery && (
+                <div className="scan-identity-chips" aria-label="Scanned identity">
+                  <span>{scannedQuery.name || "Name unread"}</span>
+                  <span>{scannedQuery.setName || "Set unknown"}</span>
+                  <span>{scannedQuery.number || "No number"}</span>
+                  <span>{scannedQuery.grade.replace(/_/g, " ")}</span>
+                  {scanModel && <span>{scanModel}</span>}
+                </div>
+              )}
+
+              {scanWarnings.length > 0 && (
+                <div className="scan-warning-list" aria-label="Scan warnings">
+                  {scanWarnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              )}
+
+              {scanMode === "ambiguous" && scanAlternatives.length > 0 && (
+                <div className="scan-candidate-list" aria-label="Possible scan matches">
+                  {scanPhotoPreview && <img className="scan-reference-photo" src={scanPhotoPreview} alt="Scanned card reference" />}
+                  <div className="scan-candidate-grid">
+                    {scanAlternatives.map((card) => (
+                      <button
+                        type="button"
+                        key={card.tcgApiId ?? card.tcgDexId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
+                        onClick={() => applyScannedCandidate(card, scannedQuery?.grade ?? grade)}
+                        disabled={busy === "lookup"}
+                      >
+                        <CardImage src={card.imageUrl ?? null} className="scan-candidate-art" fallbackClassName="scan-candidate-art blank" alt="" />
+                        <span>
+                          <strong>{card.name}</strong>
+                          <small>
+                            {card.setName}
+                            {card.number ? ` #${card.number}` : ""}
+                          </small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {scanMode === "manual" && (
+                <div className="scan-manual-card">
+                  <strong>{scanMessage ?? "Couldn't read it — retake or type."}</strong>
+                  {scanMapping?.status === "manual" && scanMapping.quickFill && (
+                    <small>Quick Fill has been pre-filled with what was readable.</small>
+                  )}
+                </div>
+              )}
+
+              {scanMode === "confirm-slab" && scanMapping?.status === "confirm-slab" && (
+                <div className="scan-confirm-card">
+                  <span>{scanMapping.grader}</span>
+                  <strong>{scanMapping.gradeLabel}</strong>
+                  <small>Tap confirm if the grade is right, or change it in the grade field before comping.</small>
+                  <button type="button" onClick={confirmScannedSlab} disabled={busy === "lookup"}>
+                    {busy === "lookup" ? "Comping..." : "Confirm + comp"}
+                  </button>
+                </div>
+              )}
+
+              <div className="scan-sheet-actions">
+                {scanMode === "stocked" ? (
+                  <button className="scan-next-action" type="button" onClick={scanNext}>
+                    Scan next
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="scan-shutter-button"
+                      type="button"
+                      onClick={() => void captureScanFrame()}
+                      disabled={busy === "scan" || scanMode === "starting" || !scanCameraAvailable}
+                      aria-label="Take scan photo"
+                    >
+                      <span aria-hidden="true" />
+                    </button>
+                    <button type="button" onClick={() => scanFileInputRef.current?.click()} disabled={busy === "scan"}>
+                      Choose photo
+                    </button>
+                    {(scanMode === "identity" || scanMode === "ambiguous" || scanMode === "manual" || scanMode === "confirm-slab") && (
+                      <button type="button" onClick={scanNext} disabled={busy === "scan" || busy === "lookup"}>
+                        {scanCompReady ? "Scan next" : "Retake"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+          )}
           <BuyFlowRail steps={buyFlowSteps} />
           {lastStocked && (
             <LastStockedPanel
@@ -9939,6 +10532,15 @@ function inferPhotoRole(index: number): CardPhoto["role"] {
   if (index === 1) return "BACK";
   if (index === 2) return "SLAB";
   return "EXTRA";
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("Could not read image."));
+    reader.readAsDataURL(blob);
+  });
 }
 
 function toTitleCase(value: string): string {

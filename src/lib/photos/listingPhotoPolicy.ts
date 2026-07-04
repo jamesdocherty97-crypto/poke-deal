@@ -1,4 +1,4 @@
-export type ListingPhotoOrigin = "REAL" | "CATALOG";
+export type ListingPhotoOrigin = "REAL" | "SCAN" | "CATALOG";
 
 export interface ListingPhoto {
   id?: string;
@@ -70,7 +70,7 @@ export function summarizeListingPhotos(input: {
 }): ListingPhotoSummary {
   const threshold = input.catalogPhotoMaxPricePence ?? readCatalogPhotoMaxPricePence();
   const orderedPhotos = orderListingPhotos(input.photos).filter((photo) => Boolean(photo.url?.trim()));
-  const hasRealPhoto = orderedPhotos.some((photo) => (photo.origin ?? "REAL") === "REAL");
+  const hasRealPhoto = orderedPhotos.some((photo) => (photo.origin ?? "REAL") !== "CATALOG");
   const hasCatalogPhoto = orderedPhotos.some((photo) => photo.origin === "CATALOG");
   const catalogOnly = hasCatalogPhoto && !hasRealPhoto;
   const catalogPhotoAllowed = isCatalogPhotoEligible({
@@ -105,7 +105,7 @@ export function photoRequirementMessage(summary: ListingPhotoSummary): string {
 }
 
 function photoOriginRank(photo: ListingPhoto): number {
-  return (photo.origin ?? "REAL") === "REAL" ? 0 : 1;
+  return (photo.origin ?? "REAL") === "CATALOG" ? 1 : 0;
 }
 
 function parsePositiveInt(value: string | undefined): number | null {

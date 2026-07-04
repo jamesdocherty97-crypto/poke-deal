@@ -16,6 +16,16 @@
   }
 }
 
+@media (max-width: 819px) {
+  body:has(.mobile-buy-action) .toast-stack {
+    bottom: calc(176px + env(safe-area-inset-bottom));
+  }
+
+  body:has(.mobile-buy-action.decision) .toast-stack {
+    bottom: calc(350px + env(safe-area-inset-bottom));
+  }
+}
+
 @media (min-width: 760px) {
   .app-shell {
     padding: 22px 24px calc(112px + env(safe-area-inset-bottom));
@@ -957,7 +967,9 @@
   }
 
   .quick-intake-actions,
-  .quick-intake-actions.has-next {
+  .quick-intake-actions.has-scan,
+  .quick-intake-actions.has-next,
+  .quick-intake-actions.has-scan.has-next {
     grid-template-columns: minmax(0, 1fr) 66px;
   }
 
@@ -1016,6 +1028,15 @@
   .bottom-nav .tab-icon {
     width: 21px;
     height: 21px;
+  }
+
+  body:has(.sell-sheet) .bottom-nav,
+  body:has(.scan-sheet) .bottom-nav,
+  body:has(.confirm-sheet) .bottom-nav,
+  body:has(.ebay-publish-overlay) .bottom-nav {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
   }
 
   .workspace,

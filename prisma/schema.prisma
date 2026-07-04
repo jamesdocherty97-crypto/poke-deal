@@ -516,6 +516,7 @@ enum PhotoRole {
 
 enum PhotoOrigin {
   REAL
+  SCAN
   CATALOG
 }
 

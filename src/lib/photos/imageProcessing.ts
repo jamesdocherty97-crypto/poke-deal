@@ -1,6 +1,8 @@
 export const PHOTO_MAX_EDGE_PX = 1600;
 export const PHOTO_MIN_EBAY_EDGE_PX = 500;
 export const PHOTO_JPEG_QUALITY = 0.85;
+export const SCAN_IMAGE_MAX_EDGE_PX = 1024;
+export const SCAN_IMAGE_JPEG_QUALITY = 0.7;
 
 export interface PhotoDimensions {
   width: number;
@@ -39,12 +41,20 @@ export function inventoryPhotoUploadPath(itemId: string, index: number, now = Da
 }
 
 export async function compressPhotoForUpload(file: File): Promise<CompressedPhoto> {
-  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  const { width, height } = fitPhotoDimensions(bitmap.width, bitmap.height);
-  if (Math.max(width, height) < PHOTO_MIN_EBAY_EDGE_PX) {
-    bitmap.close();
+  const compressed = await compressImage(file, PHOTO_MAX_EDGE_PX, PHOTO_JPEG_QUALITY);
+  if (Math.max(compressed.width, compressed.height) < PHOTO_MIN_EBAY_EDGE_PX) {
     throw new Error("Photo is too small for eBay. Use an image at least 500px on the longest side.");
   }
+  return compressed;
+}
+
+export async function compressPhotoForScan(file: File | Blob): Promise<CompressedPhoto> {
+  return compressImage(file, SCAN_IMAGE_MAX_EDGE_PX, SCAN_IMAGE_JPEG_QUALITY);
+}
+
+async function compressImage(file: File | Blob, maxEdge: number, quality: number): Promise<CompressedPhoto> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const { width, height } = fitPhotoDimensions(bitmap.width, bitmap.height, maxEdge);
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -61,7 +71,7 @@ export async function compressPhotoForUpload(file: File): Promise<CompressedPhot
     canvas.toBlob((output) => {
       if (output) resolve(output);
       else reject(new Error("Could not compress photo."));
-    }, "image/jpeg", PHOTO_JPEG_QUALITY);
+    }, "image/jpeg", quality);
   });
 
   return { blob, width, height };
