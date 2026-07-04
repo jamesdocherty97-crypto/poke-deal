@@ -79,7 +79,9 @@ The frame runs without any of these (fixture mode). Add them to `.env` (copy fro
 
 **PokeTrace cross-check path:** set `POKETRACE_API_KEY` in Vercel before relying on bigger raw-card buys. The adapter defaults to `POKETRACE_MARKETS=US,EU`, but the current free-tier production account should use `POKETRACE_MARKETS=US` because EU/Cardmarket access can be plan-gated. Pro accounts can switch to `EU,US` for Cardmarket-first cross-checks. The source maps Cardmarket/TCGPlayer/eBay tiers into GBP `CompResult`s so noisy RAW buckets can be challenged by a second source.
 
-**eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and refresh token (`EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` still works as the legacy flag). Until then the source stays out of comp aggregation and the manual UK sold link remains the reliable fallback.
+**eBay account connection path:** set `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_RU_NAME` and `TOKEN_ENCRYPTION_KEY`, then visit `/api/ebay/connect`. The callback stores the seller refresh token encrypted in Neon; `EBAY_REFRESH_TOKEN` is only a legacy fallback if no DB token exists.
+
+**eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and seller OAuth connection (`EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` still works as the legacy flag). Until then the source stays out of comp aggregation and the manual UK sold link remains the reliable fallback.
 
 **FX path:** set `FX_API_KEY` to fetch daily GBP-based rates into Neon. If the provider is down, the app uses cached rates up to seven days old; if no usable cache exists, comps still work with a visible `static FX` note on converted evidence rows.
 

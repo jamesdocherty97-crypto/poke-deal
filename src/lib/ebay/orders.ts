@@ -2,10 +2,11 @@ import { createInboxAlert } from "../alerts/inbox.js";
 import { estimateSaleCosts } from "../dealer/saleFees.js";
 import { planSaleListingClosure, planUnitSale, splitPence } from "../dealer/unitSale.js";
 import type { EbayConfig } from "./config.js";
-import { getEbayConfig, hasEbayRefreshToken, isEbayConfigured } from "./config.js";
+import { getEbayConfig, isEbayConfigured } from "./config.js";
+import { resolveEbayRefreshToken } from "./credentials.js";
 import { ebayJson } from "./client.js";
 import { ebayErrorMessage } from "./errors.js";
-import { getAccessToken } from "./tokens.js";
+import { getAccessTokenWithSource } from "./tokens.js";
 
 export type EbayOrderImportStatus = "MATCHED" | "UNMATCHED" | "SKIPPED";
 
@@ -150,14 +151,18 @@ export async function syncOwnEbaySales({
   config?: EbayConfig | null;
   fetchImpl?: typeof fetch;
 }): Promise<EbaySalesSyncResult> {
-  if (!isEbayConfigured() || !config || !hasEbayRefreshToken()) {
+  if (!isEbayConfigured() || !config) {
     return emptySyncResult(now, "eBay is not connected.");
   }
+  const refreshToken = await resolveEbayRefreshToken({
+    db: "ebayCredential" in db ? db as any : null,
+  }).catch(() => null);
+  if (!refreshToken) return emptySyncResult(now, "eBay is not connected.");
 
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
   let response: EbayFulfillmentOrdersResponse;
   try {
-    const accessToken = await getAccessToken(config, fetchImpl);
+    const { accessToken } = await getAccessTokenWithSource(config, fetchImpl, { refreshToken });
     const path = buildFulfillmentOrdersPath({
       since: since ?? new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
       until: now,

@@ -48,7 +48,7 @@ export function checkEbayReadiness(input: EbayReadinessInput): EbayReadinessResu
     key: "ebay_connected",
     label: "eBay account connected",
     status: input.ebayConnected ? "pass" : "fail",
-    detail: input.ebayConnected ? undefined : "Complete OAuth at /api/ebay/connect and save EBAY_REFRESH_TOKEN",
+    detail: input.ebayConnected ? undefined : "Complete OAuth at /api/ebay/connect; Poke Deal stores the token automatically",
   });
 
   checks.push({

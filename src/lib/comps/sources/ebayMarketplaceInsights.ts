@@ -1,7 +1,7 @@
 import type { CardRef, CompQuery, CompResult, Currency, Grade, RawSale } from "../../domain/types.js";
 import type { CompSource } from "../CompSource.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
-import { getEbayConfig, hasEbayRefreshToken, EBAY_UK_CATEGORY_POKEMON } from "../../ebay/config.js";
+import { getEbayConfig, EBAY_UK_CATEGORY_POKEMON } from "../../ebay/config.js";
 import { getAccessToken } from "../../ebay/tokens.js";
 import type { EbayConfig } from "../../ebay/config.js";
 
@@ -50,7 +50,7 @@ export class EbayMarketplaceInsightsSource implements CompSource {
 
   /*
    * Dark-launch enable steps after eBay grants restricted Marketplace Insights:
-   * 1. Keep the existing eBay app credentials and refresh token configured.
+   * 1. Keep the existing eBay app credentials and seller OAuth connection ready.
    * 2. Set EBAY_INSIGHTS_ENABLED=true (legacy EBAY_MARKETPLACE_INSIGHTS_ENABLED
    *    also works) in the deployment environment.
    * 3. Restart/redeploy; the app will add this source to comp aggregation and
@@ -62,7 +62,7 @@ export class EbayMarketplaceInsightsSource implements CompSource {
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
   ) {
-    this.live = Boolean(this.enabled && this.config && hasEbayRefreshToken());
+    this.live = Boolean(this.enabled && this.config);
   }
 
   async lookup(card: CardRef, query: CompQuery = {}): Promise<CompResult> {
@@ -71,7 +71,6 @@ export class EbayMarketplaceInsightsSource implements CompSource {
     const ctx = { source: this.name, card, grade, windowDays };
     if (!this.enabled) return emptyComp(ctx, "eBay Marketplace Insights is not enabled");
     if (!this.config) return emptyComp(ctx, "eBay credentials are not configured");
-    if (!hasEbayRefreshToken()) return emptyComp(ctx, "eBay account is not connected");
 
     try {
       const accessToken = await getAccessToken(this.config, this.fetchImpl);

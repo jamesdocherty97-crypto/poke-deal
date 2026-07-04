@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getEbayConfig, hasEbayRefreshToken, isEbayConfigured } from "@/lib/ebay/config";
+import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import {
   createInventoryLocation,
   missingEbayLocationSetupFields,
@@ -7,7 +7,8 @@ import {
   readEbayLocationSetupInput,
 } from "@/lib/ebay/location";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
-import { getAccessToken } from "@/lib/ebay/tokens";
+import { resolveEbayRefreshToken } from "@/lib/ebay/credentials";
+import { getAccessTokenWithSource } from "@/lib/ebay/tokens";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 
 export const runtime = "nodejs";
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
   if (!isEbayConfigured()) {
     return NextResponse.json({ error: "eBay is not configured." }, { status: 503 });
   }
-  if (!hasEbayRefreshToken()) {
+  const refreshToken = await resolveEbayRefreshToken().catch(() => null);
+  if (!refreshToken) {
     return NextResponse.json({ error: "eBay account is not connected." }, { status: 409 });
   }
 
@@ -41,7 +43,7 @@ export async function POST(request: Request) {
   const config = getEbayConfig()!;
 
   try {
-    const accessToken = await getAccessToken(config);
+    const { accessToken } = await getAccessTokenWithSource(config, fetch, { refreshToken });
     const created = await createInventoryLocation(config, accessToken, setup);
     const policies = await fetchEbayPolicies(config, accessToken);
     return NextResponse.json({

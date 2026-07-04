@@ -128,6 +128,24 @@ How to use it:
 1. Go to Today.
 2. Find Setup.
 3. Look for anything marked missing or warn.
+
+### eBay Connection
+
+Use `/api/ebay/connect` to connect the seller account.
+
+What happens:
+
+1. Poke Deal sends you to eBay.
+2. You approve the app.
+3. eBay returns you to Poke Deal.
+4. Poke Deal stores the refresh token encrypted in Neon.
+5. The success page says `eBay connected ✓ — you can close this tab`.
+
+You should not copy or paste refresh tokens anymore.
+
+If eBay permissions change, or the token dies, use `/api/ebay/connect?force=1`. A normal repeat visit to `/api/ebay/connect` also offers force reconnect.
+
+`EBAY_REFRESH_TOKEN` is now only a legacy fallback. The normal live app should use the stored DB token.
 4. Follow the setup hint shown under that row.
 
 Current outstanding setup actions:
@@ -763,6 +781,7 @@ Use it like this:
 Readiness checks cover:
 
 - eBay connection.
+- Stored OAuth token.
 - Seller policies.
 - Seller location.
 - Price.
@@ -1369,6 +1388,8 @@ Purpose:
 Live now:
 
 - OAuth connection/status check.
+- Encrypted server-side OAuth token storage after `/api/ebay/connect`.
+- DB-first token use with legacy `EBAY_REFRESH_TOKEN` fallback only when no stored token exists.
 - Seller policy lookup.
 - Seller-location readiness and one-tap location creation.
 - Inventory item + offer creation.
@@ -1378,6 +1399,7 @@ Live now:
 
 Still needed:
 
+- One fresh eBay consent is required after this OAuth fix is deployed if the old copied token is corrupt or dead.
 - Final eBay seller-account/payment/KYC prompts must be complete in eBay itself.
 - A real listing/photo set should be used for live validation.
 - Finances API pass for exact final fees and payouts.

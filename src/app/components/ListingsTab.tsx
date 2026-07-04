@@ -21,6 +21,7 @@ type Dashboard = {
 type EbayStatus = {
   configured: boolean;
   connected: boolean;
+  tokenSource?: "db" | "env" | null;
 };
 
 type EbaySalesSyncResult = {
@@ -405,15 +406,21 @@ export function ListingsTab({
             <span>eBay credentials not configured - set env vars to enable API automation.</span>
           ) : ebayNeedsReconnect ? (
             <>
-              <span>Reconnect eBay to grant new permissions for offers and sales sync.</span>
+              <span>Reconnect eBay. Consent now stores the token automatically.</span>
               <a href="/api/ebay/connect?force=1">Reconnect eBay</a>
             </>
           ) : (
             <>
-              <span>eBay not connected - authorise your seller account to enable offer creation.</span>
+              <span>eBay not connected - authorise your seller account once to enable offer creation.</span>
               <a href="/api/ebay/connect">Connect eBay</a>
             </>
           )}
+        </div>
+      )}
+      {ebayStatus?.connected && ebayStatus.tokenSource === "env" && listings.some((listing) => listing.channel === "EBAY") && (
+        <div className="ebay-setup-banner">
+          <span>eBay is connected using the old environment token. Reconnect once so Poke Deal can store it safely without redeploys.</span>
+          <a href="/api/ebay/connect?force=1">Reconnect eBay</a>
         </div>
       )}
       {ebayNeedsMerchantLocation && listings.some((listing) => listing.channel === "EBAY") && (

@@ -471,6 +471,7 @@ type EbayStatus = {
   connected: boolean;
   env?: string;
   marketplaceId?: string;
+  tokenSource?: "db" | "env" | null;
   hasPolicies?: boolean;
   hasMerchantLocation?: boolean;
   policies?: {
@@ -1865,18 +1866,22 @@ export default function Home() {
       required: false,
       setupHint:
         ebayStatus?.connected && ebayHasPolicies && ebayHasMerchantLocation
-          ? "Seller account and business policies are ready for app-created offers."
+          ? ebayStatus.tokenSource === "env"
+            ? "Seller account is connected using the legacy env token; reconnect once to store it in Poke Deal."
+            : "Seller account, stored OAuth token and business policies are ready for app-created offers."
           : ebayStatus?.connected && ebayHasPolicies
             ? "Required eBay policies are ready; no merchant location key was returned, so first offer creation may need seller-location setup."
           : ebayStatus?.connected
-            ? "Seller account is connected; finish business policies before offer creation."
+            ? ebayStatus.tokenSource === "env"
+              ? "Seller account is connected using the legacy env token; reconnect once to store it in Poke Deal."
+              : "Seller account is connected; finish business policies before offer creation."
             : ebayNeedsReconnect
-              ? "Reconnect eBay to grant new permissions — /api/ebay/connect"
+              ? "Reconnect eBay at /api/ebay/connect; consent now stores the token automatically."
             : ebayStatus?.configured
-              ? "Seller credentials are present; connect the eBay account to create offers."
+              ? "Seller credentials are present; connect the eBay account once to store OAuth safely."
               : "Add production eBay credentials when you are ready to automate listing offers.",
     }),
-    [ebayHasMerchantLocation, ebayHasPolicies, ebayNeedsReconnect, ebayStatus?.configured, ebayStatus?.connected],
+    [ebayHasMerchantLocation, ebayHasPolicies, ebayNeedsReconnect, ebayStatus?.configured, ebayStatus?.connected, ebayStatus?.tokenSource],
   );
   const setupSources = useMemo(
     () => (systemStatus ? [...systemStatus.sources.filter((source) => source.id !== "push-alerts"), ebayHealthSource] : []),

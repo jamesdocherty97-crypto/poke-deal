@@ -43,7 +43,3 @@ export function getEbayConfig(): EbayConfig | null {
 export function isEbayConfigured(): boolean {
   return getEbayConfig() !== null;
 }
-
-export function hasEbayRefreshToken(): boolean {
-  return Boolean(process.env.EBAY_REFRESH_TOKEN?.trim());
-}

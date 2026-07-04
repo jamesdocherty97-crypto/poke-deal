@@ -1,39 +1,71 @@
 // Access token management.
-// Uses EBAY_REFRESH_TOKEN to mint short-lived access tokens on demand.
+// Uses the stored eBay refresh token to mint short-lived access tokens on demand.
 // In-memory cache reuses valid tokens within the same lambda invocation.
 
 import type { EbayConfig } from "./config.js";
+import {
+  markEbayCredentialValidated,
+  refreshTokenFingerprint,
+  resolveEbayRefreshToken,
+  type EbayRefreshTokenSource,
+  type ResolvedEbayRefreshToken,
+} from "./credentials.js";
 import { fetchApplicationAccessToken, refreshAccessToken } from "./oauth.js";
 
 interface TokenCache {
   value: string;
   expiresAt: number; // Unix ms
+  refreshTokenFingerprint: string;
+  refreshTokenSource: EbayRefreshTokenSource;
+}
+
+interface ApplicationTokenCache {
+  value: string;
+  expiresAt: number; // Unix ms
 }
 
 let cache: TokenCache | null = null;
-let applicationCache: TokenCache | null = null;
+let applicationCache: ApplicationTokenCache | null = null;
 
 export async function getAccessToken(
   config: EbayConfig,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
+  return (await getAccessTokenWithSource(config, fetchImpl)).accessToken;
+}
+
+export async function getAccessTokenWithSource(
+  config: EbayConfig,
+  fetchImpl: typeof fetch = fetch,
+  options: { refreshToken?: ResolvedEbayRefreshToken | null } = {},
+): Promise<{ accessToken: string; tokenSource: EbayRefreshTokenSource }> {
   const now = Date.now();
-  // Leave a 90-second buffer before expiry
-  if (cache && cache.expiresAt > now + 90_000) {
-    return cache.value;
-  }
-  const refreshToken = process.env.EBAY_REFRESH_TOKEN?.trim();
+  const refreshToken = options.refreshToken ?? await resolveEbayRefreshToken();
   if (!refreshToken) {
     throw new Error(
-      "EBAY_REFRESH_TOKEN is not set. Visit /api/ebay/connect to complete OAuth.",
+      "eBay refresh token is not set. Visit /api/ebay/connect to complete OAuth.",
     );
   }
-  const tokens = await refreshAccessToken(config, refreshToken, fetchImpl);
+  const fingerprint = refreshTokenFingerprint(refreshToken.token);
+
+  // Leave a 90-second buffer before expiry
+  if (
+    cache &&
+    cache.expiresAt > now + 90_000 &&
+    cache.refreshTokenFingerprint === fingerprint &&
+    cache.refreshTokenSource === refreshToken.source
+  ) {
+    return { accessToken: cache.value, tokenSource: cache.refreshTokenSource };
+  }
+  const tokens = await refreshAccessToken(config, refreshToken.token, fetchImpl);
   cache = {
     value: tokens.access_token,
     expiresAt: now + tokens.expires_in * 1000,
+    refreshTokenFingerprint: fingerprint,
+    refreshTokenSource: refreshToken.source,
   };
-  return cache.value;
+  if (refreshToken.source === "db" && !options.refreshToken) await markEbayCredentialValidated();
+  return { accessToken: cache.value, tokenSource: refreshToken.source };
 }
 
 export async function getApplicationAccessToken(
@@ -49,7 +81,7 @@ export async function getApplicationAccessToken(
     value: tokens.access_token,
     expiresAt: now + tokens.expires_in * 1000,
   };
-  return applicationCache.value;
+  return tokens.access_token;
 }
 
 /** Clear the in-memory cache — for tests only. */

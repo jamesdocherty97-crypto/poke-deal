@@ -39,8 +39,8 @@ export default function PrivacyPage() {
 
         <h2>Access and revocation</h2>
         <p>
-          eBay app access can be revoked from the eBay account security settings at any time. Removing the
-          app's eBay refresh token from the app environment also disconnects automated eBay actions.
+          eBay app access can be revoked from the eBay account security settings at any time. Reconnecting
+          through Poke Deal replaces the stored access token used for automated eBay actions.
         </p>
 
         <h2>Contact</h2>

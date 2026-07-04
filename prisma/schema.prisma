@@ -183,6 +183,22 @@ model EbayOrderImport {
   @@index([listingId])
 }
 
+model EbayCredential {
+  id                     String    @id @default(cuid())
+  key                    String    @unique @default("default")
+  env                    String
+  marketplaceId          String
+  refreshTokenCiphertext String
+  refreshTokenIv         String
+  refreshTokenTag        String
+  refreshTokenExpiresAt  DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  lastValidatedAt        DateTime?
+
+  @@index([updatedAt])
+}
+
 model Expense {
   id          String          @id @default(cuid())
   category    ExpenseCategory @default(OTHER)

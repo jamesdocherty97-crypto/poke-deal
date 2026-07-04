@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getEbayConfig, isEbayConfigured, hasEbayRefreshToken } from "@/lib/ebay/config";
-import { getAccessToken } from "@/lib/ebay/tokens";
+import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
+import { resolveEbayRefreshToken } from "@/lib/ebay/credentials";
+import { getAccessTokenWithSource } from "@/lib/ebay/tokens";
 import { ebayErrorMessage, ebayReconnectHintForError } from "@/lib/ebay/errors";
 import { fetchEbayPolicies, fetchEbaySellingPrivileges } from "@/lib/ebay/policies";
 import { fetchEbayTradingApiUser } from "@/lib/ebay/accountIdentity";
@@ -22,18 +23,35 @@ export async function GET() {
 
   const config = getEbayConfig()!;
 
-  if (!hasEbayRefreshToken()) {
+  let refreshToken;
+  try {
+    refreshToken = await resolveEbayRefreshToken();
+  } catch (err) {
     return NextResponse.json({
       configured: true,
       connected: false,
       env: config.env,
       marketplaceId: config.marketplaceId,
+      tokenSource: "db",
+      locationSetup,
+      error: err instanceof Error ? err.message : "eBay stored token could not be read.",
+      reconnectUrl: "/api/ebay/connect?force=1",
+    });
+  }
+
+  if (!refreshToken) {
+    return NextResponse.json({
+      configured: true,
+      connected: false,
+      env: config.env,
+      marketplaceId: config.marketplaceId,
+      tokenSource: null,
       locationSetup,
     });
   }
 
   try {
-    const accessToken = await getAccessToken(config);
+    const { accessToken, tokenSource } = await getAccessTokenWithSource(config, fetch, { refreshToken });
     const policies = await fetchEbayPolicies(config, accessToken);
 
     // Diagnostics: which eBay account is actually behind the connected OAuth
@@ -61,6 +79,7 @@ export async function GET() {
       connected: true,
       env: config.env,
       marketplaceId: config.marketplaceId,
+      tokenSource,
       hasPolicies: Boolean(policies.paymentPolicyId && policies.fulfillmentPolicyId && policies.returnPolicyId),
       hasMerchantLocation: Boolean(policies.merchantLocationKey),
       policies,
@@ -82,14 +101,16 @@ export async function GET() {
     });
   } catch (err) {
     const hint = ebayReconnectHintForError(err);
+    const error = ebayErrorMessage(err, "eBay connection check failed");
     return NextResponse.json({
       configured: true,
       connected: false,
       env: config.env,
       marketplaceId: config.marketplaceId,
+      tokenSource: refreshToken.source,
       locationSetup,
-      error: ebayErrorMessage(err, "eBay connection check failed"),
-      reconnectUrl: hint ? "/api/ebay/connect?force=1" : undefined,
+      error,
+      reconnectUrl: hint || needsReconnect(error) ? "/api/ebay/connect?force=1" : undefined,
     });
   }
 }
@@ -106,4 +127,8 @@ function locationSetupStatus() {
     merchantLocationKey: setup?.merchantLocationKey ?? null,
     merchantLocationKeyFromEnv: missingRecommendedFields.length === 0,
   };
+}
+
+function needsReconnect(error: string): boolean {
+  return /(?:invalid[_ ]grant|invalid access token|authorization|refresh token|token refresh|token exchange|expired|revoked)/i.test(error);
 }

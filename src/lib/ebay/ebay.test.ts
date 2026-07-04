@@ -27,6 +27,16 @@ import {
   readEbayLocationSetup,
   readEbayLocationSetupInput,
 } from "./location.js";
+import { GET as ebayStatusGET } from "../../app/api/ebay/status/route.js";
+import {
+  decryptSecret,
+  encryptSecret,
+  persistEbayRefreshToken,
+  resolveEbayRefreshToken,
+  type EbayCredentialDb,
+  type EbayCredentialRow,
+} from "./credentials.js";
+import { handleEbayOauthCallback } from "./oauthCallback.js";
 
 const TEST_CONFIG: EbayConfig = {
   clientId: "TestClient-123",
@@ -39,6 +49,7 @@ const TEST_CONFIG: EbayConfig = {
   authBaseUrl: "https://auth.sandbox.ebay.com",
   tokenUrl: "https://api.sandbox.ebay.com/identity/v1/oauth2/token",
 };
+const TEST_TOKEN_KEY = Buffer.alloc(32, 7).toString("base64");
 
 const MOCK_POLICIES: EbayPolicies = {
   paymentPolicyId: "pay-001",
@@ -251,7 +262,9 @@ test("refreshAccessToken throws on failure", async () => {
 beforeEach(() => clearTokenCache());
 
 test("getAccessToken uses EBAY_REFRESH_TOKEN to obtain access token", async () => {
+  const saved = saveEnv(["EBAY_REFRESH_TOKEN", "DATABASE_URL"]);
   process.env.EBAY_REFRESH_TOKEN = "v^1.1-stored-refresh";
+  delete process.env.DATABASE_URL;
   let callCount = 0;
   const fetch: typeof globalThis.fetch = () => {
     callCount++;
@@ -262,24 +275,143 @@ test("getAccessToken uses EBAY_REFRESH_TOKEN to obtain access token", async () =
     } as Response);
   };
 
-  const token = await getAccessToken(TEST_CONFIG, fetch);
-  assert.equal(token, "v^1.1-fresh");
-  assert.equal(callCount, 1);
+  try {
+    const token = await getAccessToken(TEST_CONFIG, fetch);
+    assert.equal(token, "v^1.1-fresh");
+    assert.equal(callCount, 1);
 
-  // Second call should use cache
-  const token2 = await getAccessToken(TEST_CONFIG, fetch);
-  assert.equal(token2, "v^1.1-fresh");
-  assert.equal(callCount, 1); // no new fetch
-
-  delete process.env.EBAY_REFRESH_TOKEN;
+    // Second call should use cache
+    const token2 = await getAccessToken(TEST_CONFIG, fetch);
+    assert.equal(token2, "v^1.1-fresh");
+    assert.equal(callCount, 1); // no new fetch
+  } finally {
+    restoreEnv(saved);
+  }
 });
 
-test("getAccessToken throws when EBAY_REFRESH_TOKEN is missing", async () => {
+test("getAccessToken throws when no stored or legacy eBay refresh token exists", async () => {
+  const saved = saveEnv(["EBAY_REFRESH_TOKEN", "DATABASE_URL"]);
   delete process.env.EBAY_REFRESH_TOKEN;
-  await assert.rejects(
-    () => getAccessToken(TEST_CONFIG),
-    /EBAY_REFRESH_TOKEN is not set/,
-  );
+  delete process.env.DATABASE_URL;
+  try {
+    await assert.rejects(
+      () => getAccessToken(TEST_CONFIG),
+      /eBay refresh token is not set/,
+    );
+  } finally {
+    restoreEnv(saved);
+  }
+});
+
+test("encryptSecret decryptSecret round-trip without exposing plaintext", () => {
+  const key = Buffer.from(TEST_TOKEN_KEY, "base64");
+  const encrypted = encryptSecret("v^1.1-refresh-secret", key);
+
+  assert.notEqual(encrypted.ciphertext, "v^1.1-refresh-secret");
+  assert.equal(decryptSecret(encrypted, key), "v^1.1-refresh-secret");
+});
+
+test("resolveEbayRefreshToken reads DB first and falls back to env only when no row exists", async () => {
+  const db = fakeEbayCredentialDb();
+  await persistEbayRefreshToken(TEST_CONFIG, "db-refresh-token", {
+    db,
+    env: { TOKEN_ENCRYPTION_KEY: TEST_TOKEN_KEY },
+    now: new Date("2026-07-04T10:00:00.000Z"),
+  });
+
+  const resolved = await resolveEbayRefreshToken({
+    db,
+    env: { TOKEN_ENCRYPTION_KEY: TEST_TOKEN_KEY, EBAY_REFRESH_TOKEN: "env-refresh-token" },
+  });
+
+  assert.deepEqual(resolved, { token: "db-refresh-token", source: "db" });
+
+  const fallback = await resolveEbayRefreshToken({
+    db: fakeEbayCredentialDb(),
+    env: { TOKEN_ENCRYPTION_KEY: TEST_TOKEN_KEY, EBAY_REFRESH_TOKEN: "env-refresh-token" },
+  });
+
+  assert.deepEqual(fallback, { token: "env-refresh-token", source: "env" });
+});
+
+test("OAuth callback persists the returned refresh token and never displays it", async () => {
+  const saved = saveEnv(["EBAY_CLIENT_ID", "EBAY_CLIENT_SECRET", "EBAY_RU_NAME", "EBAY_ENV", "EBAY_MARKETPLACE_ID", "TOKEN_ENCRYPTION_KEY"]);
+  process.env.EBAY_CLIENT_ID = TEST_CONFIG.clientId;
+  process.env.EBAY_CLIENT_SECRET = TEST_CONFIG.clientSecret;
+  process.env.EBAY_RU_NAME = TEST_CONFIG.ruName;
+  process.env.EBAY_ENV = TEST_CONFIG.env;
+  process.env.EBAY_MARKETPLACE_ID = TEST_CONFIG.marketplaceId;
+  process.env.TOKEN_ENCRYPTION_KEY = TEST_TOKEN_KEY;
+
+  const calls: Array<{ token: string; expires?: number }> = [];
+  try {
+    const response = await handleEbayOauthCallback(
+      new Request("https://poke-deal.test/api/ebay/oauth?code=auth-code-123"),
+      {
+        exchangeCodeForTokens: async () => ({
+          access_token: "access-token",
+          refresh_token: "refresh-token-from-ebay",
+          expires_in: 7200,
+          refresh_token_expires_in: 47_304_000,
+          token_type: "User Access Token",
+        }),
+        persistEbayRefreshToken: (async (_config, token, input) => {
+          calls.push({ token, expires: input?.refreshTokenExpiresInSeconds });
+          return fakeEbayCredentialRow();
+        }) as typeof persistEbayRefreshToken,
+      },
+    );
+
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(html, /eBay connected/);
+    assert.match(html, /close this tab/);
+    assert.doesNotMatch(html, /refresh-token-from-ebay/);
+    assert.doesNotMatch(html, /EBAY_REFRESH_TOKEN/);
+    assert.deepEqual(calls, [{ token: "refresh-token-from-ebay", expires: 47_304_000 }]);
+  } finally {
+    restoreEnv(saved);
+  }
+});
+
+test("eBay status validates a legacy env token and reports reconnect details on failure", async () => {
+  const saved = saveEnv([
+    "EBAY_CLIENT_ID",
+    "EBAY_CLIENT_SECRET",
+    "EBAY_RU_NAME",
+    "EBAY_ENV",
+    "EBAY_MARKETPLACE_ID",
+    "EBAY_REFRESH_TOKEN",
+    "DATABASE_URL",
+  ]);
+  const originalFetch = globalThis.fetch;
+  process.env.EBAY_CLIENT_ID = TEST_CONFIG.clientId;
+  process.env.EBAY_CLIENT_SECRET = TEST_CONFIG.clientSecret;
+  process.env.EBAY_RU_NAME = TEST_CONFIG.ruName;
+  process.env.EBAY_ENV = TEST_CONFIG.env;
+  process.env.EBAY_MARKETPLACE_ID = TEST_CONFIG.marketplaceId;
+  process.env.EBAY_REFRESH_TOKEN = "dead-env-token";
+  delete process.env.DATABASE_URL;
+  globalThis.fetch = (() =>
+    Promise.resolve({
+      ok: false,
+      status: 400,
+      text: () => Promise.resolve(JSON.stringify({ error: "invalid_grant" })),
+      json: () => Promise.resolve({ error: "invalid_grant" }),
+    } as Response)) as typeof fetch;
+
+  try {
+    const response = await ebayStatusGET();
+    const body = await response.json() as any;
+    assert.equal(body.configured, true);
+    assert.equal(body.connected, false);
+    assert.equal(body.tokenSource, "env");
+    assert.match(body.error, /token refresh failed 400/);
+    assert.equal(body.reconnectUrl, "/api/ebay/connect?force=1");
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv(saved);
+  }
 });
 
 test("getApplicationAccessToken uses client credentials and caches the token", async () => {
@@ -1045,3 +1177,67 @@ test("checkEbayReadiness fails when channel is not EBAY", () => {
   const check = result.checks.find((c) => c.key === "channel_ebay");
   assert.equal(check?.status, "fail");
 });
+
+function fakeEbayCredentialDb(initial: EbayCredentialRow | null = null): EbayCredentialDb {
+  let row = initial;
+  const now = new Date("2026-07-04T10:00:00.000Z");
+  return {
+    ebayCredential: {
+      async findUnique() {
+        return row as EbayCredentialRow;
+      },
+      async upsert({ create, update }) {
+        row = row
+          ? {
+              ...row,
+              ...update,
+              refreshTokenExpiresAt: update.refreshTokenExpiresAt ?? null,
+              updatedAt: now,
+            }
+          : {
+              id: "ebay-credential-1",
+              createdAt: now,
+              updatedAt: now,
+              lastValidatedAt: null,
+              ...create,
+              refreshTokenExpiresAt: create.refreshTokenExpiresAt ?? null,
+            };
+        return row;
+      },
+      async update({ data }) {
+        if (!row) throw new Error("missing fake eBay credential");
+        row = { ...row, ...data, updatedAt: now };
+        return row;
+      },
+    },
+  };
+}
+
+function fakeEbayCredentialRow(): EbayCredentialRow {
+  const encrypted = encryptSecret("stored-refresh-token", Buffer.from(TEST_TOKEN_KEY, "base64"));
+  const now = new Date("2026-07-04T10:00:00.000Z");
+  return {
+    id: "ebay-credential-1",
+    key: "default",
+    env: TEST_CONFIG.env,
+    marketplaceId: TEST_CONFIG.marketplaceId,
+    refreshTokenCiphertext: encrypted.ciphertext,
+    refreshTokenIv: encrypted.iv,
+    refreshTokenTag: encrypted.tag,
+    refreshTokenExpiresAt: null,
+    createdAt: now,
+    updatedAt: now,
+    lastValidatedAt: null,
+  };
+}
+
+function saveEnv(keys: string[]): Record<string, string | undefined> {
+  return Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+}
+
+function restoreEnv(saved: Record<string, string | undefined>): void {
+  for (const [key, value] of Object.entries(saved)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
