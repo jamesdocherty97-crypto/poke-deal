@@ -4,8 +4,22 @@ import {
   buildFulfillmentOrdersPath,
   importEbayOrderLine,
   normalizePaidEbayOrder,
+  syncOwnEbaySales,
   type NormalizedEbayOrderLine,
 } from "./orders.js";
+import type { EbayConfig } from "./config.js";
+
+const TEST_CONFIG: EbayConfig = {
+  clientId: "TestClient-123",
+  clientSecret: "test-secret",
+  ruName: "TestApp-RuName-1234",
+  env: "sandbox",
+  marketplaceId: "EBAY_GB",
+  contentLanguage: "en-GB",
+  apiBaseUrl: "https://api.sandbox.ebay.com",
+  authBaseUrl: "https://auth.sandbox.ebay.com",
+  tokenUrl: "https://api.sandbox.ebay.com/identity/v1/oauth2/token",
+};
 
 test("buildFulfillmentOrdersPath requests recent fulfillment orders with a bounded limit", () => {
   const path = buildFulfillmentOrdersPath({
@@ -59,6 +73,59 @@ test("normalizePaidEbayOrder ignores unpaid orders", () => {
     }),
     [],
   );
+});
+
+test("syncOwnEbaySales explains missing fulfillment scope as a reconnect action", async () => {
+  const savedEnv = {
+    clientId: process.env.EBAY_CLIENT_ID,
+    clientSecret: process.env.EBAY_CLIENT_SECRET,
+    ruName: process.env.EBAY_RU_NAME,
+    refreshToken: process.env.EBAY_REFRESH_TOKEN,
+  };
+  process.env.EBAY_CLIENT_ID = TEST_CONFIG.clientId;
+  process.env.EBAY_CLIENT_SECRET = TEST_CONFIG.clientSecret;
+  process.env.EBAY_RU_NAME = TEST_CONFIG.ruName;
+  process.env.EBAY_REFRESH_TOKEN = "old-refresh-token";
+  let orderCalled = false;
+  const fetchImpl: typeof globalThis.fetch = (url) => {
+    const href = String(url);
+    if (href.includes("/identity/v1/oauth2/token")) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ access_token: "user-token", expires_in: 7200 }),
+        text: () => Promise.resolve("{}"),
+      } as Response);
+    }
+    orderCalled = href.includes("/sell/fulfillment/v1/order");
+    return Promise.resolve({
+      ok: false,
+      status: 403,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(JSON.stringify({
+        errors: [
+          {
+            errorId: 1100,
+            message: "Insufficient permissions",
+            longMessage: "Insufficient permissions to fulfill the request.",
+          },
+        ],
+      })),
+    } as Response);
+  };
+
+  try {
+    await assert.rejects(
+      () => syncOwnEbaySales({ db: fakeEbaySyncDb().client, config: TEST_CONFIG, fetchImpl }),
+      /Reconnect eBay to grant new permissions/,
+    );
+    assert.equal(orderCalled, true);
+  } finally {
+    restoreEnv("EBAY_CLIENT_ID", savedEnv.clientId);
+    restoreEnv("EBAY_CLIENT_SECRET", savedEnv.clientSecret);
+    restoreEnv("EBAY_RU_NAME", savedEnv.ruName);
+    restoreEnv("EBAY_REFRESH_TOKEN", savedEnv.refreshToken);
+  }
 });
 
 test("importEbayOrderLine books a matched listing sale and is idempotent", async () => {
@@ -222,4 +289,9 @@ function fakeEbaySyncDb(options: { includeListing?: boolean; includeItem?: boole
   };
 
   return { client: client as any, items, listings, imports, sales, appAlerts };
+}
+
+function restoreEnv(key: string, value: string | undefined) {
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
 }

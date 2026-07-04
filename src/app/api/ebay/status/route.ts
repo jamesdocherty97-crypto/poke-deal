@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getEbayConfig, isEbayConfigured, hasEbayRefreshToken } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
+import { ebayErrorMessage, ebayReconnectHintForError } from "@/lib/ebay/errors";
 import { fetchEbayPolicies, fetchEbaySellingPrivileges } from "@/lib/ebay/policies";
 import { fetchEbayTradingApiUser } from "@/lib/ebay/accountIdentity";
 import {
@@ -80,13 +81,15 @@ export async function GET() {
       },
     });
   } catch (err) {
+    const hint = ebayReconnectHintForError(err);
     return NextResponse.json({
       configured: true,
       connected: false,
       env: config.env,
       marketplaceId: config.marketplaceId,
       locationSetup,
-      error: err instanceof Error ? err.message : "eBay connection check failed",
+      error: ebayErrorMessage(err, "eBay connection check failed"),
+      reconnectUrl: hint ? "/api/ebay/connect?force=1" : undefined,
     });
   }
 }

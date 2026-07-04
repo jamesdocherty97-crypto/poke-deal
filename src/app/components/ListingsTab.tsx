@@ -405,8 +405,8 @@ export function ListingsTab({
             <span>eBay credentials not configured - set env vars to enable API automation.</span>
           ) : ebayNeedsReconnect ? (
             <>
-              <span>eBay connection expired - reconnect your seller account to create offers.</span>
-              <a href="/api/ebay/connect">Reconnect eBay</a>
+              <span>Reconnect eBay to grant new permissions for offers and sales sync.</span>
+              <a href="/api/ebay/connect?force=1">Reconnect eBay</a>
             </>
           ) : (
             <>

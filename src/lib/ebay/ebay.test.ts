@@ -1,7 +1,8 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { buildAuthUrl, exchangeCodeForTokens, refreshAccessToken } from "./oauth.js";
+import { EBAY_RECONNECT_HINT, EBAY_USER_SCOPES, buildAuthUrl, exchangeCodeForTokens, refreshAccessToken } from "./oauth.js";
 import { ebayJson } from "./client.js";
+import { ebayApiErrorResponseBody, ebayErrorMessage, isEbayPermissionReconnectError } from "./errors.js";
 import { buildInventoryItemPayload, upsertInventoryItem } from "./inventoryItem.js";
 import { buildOfferPayload } from "./offer.js";
 import { buildEbayOfferPreflight, toEbaySku } from "./preflight.js";
@@ -78,6 +79,29 @@ test("ebayJson includes eBay errorId and long message on failure", async () => {
   );
 });
 
+test("eBay insufficient-permissions errors carry the reconnect hint", async () => {
+  const fetch = mockFetch(403, {
+    errors: [
+      {
+        errorId: 1100,
+        domain: "ACCESS",
+        category: "REQUEST",
+        message: "Insufficient permissions",
+        longMessage: "Insufficient permissions to fulfill the request.",
+      },
+    ],
+  });
+
+  try {
+    await ebayJson(TEST_CONFIG, "/sell/fulfillment/v1/order", "token-xyz", {}, fetch);
+    assert.fail("expected eBay permission failure");
+  } catch (err) {
+    assert.equal(isEbayPermissionReconnectError(err), true);
+    assert.match(ebayErrorMessage(err, "eBay call failed"), /Reconnect eBay to grant new permissions/);
+    assert.deepEqual(ebayApiErrorResponseBody(err, "eBay call failed").hint, EBAY_RECONNECT_HINT);
+  }
+});
+
 // ── not-configured mode ───────────────────────────────────────────────────────
 
 test("isEbayConfigured returns false when credentials are missing", () => {
@@ -104,16 +128,29 @@ test("isEbayConfigured returns false when credentials are missing", () => {
 
 test("buildAuthUrl produces correct sandbox consent URL", () => {
   const url = buildAuthUrl(TEST_CONFIG);
+  const parsed = new URL(url);
+  const scopes = parsed.searchParams.get("scope")?.split(" ") ?? [];
   assert.match(url, /auth\.sandbox\.ebay\.com\/oauth2\/authorize/);
   assert.match(url, /client_id=TestClient-123/);
   assert.match(url, /redirect_uri=TestApp-RuName-1234/);
   assert.match(url, /response_type=code/);
-  assert.match(url, /sell\.inventory/);
+  assert.deepEqual(scopes, [...EBAY_USER_SCOPES]);
+  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.inventory"), true);
+  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.account"), true);
+  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.account.readonly"), true);
+  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.fulfillment"), true);
+  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly"), true);
 });
 
 test("buildAuthUrl includes custom state", () => {
   const url = buildAuthUrl(TEST_CONFIG, "my-state-123");
   assert.match(url, /state=my-state-123/);
+});
+
+test("buildAuthUrl can force a clean eBay login for re-consent", () => {
+  const url = new URL(buildAuthUrl(TEST_CONFIG, "ebay-force-reconnect", { forceLogin: true }));
+  assert.equal(url.searchParams.get("state"), "ebay-force-reconnect");
+  assert.equal(url.searchParams.get("prompt"), "login");
 });
 
 // ── Token exchange ────────────────────────────────────────────────────────────
@@ -182,6 +219,23 @@ test("refreshAccessToken sends refresh_token grant and returns access token", as
   assert.match(capturedBody, /grant_type=refresh_token/);
   assert.match(capturedBody, /refresh_token=v%5E1.1-refresh-abc/);
   assert.match(capturedBody, /scope=.*sell\.inventory/);
+  assert.match(capturedBody, /scope=.*sell\.fulfillment/);
+});
+
+test("token refresh scope failures also request eBay reconnect", async () => {
+  const fetch = mockFetch(400, { error: "invalid_scope", error_description: "The requested scope is invalid or exceeds the scope granted." });
+  await assert.rejects(
+    async () => {
+      try {
+        await refreshAccessToken(TEST_CONFIG, "old-refresh-token", fetch);
+      } catch (err) {
+        assert.equal(isEbayPermissionReconnectError(err), true);
+        assert.match(ebayErrorMessage(err, "refresh failed"), /Reconnect eBay to grant new permissions/);
+        throw err;
+      }
+    },
+    /token refresh failed 400/,
+  );
 });
 
 test("refreshAccessToken throws on failure", async () => {

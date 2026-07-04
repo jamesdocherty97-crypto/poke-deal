@@ -1,3 +1,5 @@
+import { EBAY_RECONNECT_HINT } from "./oauth.js";
+
 export interface EbayApiErrorDetail {
   errorId?: number | string;
   domain?: string;
@@ -73,14 +75,38 @@ export function isEbayApiError(error: unknown): error is EbayApiError {
   return error instanceof EbayApiError;
 }
 
+export function isEbayPermissionReconnectError(error: unknown): boolean {
+  if (isEbayApiError(error)) {
+    return error.details.some((detail) => isPermissionDetail(detail)) || isPermissionText(error.message);
+  }
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return isPermissionText(message);
+}
+
+export function ebayReconnectHintForError(error: unknown): string | null {
+  return isEbayPermissionReconnectError(error) ? EBAY_RECONNECT_HINT : null;
+}
+
+export function ebayErrorMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : fallback;
+  const hint = ebayReconnectHintForError(error);
+  return hint && !message.includes(hint) ? `${message}. ${hint}` : message;
+}
+
 export function ebayApiErrorResponseBody(error: unknown, fallback: string): Record<string, unknown> {
   if (!isEbayApiError(error)) {
-    return { error: error instanceof Error ? error.message : fallback };
+    const hint = ebayReconnectHintForError(error);
+    return {
+      error: ebayErrorMessage(error, fallback),
+      ...(hint ? { hint, reconnectUrl: "/api/ebay/connect?force=1" } : {}),
+    };
   }
 
   const primary = error.primary;
+  const hint = ebayReconnectHintForError(error);
   return {
-    error: error.message,
+    error: ebayErrorMessage(error, fallback),
+    ...(hint ? { hint, reconnectUrl: "/api/ebay/connect?force=1" } : {}),
     ebayError: {
       status: error.status,
       path: error.path,
@@ -105,4 +131,16 @@ export function ebayApiErrorLogBody(error: unknown): Record<string, unknown> {
     details: error.details,
     rawBody: error.rawBody,
   };
+}
+
+function isPermissionDetail(detail: EbayApiErrorDetail): boolean {
+  return String(detail.errorId ?? "") === "1100" || isPermissionText([
+    detail.message,
+    detail.longMessage,
+    detail.category,
+  ].filter(Boolean).join(" "));
+}
+
+function isPermissionText(value: string): boolean {
+  return /(?:errorId\s*1100|insufficient permissions|not authorized|invalid_scope|scope.*(?:invalid|missing|grant|permission|consent)|grant new permissions|new permissions)/i.test(value);
 }

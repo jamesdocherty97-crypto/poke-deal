@@ -26,6 +26,65 @@
     font-size: 34px;
   }
 
+  .topbar-actions {
+    gap: 10px;
+  }
+
+  .topbar-secondary {
+    min-width: 72px;
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .set-chip-row,
+  .preset-row,
+  .sale-channel-presets {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .set-chip-row button,
+  .preset-row button,
+  .sale-channel-presets button {
+    flex: 1 1 auto;
+  }
+
+  .workspace::before {
+    top: 16px;
+    right: -8px;
+    width: 150px;
+    height: 150px;
+    opacity: 0.18;
+  }
+
+  .today-hero-panel {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    min-height: 168px;
+    padding: 22px;
+  }
+
+  .today-hero-panel::after {
+    right: 22px;
+    bottom: -20px;
+    width: 174px;
+    height: 150px;
+  }
+
+  .today-hero-panel h2 {
+    max-width: none;
+    font-size: 42px;
+  }
+
+  .today-hero-actions {
+    justify-content: flex-end;
+    padding-right: 158px;
+  }
+
+  .metric strong {
+    font-size: 24px;
+  }
+
   .hero-board {
     grid-template-columns: minmax(0, 1fr) 190px;
     min-height: 190px;
@@ -239,6 +298,17 @@
   .pnl-workspace .reprice-row div:last-child {
     justify-items: start;
     text-align: left;
+  }
+}
+
+@media (min-width: 1181px) {
+  .buy-workspace {
+    grid-auto-flow: dense;
+  }
+
+  .buy-workspace > .stock-import-panel,
+  .buy-workspace > .recent-intake-panel {
+    grid-column: 2;
   }
 }
 

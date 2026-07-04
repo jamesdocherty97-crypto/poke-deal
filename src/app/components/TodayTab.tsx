@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { LaunchReadinessItem, LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import type { LaunchPlanItem, LaunchPlanTarget, LaunchProgress } from "@/lib/dealer/launchPlan";
 import type { OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
@@ -10,7 +11,7 @@ type TodaySystemSource = {
   id: string;
   label: string;
   role: string;
-  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem";
+  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem" | "info";
   required: boolean;
   setupHint?: string;
 };
@@ -136,6 +137,7 @@ export function TodayTab({
   appAlertUnreadCount: number;
   onMarkAlertsRead: () => void;
 }) {
+  const greeting = useTodayGreeting();
   const stockCount = dashboard?.metrics.stockCount ?? 0;
   const soldCount = dashboard?.metrics.soldCount ?? 0;
   const operatingExpensePence = dashboard?.metrics.operatingExpensePence ?? 0;
@@ -143,6 +145,25 @@ export function TodayTab({
 
   return (
     <section className="workspace today-workspace">
+      <section className="today-hero-panel" aria-label="Today summary">
+        <div>
+          <span>{greeting}</span>
+          <h2>Run today from here</h2>
+          <p>
+            {stockCount} in stock · {activeListingCount} active ·{" "}
+            {appAlertUnreadCount > 0 ? `${appAlertUnreadCount} unread` : "caught up"}
+          </p>
+        </div>
+        <div className="today-hero-actions">
+          <button type="button" onClick={onNewBuy}>
+            Comp buy
+          </button>
+          <button type="button" onClick={sellStock}>
+            {activeListingCount > 0 ? "Record sale" : "Stock"}
+          </button>
+        </div>
+      </section>
+
       <section className="panel today-panel">
         <div className="panel-heading">
           <div>
@@ -376,6 +397,19 @@ export function TodayTab({
   );
 }
 
+function useTodayGreeting(): string {
+  const [greeting, setGreeting] = useState("Good day");
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Good morning");
+    else if (hour < 18) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
+  }, []);
+
+  return greeting;
+}
+
 function NextMoveCard({
   action,
   progress,
@@ -542,6 +576,7 @@ function SetupStep({
 
 function sourceStatusLabel(status: TodaySystemSource["status"]): string {
   if (status === "ready") return "ready";
+  if (status === "info") return "info";
   if (status === "public") return "public";
   if (status === "fixture") return "fixture";
   if (status === "building") return "building";
@@ -551,7 +586,7 @@ function sourceStatusLabel(status: TodaySystemSource["status"]): string {
 
 function sourceStatusTone(status: TodaySystemSource["status"]): string {
   if (status === "ready" || status === "building") return "good";
-  if (status === "public") return "info";
+  if (status === "public" || status === "info") return "info";
   if (status === "fixture") return "warn";
   if (status === "problem") return "danger";
   return "danger";

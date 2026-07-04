@@ -4,12 +4,18 @@
 
 import type { EbayConfig } from "./config.js";
 
-export const EBAY_SCOPES = [
+export const EBAY_RECONNECT_HINT = "Reconnect eBay to grant new permissions - /api/ebay/connect";
+
+export const EBAY_USER_SCOPES = [
   "https://api.ebay.com/oauth/api_scope",
   "https://api.ebay.com/oauth/api_scope/sell.inventory",
   "https://api.ebay.com/oauth/api_scope/sell.account",
   "https://api.ebay.com/oauth/api_scope/sell.account.readonly",
-].join(" ");
+  "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
+  "https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly",
+] as const;
+
+export const EBAY_SCOPES = EBAY_USER_SCOPES.join(" ");
 
 export interface EbayTokenResponse {
   access_token: string;
@@ -20,7 +26,7 @@ export interface EbayTokenResponse {
 }
 
 /** Build the eBay OAuth consent URL. The redirect_uri param must be the RuName, not the raw URL. */
-export function buildAuthUrl(config: EbayConfig, state = "ebay-connect"): string {
+export function buildAuthUrl(config: EbayConfig, state = "ebay-connect", options: { forceLogin?: boolean } = {}): string {
   const params = new URLSearchParams({
     client_id: config.clientId,
     redirect_uri: config.ruName,
@@ -28,6 +34,7 @@ export function buildAuthUrl(config: EbayConfig, state = "ebay-connect"): string
     scope: EBAY_SCOPES,
     state,
   });
+  if (options.forceLogin) params.set("prompt", "login");
   return `${config.authBaseUrl}/oauth2/authorize?${params.toString()}`;
 }
 

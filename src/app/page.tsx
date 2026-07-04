@@ -704,7 +704,7 @@ type SystemSource = {
   id: string;
   label: string;
   role: string;
-  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem";
+  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem" | "info";
   required: boolean;
   setupHint?: string;
 };
@@ -1768,7 +1768,7 @@ export default function Home() {
     ebayStatus?.configured &&
       !ebayStatus.connected &&
       ebayStatus.error &&
-      /(?:invalid access token|authorization|refresh token|token exchange|token refresh)/i.test(ebayStatus.error),
+      /(?:invalid access token|authorization|refresh token|token exchange|token refresh|insufficient permissions|grant new permissions|invalid_scope|new permissions)/i.test(ebayStatus.error),
   );
   const ebayHealthSource = useMemo<SystemSource>(
     () => ({
@@ -1791,7 +1791,7 @@ export default function Home() {
           : ebayStatus?.connected
             ? "Seller account is connected; finish business policies before offer creation."
             : ebayNeedsReconnect
-              ? "The saved eBay connection has expired. Reconnect the seller account to create offers."
+              ? "Reconnect eBay to grant new permissions - /api/ebay/connect"
             : ebayStatus?.configured
               ? "Seller credentials are present; connect the eBay account to create offers."
               : "Add production eBay credentials when you are ready to automate listing offers.",

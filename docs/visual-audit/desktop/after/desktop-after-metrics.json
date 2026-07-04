@@ -1,0 +1,98 @@
+[
+  {
+    "view": "today",
+    "viewport": "1280x800",
+    "docScrollWidth": 1280,
+    "bodyScrollWidth": 1280,
+    "maxRight": 1160,
+    "overflow": []
+  },
+  {
+    "view": "buy",
+    "viewport": "1280x800",
+    "docScrollWidth": 1280,
+    "bodyScrollWidth": 1280,
+    "maxRight": 1160,
+    "overflow": []
+  },
+  {
+    "view": "inventory",
+    "viewport": "1280x800",
+    "docScrollWidth": 1280,
+    "bodyScrollWidth": 1280,
+    "maxRight": 1160,
+    "overflow": []
+  },
+  {
+    "view": "listings",
+    "viewport": "1280x800",
+    "docScrollWidth": 1280,
+    "bodyScrollWidth": 1280,
+    "maxRight": 1160,
+    "overflow": []
+  },
+  {
+    "view": "profit",
+    "viewport": "1280x800",
+    "docScrollWidth": 1280,
+    "bodyScrollWidth": 1280,
+    "maxRight": 1160,
+    "overflow": []
+  },
+  {
+    "view": "setup",
+    "viewport": "1280x800",
+    "docScrollWidth": 1280,
+    "bodyScrollWidth": 1280,
+    "maxRight": 1160,
+    "overflow": []
+  },
+  {
+    "view": "today",
+    "viewport": "1440x900",
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "maxRight": 1240,
+    "overflow": []
+  },
+  {
+    "view": "buy",
+    "viewport": "1440x900",
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "maxRight": 1240,
+    "overflow": []
+  },
+  {
+    "view": "inventory",
+    "viewport": "1440x900",
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "maxRight": 1240,
+    "overflow": []
+  },
+  {
+    "view": "listings",
+    "viewport": "1440x900",
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "maxRight": 1240,
+    "overflow": []
+  },
+  {
+    "view": "profit",
+    "viewport": "1440x900",
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "maxRight": 1240,
+    "overflow": []
+  },
+  {
+    "view": "setup",
+    "viewport": "1440x900",
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "maxRight": 1240,
+    "overflow": []
+  }
+]

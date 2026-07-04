@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { readEbayOrderImportQueue, syncOwnEbaySales } from "@/lib/ebay/orders";
+import { ebayApiErrorResponseBody, ebayErrorMessage } from "@/lib/ebay/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ imports, unmatched, unmatchedCount: unmatched.length });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "eBay order import queue lookup failed" },
+      { error: ebayErrorMessage(err, "eBay order import queue lookup failed") },
       { status: 500 },
     );
   }
@@ -24,7 +25,7 @@ export async function POST() {
     return NextResponse.json(result, { status: result.ok ? 200 : 500 });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "eBay sales sync failed" },
+      ebayApiErrorResponseBody(err, "eBay sales sync failed"),
       { status: 500 },
     );
   }

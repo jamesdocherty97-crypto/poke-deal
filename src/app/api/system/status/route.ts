@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { getPokeTraceHealth, PokeTraceSource } from "@/lib/comps/sources/pokeTrace";
-import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from "@/lib/comps/sources/ebayMarketplaceInsights";
+import { EbayMarketplaceInsightsSource } from "@/lib/comps/sources/ebayMarketplaceInsights";
 import { latestSuccessfulRun } from "@/lib/automation/cronRunLog";
 import { alertWebhookConfigured } from "@/lib/alerts/notifier";
 import { getPrisma } from "@/lib/db/prisma";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
-import { getEbayConfig, hasEbayRefreshToken } from "@/lib/ebay/config";
 import { PsaCertLookup } from "@/lib/psa/psaCert";
 import { getFxHealth } from "@/lib/comps/currency";
 
@@ -17,7 +16,7 @@ type SystemSource = {
   id: string;
   label: string;
   role: string;
-  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem";
+  status: "ready" | "public" | "fixture" | "missing" | "building" | "problem" | "info";
   required: boolean;
   setupHint?: string;
 };
@@ -30,9 +29,6 @@ export async function GET() {
   const ebayMi = new EbayMarketplaceInsightsSource();
   const psa = new PsaCertLookup();
   const fx = await getFxHealth();
-  const ebayConfigured = Boolean(getEbayConfig());
-  const ebayConnected = hasEbayRefreshToken();
-  const ebayMiEnabled = isEbayMarketplaceInsightsEnabled();
   const webhookReady = alertWebhookConfigured();
   const cronRuns = process.env.DATABASE_URL?.trim()
     ? await getPrisma().cronRun.findMany({
@@ -89,13 +85,11 @@ export async function GET() {
       id: "ebay-marketplace-insights",
       label: "eBay Marketplace Insights",
       role: "UK eBay sold comps",
-      status: ebayMi.live ? "ready" : ebayMiEnabled && ebayConfigured && ebayConnected ? "building" : "missing",
+      status: ebayMi.live ? "ready" : "info",
       required: false,
       setupHint: ebayMi.live
         ? "Programmatic UK eBay sold comps are enabled. If lookups still return authorization errors, eBay has not granted the restricted MI access yet."
-        : ebayMiEnabled
-          ? "MI is enabled but needs eBay credentials, OAuth connection, and restricted Marketplace Insights approval before it can return live sold comps."
-          : "Restricted eBay MI code is deployed but disabled. Set EBAY_MARKETPLACE_INSIGHTS_ENABLED=true after approval.",
+        : "Awaiting eBay approval - program currently closed to new applicants; support ticket pending. Code is ready; enable EBAY_MARKETPLACE_INSIGHTS_ENABLED=true on approval.",
     },
     {
       id: "psa-public-api",

@@ -4,6 +4,7 @@ import { planSaleListingClosure, planUnitSale, splitPence } from "../dealer/unit
 import type { EbayConfig } from "./config.js";
 import { getEbayConfig, hasEbayRefreshToken, isEbayConfigured } from "./config.js";
 import { ebayJson } from "./client.js";
+import { ebayErrorMessage } from "./errors.js";
 import { getAccessToken } from "./tokens.js";
 
 export type EbayOrderImportStatus = "MATCHED" | "UNMATCHED" | "SKIPPED";
@@ -154,19 +155,24 @@ export async function syncOwnEbaySales({
   }
 
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
-  const accessToken = await getAccessToken(config, fetchImpl);
-  const path = buildFulfillmentOrdersPath({
-    since: since ?? new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
-    until: now,
-    limit: safeLimit,
-  });
-  const response = await ebayJson<EbayFulfillmentOrdersResponse>(
-    config,
-    path,
-    accessToken,
-    { marketplaceId: config.marketplaceId },
-    fetchImpl,
-  );
+  let response: EbayFulfillmentOrdersResponse;
+  try {
+    const accessToken = await getAccessToken(config, fetchImpl);
+    const path = buildFulfillmentOrdersPath({
+      since: since ?? new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
+      until: now,
+      limit: safeLimit,
+    });
+    response = await ebayJson<EbayFulfillmentOrdersResponse>(
+      config,
+      path,
+      accessToken,
+      { marketplaceId: config.marketplaceId },
+      fetchImpl,
+    );
+  } catch (err) {
+    throw new Error(ebayErrorMessage(err, "eBay sales sync failed"));
+  }
   const orders = response.orders ?? [];
   const lines = orders.flatMap(normalizePaidEbayOrder);
   const imports: EbayOrderImportSummary[] = [];

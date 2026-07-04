@@ -5,7 +5,7 @@ import { buildAuthUrl } from "@/lib/ebay/oauth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const config = getEbayConfig();
   if (!config) {
     return NextResponse.json(
@@ -16,5 +16,7 @@ export async function GET() {
       { status: 503 },
     );
   }
-  return NextResponse.redirect(buildAuthUrl(config));
+  const url = new URL(request.url);
+  const forceLogin = url.searchParams.get("force") === "1" || url.searchParams.get("force") === "true";
+  return NextResponse.redirect(buildAuthUrl(config, forceLogin ? "ebay-force-reconnect" : "ebay-connect", { forceLogin }));
 }
