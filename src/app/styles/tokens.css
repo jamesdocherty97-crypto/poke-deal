@@ -35,6 +35,12 @@
 
   --shadow-1: 0 10px 24px rgba(0, 0, 0, 0.26);
   --shadow-2: 0 18px 48px rgba(0, 0, 0, 0.34);
+  --elevation-base: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --elevation-raised: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 16px 34px rgba(0, 0, 0, 0.24);
+  --elevation-floating: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 22px 62px rgba(0, 0, 0, 0.42);
+  --surface-base: rgba(13, 20, 36, 0.88);
+  --surface-raised: rgba(18, 27, 47, 0.94);
+  --surface-floating: rgb(13, 20, 36);
 
   --z-base: 1;
   --z-nav: 100;
@@ -45,8 +51,8 @@
   --bg: #080b13;
   --ink: #f8fbff;
   --muted: #aeb9cf;
-  --panel: rgba(13, 20, 36, 0.9);
-  --panel-2: rgba(22, 32, 55, 0.94);
+  --panel: var(--surface-base);
+  --panel-2: var(--surface-raised);
   --line: rgba(255, 255, 255, 0.14);
   --border: var(--line);
 

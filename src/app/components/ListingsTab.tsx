@@ -100,7 +100,6 @@ export function ListingsTab({
   setEbayPublishTarget,
   listingPackSheet,
   editListingSheet,
-  ebayPublishOverlay,
 }: {
   dashboard: Dashboard | null;
   firstDraftListingTarget: Listing | null;
@@ -160,7 +159,6 @@ export function ListingsTab({
   setEbayPublishTarget: (id: string | null) => void;
   listingPackSheet: ReactNode;
   editListingSheet: ReactNode;
-  ebayPublishOverlay: ReactNode;
 }) {
   return (
     <section className="workspace listings-workspace">
@@ -489,7 +487,6 @@ export function ListingsTab({
           </a>
         </div>
       )}
-      {ebayPublishOverlay}
       {visibleListings.map((listing) => (
         <ListingRow
           key={listing.id}
@@ -510,7 +507,10 @@ export function ListingsTab({
           }
           onPhotos={addPhotosToInventory}
           onCatalogArt={addCatalogArtToInventory}
-          onEbayPublish={() => setEbayPublishTarget(listing.id)}
+          onEbayPublish={() => {
+            setEbayPublishTarget(listing.id);
+            openListingPack(listing);
+          }}
         />
       ))}
       {listings.length === 0 ? (
@@ -863,7 +863,16 @@ function ListingRow({
 }
 
 function GradeBadge({ grade }: { grade: string }) {
-  return <span className="grade-badge">{grade.replace(/_/g, " ")}</span>;
+  return <span className={`grade-badge ${gradeTone(grade)}`}>{grade.replace(/_/g, " ")}</span>;
+}
+
+function gradeTone(grade: string): string {
+  if (grade === "RAW") return "raw";
+  if (grade.startsWith("PSA")) return "psa";
+  if (grade.startsWith("BGS")) return "bgs";
+  if (grade.startsWith("CGC")) return "cgc";
+  if (grade.startsWith("ACE")) return "ace";
+  return "";
 }
 
 function rowCountLabel(visible: number, total: number): string {

@@ -2,7 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
-import { type FormEvent, type KeyboardEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
 import {
   orderListingPhotos,
@@ -847,6 +847,7 @@ export default function Home() {
   const [pullDistance, setPullDistance] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeArt, setNoticeArt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
   const [sellingListingId, setSellingListingId] = useState<string | null>(null);
@@ -4501,6 +4502,13 @@ export default function Home() {
   }
 
   function requestDeleteItem(item: InventoryItem) {
+    setEditingItemId(null);
+    setCreatingListingItemId(null);
+    setEditingListingId(null);
+    setListingPackId(null);
+    setEbayPublishTarget(null);
+    setSellingId(null);
+    setSellingListingId(null);
     setDeleteTarget({ kind: "inventory", item });
   }
 
@@ -4808,6 +4816,7 @@ export default function Home() {
   }
 
   async function publishEbayListing(listingId: string) {
+    const publishedListing = listings.find((listing) => listing.id === listingId);
     setEbayPublishTarget(null);
     setBusy(`ebay-publish-${listingId}`);
     setError(null);
@@ -4816,6 +4825,7 @@ export default function Home() {
       const res = await fetch(`/api/listings/${listingId}/ebay/publish`, { method: "POST" });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay publish failed"));
+      setNoticeArt(inventoryDisplayImage(publishedListing?.item));
       setNotice(payload.message ?? "Published on eBay.");
       await refreshAll();
     } catch (err) {
@@ -5698,7 +5708,15 @@ export default function Home() {
       </section>
 
       <div className="toast-stack" aria-live="polite" aria-atomic="true">
-        {notice && <Toast tone="success" message={notice} onDismiss={() => setNotice(null)} />}
+        {notice && (
+          <Toast
+            tone="success"
+            message={notice}
+            imageUrl={/publish|published/i.test(notice) ? noticeArt : null}
+            kind={/publish|published/i.test(notice) ? "publish" : /sale|sold|imported/i.test(notice) ? "sale" : "default"}
+            onDismiss={() => setNotice(null)}
+          />
+        )}
         {error && <Toast tone="danger" message={error} onDismiss={() => setError(null)} />}
       </div>
 
@@ -6387,7 +6405,11 @@ export default function Home() {
           )}
 
           {headline && (
-            <section className="panel comp-panel" ref={compPanelRef}>
+            <section
+              className={`panel comp-panel rarity-surface ${rarityConfidenceClass(confidenceLabel?.tone)}`}
+              ref={compPanelRef}
+              style={selectedCardImage ? ({ "--ambient-card-art": `url("${selectedCardImage}")` } as CSSProperties) : undefined}
+            >
               {comp?.ambiguous && (
                 <div className="manual-rescue-card soft">
                   <div>
@@ -6412,7 +6434,9 @@ export default function Home() {
                   <h2>{needsManualComp ? "No auto price" : gbp(headline.medianPence)}</h2>
                 </div>
                 <div className="comp-hero-actions">
-                  <span className={`pill ${confidenceLabel?.tone ?? ""}`}>{confidenceLabel?.label}</span>
+                  <span className={`pill rarity-chip ${rarityConfidenceClass(confidenceLabel?.tone)}`}>
+                    {rarityConfidenceLabel(confidenceLabel?.label, confidenceLabel?.tone)}
+                  </span>
                   <button
                     className="ghost-button comp-check-button"
                     type="button"
@@ -7624,58 +7648,6 @@ export default function Home() {
           pasteListingUrlForListing={(listing) => void pasteListingUrlForListing(listing)}
           patchListing={(listing, patch, message) => void patchListing(listing, patch, message)}
           setEbayPublishTarget={setEbayPublishTarget}
-          ebayPublishOverlay={
-            ebayPublishTarget !== null ? (() => {
-              const pl = listings.find((listing) => listing.id === ebayPublishTarget);
-              const policySummary =
-                ebayPreflight?.listingId === ebayPublishTarget
-                  ? ebayPreflight.policySummary
-                  : ebayStatusPolicySummary(ebayStatus);
-              return pl ? (
-                <div className="ebay-publish-overlay">
-                  <div className="ebay-publish-confirm">
-                    <div className="ebay-publish-card">
-                      <CardImage
-                        src={inventoryDisplayImage(pl.item)}
-                        className="mini-card-art"
-                        fallbackClassName="mini-card-art blank"
-                        alt=""
-                      />
-                      <p>
-                        <strong>Publish to eBay?</strong>
-                        <small>{pl.title ?? pl.item?.card.name ?? "Untitled listing"}</small>
-                        <span>
-                          {pl.item?.card.setName ? `${pl.item.card.setName} · ` : ""}
-                          {pl.item?.grade?.replace(/_/g, " ") ?? "Ungraded"}
-                          {pl.item?.quantity && pl.item.quantity > 1 ? ` · qty ${pl.item.quantity}` : ""}
-                          {" · "}
-                          {gbp(pl.listPrice ?? pl.suggestedPrice ?? 0)}
-                        </span>
-                      </p>
-                    </div>
-                    {policySummary && <EbayPolicySummaryList summary={policySummary} />}
-                    <div>
-                      <button
-                        className="primary-action"
-                        type="button"
-                        disabled={busy === `ebay-publish-${pl.id}`}
-                        onClick={() => void publishEbayListing(pl.id)}
-                      >
-                        {busy === `ebay-publish-${pl.id}` ? "Publishing..." : "Yes, publish live"}
-                      </button>
-                      <button
-                        className="ghost-button"
-                        type="button"
-                        onClick={() => setEbayPublishTarget(null)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : null;
-            })() : null
-          }
           editListingSheet={
             editingListingId ? (
               <form className="sell-sheet" onSubmit={saveListing}>
@@ -7727,6 +7699,7 @@ export default function Home() {
                 nextListingLabel={nextListingPackTarget ? listingQueueLabel(nextListingPackTarget) : null}
                 ebayStatus={ebayStatus}
                 ebayPreflight={ebayPreflight?.listingId === listingPackTarget.id ? ebayPreflight : null}
+                publishConfirmActive={ebayPublishTarget === listingPackTarget.id}
                 onCopy={copyListingPack}
                 onCopyAndOpen={copyListingPackAndOpenVenue}
                 onCopyField={copyListingPackField}
@@ -7737,6 +7710,8 @@ export default function Home() {
                 onPreflight={() => void runEbayPreflight(listingPackTarget.id)}
                 onCreateOffer={() => void createEbayOfferForListing(listingPackTarget.id)}
                 onRequestPublish={() => setEbayPublishTarget(listingPackTarget.id)}
+                onPublish={() => void publishEbayListing(listingPackTarget.id)}
+                onCancelPublish={() => setEbayPublishTarget(null)}
                 onClose={() => {
                   setListingPackId(null);
                   setListingPackCopied(false);
@@ -8039,14 +8014,25 @@ export default function Home() {
             <button className="ghost-button" type="button" onClick={() => setDeleteTarget(null)}>
               Cancel
             </button>
-            <button
-              className="danger-button"
-              type="button"
-              onClick={confirmDeleteTarget}
-              disabled={deleteTargetBusy(deleteTarget, busy)}
-            >
-              {deleteTargetButtonLabel(deleteTarget, busy)}
-            </button>
+            {deleteTarget.kind === "inventory" ? (
+              <SlideConfirm
+                tone="danger"
+                label="slide to delete stock"
+                valueLabel={deleteTarget.item.card.name}
+                completeLabel={deleteTargetButtonLabel(deleteTarget, busy)}
+                disabled={deleteTargetBusy(deleteTarget, busy)}
+                onConfirm={() => void confirmDeleteTarget()}
+              />
+            ) : (
+              <button
+                className="danger-button"
+                type="button"
+                onClick={confirmDeleteTarget}
+                disabled={deleteTargetBusy(deleteTarget, busy)}
+              >
+                {deleteTargetButtonLabel(deleteTarget, busy)}
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -8057,7 +8043,7 @@ export default function Home() {
           aria-label={headline ? "Buy decision" : "Current buy action"}
         >
           <div>
-            <span>{headline ? confidenceLabel?.label ?? "Comp" : "Manual card"}</span>
+            <span>{headline ? rarityConfidenceLabel(confidenceLabel?.label, confidenceLabel?.tone) : "Manual card"}</span>
             <strong>{headline ? (needsManualComp ? "Check solds" : gbp(headline.medianPence)) : "No auto comp"}</strong>
             <small>
               {headline
@@ -8193,6 +8179,7 @@ function ListingPackSheet({
   nextListingLabel,
   ebayStatus,
   ebayPreflight,
+  publishConfirmActive,
   onCopy,
   onCopyField,
   onActivate,
@@ -8202,6 +8189,8 @@ function ListingPackSheet({
   onPreflight,
   onCreateOffer,
   onRequestPublish,
+  onPublish,
+  onCancelPublish,
   onCopyAndOpen,
   onPasteLiveUrl,
 }: {
@@ -8213,6 +8202,7 @@ function ListingPackSheet({
   nextListingLabel: string | null;
   ebayStatus: EbayStatus | null;
   ebayPreflight: EbayPreflight | null;
+  publishConfirmActive: boolean;
   onCopy: () => void;
   onCopyField: (field: ListingPackCopyField) => void;
   onActivate: () => void;
@@ -8222,6 +8212,8 @@ function ListingPackSheet({
   onPreflight: () => void;
   onCreateOffer: () => void;
   onRequestPublish: () => void;
+  onPublish: () => void;
+  onCancelPublish: () => void;
   onCopyAndOpen: () => void;
   onPasteLiveUrl: () => void;
 }) {
@@ -8274,6 +8266,10 @@ function ListingPackSheet({
     : null;
   const ebayOfferReady = ebayReadiness?.offerReady ?? false;
   const ebayPublishReady = ebayReadiness?.publishReady ?? false;
+  const policySummary = ebayPreflight?.policySummary ?? ebayStatusPolicySummary(ebayStatus);
+  const ambientImage = inventoryDisplayImage(item);
+  const sheetStyle = ambientImage ? ({ "--ambient-card-art": `url("${ambientImage}")` } as CSSProperties) : undefined;
+  const sheetRef = useRef<HTMLFormElement | null>(null);
   const sellingSteps = buildListingSellFlow({
     channel: listing.channel,
     state: listing.state,
@@ -8292,6 +8288,10 @@ function ListingPackSheet({
     hasVenueAction: Boolean(venueAction),
     packCopied: copied,
   });
+
+  useEffect(() => {
+    if (publishConfirmActive) sheetRef.current?.scrollTo({ top: 0 });
+  }, [publishConfirmActive]);
 
   function runNextAction() {
     if (nextAction.id === "copy-open") {
@@ -8323,9 +8323,75 @@ function ListingPackSheet({
     }
   }
 
+  if (publishConfirmActive) {
+    return (
+      <form ref={sheetRef} className="sell-sheet listing-pack-sheet listing-pack-publish-step" style={sheetStyle} onSubmit={(event) => event.preventDefault()}>
+        <div className="panel-heading ambient-heading">
+          <div>
+            <p className="eyebrow">eBay live publish</p>
+            <h2>Final check</h2>
+            <span className="muted">One clean slide pushes this listing live.</span>
+          </div>
+          <div className="sheet-heading-actions">
+            <button className="ghost-button" type="button" onClick={onCancelPublish}>Back</button>
+            <button className="ghost-button" type="button" onClick={onClose}>Close</button>
+          </div>
+        </div>
+        <div className="ebay-publish-card ambient-card">
+          <CardImage
+            src={ambientImage}
+            className="mini-card-art"
+            fallbackClassName="mini-card-art blank"
+            alt=""
+          />
+          <p>
+            <strong>{listing.title ?? item?.card.name ?? "Untitled listing"}</strong>
+            <small>
+              {item?.card.setName ? `${item.card.setName} · ` : ""}
+              {item?.card.number ?? "no number"}
+            </small>
+            <span>
+              {item?.grade ? item.grade.replace(/_/g, " ") : "Ungraded"}
+              {item?.quantity && item.quantity > 1 ? ` · qty ${item.quantity}` : ""}
+              {" · "}
+              {gbp(effectivePricePence)}
+            </span>
+          </p>
+        </div>
+        {policySummary && <EbayPolicySummaryList summary={policySummary} />}
+        {ebayReadiness && (
+          <ul className="ebay-readiness-list compact" aria-label="Publish readiness">
+            {ebayReadiness.checks.map((check) => (
+              <li key={check.key} className={`readiness-${check.status}`}>
+                <span className="readiness-icon">
+                  {check.status === "pass" ? "✓" : check.status === "warn" ? "!" : "✗"}
+                </span>
+                <span>
+                  {check.label}
+                  {check.detail && check.status !== "pass" ? ` — ${check.detail}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <SlideConfirm
+          tone="publish"
+          label="slide to publish live"
+          valueLabel={`${gbp(effectivePricePence)} on eBay`}
+          completeLabel={busy ? "Publishing..." : "Release to publish"}
+          disabled={busy || !ebayPublishReady}
+          onConfirm={onPublish}
+        />
+        {!ebayPublishReady && (
+          <p className="hint danger-text">Publish is blocked until every required eBay readiness check passes.</p>
+        )}
+      </form>
+    );
+  }
+
   return (
-    <form className="sell-sheet listing-pack-sheet" onSubmit={(event) => event.preventDefault()}>
-      <div className="panel-heading">
+    <form ref={sheetRef} className="sell-sheet listing-pack-sheet" style={sheetStyle} onSubmit={(event) => event.preventDefault()}>
+      <div className="panel-heading ambient-heading">
         <div>
           <h2>Listing pack</h2>
           <span className="muted">
@@ -8692,14 +8758,11 @@ function SalePromptCard({
         <strong>{prompt.title}</strong>
         <small>{prompt.detail}</small>
       </div>
-      <button
-        type={needsPrice ? "button" : "submit"}
-        value={needsPrice ? undefined : "done"}
-        disabled={busy}
-        onClick={needsPrice ? onPasteGross : undefined}
-      >
-        {busy ? "Saving..." : prompt.cta}
-      </button>
+      {needsPrice && (
+        <button type="button" disabled={busy} onClick={onPasteGross}>
+          {busy ? "Working..." : prompt.cta}
+        </button>
+      )}
     </div>
   );
 }
@@ -9038,19 +9101,116 @@ function deleteTargetButtonLabel(target: DeleteTarget, busy: string | null): str
 function Toast({
   tone,
   message,
+  imageUrl,
+  kind = "default",
   onDismiss,
 }: {
   tone: "success" | "danger";
   message: string;
+  imageUrl?: string | null;
+  kind?: "default" | "publish" | "sale";
   onDismiss: () => void;
 }) {
   return (
-    <div className={`notice ${tone}`} role={tone === "danger" ? "alert" : "status"}>
+    <div
+      className={`notice ${tone} ${kind !== "default" ? `notice-${kind}` : ""}`}
+      style={imageUrl ? ({ "--toast-card-art": `url("${imageUrl}")` } as CSSProperties) : undefined}
+      role={tone === "danger" ? "alert" : "status"}
+    >
       <span>{message}</span>
       <button className="toast-close" type="button" onClick={onDismiss} aria-label="Dismiss message">
         ×
       </button>
     </div>
+  );
+}
+
+function SlideConfirm({
+  tone,
+  label,
+  valueLabel,
+  completeLabel,
+  disabled,
+  onConfirm,
+}: {
+  tone: "publish" | "danger";
+  label: string;
+  valueLabel: string;
+  completeLabel: string;
+  disabled?: boolean;
+  onConfirm: () => void;
+}) {
+  const trackRef = useRef<HTMLButtonElement | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [drag, setDrag] = useState({ progress: 0, thumbX: 0 });
+  const confirmAt = 86;
+
+  function dragFromPointer(event: PointerEvent<HTMLButtonElement>): { progress: number; thumbX: number } {
+    const rect = trackRef.current?.getBoundingClientRect();
+    if (!rect) return { progress: 0, thumbX: 0 };
+    const thumb = Math.min(58, Math.max(46, rect.height - 8));
+    const travel = Math.max(1, rect.width - thumb - 8);
+    const x = event.clientX - rect.left - thumb / 2 - 4;
+    const thumbX = Math.max(0, Math.min(travel, x));
+    return { progress: (thumbX / travel) * 100, thumbX };
+  }
+
+  function start(event: PointerEvent<HTMLButtonElement>) {
+    if (disabled) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging(true);
+    setDrag(dragFromPointer(event));
+  }
+
+  function move(event: PointerEvent<HTMLButtonElement>) {
+    if (!dragging || disabled) return;
+    setDrag(dragFromPointer(event));
+  }
+
+  function finish(event: PointerEvent<HTMLButtonElement>) {
+    if (!dragging) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const finalDrag = dragFromPointer(event);
+    const shouldConfirm = finalDrag.progress >= confirmAt && !disabled;
+    setDragging(false);
+    setDrag({ progress: 0, thumbX: 0 });
+    if (shouldConfirm) onConfirm();
+  }
+
+  function cancel() {
+    setDragging(false);
+    setDrag({ progress: 0, thumbX: 0 });
+  }
+
+  return (
+    <button
+      ref={trackRef}
+      className={`slide-confirm ${tone} ${dragging ? "dragging" : ""}`}
+      style={{ "--slide-progress": `${drag.progress}%`, "--slide-thumb-x": `${drag.thumbX}px` } as CSSProperties}
+      type="button"
+      disabled={disabled}
+      onPointerDown={start}
+      onPointerMove={move}
+      onPointerUp={finish}
+      onPointerCancel={cancel}
+      onKeyDown={(event) => {
+        if (disabled) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onConfirm();
+        }
+      }}
+      aria-label={`${label}: ${valueLabel}`}
+    >
+      <span className="slide-confirm-track" aria-hidden="true" />
+      <span className="slide-confirm-label">
+        <strong>{label}</strong>
+        <small>{drag.progress >= confirmAt ? completeLabel : valueLabel}</small>
+      </span>
+      <span className="slide-confirm-thumb" aria-hidden="true">›</span>
+    </button>
   );
 }
 
@@ -9136,6 +9296,17 @@ function compConfidence(comp: CompResult, sourcesDisagree: boolean): { label: st
   if (sourcesDisagree) return { label: "Cross-check", tone: "warn" };
   if (comp.sampleSize < 3) return { label: "Thin", tone: "warn" };
   return { label: "Usable", tone: "good" };
+}
+
+function rarityConfidenceClass(tone: string | null | undefined): string {
+  if (tone === "good") return "rarity-holo";
+  if (tone === "warn") return "rarity-silver";
+  return "rarity-common";
+}
+
+function rarityConfidenceLabel(label: string | null | undefined, tone: string | null | undefined): string {
+  const rarity = tone === "good" ? "Holo" : tone === "warn" ? "Silver" : "Common";
+  return label ? `${rarity} · ${label}` : `${rarity} confidence`;
 }
 
 function dealerVerdictSignalMeta(verdict: DealerCompVerdict): string {

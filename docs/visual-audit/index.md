@@ -14,6 +14,7 @@ All galleries were captured at 390x844 with deviceScaleFactor 3 unless a focused
 | V5 - motion and feel | `b5005cf` | `docs/visual-audit/v5/report.md` | `docs/visual-audit/v5/before/` | `docs/visual-audit/v5/after/` | tab-switch skeleton proof |
 | V6 - verify and ship | final V6 commit | `docs/visual-audit/v6/report.md` | `docs/visual-audit/v6/before/` | `docs/visual-audit/v6/after/` | actual-Pokemon empty-state proof |
 | Art V2 - recognizable Pokemon pass | pending | `docs/visual-audit/art-v2/report.md` | `docs/visual-audit/art-v2/before/` | `docs/visual-audit/art-v2/after/` | all-art focused proof |
+| Pass 2 - stacked states and elevation | pending | `docs/visual-audit/pass2/report.md` | `docs/visual-audit/pass2/before/` | `docs/visual-audit/pass2/after/` | Chromium + WebKit stacked matrix |
 
 ## Final Evidence Highlights
 
