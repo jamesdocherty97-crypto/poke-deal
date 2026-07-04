@@ -40,6 +40,26 @@ test("catalog-only photos satisfy eBay only for raw stock below the threshold", 
   assert.equal(summary.requiresRealPhoto, false);
 });
 
+test("photo origin flag distinguishes stock images from real photos", () => {
+  const catalogOnly = summarizeListingPhotos({
+    photos: [{ id: "catalog-1", url: "https://img.test/catalog.png", origin: "CATALOG" }],
+    grade: "RAW",
+    pricePence: 1999,
+  });
+  const realPhoto = summarizeListingPhotos({
+    photos: [{ id: "real-1", url: "https://img.test/front.jpg", origin: "REAL" }],
+    grade: "RAW",
+    pricePence: 5000,
+  });
+
+  assert.equal(catalogOnly.hasCatalogPhoto, true);
+  assert.equal(catalogOnly.hasRealPhoto, false);
+  assert.equal(catalogOnly.catalogOnly, true);
+  assert.equal(realPhoto.hasCatalogPhoto, false);
+  assert.equal(realPhoto.hasRealPhoto, true);
+  assert.equal(realPhoto.catalogOnly, false);
+});
+
 test("catalog-only photos do not satisfy eBay at or above the threshold", () => {
   const summary = summarizeListingPhotos({
     photos: [{ id: "catalog-1", url: "https://img.test/catalog.png", origin: "CATALOG" }],

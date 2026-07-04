@@ -3,7 +3,7 @@
 import type { FormEvent, ReactNode } from "react";
 import type { ListingSort, ListingStateFilter } from "@/lib/dealer/tableControls";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
-import { isCatalogPhotoEligible, orderListingPhotos } from "@/lib/photos/listingPhotoPolicy";
+import { orderListingPhotos, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { InventoryPhotoTools } from "./InventoryPhotoTools";
 import { CardImage, EmptyState, Metric } from "./UiBits";
 
@@ -662,11 +662,25 @@ function ListingRow({
   const isPublished = listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl;
   const canPasteUrl = listing.state !== "SOLD" && !listing.externalUrl;
   const photoCount = listing.item?.photos?.length ?? 0;
-  const needsEbayPhotos = Boolean(isEbay && listing.item && listing.state !== "SOLD" && !isPublished && photoCount === 0);
+  const photoSummary = listing.item
+    ? summarizeListingPhotos({
+        photos: listing.item.photos ?? [],
+        grade: listing.item.grade,
+        pricePence: price,
+      })
+    : null;
+  const needsEbayPhotos = Boolean(
+    isEbay &&
+    listing.item &&
+    listing.state !== "SOLD" &&
+    !isPublished &&
+    !photoSummary?.satisfiesEbayPhotoRequirement,
+  );
   const canUseCatalogArt = Boolean(
     needsEbayPhotos &&
     listing.item?.card?.imageUrl &&
-    isCatalogPhotoEligible({ grade: listing.item.grade, pricePence: price }),
+    photoSummary?.catalogPhotoAllowed &&
+    !photoSummary.hasCatalogPhoto,
   );
   const ebayStatusLabel = hasOffer
     ? " · offer pending"
