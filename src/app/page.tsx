@@ -5656,10 +5656,10 @@ export default function Home() {
       setCheckedCompLogPrice("");
       setCheckedCompLogNote("");
       setManualCompReturnArmed(false);
-      pinCheckedCompEvidence(nextLoggedEntries, aggregate ?? null, card);
+      const pinnedCheckedSource = pinCheckedCompEvidence(nextLoggedEntries, aggregate ?? null, card);
       setNotice(`Logged ${gbp(pricePence)}. Add the next sold price, or close the logger.`);
       setScrollToComp(true);
-      void refreshCurrentCompAfterCheckedComp(card);
+      void refreshCurrentCompAfterCheckedComp(card, pinnedCheckedSource);
       window.requestAnimationFrame(() => checkedCompLogPriceRef.current?.focus());
     } catch (err) {
       setError(err instanceof Error ? err.message : "checked comp log failed");
@@ -5672,7 +5672,7 @@ export default function Home() {
     entries: CheckedCompEntry[],
     aggregate: CompResult | null,
     card: { name: string; setName?: string; number?: string; tcgApiId?: string; tcgDexId?: string },
-  ) {
+  ): CompResult | null {
     const checkedSource =
       aggregate && aggregate.sampleSize > 0 && aggregate.medianPence > 0
         ? aggregate
@@ -5689,7 +5689,7 @@ export default function Home() {
             },
             grade,
           );
-    if (!checkedSource) return;
+    if (!checkedSource) return null;
 
     setComp((current) => {
       const base: Reconciled = current ?? {
@@ -5706,9 +5706,13 @@ export default function Home() {
         psaCert: base.psaCert ?? psaResult,
       };
     });
+    return checkedSource;
   }
 
-  async function refreshCurrentCompAfterCheckedComp(card: { name: string; setName?: string; number?: string; tcgApiId?: string; tcgDexId?: string }) {
+  async function refreshCurrentCompAfterCheckedComp(
+    card: { name: string; setName?: string; number?: string; tcgApiId?: string; tcgDexId?: string },
+    pinnedCheckedSource: CompResult | null,
+  ) {
     try {
       const qs = new URLSearchParams({ name: card.name, grade });
       if (card.setName) qs.set("set", card.setName);
@@ -5719,15 +5723,30 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) return;
       setComp((current) => {
-        if (!isUsefulCompPayload(payload)) return current;
-        if (!current) return payload;
-        const checkedSource = current.all.find((result) => result.source === "checked-comps");
+        const checkedSource = current?.all.find((result) => result.source === "checked-comps") ?? pinnedCheckedSource;
+        if (!isUsefulCompPayload(payload)) {
+          if (!checkedSource) return current;
+          const base: Reconciled = current ?? {
+            headline: checkedSource.sampleSize >= 2 ? checkedSource : null,
+            all: [],
+            sourcesDisagree: false,
+            catalog: catalogCard,
+            psaCert: psaResult,
+          };
+          return {
+            ...base,
+            all: upsertCompResult(base.all, checkedSource),
+            catalog: base.catalog ?? catalogCard,
+            psaCert: base.psaCert ?? psaResult,
+          };
+        }
+        const payloadAll = Array.isArray(payload.all) ? payload.all : [];
         return {
           ...payload,
-          headline: payload.headline ?? current.headline,
-          all: checkedSource ? upsertCompResult(payload.all ?? [], checkedSource) : payload.all,
-          catalog: payload.catalog ?? current.catalog,
-          psaCert: payload.psaCert ?? current.psaCert,
+          headline: payload.headline ?? current?.headline ?? (checkedSource && checkedSource.sampleSize >= 2 ? checkedSource : null),
+          all: checkedSource ? upsertCompResult(payloadAll, checkedSource) : payloadAll,
+          catalog: payload.catalog ?? current?.catalog ?? catalogCard,
+          psaCert: payload.psaCert ?? current?.psaCert ?? psaResult,
         };
       });
       if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
