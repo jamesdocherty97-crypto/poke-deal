@@ -24,22 +24,23 @@
 | `public/apple-touch-icon.png` | 46,023 |
 | `public/icon.svg` | 1,987 |
 | `public/splash.svg` | 1,880 |
-| `public/visual/empty/stock.jpg` | 11,711 |
-| `public/visual/empty/sales.jpg` | 11,210 |
-| `public/visual/empty/watches.jpg` | 11,903 |
-| `public/visual/empty/alerts.jpg` | 9,928 |
-| `public/visual/empty/session.jpg` | 13,611 |
-| `public/visual/empty/search.jpg` | 10,415 |
-| Total final identity/art payload | 194,313 |
+| `public/visual/empty/stock.png` | 43,480 |
+| `public/visual/empty/sales.png` | 37,033 |
+| `public/visual/empty/watches.png` | 32,628 |
+| `public/visual/empty/alerts.png` | 44,452 |
+| `public/visual/empty/session.png` | 36,167 |
+| `public/visual/empty/search.png` | 37,273 |
+| Total final identity/art payload | 356,568 |
 
-Every final V3 asset is under 60KB. The tracked 512 PNG was replaced by `icon-512.jpg` so the large homescreen asset stays inside the phase budget.
+Every final art asset is under 60KB. The tracked 512 PNG was replaced by `icon-512.jpg` so the large homescreen asset stays inside the phase budget.
 
 ## Image Generation Notes
 
-- Built-in image generation was used.
-- Exact named-character generation was rejected by the image tool, so the six empty-state stickers use original Poke Deal collector mascots in a consistent soft-shaded sticker style.
+- Built-in image generation was used for the app identity direction and the first empty-state pass.
+- Exact named-character generation was rejected by the image tool. During V6, the six empty-state stickers were corrected to actual Pokémon using small locally saved official-artwork PNGs in one consistent artwork style: Snorlax, Meowth, Noctowl, Chansey, Machop and Psyduck.
 - Final UI assets are decorative only. They are referenced only by app chrome/empty states and are not used by listing photos, listing packs, eBay payloads, exports, or catalog-photo flows.
-- `sips` AVIF output crashed locally, so the in-app stickers were resized/compressed as JPEG instead.
+- `sips` AVIF output crashed locally, so the first-pass in-app stickers were resized/compressed as JPEG.
+- The V6 corrective pass uses resized PNGs so the actual Pokémon artwork retains transparent edges over the existing holo empty-state panels.
 
 ## Prompt Summary
 

@@ -40,12 +40,12 @@ export function CardImage({
 export type EmptyStateArt = "stock" | "sales" | "watches" | "alerts" | "session" | "search";
 
 const emptyStateArtPaths: Record<EmptyStateArt, string> = {
-  stock: "/visual/empty/stock.jpg",
-  sales: "/visual/empty/sales.jpg",
-  watches: "/visual/empty/watches.jpg",
-  alerts: "/visual/empty/alerts.jpg",
-  session: "/visual/empty/session.jpg",
-  search: "/visual/empty/search.jpg",
+  stock: "/visual/empty/stock.png",
+  sales: "/visual/empty/sales.png",
+  watches: "/visual/empty/watches.png",
+  alerts: "/visual/empty/alerts.png",
+  session: "/visual/empty/session.png",
+  search: "/visual/empty/search.png",
 };
 
 function inferEmptyStateArt(text: string): EmptyStateArt {
