@@ -1,6 +1,6 @@
 # Cron Health — 2026-07-04
 
-Checked at: 2026-07-04T20:43:06.394Z
+Checked at: 2026-07-04T21:03:03.121Z
 
 | Status | Job | Latest successful run | Latest run | Note |
 |---|---|---|---|---|
@@ -17,4 +17,4 @@ Checked at: 2026-07-04T20:43:06.394Z
 
 ## Action
 
-The code already requests `sell.fulfillment` and `sell.fulfillment.readonly` scopes. This failure means the stored eBay seller consent is stale or was granted before those scopes were added. After deploy, reconnect eBay once through `/api/ebay/connect?force=1`, then rerun the sales sync cron.
+The code already requests `sell.fulfillment` and `sell.fulfillment.readonly` scopes. This failure means the stored eBay seller consent is stale or was granted before those scopes were added. Reconnect eBay once through `/api/ebay/connect?force=1`, then rerun the sales sync cron.
