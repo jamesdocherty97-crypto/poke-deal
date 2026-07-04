@@ -18,6 +18,7 @@ import { acquireToInventory } from "@/lib/inventory/inventoryService";
 import { getPrisma } from "@/lib/db/prisma";
 import { buildCheckedComp } from "@/lib/dealer/checkedComp";
 import { GRADE_VALUES, type CardRef } from "@/lib/domain/types";
+import { PrismaCheckedCompRepo, type CheckedCompDb, type CheckedCompPlatform } from "@/lib/comps/sources/checkedComps";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,6 +108,20 @@ export async function POST(request: Request) {
           console.warn("[acquire] checked comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
         );
       }
+      if (d.checkedComp) {
+        await new PrismaCheckedCompRepo(
+          getPrisma() as unknown as CheckedCompDb,
+          catalog ? fixedCatalogSource(catalogSource.live, catalog) : catalogSource,
+        ).create({
+          card: compCard,
+          grade: d.grade,
+          pricePence: d.checkedComp.pricePence,
+          platform: checkedCompPlatformFromLegacySource(d.checkedComp.source),
+          note: d.checkedComp.note,
+        }).catch((err) =>
+          console.warn("[acquire] checked comp row persistence skipped:", err instanceof Error ? err.message : "unknown"),
+        );
+      }
     }
 
     // 3. stock it + compute the suggested list price (valuing and pricing are one pipeline)
@@ -177,4 +192,10 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function checkedCompPlatformFromLegacySource(source: string | undefined): CheckedCompPlatform {
+  if (source === "CARDMARKET") return "cardmarket";
+  if (source === "OTHER" || source === "TCGPLAYER") return "other";
+  return "ebay-uk";
 }

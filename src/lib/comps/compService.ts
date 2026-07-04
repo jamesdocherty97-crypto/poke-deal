@@ -313,6 +313,7 @@ function resultToReconCandidate(result: CompResult): ReconCandidate | null {
 function reconSource(result: CompResult): ReconSource | null {
   if (result.source === "owned-sales") return "owned-sales";
   if (result.source === "ebay-marketplace-insights") return "ebay-insights";
+  if (result.source === "checked-comps") return "checked-comps";
   if (result.source === "pokemon-price-tracker") {
     return readRawString(result, "chosenPriceSource") === "smartMarketPrice" ? "pt-smart" : "pt-median";
   }
@@ -324,6 +325,10 @@ function reconSource(result: CompResult): ReconSource | null {
 function reconRegion(result: CompResult): "UK" | "EU" | "US" {
   if (result.source === "ebay-marketplace-insights" || result.source === "owned-sales") return "UK";
   const raw = result.raw && typeof result.raw === "object" ? (result.raw as Record<string, unknown>) : {};
+  if (result.source === "checked-comps") {
+    const region = typeof raw.region === "string" ? raw.region.toUpperCase() : "";
+    return region === "EU" ? "EU" : "UK";
+  }
   const market = typeof raw.market === "string" ? raw.market.toUpperCase() : "";
   if (market === "EU") return "EU";
   if (market === "US") return "US";

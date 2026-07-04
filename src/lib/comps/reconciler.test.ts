@@ -187,6 +187,39 @@ test("T9c: three recent owned sales can headline over external baselines", () =>
   assert.equal(result.manualCheck, false);
 });
 
+test("T9d: two recent checked comps can headline over a thin US baseline", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "checked-comps", valuePence: 10000, n: 2, ageDays: 2, region: "UK" }),
+    candidate({ source: "poketrace", valuePence: 8000, n: 5, ageDays: 2, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 10000);
+  assert.equal(result.chosenSource, "checked-comps");
+  assert.match(result.reasons.join(" "), /penalty-region-us:poketrace/);
+});
+
+test("T9e: one checked comp corroborates but cannot headline", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "checked-comps", valuePence: 10000, n: 1, ageDays: 2, region: "UK" }),
+    candidate({ source: "poketrace", valuePence: 8000, n: 6, ageDays: 2, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 8000);
+  assert.equal(result.chosenSource, "poketrace");
+  assert.match(result.reasons.join(" "), /corroboration-thin-checked-comps/);
+});
+
+test("T9f: stale checked comps decay out after 90 days", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "checked-comps", valuePence: 10000, n: 2, ageDays: 91, region: "UK" }),
+    candidate({ source: "poketrace", valuePence: 8000, n: 6, ageDays: 2, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 8000);
+  assert.equal(result.chosenSource, "poketrace");
+  assert.match(result.reasons.join(" "), /stale-checked-comps/);
+});
+
 test("T10: no candidates returns no headline and a low-confidence manual check", () => {
   const result = reconcileComps(baseQuery, []);
 

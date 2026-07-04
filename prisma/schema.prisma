@@ -35,6 +35,7 @@ model Card {
 
   inventory        InventoryItem[]
   comps            CompResult[]
+  checkedComps     CheckedComp[]
   snapshots        PriceSnapshot[]
   watches          Watch[]
   dealSessionLines DealSessionLine[]
@@ -281,6 +282,26 @@ model CompResult {
   createdAt DateTime @default(now())
 
   @@index([cardId, grade, asOf])
+}
+
+/// Dealer-observed comps logged after manually checking sold listings.
+/// These are first-class evidence, not a single mutable override.
+model CheckedComp {
+  id     String @id @default(cuid())
+  card   Card   @relation(fields: [cardId], references: [id])
+  cardId String
+
+  grade      Grade
+  pricePence Int
+  soldDate   DateTime
+  platform   String   @default("ebay-uk")
+  note       String?
+  sourceUrl  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([cardId, grade, soldDate])
+  @@index([createdAt])
 }
 
 /// Daily snapshot of stock value, so portfolio/trend history builds itself.

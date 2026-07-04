@@ -14,6 +14,7 @@ export type BackupTableName =
   | "expenses"
   | "dealSessions"
   | "dealSessionLines"
+  | "checkedComps"
   | "compResults"
   | "priceSnapshots"
   | "cronRuns"
@@ -92,6 +93,7 @@ const TABLES: readonly TableDefinition[] = [
     dateFields: ["createdAt", "updatedAt", "completedAt", "abandonedAt"],
   },
   { name: "dealSessionLines", delegate: "dealSessionLine", dateFields: ["addedAt", "compAsOf"] },
+  { name: "checkedComps", delegate: "checkedComp", dateFields: ["soldDate", "createdAt"] },
   { name: "compResults", delegate: "compResult", dateFields: ["asOf", "createdAt"] },
   { name: "priceSnapshots", delegate: "priceSnapshot", dateFields: ["takenAt"] },
   { name: "cronRuns", delegate: "cronRun", dateFields: ["startedAt", "finishedAt", "createdAt"] },
@@ -109,6 +111,7 @@ const RESTORE_ORDER: readonly BackupTableName[] = [
   "dealSessions",
   "inventoryItems",
   "dealSessionLines",
+  "checkedComps",
   "cardPhotos",
   "listings",
   "sales",
@@ -147,7 +150,7 @@ export async function createLedgerBackup(
     tables,
     notes: {
       costs: "Operating costs are stored in the expenses table.",
-      checkedComps: "Manual checked comps are stored in compResults rows, usually with source manual-check.",
+      checkedComps: "Dealer-observed checked comps are stored as checkedComps rows and also remain visible in comp history when used.",
       settings: "No Settings table exists in the current schema; app settings are code defaults or device-local UI state.",
     },
   };

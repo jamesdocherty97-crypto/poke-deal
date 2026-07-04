@@ -3,6 +3,7 @@ import type { Grade } from "../domain/types.js";
 export type ReconSource =
   | "owned-sales"
   | "ebay-insights"
+  | "checked-comps"
   | "pt-smart"
   | "pt-median"
   | "tcg-market"
@@ -76,13 +77,14 @@ interface CandidateState {
 const TIER_WEIGHT: Record<ReconSource, number> = {
   "owned-sales": 1,
   "ebay-insights": 0.95,
+  "checked-comps": 0.9,
   "pt-smart": 0.75,
   "pt-median": 0.7,
   "tcg-market": 0.65,
   poketrace: 0.6,
 };
 
-const TIER_ORDER: ReconSource[] = ["owned-sales", "ebay-insights", "pt-smart", "pt-median", "tcg-market", "poketrace"];
+const TIER_ORDER: ReconSource[] = ["owned-sales", "ebay-insights", "checked-comps", "pt-smart", "pt-median", "tcg-market", "poketrace"];
 
 export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]): ReconResult {
   const states = candidates.map((candidate) => initialState(candidate));
@@ -272,6 +274,13 @@ function applyCorroborationGates(state: CandidateState): void {
   if (state.candidate.source === "owned-sales" && (state.n < 3 || state.ageDays > 120)) {
     state.corroborationOnly = true;
     state.reasons.push("corroboration-thin-owned-sales");
+  }
+  if (state.candidate.source === "checked-comps" && state.n < 2) {
+    state.corroborationOnly = true;
+    state.reasons.push("corroboration-thin-checked-comps");
+  }
+  if (state.candidate.source === "checked-comps" && state.ageDays > 90) {
+    exclude(state, "stale-checked-comps");
   }
 }
 

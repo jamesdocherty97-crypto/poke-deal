@@ -223,6 +223,20 @@ type OwnedSaleCompRow = {
   soldAt: string;
 };
 
+type CheckedCompPlatform = "ebay-uk" | "cardmarket" | "vinted" | "other";
+
+type CheckedCompEntry = {
+  id: string;
+  cardId: string;
+  grade: Grade;
+  pricePence: number;
+  soldDate: string;
+  platform: CheckedCompPlatform;
+  note?: string;
+  sourceUrl?: string;
+  createdAt: string;
+};
+
 // Bundled offline set catalog (see src/lib/catalog/setCatalog.ts) -- powers
 // set autocomplete and the "popular sets" quick-pick chips below.
 type CatalogSet = {
@@ -331,6 +345,8 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
     market?: string;
     tier?: string;
     sales?: OwnedSaleCompRow[];
+    entries?: CheckedCompEntry[];
+    region?: "UK" | "EU" | "US";
     source?: CheckedCompSource;
     sourceLabel?: string;
     note?: string;
@@ -728,6 +744,12 @@ const gradeOptions: Grade[] = [...GRADE_VALUES];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCGPLAYER", "OTHER"];
 const checkedCompSampleOptions = ["1", "2", "3", "5"];
+const checkedCompPlatforms: Array<{ value: CheckedCompPlatform; label: string }> = [
+  { value: "ebay-uk", label: "eBay UK" },
+  { value: "cardmarket", label: "Cardmarket" },
+  { value: "vinted", label: "Vinted" },
+  { value: "other", label: "Other" },
+];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const inventoryFilters: Array<{ value: InventoryFilter; label: string }> = [
   { value: "all", label: "All" },
@@ -794,6 +816,13 @@ export default function Home() {
   const [checkedCompSample, setCheckedCompSample] = useState("1");
   const [checkedCompSource, setCheckedCompSource] = useState<CheckedCompSource>("EBAY_SOLD");
   const [checkedCompNote, setCheckedCompNote] = useState("");
+  const [loggedCheckedComps, setLoggedCheckedComps] = useState<CheckedCompEntry[]>([]);
+  const [checkedCompLogOpen, setCheckedCompLogOpen] = useState(false);
+  const [checkedCompLogPrice, setCheckedCompLogPrice] = useState("");
+  const [checkedCompLogSoldDate, setCheckedCompLogSoldDate] = useState(todayInputValue());
+  const [checkedCompLogPlatform, setCheckedCompLogPlatform] = useState<CheckedCompPlatform>("ebay-uk");
+  const [checkedCompLogNote, setCheckedCompLogNote] = useState("");
+  const [checkedCompLogSourceUrl, setCheckedCompLogSourceUrl] = useState("");
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
   const [shouldCreateListing, setShouldCreateListing] = useState(false);
@@ -906,6 +935,7 @@ export default function Home() {
   const pullTracking = useRef(false);
   const compPanelRef = useRef<HTMLElement | null>(null);
   const checkedCompRef = useRef<HTMLDivElement | null>(null);
+  const checkedCompLogPriceRef = useRef<HTMLInputElement | null>(null);
   const quickIntakeRef = useRef<HTMLInputElement | null>(null);
   const costInputRef = useRef<HTMLInputElement | null>(null);
   const stockImportDetailsRef = useRef<HTMLDetailsElement | null>(null);
@@ -923,6 +953,11 @@ export default function Home() {
       .then(setEbayStatus)
       .catch(() => setEbayStatus({ configured: false, connected: false }));
   }, []);
+
+  useEffect(() => {
+    if (!checkedCompLogOpen) return;
+    window.requestAnimationFrame(() => checkedCompLogPriceRef.current?.focus());
+  }, [checkedCompLogOpen]);
 
   useEffect(() => {
     try {
@@ -1293,16 +1328,6 @@ export default function Home() {
     .filter(Boolean)
     .join(" · ");
   const sourceMatchSourceLabel = apiHeadline ? sourceLabel(apiHeadline.source, false) : "Source";
-  const compForReceipt = useMemo<Reconciled | null>(() => {
-    if (!comp) return null;
-    if (!checkedComp) return comp;
-    return {
-      ...comp,
-      headline: checkedComp,
-      all: [checkedComp, ...comp.all],
-      sourcesDisagree: false,
-    };
-  }, [checkedComp, comp]);
   const deal = useMemo(
     () => (headline ? judgeDeal(headline, poundsToPence(cost), channel, grade, condition) : null),
     [channel, condition, headline, cost, grade],
@@ -1405,7 +1430,7 @@ export default function Home() {
       card.number.trim().toLowerCase() === number.trim().toLowerCase(),
   );
   const hasActiveCardIdentity = Boolean(name.trim() || number.trim() || comp);
-  const hasBuyContext = Boolean(hasActiveCardIdentity || quickIntake.trim() || parsedQuickIntake?.name || checkedComp);
+  const hasBuyContext = Boolean(hasActiveCardIdentity || quickIntake.trim() || parsedQuickIntake?.name || checkedComp || loggedCheckedComps.length > 0);
   const canClearCurrentComp = Boolean(
     hasActiveCardIdentity ||
       setNameValue.trim() ||
@@ -1413,6 +1438,8 @@ export default function Home() {
       cost.trim() ||
       manualCompQuery.trim() ||
       checkedCompPrice.trim() ||
+      checkedCompLogPrice.trim() ||
+      loggedCheckedComps.length > 0 ||
       graderCert.trim() ||
       psaResult,
   );
@@ -1432,6 +1459,15 @@ export default function Home() {
     comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
   const ownedSalesComp =
     comp?.all.find((result) => result.source === "owned-sales" && result.sampleSize > 0) ?? null;
+  const checkedCompsFromSource = useMemo(
+    () => extractCheckedCompEntries(comp?.all.find((result) => result.source === "checked-comps") ?? null),
+    [comp],
+  );
+  const checkedCompEntries = useMemo(
+    () => mergeCheckedCompEntries([...loggedCheckedComps, ...checkedCompsFromSource]),
+    [checkedCompsFromSource, loggedCheckedComps],
+  );
+  const checkedCompsSummary = useMemo(() => summarizeCheckedCompEntries(checkedCompEntries), [checkedCompEntries]);
   const pokeTraceSignals =
     comp?.all.find((result) => result.source === "poketrace" && result.raw?.signals?.length)?.raw?.signals ?? [];
   // Full RAW→PSA→BGS→CGC ladder, pulled from the same Price Tracker response
@@ -1440,6 +1476,50 @@ export default function Home() {
   const gradeLadder =
     comp?.all.find((result) => (result.raw?.gradeLadder?.length ?? 0) > 0)?.raw?.gradeLadder ?? [];
   const compPsaContext = comp?.psaCert ?? psaResult;
+  const localCheckedCompResult = useMemo(
+    () =>
+      checkedCompsSummary
+        ? buildLocalCheckedCompResult(
+            checkedCompEntries,
+            {
+              name: catalogCard?.name ?? name,
+              setName: catalogCard?.setName ?? setNameValue,
+              number: catalogCard?.number ?? number,
+              tcgApiId: catalogCard?.tcgApiId,
+              tcgDexId: catalogCard?.tcgDexId,
+              game: "POKEMON",
+              language: "EN",
+            },
+            grade,
+          )
+        : null,
+    [
+      catalogCard?.name,
+      catalogCard?.number,
+      catalogCard?.setName,
+      catalogCard?.tcgApiId,
+      catalogCard?.tcgDexId,
+      checkedCompEntries,
+      checkedCompsSummary,
+      grade,
+      name,
+      number,
+      setNameValue,
+    ],
+  );
+  const compForReceipt = useMemo<Reconciled | null>(() => {
+    if (!comp) return null;
+    const withLogged = localCheckedCompResult
+      ? { ...comp, all: upsertCompResult(comp.all, localCheckedCompResult) }
+      : comp;
+    if (!checkedComp) return withLogged;
+    return {
+      ...withLogged,
+      headline: checkedComp,
+      all: [checkedComp, ...withLogged.all],
+      sourcesDisagree: false,
+    };
+  }, [checkedComp, comp, localCheckedCompResult]);
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
   const compLimitations = useMemo(() => (compForReceipt ? buildCompLimitations(compForReceipt) : []), [compForReceipt]);
   const reconciliationReasons = useMemo(
@@ -2322,6 +2402,13 @@ export default function Home() {
     setCheckedCompSample("1");
     setCheckedCompSource("EBAY_SOLD");
     setCheckedCompNote("");
+    setLoggedCheckedComps([]);
+    setCheckedCompLogOpen(false);
+    setCheckedCompLogPrice("");
+    setCheckedCompLogSoldDate(todayInputValue());
+    setCheckedCompLogPlatform("ebay-uk");
+    setCheckedCompLogNote("");
+    setCheckedCompLogSourceUrl("");
     setManualCompReturnArmed(false);
   }
 
@@ -4985,10 +5072,18 @@ export default function Home() {
     if (!link?.url) return;
     setManualCompQuery(link.query);
     setManualCompReturnArmed(true);
-    if (kind === "EBAY_UK_SOLD") setCheckedCompSource("EBAY_SOLD");
+    if (kind === "EBAY_UK_SOLD") openCheckedCompLogger("ebay-uk", link.url);
     window.open(link.url, "_blank", "noopener,noreferrer");
-    setNotice(kind === "EBAY_UK_SOLD" ? "Opened eBay UK solds. Paste or enter the sold price when you are back." : "Opened manual comp source.");
+    setNotice(kind === "EBAY_UK_SOLD" ? "Opened eBay UK solds. Log the sold prices when you are back." : "Opened manual comp source.");
     setError(null);
+  }
+
+  function openCheckedCompLogger(platform: CheckedCompPlatform = "ebay-uk", sourceUrl?: string) {
+    setCheckedCompLogOpen(true);
+    setCheckedCompLogPlatform(platform);
+    setCheckedCompLogSoldDate((current) => current || todayInputValue());
+    if (sourceUrl) setCheckedCompLogSourceUrl(sourceUrl);
+    setManualCompReturnArmed(true);
   }
 
   function applyQuickCost(valuePence: number) {
@@ -5010,10 +5105,10 @@ export default function Home() {
   }
 
   function applyCheckedCompPrice(valuePence: number) {
-    setCheckedCompPrice(penceToPounds(valuePence));
-    setCheckedCompSample((current) => (Number(current) > 0 ? current : "1"));
+    setCheckedCompLogPrice(penceToPounds(valuePence));
+    setCheckedCompLogOpen(true);
     setManualCompReturnArmed(false);
-    setNotice("Checked comp price filled. Adjust it if the sold listing differs.");
+    setNotice("Checked comp price filled. Tap Log price to store it.");
     setError(null);
   }
 
@@ -5032,7 +5127,85 @@ export default function Home() {
       return;
     }
 
-    applyCheckedCompPrice(pricePence);
+    setCheckedCompLogOpen(true);
+    setCheckedCompLogPrice(penceToPounds(pricePence));
+    setManualCompReturnArmed(false);
+    setNotice("Pasted price ready to log.");
+    setError(null);
+  }
+
+  async function logCheckedCompEntry(event?: FormEvent) {
+    event?.preventDefault();
+    const pricePence = parseCheckedCompPriceText(checkedCompLogPrice) ?? poundsToPence(checkedCompLogPrice);
+    if (!Number.isFinite(pricePence) || pricePence <= 0) {
+      setError("Enter a sold price first.");
+      return;
+    }
+    const card = currentCheckedCompCard();
+    if (!card.name.trim()) {
+      setError("Choose or type a card before logging a checked comp.");
+      return;
+    }
+
+    setBusy("checked-comp-log");
+    setError(null);
+    try {
+      const res = await fetch("/api/checked-comps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card,
+          grade,
+          pricePence,
+          soldDate: checkedCompLogSoldDate || todayInputValue(),
+          platform: checkedCompLogPlatform,
+          note: checkedCompLogNote.trim() || undefined,
+          sourceUrl: checkedCompLogSourceUrl.trim() || undefined,
+        }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "checked comp log failed");
+      const entries = Array.isArray(payload.entries) ? (payload.entries as CheckedCompEntry[]) : [];
+      setLoggedCheckedComps(entries.length > 0 ? entries : payload.entry ? [payload.entry as CheckedCompEntry] : []);
+      setCheckedCompLogPrice("");
+      setCheckedCompLogNote("");
+      setManualCompReturnArmed(false);
+      setNotice(`Logged ${gbp(pricePence)}. Add the next sold price, or close the logger.`);
+      void refreshCurrentCompAfterCheckedComp(card);
+      window.requestAnimationFrame(() => checkedCompLogPriceRef.current?.focus());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "checked comp log failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function refreshCurrentCompAfterCheckedComp(card: { name: string; setName?: string; number?: string; tcgApiId?: string; tcgDexId?: string }) {
+    try {
+      const qs = new URLSearchParams({ name: card.name, grade });
+      if (card.setName) qs.set("set", card.setName);
+      if (card.number) qs.set("number", card.number);
+      if (card.tcgApiId) qs.set("tcgApiId", card.tcgApiId);
+      if (card.tcgDexId) qs.set("tcgDexId", card.tcgDexId);
+      const res = await fetch(`/api/comps?${qs}`);
+      const payload = await readJson(res);
+      if (!res.ok) return;
+      setComp(payload);
+      if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
+      rememberRecentComp(payload, { name: card.name, setName: card.setName ?? "", number: card.number ?? "", grade });
+    } catch {
+      // The checked comp is already stored. The next normal comp lookup will pick it up.
+    }
+  }
+
+  function currentCheckedCompCard() {
+    return {
+      name: catalogCard?.name ?? name,
+      setName: (catalogCard?.setName ?? setNameValue) || undefined,
+      number: (catalogCard?.number ?? number) || undefined,
+      tcgApiId: catalogCard?.tcgApiId,
+      tcgDexId: catalogCard?.tcgDexId,
+    };
   }
 
   function jumpToCheckedComp() {
@@ -5140,55 +5313,114 @@ export default function Home() {
 
   function renderCheckedCompCard(variant: "full" | "priority" = "full") {
     const canOpenUkSolds = manualCompLinks.some((link) => link.kind === "EBAY_UK_SOLD" && link.query.trim());
-    const awaitingManualPrice = manualCompReturnArmed && !checkedComp;
+    const awaitingManualPrice = manualCompReturnArmed && checkedCompLogOpen;
+    const hasLoggedEntries = checkedCompEntries.length > 0;
+    const summary = checkedCompsSummary;
 
     return (
       <div
-        className={`checked-comp-card ${checkedComp ? "active" : ""} ${awaitingManualPrice ? "awaiting" : ""} ${variant}`}
+        className={`checked-comp-card ${hasLoggedEntries ? "active" : ""} ${awaitingManualPrice ? "awaiting" : ""} ${variant}`}
         ref={variant === "priority" ? checkedCompRef : undefined}
       >
         <div className="checked-comp-heading">
           <div>
-            <span>Checked comp</span>
-            <strong>{checkedComp ? `${gbp(checkedComp.medianPence)} in use` : awaitingManualPrice ? "Paste or enter sold price" : "Optional override"}</strong>
+            <span>Your checked comps</span>
+            <strong>
+              {summary
+                ? `${summary.count} logged · median ${gbp(summary.medianPence)}`
+                : awaitingManualPrice
+                  ? "Log the sold prices you saw"
+                  : "Log your manual check"}
+            </strong>
           </div>
-          {checkedComp && (
-            <button className="ghost-button" type="button" onClick={clearCheckedComp}>
-              Clear
+          {checkedCompLogOpen && (
+            <button className="ghost-button" type="button" onClick={() => setCheckedCompLogOpen(false)}>
+              Close
             </button>
           )}
         </div>
-        <div className="form-grid">
-          <label>
-            Sold price
-            <MoneyInput value={checkedCompPrice} onChange={setCheckedCompPrice} placeholder="e.g. 24.00" />
-          </label>
-          <label>
-            Seen on
-            <select
-              value={checkedCompSource}
-              onChange={(event) => setCheckedCompSource(event.target.value as CheckedCompSource)}
-            >
-              {checkedCompSources.map((source) => (
-                <option key={source} value={source}>
-                  {checkedCompSourceLabel(source)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
         <div className="checked-comp-quick-actions">
-          <button type="button" onClick={() => void pasteCheckedCompPrice()}>
-            Paste price
+          <button type="button" onClick={() => openCheckedCompLogger("ebay-uk")}>
+            Log what you saw
           </button>
           <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")} disabled={!canOpenUkSolds}>
             Open UK solds
           </button>
+          <button type="button" onClick={() => void pasteCheckedCompPrice()}>
+            Paste price
+          </button>
         </div>
-        {awaitingManualPrice && (
-          <div className="checked-comp-return">
-            <strong>Back from solds?</strong>
-            <span>Copy a sold price then tap Paste price, or type it above.</span>
+        {checkedCompLogOpen && (
+          <form className="checked-comp-log-sheet" onSubmit={(event) => void logCheckedCompEntry(event)}>
+            <div className="form-grid">
+              <label>
+                Sold price
+                <MoneyInput
+                  ref={checkedCompLogPriceRef}
+                  value={checkedCompLogPrice}
+                  onChange={setCheckedCompLogPrice}
+                  placeholder="e.g. 24.00"
+                />
+              </label>
+              <label>
+                Sold date
+                <input
+                  type="date"
+                  value={checkedCompLogSoldDate}
+                  onChange={(event) => setCheckedCompLogSoldDate(event.target.value)}
+                />
+              </label>
+              <label>
+                Platform
+                <select
+                  value={checkedCompLogPlatform}
+                  onChange={(event) => setCheckedCompLogPlatform(event.target.value as CheckedCompPlatform)}
+                >
+                  {checkedCompPlatforms.map((platform) => (
+                    <option key={platform.value} value={platform.value}>
+                      {platform.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Note
+                <input
+                  value={checkedCompLogNote}
+                  onChange={(event) => setCheckedCompLogNote(event.target.value)}
+                  placeholder="NM, same language, no offer"
+                />
+              </label>
+            </div>
+            <details className="checked-comp-source-url">
+              <summary>Source link</summary>
+              <input
+                value={checkedCompLogSourceUrl}
+                onChange={(event) => setCheckedCompLogSourceUrl(event.target.value)}
+                placeholder="Optional sold-search or listing URL"
+              />
+            </details>
+            <div className="checked-comp-log-actions">
+              <button type="submit" disabled={busy === "checked-comp-log" || !checkedCompLogPrice.trim()}>
+                {busy === "checked-comp-log" ? "Logging..." : "Log price"}
+              </button>
+              <button type="button" className="ghost-button" onClick={() => setCheckedCompLogOpen(false)}>
+                Done
+              </button>
+            </div>
+          </form>
+        )}
+        {hasLoggedEntries && (
+          <div className="checked-comp-entry-list">
+            {checkedCompEntries.slice(0, 5).map((entry) => (
+              <div className="checked-comp-entry-row" key={entry.id}>
+                <div>
+                  <strong>{gbp(entry.pricePence)}</strong>
+                  <span>{checkedCompPlatformLabel(entry.platform)} · {shortDate(entry.soldDate)}</span>
+                </div>
+                {entry.note && <small>{entry.note}</small>}
+              </div>
+            ))}
           </div>
         )}
         {checkedCompPriceOptions.length > 0 && (
@@ -5200,58 +5432,19 @@ export default function Home() {
             ))}
           </div>
         )}
-        <div className="checked-comp-presets" role="group" aria-label="Checked comp source">
-          {checkedCompSources.map((source) => (
-            <button
-              key={source}
-              type="button"
-              className={source === checkedCompSource ? "selected" : ""}
-              onClick={() => setCheckedCompSource(source)}
-            >
-              {checkedCompSourceLabel(source)}
-            </button>
-          ))}
-        </div>
-        <div className="form-grid">
-          <label>
-            Sample
-            <input
-              inputMode="numeric"
-              min="1"
-              step="1"
-              value={checkedCompSample}
-              onChange={(event) => setCheckedCompSample(event.target.value)}
-            />
-          </label>
-          <label>
-            Note
-            <input
-              value={checkedCompNote}
-              onChange={(event) => setCheckedCompNote(event.target.value)}
-              placeholder="NM solds, same language"
-            />
-          </label>
-        </div>
-        <div className="checked-comp-presets" role="group" aria-label="Checked comp sample size">
-          {checkedCompSampleOptions.map((sample) => (
-            <button
-              key={sample}
-              type="button"
-              className={String(Math.max(1, Math.round(Number(checkedCompSample)))) === sample ? "selected" : ""}
-              onClick={() => setCheckedCompSample(sample)}
-            >
-              {sample} sold{sample === "1" ? "" : "s"}
-            </button>
-          ))}
-        </div>
-        {checkedComp && (
+        {summary && summary.count === 1 && (
           <p className="hint">
-            Auto list, buy plan and acquire are using this checked comp. API sources stay in the receipt.
+            One logged comp is shown as corroboration. Log a second recent sold price before it can headline.
           </p>
         )}
-        {!checkedComp && variant === "priority" && (
+        {summary && summary.count >= 2 && (
           <p className="hint">
-            Add one checked sold price and the stock button will use it for the buy plan and draft listing.
+            These logged prices are now a real comp source. The headline refreshes through the normal engine.
+          </p>
+        )}
+        {!hasLoggedEntries && variant === "priority" && (
+          <p className="hint">
+            Open eBay UK solds, then log the exact sold prices you trust.
           </p>
         )}
       </div>
@@ -9033,6 +9226,83 @@ function gradeTone(grade: string): string {
   return "";
 }
 
+function extractCheckedCompEntries(result: CompResult | null): CheckedCompEntry[] {
+  const entries = result?.raw?.entries;
+  return Array.isArray(entries) ? entries.filter(isCheckedCompEntry) : [];
+}
+
+function mergeCheckedCompEntries(entries: CheckedCompEntry[]): CheckedCompEntry[] {
+  const byId = new Map<string, CheckedCompEntry>();
+  for (const entry of entries) byId.set(entry.id, entry);
+  return [...byId.values()].sort((a, b) => new Date(b.soldDate).getTime() - new Date(a.soldDate).getTime());
+}
+
+function summarizeCheckedCompEntries(entries: CheckedCompEntry[]): { count: number; medianPence: number } | null {
+  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  const prices = entries
+    .filter((entry) => new Date(entry.soldDate).getTime() >= cutoff)
+    .map((entry) => entry.pricePence)
+    .filter((price) => price > 0)
+    .sort((a, b) => a - b);
+  if (prices.length === 0) return null;
+  const mid = Math.floor(prices.length / 2);
+  const medianPence = prices.length % 2 ? prices[mid]! : Math.round((prices[mid - 1]! + prices[mid]!) / 2);
+  return { count: prices.length, medianPence };
+}
+
+function buildLocalCheckedCompResult(entries: CheckedCompEntry[], card: CompResult["card"], grade: Grade): CompResult | null {
+  const summary = summarizeCheckedCompEntries(entries);
+  if (!summary) return null;
+  const recentEntries = entries
+    .filter((entry) => new Date(entry.soldDate).getTime() >= Date.now() - 90 * 24 * 60 * 60 * 1000)
+    .sort((a, b) => new Date(b.soldDate).getTime() - new Date(a.soldDate).getTime());
+  const prices = recentEntries.map((entry) => entry.pricePence).filter((price) => price > 0);
+  const latest = recentEntries[0];
+  if (!latest || prices.length === 0) return null;
+  return {
+    source: "checked-comps",
+    card,
+    grade,
+    currency: "GBP",
+    medianPence: summary.medianPence,
+    meanPence: Math.round(prices.reduce((sum, price) => sum + price, 0) / prices.length),
+    lowPence: Math.min(...prices),
+    highPence: Math.max(...prices),
+    sampleSize: summary.count,
+    windowDays: 90,
+    trendPct: null,
+    outliersRemoved: 0,
+    asOf: latest.soldDate,
+    raw: {
+      kind: "checked-comps",
+      caveat: "Dealer-logged sold prices for this exact card and grade.",
+      entries: recentEntries,
+    },
+  };
+}
+
+function upsertCompResult(results: CompResult[], next: CompResult): CompResult[] {
+  return [next, ...results.filter((result) => result.source !== next.source)];
+}
+
+function isCheckedCompEntry(value: unknown): value is CheckedCompEntry {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Partial<CheckedCompEntry>;
+  return Boolean(
+    typeof row.id === "string" &&
+      typeof row.cardId === "string" &&
+      typeof row.grade === "string" &&
+      typeof row.pricePence === "number" &&
+      typeof row.soldDate === "string" &&
+      typeof row.platform === "string" &&
+      typeof row.createdAt === "string",
+  );
+}
+
+function checkedCompPlatformLabel(platform: CheckedCompPlatform | string): string {
+  return checkedCompPlatforms.find((candidate) => candidate.value === platform)?.label ?? "Checked";
+}
+
 function buildCompReceipt(comp: Reconciled): Array<{
   key: string;
   name: string;
@@ -9045,12 +9315,19 @@ function buildCompReceipt(comp: Reconciled): Array<{
     .sort((a, b) => receiptRank(a, comp.headline) - receiptRank(b, comp.headline))
     .map((result) => ({
       key: `${result.source}-${result.grade}-${result.asOf}`,
-      name: sourceLabel(result.source, result.source === comp.headline?.source),
+      name: result.source === "checked-comps"
+        ? checkedCompReceiptName(result, result.source === comp.headline?.source)
+        : sourceLabel(result.source, result.source === comp.headline?.source),
       basis: compBasis(result),
       price: result.sampleSize > 0 && result.medianPence > 0 ? gbp(result.medianPence) : "No data",
       meta: compMeta(result),
       tone: receiptTone(result, comp.headline, comp.sourcesDisagree),
     }));
+}
+
+function checkedCompReceiptName(result: CompResult, headline: boolean): string {
+  const label = `Your checked comps: ${result.sampleSize} · median ${gbp(result.medianPence)}`;
+  return headline ? `${label} · used` : label;
 }
 
 function buildCompLimitations(comp: Reconciled): Array<{ key: string; reason: string }> {
@@ -9083,6 +9360,8 @@ function humanReconciliationReason(reason: string): string {
   if (reason.includes("tcg-vintage-raw")) return "Vintage catalog market data was excluded for RAW pricing.";
   if (reason.includes("corroboration-stale")) return "One signal is too stale to headline.";
   if (reason.includes("corroboration-thin-owned")) return "Owned sales are too thin or old to headline.";
+  if (reason.includes("corroboration-thin-checked")) return "One checked comp corroborates, but needs a second recent entry to headline.";
+  if (reason.includes("stale-checked-comps")) return "Your checked comps are older than 90 days.";
   if (reason.includes("penalty-raw-bucket-spread")) return "Raw eBay bucket is wide enough to suggest graded leakage.";
   if (reason.includes("penalty-graded-bucket-spread")) return "Graded bucket has a wide sale spread.";
   if (reason.includes("trend-suppressed")) return "Impossible trend was hidden.";
@@ -9094,8 +9373,9 @@ function humanReconciliationReason(reason: string): string {
 function receiptRank(result: CompResult, headline: CompResult | null): number {
   if (headline && result.source === headline.source) return 0;
   if (result.source === "owned-sales") return 1;
-  if (result.source === "poketrace") return 2;
-  if (result.source === "pokemon-tcg-market") return 3;
+  if (result.source === "checked-comps") return 2;
+  if (result.source === "poketrace") return 3;
+  if (result.source === "pokemon-tcg-market") return 4;
   return 4;
 }
 
@@ -9109,8 +9389,10 @@ function sourceLabel(source: string, headline: boolean): string {
         ? "PokeTrace"
       : source === "pokemon-tcg-market"
         ? "Catalog"
-        : source === "owned-sales"
+      : source === "owned-sales"
           ? "Owned sales"
+        : source === "checked-comps"
+          ? "Your checked comps"
           : source.replace(/-/g, " ");
   return headline ? `${label} · used` : label;
 }
@@ -9119,6 +9401,9 @@ function compBasis(result: CompResult): string {
   if (result.sampleSize === 0 || result.medianPence <= 0) return rawReason(result) ?? "No matching signal";
   if (result.raw?.kind === "checked-comp") {
     return `${result.raw.sourceLabel ?? checkedCompSourceLabel(result.raw.source)} checked price`;
+  }
+  if (result.source === "checked-comps") {
+    return "Dealer-logged sold prices";
   }
   if (result.source === "owned-sales") return "Your sold prices";
   if (result.source === "poketrace") {
@@ -9204,6 +9489,9 @@ function sourceEmptyReason(result: CompResult): string {
   }
   if (result.source === "owned-sales") {
     return "Owned sales: no previous sold history for this card/grade yet.";
+  }
+  if (result.source === "checked-comps") {
+    return "Your checked comps: no logged prices for this card/grade in the last 90 days.";
   }
   return reason ? `${source}: ${reason}` : `${source}: no matching signal for ${grade}.`;
 }

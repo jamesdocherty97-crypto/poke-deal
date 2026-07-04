@@ -184,12 +184,12 @@ Important restore rules:
 - It refuses to run on a non-empty database.
 - Only use `--force` if you deliberately want to wipe the target database first.
 
-The bundle includes inventory, listings, sales, operating costs, deal sessions, watches, alerts, price snapshots, cards and stored comp results.
+The bundle includes inventory, listings, sales, operating costs, deal sessions, watches, alerts, price snapshots, cards, checked comps and stored comp results.
 
 Notes:
 
 - Costs are stored as `Expense` rows.
-- Manual checked comps are stored as `CompResult` rows, usually from the manual-check source.
+- Dealer-logged checked comps are stored as checked comp rows and included in backups.
 - There is no separate Settings table yet.
 - Neon may also provide point-in-time restore, but the actual recovery window depends on the Neon project plan/settings. Until that restore window is confirmed in Neon, the app says backups are manual only.
 
@@ -503,23 +503,25 @@ Buttons:
 - Widen removes the UK-only filter when UK solds are thin.
 - Cardmarket and TCGPlayer are secondary checks, not replacements for cleaned sold comps.
 
-### Checked Comp
+### Your Checked Comps
 
-Checked Comp lets you manually override the API headline with a real sold price you trust.
+Your checked comps are a real source. Use them when you check eBay UK solds, Cardmarket, Vinted or another source yourself.
 
-Fields:
+How to use:
 
-- Sold price.
-- Seen on.
-- Sample.
-- Note.
+1. Tap eBay UK solds.
+2. Check the sold results yourself.
+3. Return to Poke Deal and tap Log what you saw.
+4. Enter the sold price. The date defaults to today and the platform defaults to eBay UK.
+5. Press Enter or tap Log price, then add the next price if you saw another good match.
 
-Intended use:
+How the app treats them:
 
-- You check eBay/Cardmarket/Vinted yourself.
-- You enter the actual trusted value.
-- Auto list, buy plan and acquire use that checked comp.
-- API sources still remain visible in the receipt.
+- One logged price is shown prominently as corroboration, but cannot headline by itself.
+- Two or more checked comps for the same card and grade within 90 days can become the headline comp.
+- Checked comps never carry across to another card or grade.
+- The receipt shows `Your checked comps: n · median £X`.
+- Buy plan, Deal Judge and stock pricing consume the refreshed headline through the normal comp engine.
 
 ### Deal Judge
 

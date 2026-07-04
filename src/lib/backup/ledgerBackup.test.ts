@@ -30,6 +30,7 @@ const delegateByTable = {
   expenses: "expense",
   dealSessions: "dealSession",
   dealSessionLines: "dealSessionLine",
+  checkedComps: "checkedComp",
   compResults: "compResult",
   priceSnapshots: "priceSnapshot",
   cronRuns: "cronRun",
@@ -50,7 +51,7 @@ test("ledger backup exports every persisted table and round-trips into an empty 
     assert.equal(backup.tables[tableName].rowCount, 1, tableName);
   }
   assert.match(backup.notes.settings, /No Settings table exists/);
-  assert.match(backup.notes.checkedComps, /compResults/);
+  assert.match(backup.notes.checkedComps, /checkedComps/);
 
   const report = await restoreLedgerBackup(parsedBackup, { db: target.client });
   assert.equal(report.force, false);
@@ -308,6 +309,19 @@ function seedRows(): Partial<Record<keyof typeof delegateByTable, PlainRow[]>> {
         compSource: "pokemon-price-tracker",
         compAsOf: "2026-07-01T09:05:00.000Z",
         addedAt: "2026-07-01T09:05:00.000Z",
+      },
+    ],
+    checkedComps: [
+      {
+        id: "checked-comp-1",
+        cardId: "card-1",
+        grade: "PSA_10",
+        pricePence: 105000,
+        soldDate: "2026-07-01T09:00:00.000Z",
+        platform: "ebay-uk",
+        note: "Dealer checked solds.",
+        sourceUrl: "https://www.ebay.co.uk/sch/i.html?_nkw=Umbreon+VMAX+PSA+10&LH_Sold=1",
+        createdAt: "2026-07-01T09:03:00.000Z",
       },
     ],
     compResults: [

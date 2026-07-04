@@ -4349,7 +4349,7 @@
 
 .checked-comp-quick-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -4388,6 +4388,85 @@
   line-height: 1.25;
 }
 
+.checked-comp-log-sheet {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  border-radius: var(--r-md);
+  background: rgba(3, 8, 20, 0.24);
+  padding: 8px;
+}
+
+.checked-comp-source-url {
+  display: grid;
+  gap: 6px;
+}
+
+.checked-comp-source-url summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.checked-comp-source-url input {
+  width: 100%;
+}
+
+.checked-comp-log-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.checked-comp-log-actions button {
+  min-height: 40px;
+  font-weight: 950;
+}
+
+.checked-comp-entry-list {
+  display: grid;
+  gap: 6px;
+}
+
+.checked-comp-entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px;
+}
+
+.checked-comp-entry-row div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.checked-comp-entry-row strong {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.checked-comp-entry-row span,
+.checked-comp-entry-row small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.checked-comp-entry-row small {
+  max-width: 42%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .checked-comp-presets button {
   min-height: 38px;
   padding: 7px 6px;
@@ -4400,6 +4479,26 @@
   border-color: rgba(255, 203, 5, 0.86);
   background: linear-gradient(180deg, var(--yellow), #f59e0b);
   color: #1b2235;
+}
+
+@media (max-width: 520px) {
+  .checked-comp-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .checked-comp-log-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .checked-comp-entry-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .checked-comp-entry-row small {
+    max-width: none;
+    text-align: left;
+  }
 }
 
 .owned-sales-signal {
