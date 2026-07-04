@@ -44,6 +44,20 @@ body:has(.ebay-publish-overlay) {
   overflow: hidden;
 }
 
+.app-shell:not(:has(.workspace)):not(:has(.today-workspace))::after {
+  display: block;
+  min-height: 184px;
+  margin-top: var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 203, 5, 0.13), rgba(255, 255, 255, 0.06)),
+    rgba(13, 20, 36, 0.62);
+  background-size: 220% 100%, auto;
+  content: "";
+  animation: quickSkeleton 900ms ease-in-out infinite;
+}
+
 button,
 input,
 select,
@@ -59,6 +73,12 @@ button {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
   color: var(--ink);
   cursor: pointer;
+  transition:
+    border-color var(--motion-fast),
+    background-color var(--motion-fast),
+    color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    transform var(--motion-fast);
 }
 
 button:active:not(:disabled),
@@ -355,7 +375,12 @@ label {
   font-weight: 900;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  transition:
+    opacity var(--motion-fast),
+    border-color var(--motion-fast),
+    color var(--motion-fast),
+    transform var(--motion-fast);
+  will-change: opacity, transform;
 }
 
 .pull-refresh.visible {
@@ -487,4 +512,14 @@ label {
   margin: 0 auto;
   gap: 8px;
   pointer-events: none;
+}
+
+@keyframes quickSkeleton {
+  from {
+    background-position: 100% 0, 0 0;
+  }
+
+  to {
+    background-position: -100% 0, 0 0;
+  }
 }

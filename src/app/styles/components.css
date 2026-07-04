@@ -748,6 +748,8 @@
     rgba(3, 8, 20, 0.94);
   padding: 6px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+  transform-origin: top center;
+  animation: dropdownIn var(--motion-fast) both;
 }
 
 .smart-card-suggestions {
@@ -4339,11 +4341,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  border-color: rgba(255, 255, 255, 0.16);
+  border-radius: var(--r-lg);
+  background:
+    linear-gradient(115deg, rgba(255, 203, 5, 0.12), rgba(139, 92, 246, 0.08)),
+    rgba(13, 20, 36, 0.98);
   margin: 0;
   padding: 10px 12px;
   box-shadow: var(--shadow);
   font-weight: 800;
   pointer-events: auto;
+  animation: toastIn var(--motion-fast) both;
 }
 
 .notice.success::before {
@@ -4374,13 +4382,11 @@
 
 .notice.success {
   border-color: rgba(52, 211, 153, 0.45);
-  background: rgba(52, 211, 153, 0.08);
   color: var(--green);
 }
 
 .notice.danger {
   border-color: rgba(251, 113, 133, 0.5);
-  background: rgba(251, 113, 133, 0.08);
   color: var(--danger);
 }
 
@@ -5147,7 +5153,8 @@
   padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
   box-shadow: var(--shadow-2), 0 0 0 100vmax rgba(0, 0, 0, 0.48);
   overscroll-behavior: contain;
-  animation: sheetIn 0.2s ease-out;
+  transform-origin: bottom center;
+  animation: sheetIn var(--motion-sheet) both;
 }
 
 .listing-pack-sheet {
@@ -6016,7 +6023,8 @@
   padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
   box-shadow: var(--shadow-2), 0 0 0 100vmax rgba(0, 0, 0, 0.48);
   overscroll-behavior: contain;
-  animation: sheetIn 0.2s ease-out;
+  transform-origin: bottom center;
+  animation: sheetIn var(--motion-sheet) both;
 }
 
 .confirm-sheet h2,
@@ -6081,13 +6089,57 @@
   }
 }
 
+@keyframes dropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.buy-optional-drawer[open] > :not(summary),
+.optional-tool-panel[open] > :not(summary),
+.stock-import-panel[open] > :not(summary),
+.row-more-actions[open] > :not(summary),
+.manual-photo-url[open] > :not(summary) {
+  transform-origin: top center;
+  animation: dropdownIn var(--motion-fast) both;
+}
+
+.primary-action:active:not(:disabled),
+.secondary-action:active:not(:disabled),
+.mobile-buy-action button:active:not(:disabled),
+.listing-next-action button:active:not(:disabled),
+.sale-prompt-card button:active:not(:disabled),
+.price-preview button:active:not(:disabled),
+.next-action-button:active:not(:disabled) {
+  transform: translateY(1px) scale(var(--press-scale));
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .sell-sheet,
-  .confirm-sheet,
-  .ebay-publish-confirm,
-  .lookup-spinner,
-  .notice.success::before {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

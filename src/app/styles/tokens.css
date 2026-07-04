@@ -69,5 +69,9 @@
   --holo: linear-gradient(115deg, #69e8ff 0%, #8b5cf6 42%, #ff72d2 72%, #ffcb05 100%);
   --holo-subtle: linear-gradient(115deg, rgba(105, 232, 255, 0.16), rgba(139, 92, 246, 0.14) 42%, rgba(255, 114, 210, 0.12) 72%, rgba(255, 203, 5, 0.14));
 
+  --motion-fast: 150ms ease-out;
+  --motion-sheet: 190ms ease-out;
+  --press-scale: 0.98;
+
   --shadow: var(--shadow-2);
 }
