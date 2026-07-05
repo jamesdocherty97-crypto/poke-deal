@@ -59,7 +59,7 @@ Nothing was removed.
 | Add to lot / current deal session | Deal tools chip |
 | Grading EV | Deal tools chip |
 | Stock reprice helper | Deal tools chip |
-| eBay UK solds/manual links | Log comps chip |
+| eBay UK solds/manual links | Log comps chip, in the Manual checks block only |
 | Checked comp logger | Log comps chip |
 | Buy target/watch presets | Target chip |
 | Full grade dropdown | More grades disclosure under the quick grade grid |
@@ -70,6 +70,7 @@ Nothing was removed.
 - Cost is reset on identity changes and on new comp flows unless Quick Fill explicitly supplied a cost for that same card.
 - One logged checked comp stays visible as corroboration and no longer replaces the headline client-side.
 - Programmatic external opens check the returned window. Blocked opens show a tappable link instead of a false success toast.
+- Duplicate eBay UK sold buttons were collapsed into one Manual checks opener; Your checked comps now focuses on logging/pasting prices.
 - Scan camera startup has an 8-second timeout and visible upload fallback.
 - Stocking has a visible progress row, double-submit guard, retry path, and Undo toast.
 - The ghost Current/Next strip is suppressed unless there is a real card identity or image.

@@ -6010,7 +6010,6 @@ export default function Home() {
   }
 
   function renderCheckedCompCard(variant: "full" | "priority" = "full") {
-    const canOpenUkSolds = manualCompLinks.some((link) => link.kind === "EBAY_UK_SOLD" && link.query.trim());
     const awaitingManualPrice = manualCompReturnArmed && checkedCompLogOpen;
     const hasLoggedEntries = checkedCompEntries.length > 0;
     const summary = checkedCompsSummary;
@@ -6048,9 +6047,6 @@ export default function Home() {
         <div className="checked-comp-quick-actions">
           <button type="button" onClick={() => openCheckedCompLogger("ebay-uk")}>
             Log what you saw
-          </button>
-          <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")} disabled={!canOpenUkSolds}>
-            Open UK solds
           </button>
           <button type="button" onClick={() => void pasteCheckedCompPrice()}>
             Paste price
@@ -6162,7 +6158,7 @@ export default function Home() {
         )}
         {!hasLoggedEntries && variant === "priority" && (
           <p className="hint">
-            Open eBay UK solds, then log the exact sold prices you trust.
+            Open eBay UK solds from Manual checks, then log the exact sold prices you trust here.
           </p>
         )}
       </div>
