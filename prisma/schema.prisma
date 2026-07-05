@@ -27,6 +27,7 @@ model Card {
   number   String? // collector number within the set, e.g. "058/198"
   rarity   String?
   imageUrl String?
+  displayImageUrl String? // display-only fallback art; never used as listing/photo-pipeline catalog art
 
   // External catalog references, for adapter lookups.
   tcgApiId     String? @unique // pokemontcg.io id
@@ -39,6 +40,7 @@ model Card {
   snapshots        PriceSnapshot[]
   watches          Watch[]
   dealSessionLines DealSessionLine[]
+  scanEvents       ScanEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -331,6 +333,34 @@ model PriceSnapshot {
 
   @@unique([cardId, grade, takenAt])
   @@index([takenAt])
+}
+
+/// Append-only scan observations. Captures "dealer considered this card" even
+/// when it was not bought, stocked, or comped.
+model ScanEvent {
+  id     String @id @default(cuid())
+  card   Card?  @relation(fields: [cardId], references: [id])
+  cardId String?
+
+  source      String @default("gemini-scan")
+  status      String
+  name        String?
+  setName     String?
+  setCode     String?
+  number      String?
+  language    Language?
+  grade       Grade?
+  condition   String?
+  marketplace Channel?
+  model       String?
+  raw         Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([cardId, createdAt])
+  @@index([source, status])
+  @@index([name])
 }
 
 model CronRun {

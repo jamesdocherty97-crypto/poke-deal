@@ -49,6 +49,11 @@ test("RAW maps the stable TCGPlayer near-mint baseline when present", () => {
   assert.equal(comp.asOf, "2026-01-29T12:00:00.000Z");
   assert.equal((comp.raw as { kind?: string }).kind, "market-baseline");
   assert.equal((comp.raw as { priceSource?: string }).priceSource, "tcgplayer");
+  assert.equal((comp.raw as { displayImageUrl?: string }).displayImageUrl, "https://cdn.poketrace.com/cards/charizard-ex.webp");
+  assert.equal(
+    ((comp.raw as { providerCard?: { imageUrl?: string } }).providerCard)?.imageUrl,
+    "https://cdn.poketrace.com/cards/charizard-ex.webp",
+  );
 });
 
 test("graded cards map eBay sold aggregate tiers", () => {

@@ -33,6 +33,7 @@ type WatchRecord = {
     setName: string;
     number: string | null;
     imageUrl: string | null;
+    displayImageUrl?: string | null;
   };
   alerts?: Array<{ id: string; message: string; pence: number | null; firedAt: string; delivered: boolean }>;
 };
@@ -582,7 +583,7 @@ function WatchRow({
   const latest = watch.alerts?.[0];
   return (
     <article className={`watch-row ${watch.active ? "" : "inactive"}`}>
-      <CardImage src={watch.card.imageUrl} className="watch-card-art" fallbackClassName="watch-card-art blank" alt="" />
+      <CardImage src={watch.card.imageUrl ?? watch.card.displayImageUrl ?? null} className="watch-card-art" fallbackClassName="watch-card-art blank" alt="" />
       <div className="watch-main">
         <div className="watch-title-line">
           <strong>{watch.card.name}</strong>

@@ -65,6 +65,7 @@ type PokeTraceCard = {
   name?: unknown;
   cardNumber?: unknown;
   set?: { name?: unknown; slug?: unknown };
+  image?: unknown;
   market?: unknown;
   currency?: unknown;
   prices?: Record<string, Record<string, PokeTracePriceTier | undefined> | undefined>;
@@ -311,6 +312,7 @@ export function mapPokeTraceCardsToComp(
       market: readString(card.market),
       currency,
       fx: fxRateInfo(rates),
+      displayImageUrl: readProviderImageUrl(card),
       providerCard: providerCardRef(card),
       approxSaleCount: Boolean(choice.tier.approxSaleCount),
       signals,
@@ -461,14 +463,21 @@ function canonicalCardRef(input: CardRef, card: PokeTraceCard): CardRef {
   };
 }
 
-function providerCardRef(card: PokeTraceCard): CardRef {
+function providerCardRef(card: PokeTraceCard): CardRef & { imageUrl?: string } {
+  const imageUrl = readProviderImageUrl(card);
   return {
     name: readString(card.name) ?? "Unknown card",
     setName: readString(card.set?.name) ?? undefined,
     number: readString(card.cardNumber) ?? undefined,
+    ...(imageUrl ? { imageUrl } : {}),
     game: "POKEMON",
     language: "EN",
   };
+}
+
+function readProviderImageUrl(card: PokeTraceCard): string | null {
+  const image = readString(card.image);
+  return image && /^https?:\/\//i.test(image) ? image : null;
 }
 
 function shouldKeepRequestedPromoIdentity(input: CardRef, providerNumber: string | undefined): boolean {

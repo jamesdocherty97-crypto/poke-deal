@@ -343,6 +343,7 @@ async function findCachedCatalogCandidates(card: CardRef, limit: number): Promis
       number: row.number ?? undefined,
       rarity: row.rarity ?? undefined,
       imageUrl: row.imageUrl ?? undefined,
+      displayImageUrl: row.displayImageUrl ?? undefined,
       tcgApiId: row.tcgApiId ?? undefined,
       tcgDexId: row.tcgDexId ?? undefined,
     })),

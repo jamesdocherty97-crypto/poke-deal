@@ -378,6 +378,12 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
   };
 };
 
+type CompCardImage = {
+  imageUrl: string | null;
+  source: "catalog" | "cached-display" | "poketrace" | "pokemon-price-tracker" | "none";
+  listingSafe: boolean;
+};
+
 type Reconciled = {
   headline: CompResult | null;
   all: CompResult[];
@@ -390,6 +396,7 @@ type Reconciled = {
   alternatives?: CatalogCard[];
   psaCert?: PsaCertView | null;
   askEvidence?: EbayAskEvidence | null;
+  cardImage?: CompCardImage | null;
 };
 
 type DealSessionLine = {
@@ -457,6 +464,7 @@ type InventoryItem = {
     setName: string;
     number: string | null;
     imageUrl: string | null;
+    displayImageUrl?: string | null;
   };
   grade: string;
   quantity: number;
@@ -679,6 +687,7 @@ type WatchRecord = {
     setName: string;
     number: string | null;
     imageUrl: string | null;
+    displayImageUrl?: string | null;
   };
   alerts?: Array<{ id: string; message: string; pence: number | null; firedAt: string; delivered: boolean }>;
 };
@@ -1519,19 +1528,23 @@ export default function Home() {
       psaResult,
   );
   const canRunSmartComp = Boolean(quickIntake.trim() || name.trim());
-  const selectedCardImage = cardArtUrl ?? catalogCard?.imageUrl ?? matchingQuickHunt?.imageUrl ?? null;
+  const selectedCardImage = cardArtUrl ?? payloadDisplayImage(comp) ?? matchingQuickHunt?.imageUrl ?? null;
   const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
   const scannedQuery = scanMapping && "query" in scanMapping ? scanMapping.query : null;
   const scanWarnings = scanMapping?.warnings ?? [];
   const scanAlternatives = scanMapping?.status === "ambiguous" ? scanMapping.alternatives : [];
+  const scanResolvedArt =
+    scanMode === "ambiguous"
+      ? scanAlternatives.map((card) => catalogDisplayImage(card)).find(Boolean) ?? selectedCardImage
+      : selectedCardImage;
   const scanCompReady = Boolean(scanIdentity && headline && scanMode === "identity");
   const askEvidence = comp?.askEvidence ?? null;
   const spotlightImage =
     selectedCardImage ??
     (hasActiveCardIdentity
       ? null
-      : activeInventory.find((item) => item.card.imageUrl)?.card.imageUrl ??
-        listings.find((listing) => listing.item?.card.imageUrl)?.item?.card.imageUrl ??
+        : activeInventory.map((item) => inventoryDisplayImage(item)).find(Boolean) ??
+        listings.map((listing) => inventoryDisplayImage(listing.item)).find(Boolean) ??
         quickHunts[0]?.imageUrl ??
         null);
   const marketBaseline =
@@ -1596,6 +1609,7 @@ export default function Home() {
             sourcesDisagree: false,
             catalog: catalogCard,
             psaCert: psaResult,
+            cardImage: null,
           }
         : null);
     if (!baseComp) return null;
@@ -2777,7 +2791,7 @@ export default function Home() {
     pinRecentSetName(card.setName);
     setNumber(card.number ?? "");
     setGrade(nextGrade);
-    setCardArtUrl(card.imageUrl ?? null);
+    setCardArtUrl(catalogDisplayImage(card));
     setError(null);
     void lookupComp(lookup);
   }
@@ -2892,7 +2906,7 @@ export default function Home() {
       source: result.source,
       confidenceLabel: confidence.label,
       confidenceTone: confidence.tone,
-      ...(catalog?.imageUrl ? { imageUrl: catalog.imageUrl } : {}),
+      ...(payloadDisplayImage(payload) ? { imageUrl: payloadDisplayImage(payload)! } : {}),
       ...(catalog?.setLogoUrl || catalog?.setSymbolUrl ? { setMarkUrl: catalog.setLogoUrl ?? catalog.setSymbolUrl } : {}),
       lookedUpAt: result.asOf,
     };
@@ -3115,7 +3129,7 @@ export default function Home() {
       if (!res.ok) throw new Error(payload.error ?? "lookup failed");
       setComp(payload);
       if (payload.psaCert) setPsaResult(payload.psaCert);
-      setCardArtUrl(payload.catalog?.imageUrl ?? null);
+      setCardArtUrl(payloadDisplayImage(payload));
       pinRecentSetName(payload.catalog?.setName ?? normalizedInput.setName);
       rememberRecentComp(payload, normalizedInput);
       setPendingLookup(null);
@@ -3532,11 +3546,15 @@ export default function Home() {
       setSuggestion(payload.suggestion);
       const acquiredComps = payload.comps ?? (payload.comp ? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false } : null);
       if (acquiredComps) {
-        const rememberedComps = { ...acquiredComps, catalog: acquiredComps.catalog ?? payload.catalog ?? null };
+        const rememberedComps = {
+          ...acquiredComps,
+          catalog: acquiredComps.catalog ?? payload.catalog ?? null,
+          cardImage: acquiredComps.cardImage ?? payload.cardImage ?? null,
+        };
         setComp(rememberedComps);
         rememberRecentComp(rememberedComps, { name, setName: setNameValue, number, grade });
       }
-      if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
+      setCardArtUrl(payloadDisplayImage(payload));
       pinRecentSetName(payload.catalog?.setName ?? setNameValue);
       const listedPence = payload.listing?.listPrice ?? payload.listing?.suggestedPrice ?? payload.suggestion.pricePence;
       const listingVerb = payload.listing
@@ -3554,7 +3572,7 @@ export default function Home() {
         listPricePence: listedPence,
         channel,
         listingState: payload.listing?.state ?? "DRAFT",
-        imageUrl: payload.catalog?.imageUrl ?? cardArtUrl,
+        imageUrl: payloadDisplayImage(payload) ?? cardArtUrl,
       });
       setNotice(
         `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${
@@ -3970,7 +3988,7 @@ export default function Home() {
     setName(card.name);
     setSetNameValue(card.setName);
     setNumber(card.number);
-    setCardArtUrl(card.imageUrl ?? null);
+    setCardArtUrl(catalogDisplayImage(card));
     setManualCompQuery("");
     setNotice(null);
     setError(null);
@@ -4050,7 +4068,7 @@ export default function Home() {
     setSetNameValue(card.setName);
     pinRecentSetName(card.setName);
     setNumber(card.number ?? "");
-    setCardArtUrl(card.imageUrl ?? null);
+    setCardArtUrl(catalogDisplayImage(card));
     setManualCompQuery(manualSearch);
     setError(null);
     setNotice(`Rechecking ${lookupName}...`);
@@ -4147,7 +4165,7 @@ export default function Home() {
       setAcquireListingState(parsed.listingState);
       setShouldCreateListing(true);
     }
-    if (card.imageUrl) setCardArtUrl(card.imageUrl);
+    setCardArtUrl(catalogDisplayImage(card));
     setCardSuggestionsOpen(false);
     setManualCompQuery(manualSearch);
     setError(null);
@@ -4258,7 +4276,7 @@ export default function Home() {
     setPsaResult(null);
     setPsaPendingDecision(null);
     setQuickIntake("");
-    setCardArtUrl(item.card.imageUrl);
+    setCardArtUrl(inventoryDisplayImage(item));
     setListPriceOverride(options.repeatBuy && repeatListPrice ? penceToPounds(repeatListPrice) : "");
     setManualCompQuery(
       cardSearchQuery(
@@ -5523,7 +5541,7 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "grade check failed");
       setGradeComp(payload.headline);
-      if (!cardArtUrl) setCardArtUrl(payload.catalog?.imageUrl ?? null);
+      if (!cardArtUrl) setCardArtUrl(payloadDisplayImage(payload));
     } catch (err) {
       setError(err instanceof Error ? err.message : "grade check failed");
     } finally {
@@ -5699,12 +5717,14 @@ export default function Home() {
         sourcesDisagree: false,
         catalog: catalogCard,
         psaCert: psaResult,
+        cardImage: null,
       };
       return {
         ...base,
         all: upsertCompResult(base.all, checkedSource),
         catalog: base.catalog ?? catalogCard,
         psaCert: base.psaCert ?? psaResult,
+        cardImage: base.cardImage ?? current?.cardImage ?? comp?.cardImage ?? null,
       };
     });
     return checkedSource;
@@ -5739,6 +5759,7 @@ export default function Home() {
             all: upsertCompResult(base.all, checkedSource),
             catalog: base.catalog ?? catalogCard,
             psaCert: base.psaCert ?? psaResult,
+            cardImage: base.cardImage ?? current?.cardImage ?? null,
           };
         }
         const payloadAll = Array.isArray(payload.all) ? payload.all : [];
@@ -5748,9 +5769,11 @@ export default function Home() {
           all: checkedSource ? upsertCompResult(payloadAll, checkedSource) : payloadAll,
           catalog: payload.catalog ?? current?.catalog ?? catalogCard,
           psaCert: payload.psaCert ?? current?.psaCert ?? psaResult,
+          cardImage: payload.cardImage ?? current?.cardImage ?? null,
         };
       });
-      if (payload.catalog?.imageUrl) setCardArtUrl(payload.catalog.imageUrl);
+      const nextImage = payloadDisplayImage(payload);
+      if (nextImage) setCardArtUrl(nextImage);
       rememberRecentComp(payload, { name: card.name, setName: card.setName ?? "", number: card.number ?? "", grade });
     } catch {
       // The checked comp is already stored. The next normal comp lookup will pick it up.
@@ -5882,15 +5905,23 @@ export default function Home() {
         ref={variant === "priority" ? checkedCompRef : undefined}
       >
         <div className="checked-comp-heading">
-          <div>
-            <span>Your checked comps</span>
-            <strong>
-              {summary
-                ? `${summary.count} logged · median ${gbp(summary.medianPence)}`
-                : awaitingManualPrice
-                  ? "Log the sold prices you saw"
-                  : "Log your manual check"}
-            </strong>
+          <div className="checked-comp-title">
+            <CardImage
+              src={selectedCardImage}
+              className="checked-comp-card-art"
+              fallbackClassName="checked-comp-card-art blank"
+              alt=""
+            />
+            <div>
+              <span>Your checked comps</span>
+              <strong>
+                {summary
+                  ? `${summary.count} logged · median ${gbp(summary.medianPence)}`
+                  : awaitingManualPrice
+                    ? "Log the sold prices you saw"
+                    : "Log your manual check"}
+              </strong>
+            </div>
           </div>
           {checkedCompLogOpen && (
             <button className="ghost-button" type="button" onClick={() => setCheckedCompLogOpen(false)}>
@@ -6399,7 +6430,7 @@ export default function Home() {
                       key={card.tcgApiId ?? card.tcgDexId ?? `${card.name}-${card.setName}-${card.number ?? ""}`}
                       className="suggestion-row card-suggestion-row smart-card-suggestion-card"
                     >
-                      <CardImage src={card.imageUrl ?? null} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
+                      <CardImage src={catalogDisplayImage(card)} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
                       <span className="suggestion-name">
                         <strong>{card.name}</strong>
                         {card.rarity && <small>{card.rarity}</small>}
@@ -6676,7 +6707,7 @@ export default function Home() {
                       aria-selected="false"
                       onClick={() => chooseCard(card)}
                     >
-                      <CardImage src={card.imageUrl ?? null} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
+                      <CardImage src={catalogDisplayImage(card)} className="suggestion-card-art" fallbackClassName="suggestion-card-art blank" alt="" />
                       <span className="suggestion-name">
                         <strong>{card.name}</strong>
                         {card.rarity && <small>{card.rarity}</small>}
@@ -7028,6 +7059,24 @@ export default function Home() {
                 </div>
               )}
 
+              {scanPhotoPreview && scanResolvedArt && (scanMode === "identity" || scanMode === "ambiguous") && (
+                <div className="scan-art-compare" aria-label="Scan compared with catalog art">
+                  <figure>
+                    <img src={scanPhotoPreview} alt="Scanned card" />
+                    <figcaption>Scan</figcaption>
+                  </figure>
+                  <figure>
+                    <CardImage
+                      src={scanResolvedArt}
+                      className="scan-compare-art"
+                      fallbackClassName="scan-compare-art blank"
+                      alt="Matched card art"
+                    />
+                    <figcaption>Matched art</figcaption>
+                  </figure>
+                </div>
+              )}
+
               {scanMode === "ambiguous" && scanAlternatives.length > 0 && (
                 <div className="scan-candidate-list" aria-label="Possible scan matches">
                   {scanPhotoPreview && <img className="scan-reference-photo" src={scanPhotoPreview} alt="Scanned card reference" />}
@@ -7039,7 +7088,7 @@ export default function Home() {
                         onClick={() => applyScannedCandidate(card, scannedQuery?.grade ?? grade)}
                         disabled={busy === "lookup"}
                       >
-                        <CardImage src={card.imageUrl ?? null} className="scan-candidate-art" fallbackClassName="scan-candidate-art blank" alt="" />
+                        <CardImage src={catalogDisplayImage(card)} className="scan-candidate-art" fallbackClassName="scan-candidate-art blank" alt="" />
                         <span>
                           <strong>{card.name}</strong>
                           <small>
@@ -7252,7 +7301,7 @@ export default function Home() {
                           disabled={busy === "lookup"}
                         >
                           <CardImage
-                            src={card.imageUrl ?? null}
+                            src={catalogDisplayImage(card)}
                             className="catalog-alternative-art"
                             fallbackClassName="catalog-alternative-art blank"
                             alt=""
@@ -7566,7 +7615,7 @@ export default function Home() {
               {catalogCard && (
                 <div className="catalog-strip">
                   <CardImage
-                    src={catalogCard.imageUrl ?? null}
+                    src={catalogDisplayImage(catalogCard)}
                     className="catalog-art"
                     fallbackClassName="catalog-art blank"
                     alt={`${catalogCard.name} card art`}
@@ -7592,7 +7641,7 @@ export default function Home() {
               {sourceMatchedCard && (
                 <div className="catalog-strip source-match-strip">
                   <CardImage
-                    src={null}
+                    src={comp?.cardImage?.source !== "catalog" ? comp?.cardImage?.imageUrl ?? null : null}
                     className="catalog-art"
                     fallbackClassName="catalog-art blank"
                     alt=""
@@ -8182,7 +8231,7 @@ export default function Home() {
                   const listing = listingForInventoryItem(item);
                   return (
                     <article className="recent-intake-row" key={item.id}>
-                      <CardImage src={item.card.imageUrl} className="mini-card-art" fallbackClassName="mini-card-art blank" alt="" />
+                      <CardImage src={inventoryDisplayImage(item)} className="mini-card-art" fallbackClassName="mini-card-art blank" alt="" />
                       <div className="recent-intake-copy">
                         <strong>{item.card.name}</strong>
                         <span>
@@ -10544,7 +10593,15 @@ function primaryItemPhoto(item: InventoryItem | undefined | null): CardPhoto | n
 }
 
 function inventoryDisplayImage(item: InventoryItem | undefined | null): string | null {
-  return primaryItemPhoto(item)?.url ?? item?.card.imageUrl ?? null;
+  return primaryItemPhoto(item)?.url ?? item?.card.imageUrl ?? item?.card.displayImageUrl ?? null;
+}
+
+function catalogDisplayImage(card: Pick<CatalogCard, "imageUrl" | "displayImageUrl"> | undefined | null): string | null {
+  return card?.imageUrl ?? card?.displayImageUrl ?? null;
+}
+
+function payloadDisplayImage(payload: Pick<Reconciled, "cardImage" | "catalog"> | undefined | null): string | null {
+  return payload?.cardImage?.imageUrl ?? catalogDisplayImage(payload?.catalog);
 }
 
 function inferPhotoRole(index: number): CardPhoto["role"] {

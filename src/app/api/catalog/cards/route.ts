@@ -32,6 +32,7 @@ type DbCard = {
   number: string | null;
   rarity: string | null;
   imageUrl: string | null;
+  displayImageUrl: string | null;
   tcgApiId: string | null;
   tcgDexId: string | null;
 };
@@ -198,6 +199,7 @@ function dbCardToCatalogCard(card: DbCard): CatalogCard {
     number: normalizeCachedCardNumber(card),
     rarity: card.rarity ?? undefined,
     imageUrl: card.imageUrl ?? undefined,
+    displayImageUrl: card.displayImageUrl ?? undefined,
     tcgApiId: card.tcgApiId ?? undefined,
     tcgDexId: card.tcgDexId ?? undefined,
   };
@@ -229,7 +231,7 @@ function catalogMatchLabel(card: CatalogCard, lookup: { name: string; setName?: 
   if (lookup.setName && catalogCardMatchesSetContext(card, lookup.setName)) {
     return "Set match";
   }
-  if (card.imageUrl) return "Image match";
+  if (card.imageUrl || card.displayImageUrl) return "Image match";
   return "Manual candidate";
 }
 

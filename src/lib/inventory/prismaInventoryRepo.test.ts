@@ -12,6 +12,7 @@ type FakeCard = {
   number: string | null;
   rarity: string | null;
   imageUrl: string | null;
+  displayImageUrl: string | null;
   tcgApiId: string | null;
 };
 
@@ -38,6 +39,7 @@ type FakeCardData = {
   number?: string;
   rarity?: string;
   imageUrl?: string;
+  displayImageUrl?: string;
   tcgApiId?: string;
 };
 
@@ -91,6 +93,7 @@ function fakeDb(seedCards: FakeCard[] = []) {
             number: data.number ?? null,
             rarity: data.rarity ?? null,
             imageUrl: data.imageUrl ?? null,
+            displayImageUrl: data.displayImageUrl ?? null,
             tcgApiId: data.tcgApiId ?? null,
           };
           cards.push(card);
@@ -117,6 +120,7 @@ function fakeDb(seedCards: FakeCard[] = []) {
             number: create.number ?? null,
             rarity: create.rarity ?? null,
             imageUrl: create.imageUrl ?? null,
+            displayImageUrl: create.displayImageUrl ?? null,
             tcgApiId: create.tcgApiId ?? null,
           };
           cards.push(card);
@@ -189,6 +193,7 @@ test("PrismaInventoryRepo reuses tcgApiId cards", async () => {
       number: "199/165",
       rarity: null,
       imageUrl: null,
+      displayImageUrl: null,
       tcgApiId: "sv3pt5-199",
     },
   ]);

@@ -36,6 +36,7 @@ type TodayListingItem = {
     name: string;
     number: string | null;
     imageUrl: string | null;
+    displayImageUrl?: string | null;
   };
   photos?: Array<{ url: string }>;
 };
@@ -650,7 +651,7 @@ function listingQueueLabel(listing: TodayListing): string {
 }
 
 function inventoryDisplayImage(item: TodayListingItem | undefined | null): string | null {
-  return item?.photos?.[0]?.url ?? item?.card.imageUrl ?? null;
+  return item?.photos?.[0]?.url ?? item?.card.imageUrl ?? item?.card.displayImageUrl ?? null;
 }
 
 function ageLabel(value: string): string {

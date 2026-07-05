@@ -150,6 +150,7 @@ function checkedComp(
       number: "192/165",
       rarity: "Ultra Rare",
       imageUrl: "https://example.test/zapdos.png",
+      displayImageUrl: null,
       tcgApiId: "sv3pt5-192",
       tcgDexId: null,
       cardmarketId: null,

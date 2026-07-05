@@ -7,10 +7,13 @@ import {
   createAppCompService,
   findAmbiguousCatalogCandidates,
   findCatalogAlternatives,
+  fixedCatalogSource,
   requestHasExplicitCardNumber,
   resolveBareSetAmbiguity,
   resolveCatalogCard,
 } from "@/lib/comps/appCompLookup";
+import { resolveCompCardImage } from "@/lib/comps/cardArt";
+import { persistResolvedDisplayImage, withResolvedDisplayImage } from "@/lib/comps/cardArtPersistence";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
 import { readCompLookupRequest } from "@/lib/comps/request";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
@@ -81,6 +84,8 @@ export async function GET(request: Request) {
     const askEvidencePromise = fetchEbayAskEvidence(compCard, { grade });
     const result = await compService.lookup(compCard, { grade }, { ambiguous });
     const askEvidence = await askEvidencePromise;
+    const cardImage = resolveCompCardImage({ catalog, headline: result.headline, all: result.all });
+    const responseCatalog = withResolvedDisplayImage(catalog, cardImage);
     const needsRecovery = !catalog || !result.headline || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
 
     if (needsRecovery) {
@@ -88,6 +93,19 @@ export async function GET(request: Request) {
       alternatives = dedupeCatalogCards([...ambiguityAlternatives, ...recovery]).slice(0, 8);
     } else if (ambiguous) {
       alternatives = ambiguityAlternatives;
+    }
+    if (cardImage.imageUrl && !cardImage.listingSafe) {
+      await persistResolvedDisplayImage({
+        card: compCard,
+        catalog: responseCatalog,
+        cardImage,
+        catalogSource: responseCatalog ? fixedCatalogSource(catalogSource.live, responseCatalog) : null,
+      }).catch((err) => {
+        console.warn(
+          "[comps] card display image persistence skipped:",
+          err instanceof Error ? err.message : "unknown error",
+        );
+      });
     }
     if (process.env.DATABASE_URL && result.headline) {
       await new PrismaCompResultRepo().create(result.headline).catch((err) => {
@@ -97,7 +115,14 @@ export async function GET(request: Request) {
         );
       });
     }
-    return NextResponse.json({ ...attachAskEvidence(result, askEvidence), catalog, alternatives, ambiguous, psaCert: psaResult });
+    return NextResponse.json({
+      ...attachAskEvidence(result, askEvidence),
+      catalog: responseCatalog,
+      alternatives,
+      ambiguous,
+      psaCert: psaResult,
+      cardImage,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "lookup failed" },

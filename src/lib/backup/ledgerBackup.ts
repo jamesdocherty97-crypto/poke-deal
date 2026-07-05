@@ -17,6 +17,7 @@ export type BackupTableName =
   | "checkedComps"
   | "compResults"
   | "priceSnapshots"
+  | "scanEvents"
   | "cronRuns"
   | "fxRates"
   | "watches"
@@ -96,6 +97,7 @@ const TABLES: readonly TableDefinition[] = [
   { name: "checkedComps", delegate: "checkedComp", dateFields: ["soldDate", "createdAt"] },
   { name: "compResults", delegate: "compResult", dateFields: ["asOf", "createdAt"] },
   { name: "priceSnapshots", delegate: "priceSnapshot", dateFields: ["takenAt"] },
+  { name: "scanEvents", delegate: "scanEvent", dateFields: ["createdAt"] },
   { name: "cronRuns", delegate: "cronRun", dateFields: ["startedAt", "finishedAt", "createdAt"] },
   { name: "fxRates", delegate: "fxRate", dateFields: ["asOf", "fetchedAt", "createdAt", "updatedAt"] },
   { name: "watches", delegate: "watch", dateFields: ["createdAt"] },
@@ -118,6 +120,7 @@ const RESTORE_ORDER: readonly BackupTableName[] = [
   "ebayOrderImports",
   "compResults",
   "priceSnapshots",
+  "scanEvents",
   "cronRuns",
   "fxRates",
   "watches",

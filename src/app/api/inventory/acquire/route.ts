@@ -13,6 +13,8 @@ import {
 } from "@/lib/comps/appCompLookup";
 import { PrismaInventoryRepo } from "@/lib/inventory/prismaInventoryRepo";
 import { PrismaCompResultRepo } from "@/lib/comps/prismaCompResultRepo";
+import { resolveCompCardImage } from "@/lib/comps/cardArt";
+import { persistResolvedDisplayImage, withResolvedDisplayImage } from "@/lib/comps/cardArtPersistence";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { acquireToInventory } from "@/lib/inventory/inventoryService";
 import { getPrisma } from "@/lib/db/prisma";
@@ -94,9 +96,21 @@ export async function POST(request: Request) {
     const responseComps = checkedComp
       ? { ...comps, headline: checkedComp, all: [checkedComp, ...comps.all], sourcesDisagree: false }
       : comps;
+    const cardImage = resolveCompCardImage({ catalog, headline: responseComps.headline, all: responseComps.all });
+    const responseCatalog = withResolvedDisplayImage(catalog, cardImage);
 
     // 2. persist comp history (best-effort)
     if (process.env.DATABASE_URL) {
+      if (cardImage.imageUrl && !cardImage.listingSafe) {
+        await persistResolvedDisplayImage({
+          card: compCard,
+          catalog: responseCatalog,
+          cardImage,
+          catalogSource: responseCatalog ? fixedCatalogSource(catalogSource.live, responseCatalog) : null,
+        }).catch((err) =>
+          console.warn("[acquire] card display image persistence skipped:", err instanceof Error ? err.message : "unknown"),
+        );
+      }
       const compRepo = new PrismaCompResultRepo();
       if (comps.headline) {
         await compRepo.create(comps.headline).catch((err) =>
@@ -185,7 +199,15 @@ export async function POST(request: Request) {
         });
     }
 
-    return NextResponse.json({ item, suggestion, comp: pricingComp, comps: responseComps, catalog, listing }, { status: 201 });
+    return NextResponse.json({
+      item,
+      suggestion,
+      comp: pricingComp,
+      comps: { ...responseComps, catalog: responseCatalog, cardImage },
+      catalog: responseCatalog,
+      cardImage,
+      listing,
+    }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "acquire failed" },

@@ -141,13 +141,14 @@ async function findExistingByProviderId(db: ReturnType<typeof getPrisma>, data: 
   return null;
 }
 
-function mergeCardDataForUpdate<T extends { imageUrl: string | null; tcgApiId: string | null; tcgDexId: string | null }>(
+function mergeCardDataForUpdate<T extends { imageUrl: string | null; displayImageUrl?: string | null; tcgApiId: string | null; tcgDexId: string | null }>(
   existing: T,
   data: PrismaCardData,
 ): PrismaCardData {
   return {
     ...data,
     imageUrl: data.imageUrl ?? existing.imageUrl ?? undefined,
+    displayImageUrl: data.displayImageUrl ?? existing.displayImageUrl ?? undefined,
     tcgApiId: data.tcgApiId ?? existing.tcgApiId ?? undefined,
     tcgDexId: data.tcgDexId ?? existing.tcgDexId ?? undefined,
   };

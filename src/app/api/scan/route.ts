@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readCardImage, ScanError } from "@/lib/scan/cardScan";
+import { logScanEvent, scanEventDataFromError, scanEventDataFromResult } from "@/lib/scan/scanEvent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,8 +46,10 @@ export async function POST(request: Request) {
   try {
     dayCount += 1;
     const result = await readCardImage(imageBase64, mimeType);
+    void logScanEvent(scanEventDataFromResult(result));
     return NextResponse.json(result);
   } catch (err) {
+    void logScanEvent(scanEventDataFromError(err));
     if (err instanceof ScanError) {
       const status = err.kind === "config" ? 503 : err.kind === "quota" ? 429 : err.kind === "unreadable" ? 422 : 502;
       return NextResponse.json({ error: err.message, kind: err.kind }, { status });

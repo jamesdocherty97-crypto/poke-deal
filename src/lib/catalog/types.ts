@@ -22,7 +22,10 @@ export interface CatalogCard {
   setCode?: string;
   number?: string;
   rarity?: string;
+  /** Listing-safe catalog art from Pokemon TCG API/ScryDex/TCGdex. */
   imageUrl?: string;
+  /** Display-only fallback art, usually provider CDN. Must never feed listing photos. */
+  displayImageUrl?: string;
   setLogoUrl?: string;
   setSymbolUrl?: string;
   tcgApiId?: string;

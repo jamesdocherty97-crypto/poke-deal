@@ -399,6 +399,8 @@ export function mapCardAggregateToComp(
       ...agg,
       fx: fxRateInfo(rates),
       prices: card?.prices,
+      displayImageUrl: readProviderImageUrl(card),
+      providerCard: providerCardRef(card),
       chosenPriceSource: smartRawPrice ? "smartMarketPrice" : "medianPrice",
       // Full grade ladder from this same single response — no extra credits.
       gradeLadder: buildGradeLadder(json, rates),
@@ -513,6 +515,43 @@ export function selectMatchingPptCard(
 function readProviderCard(json: unknown): PptProviderCard | null {
   const cards = listProviderCards(json);
   return cards[0] ?? null;
+}
+
+function providerCardRef(card: PptProviderCard | null): (CardRef & { imageUrl?: string; imageCdnUrl?: string; imageCdnUrl800?: string }) | undefined {
+  if (!card) return undefined;
+  const imageUrl = readProviderImageUrl(card);
+  const imageCdnUrl = readProviderString(card, "imageCdnUrl");
+  const imageCdnUrl800 = readProviderString(card, "imageCdnUrl800");
+  return {
+    name: readProviderString(card, "name") ?? "Unknown card",
+    setName: readProviderSetName(card) ?? undefined,
+    number: readProviderCollectorNumber(card),
+    ...(imageUrl ? { imageUrl } : {}),
+    ...(imageCdnUrl ? { imageCdnUrl } : {}),
+    ...(imageCdnUrl800 ? { imageCdnUrl800 } : {}),
+    game: "POKEMON",
+    language: "EN",
+  };
+}
+
+function readProviderImageUrl(card: PptProviderCard | null): string | null {
+  if (!card) return null;
+  return firstHttpUrl(
+    readProviderString(card, "imageCdnUrl800"),
+    readProviderString(card, "imageCdnUrl400"),
+    readProviderString(card, "imageCdnUrl200"),
+    readProviderString(card, "imageCdnUrl"),
+    readProviderString(card, "imageUrl"),
+    readProviderString(card, "image"),
+  );
+}
+
+function firstHttpUrl(...values: Array<string | null | undefined>): string | null {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed && /^https?:\/\//i.test(trimmed)) return trimmed;
+  }
+  return null;
 }
 
 function listProviderCards(json: unknown): PptProviderCard[] {

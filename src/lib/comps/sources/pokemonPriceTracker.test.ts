@@ -497,6 +497,8 @@ test("mapCardAggregateToComp accepts a direct provider card object", () => {
     name: "Umbreon",
     setName: "Evolving Skies",
     cardNumber: "94/203",
+    imageCdnUrl800: "https://tcgplayer-cdn.tcgplayer.com/product/umbreon_800.jpg",
+    imageCdnUrl: "https://tcgplayer-cdn.tcgplayer.com/product/umbreon.jpg",
     ebay: {
       salesByGrade: {
         ungraded: {
@@ -514,6 +516,11 @@ test("mapCardAggregateToComp accepts a direct provider card object", () => {
   const directResult = mapCardAggregateToComp(directCard, ctx("RAW"));
   assert.equal(directResult.sampleSize, 7);
   assert.equal(directResult.medianPence, usdToPence(98));
+  assert.equal((directResult.raw as { displayImageUrl?: string }).displayImageUrl, "https://tcgplayer-cdn.tcgplayer.com/product/umbreon_800.jpg");
+  assert.equal(
+    ((directResult.raw as { providerCard?: { imageUrl?: string } }).providerCard)?.imageUrl,
+    "https://tcgplayer-cdn.tcgplayer.com/product/umbreon_800.jpg",
+  );
 });
 
 test("mapCardAggregateToComp derives trend from provider blended prices", () => {

@@ -11,6 +11,7 @@ export type PrismaCard = {
   number: string | null;
   rarity: string | null;
   imageUrl: string | null;
+  displayImageUrl: string | null;
   tcgApiId: string | null;
   tcgDexId?: string | null;
 };
@@ -24,6 +25,7 @@ export type PrismaCardData = {
   number?: string;
   rarity?: string;
   imageUrl?: string;
+  displayImageUrl?: string;
   tcgApiId?: string;
   tcgDexId?: string;
 };
@@ -129,6 +131,7 @@ export function toCardData(card: CardRef | CatalogCard): PrismaCardData {
     number: cleanOptional(card.number),
     rarity: cleanOptional("rarity" in card ? card.rarity : undefined),
     imageUrl: cleanOptional("imageUrl" in card ? card.imageUrl : undefined),
+    displayImageUrl: cleanOptional("displayImageUrl" in card ? card.displayImageUrl : undefined),
     tcgApiId: cleanOptional(card.tcgApiId),
     tcgDexId: cleanOptional("tcgDexId" in card ? card.tcgDexId : undefined),
   };
