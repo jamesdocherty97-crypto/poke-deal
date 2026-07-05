@@ -21,6 +21,8 @@ const MARKET_DENY_TTL_MS = 6 * 60 * 60 * 1000;
 // PokeTrace silently returns nothing. We pause before fallback markets to clear
 // the burst window. Free-tier accounts should usually run US only.
 const DEFAULT_INTER_MARKET_DELAY_MS = 2100;
+const RAW_EBAY_SOLD_SAMPLE_FLOOR = 30;
+const RAW_EBAY_INFLATION_LIMIT = 1.2;
 let sharedPokeTraceRequestAt = 0;
 let sharedPokeTraceQueue = Promise.resolve();
 let sharedPokeTraceCooldownUntil = 0;
@@ -366,8 +368,11 @@ function chooseTier(card: PokeTraceCard, grade: Grade): PokeTraceTierChoice | nu
     const cardmarket = card.prices?.cardmarket?.[tierKey] ?? card.prices?.cardmarket_unsold?.[tierKey];
     if (cardmarket) return { tier: cardmarket, tierKey, priceSource: "cardmarket", kind: "market-baseline" };
     const tcgplayer = card.prices?.tcgplayer?.[tierKey];
-    if (tcgplayer) return { tier: tcgplayer, tierKey, priceSource: "tcgplayer", kind: "market-baseline" };
     const ebay = card.prices?.ebay?.[tierKey];
+    if (ebay && (!tcgplayer || shouldPreferRawEbaySoldAggregate(ebay, tcgplayer))) {
+      return { tier: ebay, tierKey, priceSource: "ebay", kind: "sold-aggregate" };
+    }
+    if (tcgplayer) return { tier: tcgplayer, tierKey, priceSource: "tcgplayer", kind: "market-baseline" };
     if (ebay) return { tier: ebay, tierKey, priceSource: "ebay", kind: "sold-aggregate" };
     return null;
   }
@@ -377,6 +382,20 @@ function chooseTier(card: PokeTraceCard, grade: Grade): PokeTraceTierChoice | nu
   const cardmarket = card.prices?.cardmarket_unsold?.[tierKey];
   if (cardmarket) return { tier: cardmarket, tierKey, priceSource: "cardmarket_unsold", kind: "market-baseline" };
   return null;
+}
+
+function shouldPreferRawEbaySoldAggregate(ebay: PokeTracePriceTier, baseline: PokeTracePriceTier): boolean {
+  const saleCount = readPositiveInt(ebay.saleCount) ?? 0;
+  if (saleCount < RAW_EBAY_SOLD_SAMPLE_FLOOR) return false;
+
+  const ebayAvg = readPositiveNumber(ebay.avg);
+  const baselineAvg = readPositiveNumber(baseline.avg);
+  if (!ebayAvg || !baselineAvg) return true;
+
+  // Raw eBay buckets can be polluted by graded or mislabelled sales. A strong
+  // sold sample is useful, but only when it is not inflated above the cleaner
+  // market baseline.
+  return ebayAvg <= baselineAvg * RAW_EBAY_INFLATION_LIMIT;
 }
 
 function collectPokeTraceSignals(
@@ -617,6 +636,11 @@ function readCurrency(value: unknown): "USD" | "EUR" | null {
 function readPositiveInt(value: unknown): number | null {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function readPositiveNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function readString(value: unknown): string | null {

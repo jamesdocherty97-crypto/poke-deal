@@ -56,6 +56,68 @@ test("RAW maps the stable TCGPlayer near-mint baseline when present", () => {
   );
 });
 
+test("RAW prefers a strong eBay sold aggregate over a higher US market baseline", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Charizard",
+          cardNumber: "4/102",
+          set: { name: "Base Set" },
+          market: "US",
+          currency: "USD",
+          prices: {
+            ebay: {
+              NEAR_MINT: { avg: 474.56, low: 330, high: 610, saleCount: 47, approxSaleCount: true },
+            },
+            tcgplayer: {
+              NEAR_MINT: { avg: 685.23, low: 620, high: 730, saleCount: 91 },
+            },
+          },
+          totalSaleCount: 138,
+          lastUpdated: "2026-07-05T09:00:00Z",
+        },
+      ],
+    },
+    { source: "poketrace", card: { name: "Charizard", setName: "Base", number: "4/102" }, grade: "RAW", windowDays: 90 },
+  );
+
+  assert.equal(comp.sampleSize, 47);
+  assert.equal(comp.medianPence, usdToPence(474.56));
+  assert.equal((comp.raw as { kind?: string }).kind, "sold-aggregate");
+  assert.equal((comp.raw as { priceSource?: string }).priceSource, "ebay");
+});
+
+test("RAW keeps the market baseline when the eBay sold bucket looks inflated", () => {
+  const comp = mapPokeTraceCardsToComp(
+    {
+      data: [
+        {
+          name: "Mew",
+          cardNumber: "25/25",
+          set: { name: "Celebrations" },
+          market: "US",
+          currency: "USD",
+          prices: {
+            ebay: {
+              NEAR_MINT: { avg: 80, low: 20, high: 160, saleCount: 52, approxSaleCount: true },
+            },
+            tcgplayer: {
+              NEAR_MINT: { avg: 30, low: 25, high: 34, saleCount: 80 },
+            },
+          },
+        },
+      ],
+    },
+    { source: "poketrace", card: { name: "Mew", setName: "Celebrations", number: "25/25" }, grade: "RAW", windowDays: 90 },
+  );
+
+  assert.equal(comp.sampleSize, 80);
+  assert.equal(comp.medianPence, usdToPence(30));
+  assert.equal((comp.raw as { kind?: string }).kind, "market-baseline");
+  assert.equal((comp.raw as { priceSource?: string }).priceSource, "tcgplayer");
+});
+
 test("graded cards map eBay sold aggregate tiers", () => {
   const comp = mapPokeTraceCardsToComp(fixture, ctx("PSA_10"));
 
@@ -607,7 +669,7 @@ test("shared throttle spaces separate source instances for rapid app lookups", a
   resetPokeTraceSharedThrottleForTests();
 });
 
-test("free tier (US only): RAW resolves to the US TCGPlayer baseline", () => {
+test("free tier (US only): RAW resolves to the US eBay sold aggregate when the sample is strong", () => {
   const freeCard: CardRef = { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203" };
   const comp = mapPokeTraceCardsToComp(freeTierFixture, {
     source: "poketrace",
@@ -616,11 +678,11 @@ test("free tier (US only): RAW resolves to the US TCGPlayer baseline", () => {
     windowDays: 90,
   });
 
-  // No Cardmarket on free tier, so the stable US TCGPlayer near-mint baseline is used.
-  assert.equal(comp.medianPence, usdToPence(505));
-  assert.equal(comp.sampleSize, 88);
-  assert.equal((comp.raw as { priceSource?: string }).priceSource, "tcgplayer");
-  assert.equal((comp.raw as { kind?: string }).kind, "market-baseline");
+  // No Cardmarket on free tier; a well-sampled eBay sold aggregate wins when it is not inflated.
+  assert.equal(comp.medianPence, usdToPence(540));
+  assert.equal(comp.sampleSize, 61);
+  assert.equal((comp.raw as { priceSource?: string }).priceSource, "ebay");
+  assert.equal((comp.raw as { kind?: string }).kind, "sold-aggregate");
   assert.equal((comp.raw as { market?: string }).market, "US");
 });
 
@@ -654,7 +716,7 @@ test("free tier: EU market request comes back empty, source falls back to US", a
   );
 
   assert.deepEqual(requestedMarkets, ["EU", "US"]);
-  assert.equal(comp.medianPence, usdToPence(505));
+  assert.equal(comp.medianPence, usdToPence(540));
   assert.equal((comp.raw as { market?: string }).market, "US");
 });
 
