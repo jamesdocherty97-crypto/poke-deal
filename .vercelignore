@@ -4,6 +4,7 @@ APP_LOGIN_PASSWORD.txt
 HANDOVER_*.md
 node_modules
 .next
+.next-stale-build*
 .vercel
 *.tsbuildinfo
 public/icon 2.svg
