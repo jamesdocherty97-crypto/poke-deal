@@ -3,6 +3,7 @@
 // FX_API_KEY is configured; fixture/dev mode falls back honestly to static rates.
 
 import type { Currency } from "../domain/types.js";
+export { formatGbp } from "../format/money.js";
 
 const REQUIRED_QUOTES = ["GBP", "EUR", "USD", "JPY"] as const satisfies readonly Currency[];
 const FOREIGN_QUOTES = ["EUR", "USD", "JPY"] as const satisfies readonly Currency[];
@@ -97,13 +98,6 @@ export function roundHalfUpPence(gbp: number): number {
   if (!Number.isFinite(gbp)) throw new Error("Cannot round a non-finite GBP amount");
   const sign = gbp < 0 ? -1 : 1;
   return sign * Math.floor(Math.abs(gbp) * 100 + 0.5 + 1e-9);
-}
-
-/** Convenience: format GBP pence as a string like "£12.50". */
-export function formatGbp(pence: number): string {
-  const sign = pence < 0 ? "-" : "";
-  const abs = Math.abs(pence);
-  return `${sign}£${(abs / 100).toFixed(2)}`;
 }
 
 /**

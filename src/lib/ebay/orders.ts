@@ -1,6 +1,7 @@
 import { createInboxAlert } from "../alerts/inbox.js";
 import { estimateSaleCosts } from "../dealer/saleFees.js";
 import { planSaleListingClosure, planUnitSale, splitPence } from "../dealer/unitSale.js";
+import { formatGbp } from "../format/money.js";
 import type { EbayConfig } from "./config.js";
 import { getEbayConfig, isEbayConfigured } from "./config.js";
 import { resolveEbayRefreshToken } from "./credentials.js";
@@ -552,8 +553,4 @@ function parseDate(value: string | undefined): Date | null {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatGbp(pence: number): string {
-  return `£${(Math.max(0, Math.round(pence)) / 100).toFixed(2)}`;
 }

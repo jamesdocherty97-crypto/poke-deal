@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 type DeepHealthSource = {
   id: string;
   label: string;
@@ -37,6 +40,12 @@ console.table(
   })),
 );
 
+const reportDate = new Date(report.checkedAt || Date.now()).toISOString().slice(0, 10);
+const outPath = path.join(process.cwd(), `docs/HEALTH_CHECK_${reportDate}.md`);
+await mkdir(path.dirname(outPath), { recursive: true });
+await writeFile(outPath, renderReport(report, url.toString(), reportDate), "utf8");
+console.log(`Wrote ${outPath}`);
+
 const requiredFailures = report.sources.filter((source) => source.required && source.status === "fail");
 const optionalFailures = report.sources.filter((source) => !source.required && source.status === "fail");
 if (optionalFailures.length > 0) {
@@ -57,4 +66,28 @@ function headers(): Record<string, string> {
   const basic = process.env.POKE_DEAL_BASIC_AUTH ?? process.env.VERIFY_PROD_BASIC_AUTH;
   if (basic) result.authorization = `Basic ${Buffer.from(basic).toString("base64")}`;
   return result;
+}
+
+function renderReport(report: DeepHealthReport, url: string, date: string): string {
+  return [
+    `# Deep Source Health - ${date}`,
+    "",
+    `Checked against production at \`${url}\` on ${report.checkedAt}.`,
+    "",
+    "| Status | Source | Required | Detail | Latency |",
+    "|---|---|---|---|---|",
+    ...report.sources.map((source) =>
+      `| ${source.status.toUpperCase()} | ${escapeCell(source.label)} | ${source.required ? "yes" : "no"} | ${escapeCell(source.detail)} | ${source.latencyMs}ms |`,
+    ),
+    "",
+    "## Notes",
+    "",
+    "- Required source failures fail the health gate.",
+    "- Optional failures/skips stay visible so the dealer can see what is not live.",
+    "",
+  ].join("\n");
+}
+
+function escapeCell(value: string): string {
+  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }

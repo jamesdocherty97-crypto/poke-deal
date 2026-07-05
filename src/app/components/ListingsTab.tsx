@@ -3,6 +3,7 @@
 import type { FormEvent, ReactNode } from "react";
 import type { ListingSort, ListingStateFilter } from "@/lib/dealer/tableControls";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
+import { formatGbp as gbp } from "@/lib/format/money";
 import { orderListingPhotos, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { InventoryPhotoTools } from "./InventoryPhotoTools";
 import { CardImage, EmptyState, Metric } from "./UiBits";
@@ -908,11 +909,6 @@ function channelLabel(channel: Channel): string {
   if (channel === "CARDMARKET") return "Cardmarket";
   if (channel === "VINTED") return "Vinted";
   return "In person";
-}
-
-function gbp(pence: number): string {
-  const sign = pence < 0 ? "-" : "";
-  return `${sign}£${(Math.abs(pence) / 100).toFixed(2)}`;
 }
 
 function formatPct(value: number | null): string {

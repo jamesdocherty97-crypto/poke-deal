@@ -3,6 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
 import { type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { formatGbp as gbp } from "@/lib/format/money";
 import { compressPhotoForScan, compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
 import {
   orderListingPhotos,
@@ -10716,11 +10717,6 @@ function findSelectedSet(sets: CatalogSet[], value: string): CatalogSet | null {
     sets.find((set) => set.name.toLowerCase().includes(query)) ??
     null
   );
-}
-
-function gbp(pence: number): string {
-  const sign = pence < 0 ? "-" : "";
-  return `${sign}£${(Math.abs(pence) / 100).toFixed(2)}`;
 }
 
 function formatPct(value: number | null): string {

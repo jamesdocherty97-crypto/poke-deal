@@ -1,3 +1,5 @@
+import { formatGbp } from "../format/money.js";
+
 export type ListingPhotoOrigin = "REAL" | "SCAN" | "CATALOG";
 
 export interface ListingPhoto {
@@ -118,8 +120,4 @@ function parsePositiveNumber(value: string | undefined): number | null {
   if (!value) return null;
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function formatGbp(pence: number): string {
-  return `£${(pence / 100).toFixed(0)}`;
 }

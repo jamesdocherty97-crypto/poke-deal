@@ -4,6 +4,7 @@ import { type FormEvent, useMemo } from "react";
 import { buildProfitTrend, type ProfitTrendPoint } from "@/lib/dealer/metrics";
 import type { RepriceRecommendation } from "@/lib/alerts/repricing";
 import type { WatchHit } from "@/lib/alerts/watchlist";
+import { formatGbp as gbp } from "@/lib/format/money";
 import { CardImage, EmptyState, Metric, MoneyInput } from "./UiBits";
 
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
@@ -728,10 +729,6 @@ function formatMonth(value: string): string {
   const date = new Date(`${value}-01T12:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
-}
-
-function gbp(pence: number): string {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(pence / 100);
 }
 
 function penceToPounds(pence: number | null | undefined): string {

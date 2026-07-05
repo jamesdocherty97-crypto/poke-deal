@@ -19,6 +19,7 @@ This pass focused on app feel and screen identity, using the existing recognizab
 - Gave the comp headline and receipt a more obvious holo treatment.
 - Enlarged and centered the Pokeball lookup spinner treatment in the lookup-progress card.
 - Added a branded Poke Deal password fallback screen while keeping the existing HTTP Basic gate.
+- Moved app-facing GBP display copy onto one shared formatter so prices render consistently as `£12.50` style strings.
 
 ## Listing Safety
 
@@ -36,4 +37,3 @@ Mobile after screenshots:
 - `docs/visual-audit/polish-2026-07-04/after/polish-after-mobile-setup.jpg`
 
 Desktop after screenshots are in `docs/visual-audit/desktop/after/`.
-

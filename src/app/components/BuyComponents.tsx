@@ -2,6 +2,7 @@
 
 import { isPsaPokemonTcgCert } from "@/lib/psa/lookupFields";
 import type { Grade } from "@/lib/domain/types";
+import { formatGbp as gbp } from "@/lib/format/money";
 import { CardImage, Metric } from "./UiBits";
 
 type BuyFlowStep = {
@@ -291,9 +292,4 @@ function toTitleCase(value: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function gbp(pence: number): string {
-  const sign = pence < 0 ? "-" : "";
-  return `${sign}£${(Math.abs(pence) / 100).toFixed(2)}`;
 }

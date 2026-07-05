@@ -9,6 +9,7 @@
 // Money is GBP integer pence throughout, matching the rest of the app.
 
 import { STOCK_IMAGE_DISCLOSURE } from "../photos/listingPhotoPolicy.js";
+import { formatGbp } from "../format/money.js";
 
 export interface ListingPackCard {
   name: string;
@@ -391,10 +392,6 @@ export function buildListingPackCsv(inputs: ListingPackInput[]): string {
 function csvCell(value: string): string {
   const v = String(value ?? "");
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-}
-
-function formatGbp(pence: number): string {
-  return `£${(pence / 100).toFixed(2)}`;
 }
 
 function buildListingTitle(input: ListingPackInput): string {

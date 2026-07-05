@@ -1,0 +1,14 @@
+{
+  "capturedAt": "2026-07-05T00:15:05.634Z",
+  "status": 200,
+  "response": {
+    "ok": true,
+    "checkedAt": "2026-07-05T00:15:04.566Z",
+    "skipped": false,
+    "fetchedOrders": 0,
+    "matchedCount": 0,
+    "unmatchedCount": 0,
+    "skippedCount": 0,
+    "imports": []
+  }
+}

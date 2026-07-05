@@ -5,6 +5,7 @@ import type { LaunchReadinessItem, LaunchReadinessTarget } from "@/lib/dealer/la
 import type { LaunchPlanItem, LaunchPlanTarget, LaunchProgress } from "@/lib/dealer/launchPlan";
 import type { OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
 import type { TodayAction, TodayActionTarget } from "@/lib/dealer/today";
+import { formatGbp as gbp } from "@/lib/format/money";
 import { CardImage, EmptyState } from "./UiBits";
 
 type TodaySystemSource = {
@@ -650,11 +651,6 @@ function listingQueueLabel(listing: TodayListing): string {
 
 function inventoryDisplayImage(item: TodayListingItem | undefined | null): string | null {
   return item?.photos?.[0]?.url ?? item?.card.imageUrl ?? null;
-}
-
-function gbp(pence: number): string {
-  const sign = pence < 0 ? "-" : "";
-  return `${sign}£${(Math.abs(pence) / 100).toFixed(2)}`;
 }
 
 function ageLabel(value: string): string {

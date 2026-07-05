@@ -55,7 +55,8 @@ const recentFailures = await db.appAlert.findMany({
 });
 
 const reportRows = jobs.map((job) => inspectJob(job, rows, now));
-const outPath = path.join(process.cwd(), "docs/CRON_HEALTH_2026-07-04.md");
+const reportDate = now.toISOString().slice(0, 10);
+const outPath = path.join(process.cwd(), `docs/CRON_HEALTH_${reportDate}.md`);
 await mkdir(path.dirname(outPath), { recursive: true });
 await writeFile(outPath, renderReport(reportRows, recentFailures, now), "utf8");
 
@@ -116,7 +117,7 @@ function inspectJob(job: JobSpec, rows: CronRow[], now: Date): CronReportRow {
 
 function renderReport(rows: CronReportRow[], alerts: Array<{ title: string; message: string; createdAt: Date | string }>, now: Date): string {
   return [
-    "# Cron Health — 2026-07-04",
+    `# Cron Health - ${reportDate}`,
     "",
     `Checked at: ${now.toISOString()}`,
     "",

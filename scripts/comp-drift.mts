@@ -47,7 +47,8 @@ type DriftRow = {
 
 const baseUrl = process.env.BASE_URL ?? "https://poke-deal.vercel.app";
 const fixtureDir = path.join(process.cwd(), "src/lib/comps/__fixtures__/live-regression");
-const outPath = path.join(process.cwd(), "docs/COMPS_DRIFT_2026-07-04.md");
+const reportDate = new Date().toISOString().slice(0, 10);
+const outPath = path.join(process.cwd(), `docs/COMPS_DRIFT_${reportDate}.md`);
 const files = (await readdir(fixtureDir)).filter((file) => file.endsWith(".json")).sort();
 const rows: DriftRow[] = [];
 
@@ -153,7 +154,7 @@ function renderReport(rows: DriftRow[]): string {
     { OK: 0, DRIFT: 0, ERROR: 0 } as Record<DriftRow["status"], number>,
   );
   return [
-    "# Production Comp Drift — 2026-07-04",
+    `# Production Comp Drift - ${reportDate}`,
     "",
     `Base URL: ${baseUrl}`,
     `Corpus: ${rows.length} pinned live-regression cards`,
