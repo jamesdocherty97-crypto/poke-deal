@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CompService, defaultCompSources, detectDisagreement, MemoryLastKnownCompCache, pickHeadline } from "./compService.js";
+import {
+  CompService,
+  defaultCompSources,
+  detectDisagreement,
+  MemoryLastKnownCompCache,
+  pickHeadline,
+  pickHeadlineForQuery,
+} from "./compService.js";
 import type { CompResult } from "../domain/types.js";
 import type { CompSource } from "./CompSource.js";
 
@@ -164,6 +171,47 @@ test("pickHeadline uses PokeTrace raw market baseline when ordinary raw buckets 
   });
 
   assert.equal(pickHeadline([noisyRaw, pokeTraceBaseline]), pokeTraceBaseline);
+});
+
+test("PokeTrace agreeing internal signals can lift confidence without changing the headline", () => {
+  const pokeTraceSolds = comp({
+    source: "poketrace",
+    card: { name: "Victini", setName: "Scarlet & Violet Black Star Promos", number: "SVP208" },
+    medianPence: 1347,
+    meanPence: 1347,
+    lowPence: 1347,
+    highPence: 1347,
+    sampleSize: 289,
+    trendPct: 6,
+    raw: {
+      kind: "sold-aggregate",
+      priceSource: "ebay",
+      tier: "NEAR_MINT",
+      market: "US",
+      providerCard: {
+        name: "Victini - 208",
+        setName: "SV: Scarlet & Violet Promo Cards",
+        number: "208",
+        language: "EN",
+      },
+      signals: [
+        { priceSource: "tcgplayer", medianPence: 1326, sampleSize: 24553 },
+        { priceSource: "ebay", medianPence: 1347, sampleSize: 289 },
+      ],
+    },
+  });
+
+  const result = pickHeadlineForQuery(
+    [pokeTraceSolds],
+    { name: "Victini", setName: "Scarlet & Violet Black Star Promos", number: "SVP208" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(result.headline?.source, "poketrace");
+  assert.equal(result.headline?.sampleSize, 289);
+  assert.equal(result.reconciliation.headlinePence, 1347);
+  assert.equal(result.reconciliation.confidence, "high");
+  assert.equal(result.reconciliation.manualCheck, false);
 });
 
 test("pickHeadline keeps confident graded comps on sample size", () => {

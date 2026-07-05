@@ -296,7 +296,7 @@ function resultToReconCandidate(result: CompResult): ReconCandidate | null {
   return {
     source,
     valuePence: result.medianPence,
-    n: result.sampleSize,
+    n: reconcilerSampleSize(result, raw),
     ageDays: ageDays(result.asOf),
     region: reconRegion(result),
     matchedSetId: resolveSetIdForCard(matchedCard.setName, matchedCard.number) ?? setIdFromTcgApiId(matchedCard.tcgApiId),
@@ -308,6 +308,27 @@ function resultToReconCandidate(result: CompResult): ReconCandidate | null {
     trendWindowDays: result.windowDays,
     candidateHasGradeScopedData: source === "poketrace" && raw.kind === "sold-aggregate",
   };
+}
+
+function reconcilerSampleSize(result: CompResult, raw: Record<string, unknown>): number {
+  if (result.source !== "poketrace") return result.sampleSize;
+  return Math.max(result.sampleSize, corroboratingPokeTraceSignalSampleSize(raw, result.medianPence));
+}
+
+function corroboratingPokeTraceSignalSampleSize(raw: Record<string, unknown>, headlinePence: number): number {
+  if (headlinePence <= 0 || !Array.isArray(raw.signals)) return 0;
+  const agreeingSamples = raw.signals
+    .map((signal) => {
+      if (!signal || typeof signal !== "object") return 0;
+      const medianPence = Number((signal as { medianPence?: unknown }).medianPence);
+      const sampleSize = Number((signal as { sampleSize?: unknown }).sampleSize);
+      if (!Number.isFinite(medianPence) || medianPence <= 0) return 0;
+      if (!Number.isInteger(sampleSize) || sampleSize <= 0) return 0;
+      const spread = Math.max(medianPence, headlinePence) / Math.min(medianPence, headlinePence);
+      return spread <= 1.15 ? sampleSize : 0;
+    })
+    .filter((sampleSize) => sampleSize > 0);
+  return agreeingSamples.length > 0 ? Math.max(...agreeingSamples) : 0;
 }
 
 function reconSource(result: CompResult): ReconSource | null {
