@@ -47,6 +47,10 @@ export interface ReconCandidate {
   trendWindowDays?: number;
   trendBucketDaysApart?: number;
   candidateHasGradeScopedData?: boolean;
+  nBoostedByAgreeingSignals?: boolean;
+  adjacentLowerGradeMedianPence?: number;
+  convertedFromNonGbp?: boolean;
+  fxAgeDays?: number;
 }
 
 export interface ReconResult {
@@ -97,12 +101,15 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     applySourceSanityGates(state, query);
   }
 
-  applyDominantSourceOutlierGate(states);
-
   for (const state of states) {
     applyCorroborationGates(state);
     applyPenalties(state, query);
     applyTrendSuppression(state);
+  }
+
+  applyDominantSourceOutlierGate(states);
+
+  for (const state of states) {
     state.weight = state.excluded ? 0 : candidateWeight(state);
     reasons.push(...state.reasons);
   }
@@ -134,6 +141,11 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
       state.valuePence > 0 &&
       spreadRatio([state.valuePence, chosen.valuePence]) > 1.4,
   );
+  const staleConsensusManualCheck = newestEligibleAgeDays(eligible) > 45;
+  const gradeBleedManualCheck = isGradeBleedSuspect(chosen, query);
+  const fxAged = chosen.candidate.convertedFromNonGbp === true && (chosen.candidate.fxAgeDays ?? 0) > 3;
+  const fxAgedManualCheck = fxAged && chosen.valuePence >= 50_000;
+  const ukSoldsDisagree = chosen.candidate.region === "US" && hasUkSoldDisagreement(chosen, states);
 
   const capsMedium =
     Boolean(query.ambiguous) ||
@@ -162,7 +174,11 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     hardExclusionManualCheck ||
     dominantOutlierExcluded ||
     ownedDeviation ||
-    staleCorroborationDisagrees;
+    staleCorroborationDisagrees ||
+    staleConsensusManualCheck ||
+    gradeBleedManualCheck ||
+    fxAgedManualCheck ||
+    ukSoldsDisagree;
   const spreadOnly = spreadManualCheck && !otherManualCheck;
   const suppressedSpreadReasons = spreadOnly
     ? [
@@ -174,7 +190,14 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
   const manualCheck =
     otherManualCheck ||
     shouldManualCheckForSpread;
-  const finalReasons = [...reasons, ...suppressedSpreadReasons];
+  const finalReasons = [
+    ...reasons,
+    staleConsensusManualCheck ? "stale-consensus" : null,
+    gradeBleedManualCheck ? "grade-bleed-suspect" : null,
+    fxAged ? "fx-aged" : null,
+    ukSoldsDisagree ? "uk-solds-disagree" : null,
+    ...suppressedSpreadReasons,
+  ].filter((reason): reason is string => reason != null);
 
   return {
     headlinePence: chosen.valuePence,
@@ -194,7 +217,7 @@ function initialState(candidate: ReconCandidate): CandidateState {
     ageDays: candidate.ageDays ?? Number.POSITIVE_INFINITY,
     excluded: false,
     corroborationOnly: false,
-    reasons: [],
+    reasons: candidate.nBoostedByAgreeingSignals ? ["n-boosted-by-agreeing-signals"] : [],
     penalties: [],
     penaltyProduct: 1,
     qualityPenaltyProduct: 1,
@@ -260,10 +283,26 @@ function applyDominantSourceOutlierGate(states: CandidateState[]): void {
   const dominant = survivors.reduce((best, state) => (state.n > best.n ? state : best));
   for (const state of survivors) {
     if (state === dominant) continue;
-    if (dominant.n >= 50 * state.n && dominant.n >= 500 && spreadRatio([state.valuePence, dominant.valuePence]) > 3) {
+    if (
+      dominant.n >= 50 * state.n &&
+      dominant.n >= 500 &&
+      spreadRatio([state.valuePence, dominant.valuePence]) > 3 &&
+      canDominantSourceExclude(state, dominant)
+    ) {
       exclude(state, `dominant-source-outlier:${state.candidate.source}:vs:${dominant.candidate.source}`);
     }
   }
+}
+
+function canDominantSourceExclude(state: CandidateState, dominant: CandidateState): boolean {
+  if (isUkSoldSource(state.candidate) && TIER_WEIGHT[state.candidate.source] > TIER_WEIGHT[dominant.candidate.source]) {
+    return false;
+  }
+  return dominanceWeight(state) <= dominanceWeight(dominant);
+}
+
+function dominanceWeight(state: CandidateState): number {
+  return TIER_WEIGHT[state.candidate.source] * sizeFactor(state.n) * state.qualityPenaltyProduct * state.regionFactor;
 }
 
 function applyCorroborationGates(state: CandidateState): void {
@@ -394,6 +433,32 @@ function ownedSalesDeviation(chosen: CandidateState, states: CandidateState[]): 
       state.valuePence > 0 &&
       spreadRatio([state.valuePence, chosen.valuePence]) > 1.4,
   );
+}
+
+function newestEligibleAgeDays(eligible: CandidateState[]): number {
+  return eligible.reduce((newest, state) => Math.min(newest, state.ageDays), Number.POSITIVE_INFINITY);
+}
+
+function isGradeBleedSuspect(chosen: CandidateState, query: ReconQuery): boolean {
+  if (!isGraded(query.gradeBucket)) return false;
+  const lower = chosen.candidate.adjacentLowerGradeMedianPence;
+  return typeof lower === "number" && lower > 0 && chosen.valuePence < lower * 1.15;
+}
+
+function hasUkSoldDisagreement(chosen: CandidateState, states: CandidateState[]): boolean {
+  return states.some(
+    (state) =>
+      state !== chosen &&
+      !state.excluded &&
+      state.valuePence > 0 &&
+      state.n >= 5 &&
+      isUkSoldSource(state.candidate) &&
+      spreadRatio([state.valuePence, chosen.valuePence]) > 1.15,
+  );
+}
+
+function isUkSoldSource(candidate: ReconCandidate): boolean {
+  return candidate.region === "UK" && ["owned-sales", "checked-comps", "ebay-insights"].includes(candidate.source);
 }
 
 function rawSpread(raw: ReconCandidate["raw"]): number {

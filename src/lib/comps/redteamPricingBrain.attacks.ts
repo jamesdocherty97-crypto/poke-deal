@@ -76,6 +76,7 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
       source: "pt-median",
       valuePence: 6000,
       n: 40,
+      adjacentLowerGradeMedianPence: 5800,
       raw: { min: 5500, max: 6500, median: 6000, count: 40 },
     }),
   ]);
@@ -85,6 +86,17 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
   const usdSale = 1270;
   const staleFxPence = Math.round((usdSale / staleUsdPerGbp) * 100);
   const shockedFxPence = Math.round((usdSale / shockedUsdPerGbp) * 100);
+  const currencyShock = reconcileComps(baseQuery, [
+    candidate({
+      source: "poketrace",
+      valuePence: staleFxPence,
+      n: 500,
+      ageDays: 2,
+      region: "US",
+      convertedFromNonGbp: true,
+      fxAgeDays: 6,
+    }),
+  ]);
 
   const boundary1999 = dealCalc({
     headlinePence: 1999,
@@ -136,7 +148,7 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
       name: "Reprint crash",
       setup: "All available sources are 60-70 days old and still show GBP 200 after a hypothetical overnight true-value crash to GBP 100.",
       expectedHonestBehaviour: "Avoid treating stale agreement as fresh certainty, or visibly warn that no post-crash source exists.",
-      verdict: reprintCrash.manualCheck ? "DEGRADED" : "FAILS",
+      verdict: reprintCrash.manualCheck && reprintCrash.reasons.includes("stale-consensus") ? "SURVIVES" : "FAILS",
       moneyAtRiskPence: 10000,
       reconciler: reprintCrash,
       dealCalc: quoteFrom(reprintCrash, 100),
@@ -157,7 +169,7 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
       name: "Grade bleed",
       setup: "A PSA 10 query receives a clean-looking provider aggregate that is actually PSA 9 data.",
       expectedHonestBehaviour: "Detect grade leakage or force manual verification for single-provider slab data.",
-      verdict: gradeBleed.manualCheck ? "DEGRADED" : "FAILS",
+      verdict: gradeBleed.manualCheck && gradeBleed.reasons.includes("grade-bleed-suspect") ? "SURVIVES" : "FAILS",
       moneyAtRiskPence: 4000,
       reconciler: gradeBleed,
       dealCalc: quoteFrom(gradeBleed, 40),
@@ -167,8 +179,10 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
       name: "Currency shock",
       setup: "GBP/USD moves 8 percent while a USD source is converted through a six-day-old FX rate.",
       expectedHonestBehaviour: "Quantify the stale-FX error on high-value cards and warn if stale FX is material.",
-      verdict: "DEGRADED",
+      verdict: currencyShock.manualCheck && currencyShock.reasons.includes("fx-aged") ? "SURVIVES" : "FAILS",
       moneyAtRiskPence: Math.abs(staleFxPence - shockedFxPence),
+      reconciler: currencyShock,
+      dealCalc: quoteFrom(currencyShock, 500),
       extra: {
         usdSale,
         staleUsdPerGbp,

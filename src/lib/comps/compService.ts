@@ -3,7 +3,7 @@
 // if none are confident, take the largest sample anyway but flag low confidence.
 // All individual results are returned too, so the UI can show cross-source spread.
 
-import type { CardRef, CompQuery, CompResult } from "../domain/types.js";
+import { GRADE_VALUES, type CardRef, type CompQuery, type CompResult, type Grade } from "../domain/types.js";
 import { getSetById, resolveSetIdForCard } from "../catalog/setCatalog.js";
 import type { CompSource } from "./CompSource.js";
 import { DEFAULT_WINDOW_DAYS, isConfident } from "./cleaning.js";
@@ -293,10 +293,12 @@ function resultToReconCandidate(result: CompResult): ReconCandidate | null {
   const providerCard = raw.providerCard && typeof raw.providerCard === "object" ? (raw.providerCard as CardRef) : null;
   const matchedCard = providerCard ?? result.card;
   const fields = source === "tcg-market" ? readTcgMarketFields(raw, result.medianPence) : undefined;
+  const sample = reconcilerSampleSize(result, raw);
+  const fx = readFxMetadata(result, raw);
   return {
     source,
     valuePence: result.medianPence,
-    n: reconcilerSampleSize(result, raw),
+    n: sample.n,
     ageDays: ageDays(result.asOf),
     region: reconRegion(result),
     matchedSetId: resolveSetIdForCard(matchedCard.setName, matchedCard.number) ?? setIdFromTcgApiId(matchedCard.tcgApiId),
@@ -307,12 +309,18 @@ function resultToReconCandidate(result: CompResult): ReconCandidate | null {
     trendPct: result.trendPct,
     trendWindowDays: result.windowDays,
     candidateHasGradeScopedData: source === "poketrace" && raw.kind === "sold-aggregate",
+    nBoostedByAgreeingSignals: sample.boosted,
+    adjacentLowerGradeMedianPence: adjacentLowerGradeMedianPence(result.grade, raw),
+    convertedFromNonGbp: fx.convertedFromNonGbp,
+    fxAgeDays: fx.ageDays,
   };
 }
 
-function reconcilerSampleSize(result: CompResult, raw: Record<string, unknown>): number {
-  if (result.source !== "poketrace") return result.sampleSize;
-  return Math.max(result.sampleSize, corroboratingPokeTraceSignalSampleSize(raw, result.medianPence));
+function reconcilerSampleSize(result: CompResult, raw: Record<string, unknown>): { n: number; boosted: boolean } {
+  if (result.source !== "poketrace") return { n: result.sampleSize, boosted: false };
+  const corroborating = corroboratingPokeTraceSignalSampleSize(raw, result.medianPence);
+  const n = Math.max(result.sampleSize, corroborating);
+  return { n, boosted: n > result.sampleSize };
 }
 
 function corroboratingPokeTraceSignalSampleSize(raw: Record<string, unknown>, headlinePence: number): number {
@@ -329,6 +337,48 @@ function corroboratingPokeTraceSignalSampleSize(raw: Record<string, unknown>, he
     })
     .filter((sampleSize) => sampleSize > 0);
   return agreeingSamples.length > 0 ? Math.max(...agreeingSamples) : 0;
+}
+
+function adjacentLowerGradeMedianPence(grade: Grade, raw: Record<string, unknown>): number | undefined {
+  const lower = adjacentLowerGrade(grade);
+  if (!lower || !Array.isArray(raw.gradeLadder)) return undefined;
+  const row = raw.gradeLadder.find((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    return (entry as { grade?: unknown }).grade === lower;
+  }) as { medianPence?: unknown } | undefined;
+  const median = Number(row?.medianPence);
+  return Number.isFinite(median) && median > 0 ? median : undefined;
+}
+
+function adjacentLowerGrade(grade: Grade): Grade | null {
+  const index = GRADE_VALUES.indexOf(grade);
+  if (index <= 0) return null;
+  const prefix = grade.split("_")[0];
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const candidate = GRADE_VALUES[i]!;
+    if (candidate === "RAW") return null;
+    if (candidate.startsWith(`${prefix}_`)) return candidate;
+  }
+  return null;
+}
+
+function readFxMetadata(result: CompResult, raw: Record<string, unknown>): { convertedFromNonGbp: boolean; ageDays?: number } {
+  const fx = raw.fx && typeof raw.fx === "object" ? (raw.fx as Record<string, unknown>) : null;
+  const age = Number(fx?.ageDays);
+  const ageDays = Number.isFinite(age) ? age : undefined;
+  const chosenSignal = raw.chosenSignal && typeof raw.chosenSignal === "object" ? (raw.chosenSignal as Record<string, unknown>) : null;
+  const rawCurrency = typeof raw.currency === "string" ? raw.currency.toUpperCase() : "";
+  const signalCurrency = typeof chosenSignal?.originalCurrency === "string" ? chosenSignal.originalCurrency.toUpperCase() : "";
+  const convertedFromNonGbp =
+    Boolean(fx) &&
+    (rawCurrency === "USD" ||
+      rawCurrency === "EUR" ||
+      rawCurrency === "JPY" ||
+      signalCurrency === "USD" ||
+      signalCurrency === "EUR" ||
+      signalCurrency === "JPY" ||
+      result.source === "pokemon-price-tracker");
+  return { convertedFromNonGbp, ageDays };
 }
 
 function reconSource(result: CompResult): ReconSource | null {

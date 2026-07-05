@@ -384,3 +384,134 @@ test("T14: graded asymmetric tail is marked as contamination but is not automati
   assert.equal(result.manualCheck, false);
   assert.match(result.reasons.join(" "), /penalty-graded-tail-spread/);
 });
+
+test("R3-1: stale consensus cannot auto-quote when every eligible source is older than 45 days", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "pt-smart", valuePence: 20000, n: 100, ageDays: 60, raw: { min: 18000, max: 22000, median: 20000 } }),
+    candidate({ source: "tcg-market", valuePence: 20000, n: 10, ageDays: 65, region: "EU" }),
+    candidate({ source: "poketrace", valuePence: 20000, n: 70, ageDays: 70, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 20000);
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /stale-consensus/);
+});
+
+test("R3-1: stale consensus does not fire when one eligible source is fresh", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "pt-smart", valuePence: 20000, n: 100, ageDays: 60, raw: { min: 18000, max: 22000, median: 20000 } }),
+    candidate({ source: "tcg-market", valuePence: 20000, n: 10, ageDays: 45, region: "EU" }),
+    candidate({ source: "poketrace", valuePence: 20000, n: 70, ageDays: 70, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 20000);
+  assert.equal(result.manualCheck, false);
+  assert.doesNotMatch(result.reasons.join(" "), /stale-consensus/);
+});
+
+test("R3-2: dominant outlier still excludes a thin broad-source price when it has lower effective dominance weight", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "pt-smart", valuePence: 11614, n: 11, region: "US", raw: { min: 1000, max: 12000, median: 6000 } }),
+    candidate({ source: "poketrace", valuePence: 880, n: 5002, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 880);
+  assert.match(result.reasons.join(" "), /dominant-source-outlier:pt-smart:vs:poketrace/);
+});
+
+test("R3-2: a huge US baseline cannot exclude a higher-trust UK eBay sold source", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 2000, n: 5000, ageDays: 3, region: "US" }),
+    candidate({ source: "ebay-insights", valuePence: 10000, n: 8, ageDays: 2, region: "UK" }),
+  ]);
+
+  assert.doesNotMatch(result.reasons.join(" "), /dominant-source-outlier:ebay-insights/);
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /uk-solds-disagree/);
+});
+
+test("R3-3: graded adjacent lower-grade aggregate near the queried grade forces manual check", () => {
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
+    candidate({ source: "pt-median", valuePence: 10500, n: 80, adjacentLowerGradeMedianPence: 10000 }),
+  ]);
+
+  assert.equal(result.headlinePence, 10500);
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /grade-bleed-suspect/);
+});
+
+test("R3-3: graded adjacent lower-grade aggregate well below the queried grade is not flagged", () => {
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
+    candidate({ source: "pt-median", valuePence: 15000, n: 80, adjacentLowerGradeMedianPence: 10000 }),
+  ]);
+
+  assert.equal(result.manualCheck, false);
+  assert.doesNotMatch(result.reasons.join(" "), /grade-bleed-suspect/);
+});
+
+test("R3-3: missing adjacent lower-grade aggregate leaves graded behaviour unchanged", () => {
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
+    candidate({ source: "pt-median", valuePence: 10500, n: 80 }),
+  ]);
+
+  assert.equal(result.manualCheck, false);
+  assert.doesNotMatch(result.reasons.join(" "), /grade-bleed-suspect/);
+});
+
+test("R3-4: aged FX flags high-value converted headlines", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 100000, n: 500, convertedFromNonGbp: true, fxAgeDays: 6 }),
+  ]);
+
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /fx-aged/);
+});
+
+test("R3-4: aged FX is disclosed but does not block low-value converted headlines", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 8000, n: 500, convertedFromNonGbp: true, fxAgeDays: 6 }),
+  ]);
+
+  assert.equal(result.manualCheck, false);
+  assert.match(result.reasons.join(" "), /fx-aged/);
+});
+
+test("R3-4: fresh FX leaves converted headlines unchanged", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 100000, n: 500, convertedFromNonGbp: true, fxAgeDays: 1 }),
+  ]);
+
+  assert.equal(result.manualCheck, false);
+  assert.doesNotMatch(result.reasons.join(" "), /fx-aged/);
+});
+
+test("R3-5: UK sold disagreement is surfaced when a US baseline wins", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "ebay-insights", valuePence: 7500, n: 8, ageDays: 2, region: "UK" }),
+    candidate({ source: "poketrace", valuePence: 10000, n: 5000, ageDays: 2, region: "US" }),
+  ]);
+
+  assert.equal(result.chosenSource, "poketrace");
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /uk-solds-disagree/);
+});
+
+test("R3-5: nearby UK sold evidence does not force manual check", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "ebay-insights", valuePence: 9200, n: 8, ageDays: 2, region: "UK" }),
+    candidate({ source: "poketrace", valuePence: 10000, n: 5000, ageDays: 2, region: "US" }),
+  ]);
+
+  assert.equal(result.chosenSource, "poketrace");
+  assert.equal(result.manualCheck, false);
+  assert.doesNotMatch(result.reasons.join(" "), /uk-solds-disagree/);
+});
+
+test("c95d8be disclosure: n boost from agreeing signals is visible in reconciliation reasons", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 1300, n: 24000, nBoostedByAgreeingSignals: true }),
+  ]);
+
+  assert.equal(result.manualCheck, false);
+  assert.match(result.reasons.join(" "), /n-boosted-by-agreeing-signals/);
+});

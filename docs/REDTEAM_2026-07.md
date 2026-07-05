@@ -107,3 +107,36 @@ This suite is intentionally excluded from `npm test`. It uses the real reconcile
   }
 ]
 ```
+
+## Amendment 3 Rerun — 2026-07-05
+
+Scope: rulings R3-1 to R3-5 and the `n-boosted-by-agreeing-signals` disclosure condition from `CODEX_RECON_AMENDMENT3_2026-07-05.md`.
+
+Run directly with:
+
+```bash
+node --import tsx --test src/lib/comps/redteamPricingBrain.attacks.test.ts
+```
+
+Updated result: **0 FAILS**. The remaining DEGRADED cases are warnings where the app blocks the automatic quote and sends the dealer to manual review.
+
+| Rank | Attack | Previous | Updated | Money at risk | Actual behaviour after amendment |
+| --- | --- | --- | --- | ---: | --- |
+| 1 | Vintage raw single-provider confidence | SURVIVES | SURVIVES | £900.00 | Low confidence + manual check; deal calc refuses a quote. |
+| 2 | Shill-bid poisoning | SURVIVES | SURVIVES | £400.00 | Chooses broader PokeTrace baseline, low confidence, manual check. |
+| 3 | Reprint crash | FAILS | SURVIVES | £100.00 | All eligible sources are older than 45 days, so `stale-consensus` forces manual review. |
+| 4 | Checked-comp staleness trap | DEGRADED | DEGRADED | £80.00 | 80-day checked comps can headline, but stale/low confidence blocks the automatic quote. |
+| 5 | Dominant bad source suppresses a good UK source | FAILS | SURVIVES | £80.00 | Huge US PokeTrace evidence no longer excludes higher-trust UK eBay sold evidence. |
+| 6 | Currency shock | DEGRADED | SURVIVES | £74.07 | A high-value non-GBP headline with six-day FX metadata gets `fx-aged` and manual review. |
+| 7 | Grade bleed | FAILS | SURVIVES | £40.00 | Queried PSA 10 close to adjacent lower-grade median gets `grade-bleed-suspect` and manual review. |
+| 8 | UK small sample loses to huge US baseline | DEGRADED | DEGRADED | £40.00 | Huge US baseline can headline, but UK sold disagreement now forces manual review. |
+| 9 | Owned-sales self-poisoning | SURVIVES | SURVIVES | £30.00 | Owned firesale headline remains low confidence/manual check, so no quote. |
+| 10 | Deal-calc margin illusion | SURVIVES | SURVIVES | £1.14 | Quote still steps down across the £19.99/£20.00 postage boundary. |
+
+Verdict counts after rerun:
+
+| Verdict | Count |
+| --- | ---: |
+| SURVIVES | 8 |
+| DEGRADED | 2 |
+| FAILS | 0 |

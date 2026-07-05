@@ -212,6 +212,7 @@ test("PokeTrace agreeing internal signals can lift confidence without changing t
   assert.equal(result.reconciliation.headlinePence, 1347);
   assert.equal(result.reconciliation.confidence, "high");
   assert.equal(result.reconciliation.manualCheck, false);
+  assert.match(result.reconciliation.reasons.join(" "), /n-boosted-by-agreeing-signals/);
 });
 
 test("pickHeadline keeps confident graded comps on sample size", () => {
