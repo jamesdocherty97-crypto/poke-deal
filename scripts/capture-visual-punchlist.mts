@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium, webkit, type Browser, type BrowserType, type Page } from "playwright";
 
@@ -12,6 +12,7 @@ type CaptureState = {
 const phase = process.argv[2] ?? "after";
 const baseUrl = process.argv[3] ?? "http://localhost:3000";
 const outDir = path.join(process.cwd(), "docs/visual-audit/punch-list-2026-07-04", phase);
+const authorizationHeader = await readBasicAuthHeader();
 const engines: Engine[] = [
   { name: "chromium", launcher: chromium },
   { name: "webkit", launcher: webkit },
@@ -24,6 +25,14 @@ const viewports: ViewportSpec[] = [
 await mkdir(outDir, { recursive: true });
 
 const states: CaptureState[] = [
+  {
+    name: "inventory-resting-row",
+    prepare: async (page) => {
+      await goto(page);
+      await clickTab(page, "Inventory");
+      await page.waitForTimeout(300);
+    },
+  },
   {
     name: "inventory-more-actions-sheet",
     prepare: async (page) => {
@@ -62,6 +71,28 @@ const states: CaptureState[] = [
       await page.getByLabel(/^Number$/i).fill("SVP 208");
       await page.getByRole("button", { name: /Comp from typed fields/i }).click({ timeout: 7000 });
       await page.locator(".quick-stock-card .money-input input").first().fill("5");
+      await page.waitForTimeout(350);
+    },
+  },
+  {
+    name: "buy-success-toast-placement",
+    prepare: async (page) => {
+      await setupCompMock(page);
+      await setupAcquireMock(page);
+      await goto(page);
+      await clickTab(page, "Buy");
+      await page.getByLabel(/^Card$/i).fill("Victini");
+      await page.getByLabel(/^Set$/i).fill("Scarlet & Violet Black Star Promos");
+      await page.getByLabel(/^Number$/i).fill("SVP 208");
+      await page.getByRole("button", { name: /Comp from typed fields/i }).click({ timeout: 7000 });
+      await page.locator(".quick-stock-card .money-input input").first().fill("5");
+      const mobileBuy = page.locator(".mobile-buy-action button.primary-action");
+      if (await mobileBuy.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await mobileBuy.click({ timeout: 7000, force: true });
+      } else {
+        await page.locator(".quick-stock-card button.primary-action").click({ timeout: 7000, force: true });
+      }
+      await page.locator(".notice").waitFor({ state: "visible", timeout: 7000 });
       await page.waitForTimeout(350);
     },
   },
@@ -106,6 +137,7 @@ async function captureState(browser: Browser, engine: Engine["name"], state: Cap
     deviceScaleFactor: viewport.scale,
     isMobile: viewport.mobile,
     hasTouch: viewport.mobile,
+    extraHTTPHeaders: authorizationHeader ? { Authorization: authorizationHeader } : undefined,
   });
   const page = await context.newPage();
   try {
@@ -121,6 +153,16 @@ async function captureState(browser: Browser, engine: Engine["name"], state: Cap
   } finally {
     await context.close();
   }
+}
+
+async function readBasicAuthHeader(): Promise<string | undefined> {
+  const password =
+    process.env.APP_BASIC_AUTH_PASSWORD ??
+    (process.env.APP_BASIC_AUTH_PASSWORD_FILE
+      ? await readFile(process.env.APP_BASIC_AUTH_PASSWORD_FILE, "utf8").then((value) => value.trim())
+      : "");
+  if (!password) return undefined;
+  return `Basic ${Buffer.from(`codex:${password}`).toString("base64")}`;
 }
 
 async function goto(page: Page) {
@@ -166,6 +208,36 @@ async function setupCompMock(page: Page) {
             sourceLabel: "Pokemon TCG API",
           },
         ],
+      },
+    });
+  });
+}
+
+async function setupAcquireMock(page: Page) {
+  await page.route("**/api/inventory/acquire", async (route) => {
+    const now = new Date().toISOString();
+    await route.fulfill({
+      json: {
+        item: {
+          id: "visual-toast-item",
+          card: {
+            name: "Victini",
+            setName: "Scarlet & Violet Black Star Promos",
+            number: "SVP 208",
+            imageUrl: "https://images.pokemontcg.io/svp/208_hires.png",
+          },
+          grade: "RAW",
+          status: "IN_STOCK",
+          costBasis: 500,
+          quantity: 1,
+          acquiredAt: now,
+          updatedAt: now,
+          photos: [],
+        },
+        listing: null,
+        suggestion: { pricePence: 1280, strategy: "MARKET" },
+        catalog: compPayload().catalog,
+        comps: compPayload(),
       },
     });
   });
