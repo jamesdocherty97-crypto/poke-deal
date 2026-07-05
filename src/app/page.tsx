@@ -68,7 +68,6 @@ import { buildBuyPlan, buildBuyTargetOptions, buildBuyTargetSuggestion } from "@
 import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
 import {
   buildCheckedComp,
-  checkedCompSourceFromPlatform,
   checkedCompSourceLabel,
   parseCheckedCompPriceText,
   type CheckedCompSource,
@@ -183,6 +182,7 @@ type BuyFlowStep = {
   detail: string;
   state: BuyFlowState;
 };
+type BuyResultSection = "confidence" | "evidence" | "deal" | "log" | "target" | null;
 type LookupInput = {
   name: string;
   setName: string;
@@ -788,8 +788,6 @@ const quickGrades: Grade[] = [
 ];
 const gradeOptions: Grade[] = [...GRADE_VALUES];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
-const checkedCompSources: CheckedCompSource[] = ["EBAY_SOLD", "CARDMARKET", "TCGPLAYER", "OTHER"];
-const checkedCompSampleOptions = ["1", "2", "3", "5"];
 const checkedCompPlatforms: Array<{ value: CheckedCompPlatform; label: string }> = [
   { value: "ebay-uk", label: "eBay UK" },
   { value: "cardmarket", label: "Cardmarket" },
@@ -833,9 +831,16 @@ const stockImportTemplates = [
 ] as const;
 const VISIBLE_POPULAR_SET_LIMIT = 30;
 const VISIBLE_QUICK_HUNT_LIMIT = 8;
+const SCAN_CAMERA_TIMEOUT_MS = 8000;
 type RefreshOptions = {
   toast?: boolean;
   user?: boolean;
+};
+
+type NoticeAction = {
+  label: string;
+  href?: string;
+  onClick?: () => void;
 };
 
 export default function Home() {
@@ -848,6 +853,7 @@ export default function Home() {
   const [stockImportText, setStockImportText] = useState("");
   const [grade, setGrade] = useState<Grade>("RAW");
   const [cost, setCost] = useState("");
+  const [selectedQuickCostPence, setSelectedQuickCostPence] = useState<number | null>(null);
   const [quantity, setQuantity] = useState("1");
   const [source, setSource] = useState(DEFAULT_INTAKE_PREFERENCES.source);
   const [location, setLocation] = useState(DEFAULT_INTAKE_PREFERENCES.location);
@@ -870,6 +876,7 @@ export default function Home() {
   const [checkedCompLogNote, setCheckedCompLogNote] = useState("");
   const [checkedCompLogSourceUrl, setCheckedCompLogSourceUrl] = useState("");
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
+  const [buyResultSection, setBuyResultSection] = useState<BuyResultSection>(null);
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
   const [shouldCreateListing, setShouldCreateListing] = useState(false);
   const [keepBuying, setKeepBuying] = useState(DEFAULT_INTAKE_PREFERENCES.keepBuying);
@@ -892,7 +899,8 @@ export default function Home() {
   const [userRefreshing, setUserRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNoticeState] = useState<string | null>(null);
+  const [noticeAction, setNoticeAction] = useState<NoticeAction | null>(null);
   const [noticeArt, setNoticeArt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
@@ -1007,6 +1015,11 @@ export default function Home() {
   const expensePanelRef = useRef<HTMLElement | null>(null);
   const expenseDescriptionRef = useRef<HTMLInputElement | null>(null);
   const pnlWatchPanelRef = useRef<HTMLElement | null>(null);
+
+  function setNotice(message: string | null, action: NoticeAction | null = null) {
+    setNoticeState(message);
+    setNoticeAction(message ? action : null);
+  }
 
   useEffect(() => {
     void refreshAll();
@@ -1157,9 +1170,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!notice) return;
-    const handle = window.setTimeout(() => setNotice(null), 4200);
+    const handle = window.setTimeout(() => setNotice(null), noticeAction ? 12000 : 4200);
     return () => window.clearTimeout(handle);
-  }, [notice]);
+  }, [notice, noticeAction]);
 
   useEffect(() => {
     if (!error) return;
@@ -1513,7 +1526,8 @@ export default function Home() {
       card.setName.trim().toLowerCase() === setNameValue.trim().toLowerCase() &&
       card.number.trim().toLowerCase() === number.trim().toLowerCase(),
   );
-  const hasActiveCardIdentity = Boolean(name.trim() || number.trim() || comp);
+  const hasNamedCardIdentity = Boolean(displayCardName.trim() || displayNumber);
+  const hasActiveCardIdentity = Boolean(hasNamedCardIdentity || comp);
   const hasBuyContext = Boolean(hasActiveCardIdentity || quickIntake.trim() || parsedQuickIntake?.name || checkedComp || loggedCheckedComps.length > 0);
   const canClearCurrentComp = Boolean(
     hasActiveCardIdentity ||
@@ -1529,6 +1543,7 @@ export default function Home() {
   );
   const canRunSmartComp = Boolean(quickIntake.trim() || name.trim());
   const selectedCardImage = cardArtUrl ?? payloadDisplayImage(comp) ?? matchingQuickHunt?.imageUrl ?? null;
+  const shouldShowSelectedCardStrip = Boolean(hasNamedCardIdentity || selectedCardImage);
   const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
   const scannedQuery = scanMapping && "query" in scanMapping ? scanMapping.query : null;
   const scanWarnings = scanMapping?.warnings ?? [];
@@ -1914,6 +1929,14 @@ export default function Home() {
     }, 80);
     return () => window.clearTimeout(handle);
   }, [headline, scrollToComp]);
+
+  useEffect(() => {
+    if (!buyResultSection || !compPanelRef.current) return;
+    const handle = window.setTimeout(() => {
+      compPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 40);
+    return () => window.clearTimeout(handle);
+  }, [buyResultSection]);
 
   useEffect(() => {
     if (!scrollToStockImport || view !== "acquire" || !stockImportRef.current) return;
@@ -2548,7 +2571,7 @@ export default function Home() {
     updateScanMode("starting");
     setScanMessage("Opening camera...");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const mediaPromise = navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
           width: { ideal: 1280 },
@@ -2556,6 +2579,14 @@ export default function Home() {
         },
         audio: false,
       });
+      const timeoutPromise = new Promise<null>((resolve) => {
+        window.setTimeout(() => resolve(null), SCAN_CAMERA_TIMEOUT_MS);
+      });
+      const stream = await Promise.race([mediaPromise, timeoutPromise]);
+      if (!stream) {
+        void mediaPromise.then((lateStream) => lateStream.getTracks().forEach((track) => track.stop())).catch(() => undefined);
+        throw new Error("timeout");
+      }
       scanStreamRef.current = stream;
       if (scanVideoRef.current) {
         scanVideoRef.current.srcObject = stream;
@@ -2566,11 +2597,13 @@ export default function Home() {
         updateScanMode("camera");
         setScanMessage("Line up the name, number and slab label if present.");
       }
-    } catch {
+    } catch (err) {
       setScanCameraAvailable(false);
       if (scanModeRef.current === "starting") {
         updateScanMode("camera");
-        setScanMessage("Camera permission was blocked. Choose a photo instead.");
+        setScanMessage(err instanceof Error && err.message === "timeout"
+          ? "Camera did not open after 8 seconds. Upload photo instead."
+          : "Camera permission was blocked. Upload photo instead.");
       }
     }
   }
@@ -2756,6 +2789,7 @@ export default function Home() {
 
   function applyScanQueryFields(query: ScanCompQuery, quickFill?: string) {
     clearCompEvidence();
+    resetBuyCost();
     setQuickIntake(quickFill || cardIdentitySearchText({ name: query.name, setName: query.setName, number: query.number }, query.grade));
     setName(query.name);
     setSetNameValue(query.setName);
@@ -2783,6 +2817,7 @@ export default function Home() {
       ...(card.tcgDexId ? { tcgDexId: card.tcgDexId } : {}),
     };
     clearCompEvidence();
+    resetBuyCost();
     updateScanMode("identity");
     setScanMessage("Exact card chosen. Comp loading...");
     setQuickIntake(cardIdentitySearchText({ name: card.name, setName: card.setName, number: card.number }, nextGrade));
@@ -2839,10 +2874,21 @@ export default function Home() {
     setManualCompReturnArmed(false);
   }
 
+  function resetBuyCost() {
+    setCost("");
+    setSelectedQuickCostPence(null);
+  }
+
+  function setManualBuyCost(value: string) {
+    setCost(value);
+    setSelectedQuickCostPence(null);
+  }
+
   function clearCompEvidence() {
     setComp(null);
     setPendingLookup(null);
     setStockCompItemId(null);
+    setBuyResultSection(null);
     setSuggestion(null);
     setCardArtUrl(null);
     setGradeComp(null);
@@ -2853,6 +2899,7 @@ export default function Home() {
 
   function editCompIdentity() {
     clearCompEvidence();
+    resetBuyCost();
     setQuickIntake("");
     setManualCompQuery("");
   }
@@ -2863,7 +2910,7 @@ export default function Home() {
     setNumber("");
     setQuickIntake("");
     setManualCompQuery("");
-    setCost("");
+    resetBuyCost();
     setQuantity("1");
     clearCompEvidence();
     setGraderCert("");
@@ -2936,6 +2983,7 @@ export default function Home() {
     setSetNameValue(next.setName);
     setNumber(next.number);
     setCost(next.cost);
+    setSelectedQuickCostPence(null);
     setQuantity(next.quantity);
     setComp(null);
     setSuggestion(null);
@@ -2990,8 +3038,10 @@ export default function Home() {
       filled.push("cert");
     }
     if (parsed.cost) {
-      setCost(parsed.cost);
+      setManualBuyCost(parsed.cost);
       filled.push("cost");
+    } else if (identityChanged) {
+      resetBuyCost();
     }
     if (parsed.quantity) {
       setQuantity(parsed.quantity);
@@ -3052,7 +3102,7 @@ export default function Home() {
         return;
       }
       setNotice(`Filled ${filled.join(", ")}. Looking up comp...`);
-      void lookupComp(nextLookup);
+      void lookupComp(nextLookup, { preserveCost: Boolean(parsed.cost) });
       return;
     }
     setNotice(`Filled ${filled.join(", ")}.`);
@@ -3102,8 +3152,12 @@ export default function Home() {
     if (input.number !== number) setNumber(input.number);
   }
 
-  async function lookupComp(input: LookupInput) {
+  async function lookupComp(input: LookupInput, options: { preserveCost?: boolean } = {}) {
     const normalizedInput = normalizeLookupInput(input);
+    const identityChanged =
+      lookupIdentityKey(normalizedInput) !==
+      lookupIdentityKey({ name, setName: setNameValue, number, grade });
+    if (identityChanged && !options.preserveCost) resetBuyCost();
     applyNormalizedLookupFields(normalizedInput);
     setPendingLookup({
       name: normalizedInput.name,
@@ -3134,6 +3188,7 @@ export default function Home() {
       rememberRecentComp(payload, normalizedInput);
       setPendingLookup(null);
       setGradeComp(null);
+      setBuyResultSection(null);
       setScrollToComp(true);
     } catch (err) {
       setPendingLookup(null);
@@ -3222,6 +3277,7 @@ export default function Home() {
   ) {
     if (!result.found || !isPsaPokemonTcgCert(result)) return;
     clearCompEvidence();
+    resetBuyCost();
     setPsaResult(result);
     setPsaPendingDecision(null);
     setGraderCert(result.certNumber);
@@ -3262,6 +3318,7 @@ export default function Home() {
     if (!psaPendingDecision) return;
     const { result, lookupAfter } = psaPendingDecision;
     clearCompEvidence();
+    resetBuyCost();
     setPsaResult(result);
     setPsaPendingDecision(null);
     setGraderCert(result.certNumber);
@@ -3475,6 +3532,7 @@ export default function Home() {
 
   async function acquire(event?: FormEvent) {
     event?.preventDefault();
+    if (busy === "acquire") return;
     const intakeQuantity = parseIntakeQuantity(quantity);
     if (!intakeQuantity) {
       setError("Quantity must be a whole number above 0.");
@@ -3574,10 +3632,12 @@ export default function Home() {
         listingState: payload.listing?.state ?? "DRAFT",
         imageUrl: payloadDisplayImage(payload) ?? cardArtUrl,
       });
-      setNotice(
+      showStockedNotice(
         `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${
           payload.listing ? `${listingVerb} at ${gbp(listedPence)}.` : "Listing skipped."
         }${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
+        payload.item.id,
+        payload.catalog?.name ?? name,
       );
       await refreshAll();
       applyPostStockFlow();
@@ -3593,6 +3653,7 @@ export default function Home() {
   }
 
   async function stockWithoutComp() {
+    if (busy === "manual-stock") return;
     const intakeQuantity = parseIntakeQuantity(quantity);
     if (!intakeQuantity) {
       setError("Quantity must be a whole number above 0.");
@@ -3693,10 +3754,12 @@ export default function Home() {
         listingState: createdListing?.state ?? acquireListingState,
         imageUrl: stockedItem?.card?.imageUrl ?? cardArtUrl,
       });
-      setNotice(
+      showStockedNotice(
         createdListing
           ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${acquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(overrideListPricePence ?? draftDefaults.listPricePence)}.${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`
           : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
+        stockedItem?.id ?? payload.item?.id,
+        stockedItem?.card?.name ?? name,
       );
       await refreshAll();
       applyPostStockFlow();
@@ -3706,6 +3769,35 @@ export default function Home() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "manual stock failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function showStockedNotice(message: string, itemId: string | undefined, itemName: string) {
+    if (!itemId) {
+      setNotice(message);
+      return;
+    }
+    setNotice(`${message} Undo if this was a mis-tap.`, {
+      label: "Undo",
+      onClick: () => void undoStockCommit(itemId, itemName),
+    });
+  }
+
+  async function undoStockCommit(itemId: string, itemName: string) {
+    setBusy(`undo-stock-${itemId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/inventory/${itemId}`, { method: "DELETE" });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "undo stock failed");
+      setLastStocked((current) => (current?.itemId === itemId ? null : current));
+      await refreshAll();
+      setNotice(`${itemName || "Card"} removed from stock.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "undo stock failed. Open Stock and delete the row manually.");
     } finally {
       setBusy(null);
     }
@@ -3984,6 +4076,7 @@ export default function Home() {
       grade,
     };
     clearCompEvidence();
+    resetBuyCost();
     setQuickIntake(cardIdentitySearchText({ name: card.name, setName: card.setName, number: card.number }, grade));
     setName(card.name);
     setSetNameValue(card.setName);
@@ -4009,6 +4102,7 @@ export default function Home() {
 
     setView("acquire");
     clearCompEvidence();
+    resetBuyCost();
     setQuickIntake(cardIdentitySearchText({ name: entry.name, setName: entry.setName, number: entry.number }, nextGrade));
     setName(entry.name);
     setSetNameValue(entry.setName);
@@ -4063,6 +4157,7 @@ export default function Home() {
     };
 
     clearCompEvidence();
+    resetBuyCost();
     setQuickIntake(cardIdentitySearchText({ name: lookupName, setName: card.setName, number: card.number }, grade, conditionSearchTerm));
     setName(lookupName);
     setSetNameValue(card.setName);
@@ -4156,7 +4251,8 @@ export default function Home() {
     setNumber(card.number ?? "");
     if (parsed?.grade) setGrade(parsed.grade);
     if (parsed?.condition) setCondition(parsed.condition);
-    if (parsed?.cost) setCost(parsed.cost);
+    if (parsed?.cost) setManualBuyCost(parsed.cost);
+    else resetBuyCost();
     if (parsed?.quantity) setQuantity(parsed.quantity);
     if (parsed?.source) setSource(parsed.source);
     if (parsed?.location) setLocation(parsed.location);
@@ -4174,7 +4270,7 @@ export default function Home() {
       return;
     }
     setNotice(`Rechecking ${lookupName}...`);
-    void lookupComp(nextLookup);
+    void lookupComp(nextLookup, { preserveCost: Boolean(parsed?.cost) });
   }
 
   function handleCardNameChange(value: string) {
@@ -4264,6 +4360,7 @@ export default function Home() {
     setNumber(item.card.number ?? "");
     setGrade(nextGrade);
     setCost(options.repeatBuy ? penceToPounds(item.costBasis) : "");
+    setSelectedQuickCostPence(null);
     setQuantity("1");
     setSource(item.acquiredFrom ?? source);
     setLocation(item.location ?? location);
@@ -5043,15 +5140,18 @@ export default function Home() {
   async function copyListingPackAndOpenVenue() {
     if (!listingPack || !listingPackTarget) return;
     const venueAction = listingVenueAction(listingPackTarget.channel, { query: listingPackSearchQuery(listingPackTarget, listingPack) });
-    if (venueAction) window.open(venueAction.url, "_blank", "noopener,noreferrer");
+    const opened = venueAction ? openExternalUrl(venueAction.url) : false;
     try {
       await navigator.clipboard.writeText(listingPack.copyReady);
       setListingPackCopied(true);
       setListingPackCopiedField(null);
       setNotice(
         venueAction
-          ? `Listing pack copied. ${venueAction.openedLabel} opened.`
+          ? opened
+            ? `Listing pack copied. ${venueAction.openedLabel} opened.`
+            : "Listing pack copied. Open the venue from this link."
           : "Listing pack copied.",
+        venueAction && !opened ? { label: venueAction.openedLabel, href: venueAction.url } : null,
       );
       setError(null);
     } catch {
@@ -5567,9 +5667,25 @@ export default function Home() {
     setManualCompQuery(link.query);
     setManualCompReturnArmed(true);
     if (kind === "EBAY_UK_SOLD") openCheckedCompLogger("ebay-uk", link.url);
-    window.open(link.url, "_blank", "noopener,noreferrer");
-    setNotice(kind === "EBAY_UK_SOLD" ? "Opened eBay UK solds. Log the sold prices when you are back." : "Opened manual comp source.");
+    const opened = openExternalUrl(link.url);
+    setNotice(
+      opened
+        ? kind === "EBAY_UK_SOLD"
+          ? "Opened eBay UK solds. Log the sold prices when you are back."
+          : "Opened manual comp source."
+        : kind === "EBAY_UK_SOLD"
+          ? "New tab was blocked. Open eBay UK solds from this link, then log what you saw."
+          : "New tab was blocked. Open the manual comp source from this link.",
+      opened ? null : { label: link.label, href: link.url },
+    );
     setError(null);
+  }
+
+  function openExternalUrl(url: string): boolean {
+    const opened = window.open(url, "_blank");
+    if (!opened) return false;
+    opened.opener = null;
+    return true;
   }
 
   function openCheckedCompLogger(platform: CheckedCompPlatform = "ebay-uk", sourceUrl?: string) {
@@ -5582,12 +5698,14 @@ export default function Home() {
 
   function applyQuickCost(valuePence: number) {
     setCost(penceToPounds(valuePence));
+    setSelectedQuickCostPence(valuePence);
     setError(null);
   }
 
   function applyTotalCostSplit() {
     if (!totalCostSplit) return;
     setCost(penceToPounds(totalCostSplit.unitCostPence));
+    setSelectedQuickCostPence(null);
     setNotice(
       `Split total into ${gbp(totalCostSplit.unitCostPence)} each${
         totalCostSplit.roundingDeltaPence
@@ -5662,16 +5780,8 @@ export default function Home() {
       const entries = Array.isArray(payload.entries) ? (payload.entries as CheckedCompEntry[]) : [];
       const nextLoggedEntries = entries.length > 0 ? entries : payload.entry ? [payload.entry as CheckedCompEntry] : [];
       const aggregate = payload.aggregate as CompResult | null | undefined;
-      const activeCheckedPricePence =
-        aggregate && aggregate.sampleSize > 0 && aggregate.medianPence > 0 ? aggregate.medianPence : pricePence;
-      const activeCheckedSample =
-        aggregate && aggregate.sampleSize > 0 ? aggregate.sampleSize : Math.max(1, nextLoggedEntries.length);
 
       setLoggedCheckedComps(nextLoggedEntries);
-      setCheckedCompPrice(penceToPounds(activeCheckedPricePence));
-      setCheckedCompSample(String(activeCheckedSample));
-      setCheckedCompSource(checkedCompSourceFromPlatform(checkedCompLogPlatform));
-      setCheckedCompNote(checkedCompLogNote.trim());
       setCheckedCompLogPrice("");
       setCheckedCompLogNote("");
       setManualCompReturnArmed(false);
@@ -5817,6 +5927,12 @@ export default function Home() {
   }
 
   function runStockAction() {
+    if (busy === "acquire" || busy === "manual-stock") return;
+    if (buyResultSection !== "deal") {
+      setBuyResultSection("deal");
+      window.requestAnimationFrame(() => jumpToCostEntry());
+      return;
+    }
     if (!quickStockReady) {
       jumpToCostEntry();
       return;
@@ -6076,7 +6192,7 @@ export default function Home() {
         <div className="quick-stock-grid">
           <label>
             Cost
-            <MoneyInput ref={costInputRef} value={cost} onChange={setCost} />
+            <MoneyInput ref={costInputRef} value={cost} onChange={setManualBuyCost} />
           </label>
           <label>
             Qty
@@ -6157,7 +6273,12 @@ export default function Home() {
         {quickOfferOptions.length > 0 && (
           <div className="quick-offer-presets" aria-label="Quick cost presets">
             {quickOfferOptions.map((option) => (
-              <button key={`${option.label}-${option.valuePence}`} type="button" onClick={() => applyQuickCost(option.valuePence)}>
+              <button
+                key={`${option.label}-${option.valuePence}`}
+                type="button"
+                className={selectedQuickCostPence === option.valuePence ? "selected" : ""}
+                onClick={() => applyQuickCost(option.valuePence)}
+              >
                 {option.label} {gbp(option.valuePence)}
               </button>
             ))}
@@ -6170,7 +6291,7 @@ export default function Home() {
               <strong>{buyPlan.label}</strong>
               <small>{buyPlan.note}</small>
             </div>
-            <div>
+            <div className="buy-plan-sale-side">
               <span>Expected sale</span>
               <strong>{gbp(buyPlan.unitGrossSalePence)}</strong>
               <small>net {gbp(buyPlan.unitNetPence)}</small>
@@ -6186,6 +6307,15 @@ export default function Home() {
               <span>Return</span>
               <strong>{formatPct(buyPlan.roiPct)}</strong>
               <small>{formatPct(buyPlan.marginPct)} margin</small>
+            </div>
+          </div>
+        )}
+        {busy === "acquire" && (
+          <div className="stock-progress-card" aria-live="polite">
+            <span className="lookup-spinner" aria-hidden="true" />
+            <div>
+              <strong>Stocking this card...</strong>
+              <small>Saving stock, listing draft and comp evidence. If it fails, the button unlocks for retry.</small>
             </div>
           </div>
         )}
@@ -6271,7 +6401,7 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="hero-board" aria-label="Dealer command board">
+      {!(view === "acquire" && headline) && <section className="hero-board" aria-label="Dealer command board">
         <div className="hero-copy">
           <p className="eyebrow">Card fair mode</p>
           <strong>{chaseLine}</strong>
@@ -6281,9 +6411,9 @@ export default function Home() {
           <CardImage src={spotlightImage} fallbackClassName="card-back" alt="" />
           {selectedCardMarkUrl && <img className="set-mark" src={selectedCardMarkUrl} alt="" onError={hideBrokenImage} />}
         </div>
-      </section>
+      </section>}
 
-      <section className="status-strip" aria-label="Business summary">
+      {!(view === "acquire" && headline) && <section className="status-strip" aria-label="Business summary">
         <Metric label="Stock" value={String(dashboard?.metrics.stockCount ?? 0)} loading={dashboardLoading} />
         <Metric label="Listed" value={String(dashboard?.metrics.listedCount ?? 0)} loading={dashboardLoading} />
         <Metric
@@ -6292,7 +6422,7 @@ export default function Home() {
           tone="good"
           loading={dashboardLoading}
         />
-      </section>
+      </section>}
 
       <div className="toast-stack" aria-live="polite" aria-atomic="true">
         {notice && (
@@ -6301,6 +6431,7 @@ export default function Home() {
             message={notice}
             imageUrl={/publish|published/i.test(notice) ? noticeArt : null}
             kind={/publish|published/i.test(notice) ? "publish" : /sale|sold|imported/i.test(notice) ? "sale" : "default"}
+            action={noticeAction}
             onDismiss={() => setNotice(null)}
           />
         )}
@@ -6354,6 +6485,7 @@ export default function Home() {
 
       {view === "acquire" && (
         <section className="workspace buy-workspace">
+          {!headline && (
           <form className="panel lookup-panel" onSubmit={lookup}>
             <div className="panel-heading">
               <h2>Comp, buy, stock</h2>
@@ -6370,7 +6502,10 @@ export default function Home() {
                     setQuickIntake(event.target.value);
                     setCardSuggestions([]);
                     setCardSuggestionsLoading(Boolean(event.target.value.trim()));
-                    if (comp || checkedCompPrice.trim()) clearCompEvidence();
+                    if (comp || checkedCompPrice.trim()) {
+                      clearCompEvidence();
+                      resetBuyCost();
+                    }
                   }}
                   onFocus={() => setCardSuggestionsOpen(true)}
                   onBlur={() => setTimeout(() => setCardSuggestionsOpen(false), 150)}
@@ -6515,7 +6650,7 @@ export default function Home() {
                 )}
               </div>
             )}
-            {hasBuyContext && (
+            {shouldShowSelectedCardStrip && (
               <div className="selected-card-strip" aria-label="Selected card">
                 <CardImage
                   src={selectedCardImage}
@@ -6645,6 +6780,7 @@ export default function Home() {
                   type="button"
                   onClick={() => {
                     clearCompEvidence();
+                    resetBuyCost();
                     setGrade(g);
                   }}
                 >
@@ -6792,22 +6928,29 @@ export default function Home() {
               </label>
             </div>
             <div className="form-grid">
-              <label className="grade-select-field">
-                Full grade list
-                <select
-                  value={grade}
-                  onChange={(event) => {
-                    clearCompEvidence();
-                    setGrade(event.target.value as Grade);
-                  }}
-                >
-                  {gradeOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option.replace(/_/g, " ")}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <details className="more-grade-details">
+                <summary>
+                  <span>More grades</span>
+                  <strong>{grade.replace(/_/g, " ")}</strong>
+                </summary>
+                <label className="grade-select-field">
+                  Full grade list
+                  <select
+                    value={grade}
+                    onChange={(event) => {
+                      clearCompEvidence();
+                      resetBuyCost();
+                      setGrade(event.target.value as Grade);
+                    }}
+                  >
+                    {gradeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </details>
               <label className={`psa-lookup-field ${isPsaGrade(grade) ? "active" : ""}`}>
                 <span className="psa-lookup-heading">
                   <span>{isPsaGrade(grade) ? "PSA slab check" : "PSA cert"}</span>
@@ -6992,6 +7135,7 @@ export default function Home() {
               </details>
             )}
           </form>
+          )}
           {scanOpen && (
             <section className={`scan-sheet ${scanMode}`} role="dialog" aria-modal="true" aria-label="Scan a card">
               <div className="sheet-drag-handle" aria-hidden="true" />
@@ -7031,6 +7175,7 @@ export default function Home() {
               </div>
 
               <input
+                id="scan-photo-upload"
                 ref={scanFileInputRef}
                 className="visually-hidden"
                 type="file"
@@ -7138,9 +7283,15 @@ export default function Home() {
                     >
                       <span aria-hidden="true" />
                     </button>
-                    <button type="button" onClick={() => scanFileInputRef.current?.click()} disabled={busy === "scan"}>
-                      Choose photo
-                    </button>
+                    <label
+                      className={`scan-upload-button ${busy === "scan" ? "disabled" : ""}`}
+                      htmlFor="scan-photo-upload"
+                      onClick={(event) => {
+                        if (busy === "scan") event.preventDefault();
+                      }}
+                    >
+                      Upload photo instead
+                    </label>
                     {(scanMode === "identity" || scanMode === "ambiguous" || scanMode === "manual" || scanMode === "confirm-slab") && (
                       <button type="button" onClick={scanNext} disabled={busy === "scan" || busy === "lookup"}>
                         {scanCompReady ? "Scan next" : "Retake"}
@@ -7151,8 +7302,8 @@ export default function Home() {
               </div>
             </section>
           )}
-          <BuyFlowRail steps={buyFlowSteps} />
-          {lastStocked && (
+          {!headline && <BuyFlowRail steps={buyFlowSteps} />}
+          {!headline && lastStocked && (
             <LastStockedPanel
               card={lastStocked}
               onPack={openLastStockedPack}
@@ -7191,29 +7342,6 @@ export default function Home() {
                   </p>
                   <h2>{needsManualComp ? "No auto price" : gbp(headline.medianPence)}</h2>
                 </div>
-                <div className="comp-hero-actions">
-                  <span className={`pill rarity-chip ${rarityConfidenceClass(confidenceLabel?.tone)}`}>
-                    {rarityConfidenceLabel(confidenceLabel?.label, confidenceLabel?.tone)}
-                  </span>
-                  <button
-                    className="ghost-button comp-check-button"
-                    type="button"
-                    onClick={() => openManualCompLink("EBAY_UK_SOLD")}
-                  >
-                    UK solds
-                  </button>
-                  <button className="ghost-button comp-skip-button" type="button" onClick={skipCurrentComp}>
-                    Next comp
-                  </button>
-                  <button
-                    className="ghost-button comp-skip-button"
-                    type="button"
-                    onClick={() => void addCurrentCompToSession()}
-                    disabled={busy === "deal-session-add"}
-                  >
-                    {busy === "deal-session-add" ? "Adding..." : "Add to lot"}
-                  </button>
-                </div>
               </div>
               <div className="comp-identity-strip" aria-label="Comp card identity">
                 <CardImage
@@ -7235,6 +7363,49 @@ export default function Home() {
                     onError={hideBrokenImage}
                   />
                 )}
+              </div>
+              <div className="buy-result-summary" aria-label="Buy decision summary">
+                <button
+                  type="button"
+                  className={`buy-confidence-chip ${rarityConfidenceClass(confidenceLabel?.tone)} ${buyResultSection === "confidence" ? "selected" : ""}`}
+                  onClick={() => setBuyResultSection((current) => (current === "confidence" ? null : "confidence"))}
+                >
+                  <span>{rarityConfidenceLabel(confidenceLabel?.label, confidenceLabel?.tone)}</span>
+                  <strong>{dealerVerdict?.title ?? (needsManualComp ? "Check solds" : "Priced")}</strong>
+                </button>
+                <div>
+                  <span>Max offer</span>
+                  <strong>{offerCalc?.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}</strong>
+                  <small>{decisionBarOfferText}</small>
+                </div>
+              </div>
+              <div className="buy-result-action-row" aria-label="Buy actions">
+                <button className="primary-action" type="button" onClick={runDecisionBarBuy} disabled={busy === "acquire" || busy === "manual-stock"}>
+                  {busy === "acquire" ? "Stocking..." : "Buy"}
+                </button>
+                <button type="button" onClick={watchDecisionTarget} disabled={busy === "watch-create" || decisionBarWatchTargetPence <= 0}>
+                  {busy === "watch-create" ? "Watching..." : "Watch"}
+                </button>
+                <button type="button" className="ghost-button" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
+                  Pass
+                </button>
+              </div>
+              <div className="buy-result-chip-row" aria-label="Comp sections">
+                {[
+                  ["evidence", "Evidence"],
+                  ["deal", "Deal tools"],
+                  ["log", "Log comps"],
+                  ["target", "Target"],
+                ].map(([section, label]) => (
+                  <button
+                    key={section}
+                    type="button"
+                    className={buyResultSection === section ? "selected" : ""}
+                    onClick={() => setBuyResultSection((current) => (current === section ? null : (section as BuyResultSection)))}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
               {compPsaContext && (
                 <PsaCertCard
@@ -7261,8 +7432,20 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {!needsManualComp && !stockCompItem && renderQuickStockCard()}
-              {needsManualComp && (
+              {buyResultSection === "deal" && !needsManualComp && !stockCompItem && renderQuickStockCard()}
+              {buyResultSection === "deal" && (
+                <div className="deal-tool-actions">
+                  <div>
+                    <span>Buying a lot</span>
+                    <strong>Add this comp to the current lot</strong>
+                    <small>Use when you are pricing several cards before deciding the total offer.</small>
+                  </div>
+                  <button type="button" onClick={() => void addCurrentCompToSession()} disabled={busy === "deal-session-add" || !headline}>
+                    {busy === "deal-session-add" ? "Adding..." : "Add to lot"}
+                  </button>
+                </div>
+              )}
+              {buyResultSection === "log" && needsManualComp && (
                 <div className="manual-rescue-card">
                   <div>
                     <span>{compLimitations.length > 0 ? "Auto comp limits" : "Vintage, promos and odd variants"}</span>
@@ -7323,7 +7506,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {shouldOfferManualComp && !needsManualComp && (
+              {buyResultSection === "log" && shouldOfferManualComp && !needsManualComp && (
                 <div className="manual-rescue-card soft">
                   <div>
                     <span>Worth a quick check</span>
@@ -7341,9 +7524,9 @@ export default function Home() {
                   </ol>
                 </div>
               )}
-              {shouldOfferManualComp && renderManualCompLinks(needsManualComp ? "priority" : "compact")}
-              {needsManualComp && renderCheckedCompCard("priority")}
-              {dealerVerdict && (
+              {buyResultSection === "log" && shouldOfferManualComp && renderManualCompLinks(needsManualComp ? "priority" : "compact")}
+              {buyResultSection === "log" && needsManualComp && renderCheckedCompCard("priority")}
+              {buyResultSection === "confidence" && dealerVerdict && (
                 <div className={`dealer-verdict ${dealerVerdict.tone}`}>
                   <div className="dealer-verdict-main">
                     <span>{dealerVerdict.label}</span>
@@ -7369,7 +7552,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {offerCalc && (
+              {buyResultSection === "deal" && offerCalc && (
                 <div className={`deal-banner ${dealCalcTone(offerCalc)}`}>
                   <div>
                     <span>{offerCalc.route === "no-quote" ? "Buy offer" : "Max cash offer"}</span>
@@ -7391,7 +7574,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {offerCalc?.gradeRoute && (
+              {buyResultSection === "deal" && offerCalc?.gradeRoute && (
                 <div className={`grade-verdict ${offerCalc.route === "grade" ? "good" : "warn"}`}>
                   <span>Grade route EV</span>
                   <strong>
@@ -7399,7 +7582,7 @@ export default function Home() {
                   </strong>
                 </div>
               )}
-              {!needsManualComp && stockCompItem && stockCompSuggestion && (
+              {buyResultSection === "deal" && !needsManualComp && stockCompItem && stockCompSuggestion && (
                 <div className="stock-reprice-card">
                   <div>
                     <span>Stock reprice</span>
@@ -7425,7 +7608,7 @@ export default function Home() {
                   )}
                 </div>
               )}
-              {askEvidence && (
+              {buyResultSection === "evidence" && askEvidence && (
                 <div className={`ask-evidence-card ${askEvidence.skipped ? "muted" : ""}`}>
                   <div className="receipt-heading">
                     <span>UK asks (live)</span>
@@ -7465,15 +7648,15 @@ export default function Home() {
                   )}
                 </div>
               )}
-              <div className="detail-grid">
+              {buyResultSection === "evidence" && <div className="detail-grid">
                 <Metric label="Range" value={`${gbp(headline.lowPence)}-${gbp(headline.highPence)}`} />
                 {conditionAdjustedHeadlinePence != null && (
                   <Metric label="Raw value" value={gbp(conditionAdjustedHeadlinePence)} tone="warn" />
                 )}
                 <Metric label="Sample" value={`${headline.sampleSize} / ${headline.windowDays}d`} />
                 <Metric label="Outliers" value={String(headline.outliersRemoved)} />
-              </div>
-              {(comp?.cached || (comp?.unavailableSources?.length ?? 0) > 0) && (
+              </div>}
+              {buyResultSection === "evidence" && (comp?.cached || (comp?.unavailableSources?.length ?? 0) > 0) && (
                 <div className={`cache-badge ${comp?.cached ? "warn" : "info"}`}>
                   {comp?.cached ? (
                     <>
@@ -7488,7 +7671,7 @@ export default function Home() {
                   )}
                 </div>
               )}
-              {gradeLadder.length > 1 && (
+              {buyResultSection === "evidence" && gradeLadder.length > 1 && (
                 <div className="grade-ladder" aria-label="Price by grade from one lookup">
                   <div className="receipt-heading">
                     <span>Price by grade</span>
@@ -7515,7 +7698,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {compReceipt.length > 0 && (
+              {buyResultSection === "evidence" && compReceipt.length > 0 && (
                 <div className="comp-receipt">
                   <div className="receipt-heading">
                     <span>Comp receipt</span>
@@ -7546,7 +7729,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {reconciliationReasons.length > 0 && (
+              {buyResultSection === "confidence" && reconciliationReasons.length > 0 && (
                 <div className="reconciliation-notes" title={reconciliationReasons.map((item) => item.label).join(" · ")}>
                   <div className="receipt-heading">
                     <span>Why check</span>
@@ -7559,7 +7742,7 @@ export default function Home() {
                   </ul>
                 </div>
               )}
-              {pokeTraceSignals.length > 0 && (
+              {buyResultSection === "evidence" && pokeTraceSignals.length > 0 && (
                 <div className="poketrace-signal-list" aria-label="PokeTrace returned signals">
                   <div className="receipt-heading">
                     <span>PokeTrace signals</span>
@@ -7585,16 +7768,16 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              {!needsManualComp && !shouldOfferManualComp && renderManualCompLinks()}
-              {!needsManualComp && renderCheckedCompCard()}
-              {marketBaseline && (
+              {buyResultSection === "log" && !needsManualComp && !shouldOfferManualComp && renderManualCompLinks()}
+              {buyResultSection === "log" && !needsManualComp && renderCheckedCompCard()}
+              {buyResultSection === "evidence" && marketBaseline && (
                 <div className="market-signal">
                   <span>Catalog baseline</span>
                   <strong>{gbp(marketBaseline.medianPence)}</strong>
                   <small>{marketBaseline.raw?.chosenSignal?.label ?? "TCGPlayer/Cardmarket"}</small>
                 </div>
               )}
-              {ownedSalesComp && (
+              {buyResultSection === "evidence" && ownedSalesComp && (
                 <div className="owned-sales-signal">
                   <div>
                     <span>Your sales</span>
@@ -7612,7 +7795,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {catalogCard && (
+              {buyResultSection === "evidence" && catalogCard && (
                 <div className="catalog-strip">
                   <CardImage
                     src={catalogDisplayImage(catalogCard)}
@@ -7638,7 +7821,7 @@ export default function Home() {
                   )}
                 </div>
               )}
-              {sourceMatchedCard && (
+              {buyResultSection === "evidence" && sourceMatchedCard && (
                 <div className="catalog-strip source-match-strip">
                   <CardImage
                     src={comp?.cardImage?.source !== "catalog" ? comp?.cardImage?.imageUrl ?? null : null}
@@ -7667,12 +7850,12 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {!catalogCard && headline.medianPence > 0 && (
+              {buyResultSection === "evidence" && !catalogCard && headline.medianPence > 0 && (
                 <p className="hint">
                   Source found a price, but catalog/art did not confirm the card. Verify bigger buys with a UK sold check.
                 </p>
               )}
-              {headline.raw?.chosenPriceSource === "smartMarketPrice" && (
+              {buyResultSection === "evidence" && headline.raw?.chosenPriceSource === "smartMarketPrice" && (
                 <p className="hint">
                   RAW is using the provider smart price to reduce noisy ungraded eBay leakage.
                   {headline.raw.smartMarketPrice?.confidence
@@ -7680,22 +7863,22 @@ export default function Home() {
                     : ""}
                 </p>
               )}
-              {headline.raw?.kind === "catalog-market-baseline" && (
+              {buyResultSection === "evidence" && headline.raw?.kind === "catalog-market-baseline" && (
                 <p className="hint">
                   Using a catalog market baseline because raw sold data is thin, missing, or materially above market.
                   {headline.raw.caveat ? ` ${headline.raw.caveat}` : ""}
                 </p>
               )}
-              {headline.raw?.kind === "checked-comp" && (
+              {buyResultSection === "evidence" && headline.raw?.kind === "checked-comp" && (
                 <p className="hint">
                   Checked against {headline.raw.sourceLabel ?? checkedCompSourceLabel(headline.raw.source)}
                   {headline.raw.note ? ` · ${headline.raw.note}` : ""}.
                 </p>
               )}
-              {comp?.sourcesDisagree && !checkedComp && (
+              {buyResultSection === "confidence" && comp?.sourcesDisagree && !checkedComp && (
                 <p className="hint danger-text">Sources disagree materially. Treat this as a check-before-buy price.</p>
               )}
-              {comp?.sourcesDisagree && checkedComp && (
+              {buyResultSection === "confidence" && comp?.sourcesDisagree && checkedComp && (
                 <p className="hint danger-text">API sources disagree; the checked comp is driving this buy.</p>
               )}
             </section>
@@ -7797,11 +7980,11 @@ export default function Home() {
             </section>
           )}
 
-          {headline && grade === "RAW" && !needsManualComp && (
+          {headline && buyResultSection === "deal" && grade === "RAW" && !needsManualComp && (
             <details className="panel optional-tool-panel grade-lab">
               <summary>
                 <span>Optional</span>
-                <strong>Grade lab</strong>
+                <strong>Grading EV</strong>
                 <small>RAW to PSA 10 EV</small>
               </summary>
               <div className="form-grid">
@@ -7826,7 +8009,7 @@ export default function Home() {
             </details>
           )}
 
-          {headline && !needsManualComp && (
+          {headline && buyResultSection === "target" && !needsManualComp && (
             <details className="panel optional-tool-panel watch-panel">
               <summary>
                 <span>Optional</span>
@@ -7897,7 +8080,7 @@ export default function Home() {
             <div className="form-grid">
               <label>
                 Cost
-                <MoneyInput ref={costInputRef} value={cost} onChange={setCost} />
+                <MoneyInput ref={costInputRef} value={cost} onChange={setManualBuyCost} />
               </label>
               <label>
                 Qty
@@ -8095,6 +8278,15 @@ export default function Home() {
                 </div>
               </div>
             )}
+            {busy === "manual-stock" && (
+              <div className="stock-progress-card" aria-live="polite">
+                <span className="lookup-spinner" aria-hidden="true" />
+                <div>
+                  <strong>Stocking manually...</strong>
+                  <small>Saving this card now. If it fails, the button unlocks for retry.</small>
+                </div>
+              </div>
+            )}
             <button
               className="primary-action"
               type="submit"
@@ -8116,7 +8308,7 @@ export default function Home() {
             )}
           </form>
           )}
-          <details className="panel stock-import-panel" ref={stockImportDetailsRef}>
+          {!headline && <details className="panel stock-import-panel" ref={stockImportDetailsRef}>
             <summary>
               <span>Opening stock import</span>
               <small>
@@ -8216,8 +8408,8 @@ export default function Home() {
                     : "Import rows"}
               </button>
             </form>
-          </details>
-          {recentIntake.length > 0 && (
+          </details>}
+          {!headline && recentIntake.length > 0 && (
             <section className="panel recent-intake-panel">
               <div className="panel-heading">
                 <div>
@@ -8269,7 +8461,7 @@ export default function Home() {
               </div>
             </section>
           )}
-          {(headline || name.trim() || setNameValue.trim() || number.trim() || checkedComp) && (
+          {!headline && (name.trim() || setNameValue.trim() || number.trim() || checkedComp) && (
             <div className="mobile-buy-spacer" aria-hidden="true" />
           )}
         </section>
@@ -8828,66 +9020,32 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && (headline || name.trim() || number.trim() || checkedComp) && (
+      {view === "acquire" && !headline && (name.trim() || number.trim() || checkedComp) && (
         <section
-          className={`mobile-buy-action ${headline ? "decision" : ""} ${buyPlan?.tone ?? deal?.tone ?? "warn"}`}
-          aria-label={headline ? "Buy decision" : "Current buy action"}
+          className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`}
+          aria-label="Current buy action"
         >
           <div>
-            <span>{headline ? rarityConfidenceLabel(confidenceLabel?.label, confidenceLabel?.tone) : "Manual card"}</span>
-            <strong>{headline ? (needsManualComp ? "Check solds" : gbp(headline.medianPence)) : "No auto comp"}</strong>
-            <small>
-              {headline
-                ? decisionBarOfferText
-                : !headline
-                ? manualStockReady
-                  ? "stock manually now, price/list later if needed"
-                  : "open UK solds or add cost and quantity"
-                : "add cost and quantity"}
-            </small>
+            <span>Manual card</span>
+            <strong>No auto comp</strong>
+            <small>{manualStockReady ? "stock manually now, price/list later if needed" : "open UK solds or add cost and quantity"}</small>
           </div>
-          {headline ? (
-            <>
-              <button
-                className="primary-action"
-                type="button"
-                onClick={runDecisionBarBuy}
-                disabled={busy === "acquire" || busy === "manual-stock" || Boolean(quickStockReady && !quickStockCanSubmit)}
-              >
-                {busy === "acquire" ? "Stocking..." : mobileNeedsCheckedComp && !mobileCanStockLater ? "Check first" : "Buy"}
-              </button>
-              <button
-                type="button"
-                onClick={watchDecisionTarget}
-                disabled={busy === "watch-create" || decisionBarWatchTargetPence <= 0}
-                title={decisionBarWatchTargetPence > 0 ? `Watch at ${gbp(decisionBarWatchTargetPence)}` : "No target yet"}
-              >
-                {busy === "watch-create" ? "Watching..." : "Watch"}
-              </button>
-              <button className="mobile-skip-button" type="button" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
-                Pass
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                className="mobile-skip-button"
-                type="button"
-                onClick={() => clearCurrentComp()}
-                disabled={busy === "acquire" || busy === "manual-stock"}
-              >
-                Next
-              </button>
-              <button
-                className="primary-action"
-                type="button"
-                onClick={manualStockReady ? () => void stockWithoutComp() : () => openManualCompLink("EBAY_UK_SOLD")}
-                disabled={busy === "acquire" || busy === "manual-stock" || (!manualStockReady && !manualCompFallbackQuery.trim())}
-              >
-                {manualStockReady ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : "Open UK"}
-              </button>
-            </>
-          )}
+          <button
+            className="mobile-skip-button"
+            type="button"
+            onClick={() => clearCurrentComp()}
+            disabled={busy === "acquire" || busy === "manual-stock"}
+          >
+            Next
+          </button>
+          <button
+            className="primary-action"
+            type="button"
+            onClick={manualStockReady ? () => void stockWithoutComp() : () => openManualCompLink("EBAY_UK_SOLD")}
+            disabled={busy === "acquire" || busy === "manual-stock" || (!manualStockReady && !manualCompFallbackQuery.trim())}
+          >
+            {manualStockReady ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : "Open UK"}
+          </button>
         </section>
       )}
 
@@ -9978,12 +10136,14 @@ function Toast({
   message,
   imageUrl,
   kind = "default",
+  action,
   onDismiss,
 }: {
   tone: "success" | "danger";
   message: string;
   imageUrl?: string | null;
   kind?: "default" | "publish" | "sale";
+  action?: NoticeAction | null;
   onDismiss: () => void;
 }) {
   return (
@@ -9993,6 +10153,15 @@ function Toast({
       role={tone === "danger" ? "alert" : "status"}
     >
       <span>{message}</span>
+      {action?.href ? (
+        <a className="toast-action" href={action.href} target="_blank" rel="noreferrer" onClick={onDismiss}>
+          {action.label}
+        </a>
+      ) : action?.onClick ? (
+        <button className="toast-action" type="button" onClick={action.onClick}>
+          {action.label}
+        </button>
+      ) : null}
       <button className="toast-close" type="button" onClick={onDismiss} aria-label="Dismiss message">
         ×
       </button>
@@ -10453,6 +10622,12 @@ function sourceLabel(source: string, headline: boolean): string {
           ? "Your checked comps"
           : source.replace(/-/g, " ");
   return headline ? `${label} · used` : label;
+}
+
+function lookupIdentityKey(input: Pick<LookupInput, "name" | "setName" | "number" | "grade">): string {
+  return [input.name, input.setName, input.number, input.grade]
+    .map((part) => String(part ?? "").trim().toLowerCase())
+    .join("|");
 }
 
 function compBasis(result: CompResult): string {

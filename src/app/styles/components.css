@@ -3275,6 +3275,195 @@ label,
   border-color: rgba(251, 113, 133, 0.38);
 }
 
+.buy-result-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.buy-confidence-chip,
+.buy-result-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 10px;
+  text-align: left;
+}
+
+.buy-confidence-chip.selected,
+.buy-result-chip-row button.selected {
+  border-color: rgba(255, 203, 5, 0.74);
+  background:
+    linear-gradient(135deg, rgba(255, 203, 5, 0.2), rgba(105, 232, 255, 0.08)),
+    rgba(255, 255, 255, 0.08);
+}
+
+.buy-result-summary span,
+.buy-result-summary small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buy-result-summary strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 1000;
+  line-height: 1.08;
+}
+
+.buy-result-action-row,
+.buy-result-chip-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.buy-result-action-row button,
+.buy-result-chip-row button {
+  min-height: 44px;
+  padding-inline: 8px;
+  font-size: 13px;
+  line-height: 1.05;
+}
+
+.buy-result-chip-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.buy-result-chip-row button {
+  min-height: 38px;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.more-grade-details {
+  min-width: 0;
+}
+
+.more-grade-details summary {
+  display: grid;
+  min-height: 44px;
+  cursor: pointer;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 8px 10px;
+}
+
+.more-grade-details summary span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.more-grade-details summary strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.more-grade-details[open] summary {
+  border-color: rgba(255, 203, 5, 0.4);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.more-grade-details .grade-select-field {
+  border: 1px solid rgba(255, 203, 5, 0.28);
+  border-top: 0;
+  border-radius: 0 0 var(--r-sm) var(--r-sm);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px;
+}
+
+.deal-tool-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.055);
+  padding: 10px;
+}
+
+.deal-tool-actions div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.deal-tool-actions span,
+.deal-tool-actions small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+}
+
+.deal-tool-actions strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.deal-tool-actions button {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .buy-result-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .buy-result-chip-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .deal-tool-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stock-progress-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(105, 232, 255, 0.24);
+  border-radius: var(--r-sm);
+  background: rgba(105, 232, 255, 0.08);
+  padding: 9px;
+}
+
+.stock-progress-card strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.stock-progress-card small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .quick-offer-presets,
 .checked-comp-price-presets {
   display: flex;
@@ -3295,6 +3484,13 @@ label,
   font-size: 12px;
   font-weight: 950;
   white-space: nowrap;
+}
+
+.quick-offer-presets button.selected {
+  border-color: rgba(255, 203, 5, 0.86);
+  background: linear-gradient(180deg, var(--yellow), #f59e0b);
+  color: #1b2235;
+  box-shadow: 0 0 0 2px rgba(255, 203, 5, 0.18);
 }
 
 .checked-comp-price-presets button {
@@ -4995,6 +5191,19 @@ label,
   overflow-wrap: anywhere;
 }
 
+.toast-action {
+  flex: 0 0 auto;
+  min-height: 34px;
+  border: 1px solid rgba(255, 203, 5, 0.44);
+  border-radius: var(--r-sm);
+  background: rgba(255, 203, 5, 0.14);
+  color: #fff4b0;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 950;
+  text-decoration: none;
+}
+
 .notice.success {
   border-color: rgba(52, 211, 153, 0.45);
   color: var(--green);
@@ -6105,6 +6314,25 @@ label,
   align-items: center;
 }
 
+.scan-upload-button {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border: 1px solid rgba(255, 203, 5, 0.36);
+  border-radius: var(--r-sm);
+  background: rgba(255, 203, 5, 0.12);
+  color: #fff4b0;
+  font-size: 13px;
+  font-weight: 950;
+  text-align: center;
+  cursor: pointer;
+}
+
+.scan-upload-button.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .scan-shutter-button {
   display: grid;
   place-items: center;
@@ -7091,6 +7319,17 @@ label,
 
 .buy-plan.compact .buy-plan-heading strong {
   font-size: 18px;
+}
+
+.buy-plan .buy-plan-sale-side {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  padding-left: 8px;
+}
+
+.buy-plan .buy-plan-sale-side strong {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .mobile-buy-spacer {

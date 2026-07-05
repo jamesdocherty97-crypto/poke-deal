@@ -35,7 +35,7 @@ Live today:
 - Live primary comps from Pokemon Price Tracker.
 - Staged comp lookup: card identity appears first, then live pricing fills in.
 - RAW comp protection using smart price and catalog baselines.
-- Manual checked-comp override.
+- Dealer-logged checked comps as stored evidence.
 - Inventory and stock ledger.
 - Listing drafts and active listing tracking.
 - eBay readiness, offer creation and publish flow for your own listings when the seller account/API connection is ready.
@@ -214,6 +214,22 @@ Notes:
 ## Buy Flow
 
 Go to Buy when you are looking at a card and deciding what to do.
+
+The page has three simple states:
+
+- Searching: Smart comp search, scan/upload photo, grade quick buttons, recent comps and card/set/number fields.
+- Result: one compact comp card with art, headline price, confidence/verdict, max offer, and Buy/Watch/Pass.
+- Acting: Buy opens the cost step first, Log comps opens the manual sold-price logger, Target opens the watch controls, and Evidence opens the receipt.
+
+Result chips:
+
+- Confidence: why the app trusts or distrusts the headline.
+- Evidence: receipt, sources, PokeTrace signals, UK asks, card identity and grade ladder.
+- Deal tools: cost, quantity, offer maths, listing choice and grading EV tools.
+- Log comps: eBay UK solds, fallback manual links and your checked comp logger.
+- Target: buy-watch target and presets.
+
+Nothing was removed; the long panels are now summoned from those chips.
 
 ### Quick Fill
 
@@ -576,36 +592,15 @@ Use it when:
 - You are sourcing from Facebook, Vinted, fairs or collections.
 - You do not want to remember target numbers manually.
 
-### Grade Lab
+### Grading EV
 
-Grade Lab estimates whether grading a RAW card might be worth it.
-
-Inputs:
-
-- PSA 10 odds.
-- Grading cost.
-
-It compares:
-
-- RAW comp.
-- PSA 10 comp.
-- Your estimated chance of hitting PSA 10.
-
-Intended use:
-
-- Quick grading EV check.
-- Not a replacement for condition inspection.
-
-Outstanding:
-
-- PSA cert lookup is wired into Buy for PSA slabs. Enter a cert to pull subject, card number, grade and population, then run the usual market comp from that verified identity.
-- PSA data is most useful for PSA slabs. ACE/BGS/CGC slabs still rely on manual cert/context and market comps.
+For RAW cards, open Deal tools after a comp to check RAW-to-PSA 10 grading EV. Enter your PSA 10 odds and grading cost, then run the PSA 10 comparison. This is a quick EV check, not a replacement for condition inspection.
 
 ## Just Bought It
 
 This section turns a comp into stock and a listing draft.
 
-On mobile, tap Buy in the sticky decision bar to jump straight to the cost field. Enter cost, check quantity, then stock.
+On mobile, tap Buy to open the cost step. Enter cost, check quantity, then tap Buy again to stock. The success toast includes Undo if it was a mis-tap.
 
 Fields:
 
