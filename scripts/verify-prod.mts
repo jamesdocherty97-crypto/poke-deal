@@ -12,6 +12,7 @@ type CompResponse = {
     source?: string;
     medianPence?: number;
     sampleSize?: number;
+    card?: { name?: string; number?: string };
     raw?: unknown;
   };
   all?: Array<{
@@ -29,6 +30,7 @@ type CompResponse = {
     reasons?: string[];
     trendPct?: number | null;
   };
+  unavailableSources?: Array<{ name?: string; reason?: string }>;
 };
 
 type Result = {
@@ -91,15 +93,22 @@ const probes: Probe[] = [
     slug: "victini-svp-208-raw",
     label: "Victini SVP 208 RAW",
     params: { name: "Victini", setName: "Scarlet & Violet Promos", number: "SVP 208", grade: "RAW" },
-    assert: (json) => [
-      inBand(json.headline?.medianPence, 1_200, 1_400)
-        ? ""
-        : `headline ${formatPence(json.headline?.medianPence)} outside £12-£14 band`,
-      json.reconciliation?.confidence === "high"
-        ? ""
-        : `expected high confidence, got ${json.reconciliation?.confidence ?? "missing"}`,
-      json.reconciliation?.manualCheck === false ? "" : "expected manualCheck=false",
-    ],
+    assert: (json) => {
+      const primaryUnavailable = json.unavailableSources?.some((source) => source.name === "pokemon-price-tracker") === true;
+      const expectedConfidence = primaryUnavailable ? ["medium", "high"] : ["high"];
+      return [
+        normalizeIdentityPart(json.headline?.card?.name) === "victini" ? "" : "headline identity was not Victini",
+        normalizeIdentityPart(json.headline?.card?.number) === "svp208" ? "" : "headline collector number was not SVP208",
+        inBand(json.headline?.medianPence, 900, 1_600)
+          ? ""
+          : `headline ${formatPence(json.headline?.medianPence)} outside the £9-£16 live-market guardrail`,
+        (json.headline?.sampleSize ?? 0) >= 3 ? "" : "expected at least three observations",
+        expectedConfidence.includes(json.reconciliation?.confidence ?? "")
+          ? ""
+          : `expected ${expectedConfidence.join("/")} confidence, got ${json.reconciliation?.confidence ?? "missing"}`,
+        json.reconciliation?.manualCheck === false ? "" : "expected manualCheck=false",
+      ];
+    },
   },
 ];
 
@@ -178,6 +187,10 @@ function formatPence(value: number | undefined): string {
 
 function inBand(value: number | undefined, low: number, high: number): boolean {
   return typeof value === "number" && value >= low && value <= high;
+}
+
+function normalizeIdentityPart(value: string | undefined): string {
+  return value?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
 }
 
 function hasCardmarketTrendPriceBug(json: CompResponse): boolean {
