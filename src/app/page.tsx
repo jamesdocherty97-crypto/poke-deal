@@ -4,7 +4,7 @@ import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
 import { type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatGbp as gbp } from "@/lib/format/money";
-import { compressPhotoForScan, compressPhotoForUpload, inventoryPhotoUploadPath } from "@/lib/photos/imageProcessing";
+import { compressPhotoForUpload, inventoryPhotoUploadPath, preparePhotoForScan } from "@/lib/photos/imageProcessing";
 import {
   orderListingPhotos,
   photoRequirementMessage,
@@ -74,6 +74,7 @@ import {
 } from "@/lib/dealer/checkedComp";
 import {
   buildListingPack,
+  buildListingPackCsv,
   DEFAULT_LISTING_COPY_SETTINGS,
   listingPackCopyFields,
   resolveListingCopySettings,
@@ -131,14 +132,40 @@ import {
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayActionTarget } from "@/lib/dealer/today";
 import { textMentionsFirstEdition } from "@/lib/comps/variants";
+import { readCompProgress } from "@/lib/comps/clientProgress";
+import type { CompProgressEvent, CompSourceEvent } from "@/lib/comps/progressContract";
+import type { ManualCompReview, ManualReviewResolution } from "@/lib/comps/manualReview";
+import {
+  cardGradeHistoryKey,
+  type CardPriceHistory,
+  type CardPriceHistoryPreview,
+} from "@/lib/comps/priceHistory";
+import { listingEvidenceFromPreview } from "@/lib/dealer/listingEvidence";
 import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@/lib/catalog/cardSearch";
 import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
 import type { ScanIdentity } from "@/lib/scan/cardScan";
 import { scanIdentityToQuery, type ScanIdentityMapping, type ScanCompQuery } from "@/lib/scan/scanIdentityMapper";
+import {
+  enqueueOfflineMutation,
+  flushOfflineQueue,
+  getOfflineBootstrap,
+  getOfflineComp,
+  getOfflineSyncState,
+  listOfflineMutations,
+  putOfflineComp,
+  putOfflineBootstrap,
+  registerOfflineWorker,
+  removeOfflineMutation,
+  retryOfflineMutation,
+  subscribeOfflineState,
+  type OfflineMutation,
+  type OfflineSyncState,
+} from "@/lib/offline/offlineStore";
 import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
 import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
 import { CardImage, EmptyState, Metric, MoneyInput } from "./components/UiBits";
+import { PriceHistorySheet, StockHistorySparkline } from "./components/PriceHistory";
 
 const InventoryTab = dynamic(() => import("./components/InventoryTab").then((mod) => mod.InventoryTab));
 const ListingsTab = dynamic(() => import("./components/ListingsTab").then((mod) => mod.ListingsTab));
@@ -231,7 +258,10 @@ type LastStockedCard = {
   channel: Channel;
   listingState: ListingState;
   imageUrl: string | null;
+  queued?: boolean;
 };
+
+type CompSourceProgressView = Pick<CompSourceEvent, "source" | "status" | "latencyMs" | "completed" | "total">;
 
 type OwnedSaleCompRow = {
   id: string;
@@ -460,6 +490,7 @@ type CardPhoto = {
 type InventoryItem = {
   id: string;
   card: {
+    id?: string;
     name: string;
     setName: string;
     number: string | null;
@@ -771,6 +802,20 @@ type SystemSource = {
   deepCheck?: DeepHealthSource;
 };
 
+type OfflineBootstrapPayload = {
+  inventory: InventoryItem[];
+  priceHistoryPreviews?: Record<string, CardPriceHistoryPreview>;
+  listings: Listing[];
+  dashboard: Dashboard;
+  portfolio: PortfolioHistory;
+  watches: WatchRecord[];
+  alerts: AppAlertRecord[];
+  alertUnreadCount: number;
+  expenses: ExpenseRecord[];
+  systemStatus: SystemStatus;
+  dealSession: DealSessionPayload;
+};
+
 const quickGrades: Grade[] = [
   "RAW",
   "PSA_8",
@@ -809,6 +854,7 @@ const RECENT_COMPS_STORAGE_KEY = "pokemon-dealer-os.recent-comps.v1";
 const INTAKE_PREFERENCES_STORAGE_KEY = "pokemon-dealer-os.intake-preferences.v1";
 const DEAL_SETTINGS_STORAGE_KEY = "pokemon-dealer-os.deal-settings.v1";
 const LISTING_COPY_SETTINGS_STORAGE_KEY = "pokemon-dealer-os.listing-copy-settings.v1";
+let volatileScanSessionId: string | null = null;
 const sourcePresets = ["Card fair", "Facebook", "eBay", "Cardmarket", "Vinted", "Whatnot", "Collection", "Trade-in"];
 const locationPresets = ["Box A", "Box B", "Binder", "To list", "Slabs", "Singles"];
 const conditionPresets = ["NM", "LP", "MP", "HP", "DMG"];
@@ -844,7 +890,7 @@ type NoticeAction = {
 };
 
 export default function Home() {
-  const [view, setView] = useState<View>("acquire");
+  const [view, setViewState] = useState<View>("acquire");
   const [name, setName] = useState("");
   const [setNameValue, setSetNameValue] = useState("");
   const [number, setNumber] = useState("");
@@ -978,6 +1024,8 @@ export default function Home() {
   const [cardSuggestionsOpen, setCardSuggestionsOpen] = useState(false);
   const [cardSuggestionsLoading, setCardSuggestionsLoading] = useState(false);
   const [pendingLookup, setPendingLookup] = useState<PendingLookup | null>(null);
+  const [compProgressSources, setCompProgressSources] = useState<CompSourceProgressView[]>([]);
+  const [compProgressPhase, setCompProgressPhase] = useState<"catalog" | "provisional" | "quorum" | "receipt" | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanMode, setScanMode] = useState<ScanMode>("idle");
   const [scanCameraAvailable, setScanCameraAvailable] = useState(true);
@@ -986,6 +1034,8 @@ export default function Home() {
   const [scanPhotoPreview, setScanPhotoPreview] = useState<string | null>(null);
   const [scanPhotoPayload, setScanPhotoPayload] = useState<ScanPhotoPayload | null>(null);
   const [scanModel, setScanModel] = useState<string | null>(null);
+  const [scanEventId, setScanEventId] = useState<string | null>(null);
+  const [scanCorrectionKey, setScanCorrectionKey] = useState<string | null>(null);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("all");
@@ -997,6 +1047,23 @@ export default function Home() {
   const [recentSetIds, setRecentSetIds] = useState<string[]>([]);
   const [recentComps, setRecentComps] = useState<RecentCompEntry[]>([]);
   const [intakePreferencesLoaded, setIntakePreferencesLoaded] = useState(false);
+  const [offlineSync, setOfflineSync] = useState<OfflineSyncState>({
+    supported: true,
+    online: true,
+    syncing: false,
+    pendingCount: 0,
+    failedCount: 0,
+    lastError: null,
+  });
+  const [offlineMutations, setOfflineMutations] = useState<OfflineMutation[]>([]);
+  const [offlineBootstrapAgeHours, setOfflineBootstrapAgeHours] = useState<number | null>(null);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [manualReviews, setManualReviews] = useState<ManualCompReview[]>([]);
+  const [manualReviewBusyId, setManualReviewBusyId] = useState<string | null>(null);
+  const [priceHistoryByKey, setPriceHistoryByKey] = useState<Record<string, CardPriceHistory | null>>({});
+  const [priceHistoryPreviews, setPriceHistoryPreviews] = useState<Record<string, CardPriceHistoryPreview>>({});
+  const [priceHistoryItemId, setPriceHistoryItemId] = useState<string | null>(null);
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const pullTracking = useRef(false);
   const compPanelRef = useRef<HTMLElement | null>(null);
@@ -1021,9 +1088,130 @@ export default function Home() {
     setNoticeAction(message ? action : null);
   }
 
+  function setView(nextView: View) {
+    setViewState(nextView);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const nextParam = viewQueryValue(nextView);
+    if (url.searchParams.get("view") === nextParam) return;
+    url.searchParams.set("view", nextParam);
+    window.history.pushState({ view: nextParam }, "", url);
+  }
+
   useEffect(() => {
-    void refreshAll();
+    const syncViewFromLocation = () => setViewState(parseViewQuery(new URL(window.location.href).searchParams.get("view")));
+    syncViewFromLocation();
+    window.addEventListener("popstate", syncViewFromLocation);
+    return () => window.removeEventListener("popstate", syncViewFromLocation);
+  }, []);
+
+  useEffect(() => {
+    const handleCommandKey = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandPaletteOpen((current) => !current);
+      } else if (event.key === "Escape") {
+        setCommandPaletteOpen(false);
+      } else if (event.key.toLowerCase() === "q" && !isInteractiveTarget(event.target)) {
+        event.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleCommandKey);
+    return () => window.removeEventListener("keydown", handleCommandKey);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refreshOfflineState = async () => {
+      const [state, queue] = await Promise.all([getOfflineSyncState(), listOfflineMutations().catch(() => [])]);
+      if (!active) return;
+      setOfflineSync(state);
+      setOfflineMutations(queue);
+    };
+    const unsubscribe = subscribeOfflineState((state) => {
+      if (!active) return;
+      setOfflineSync(state);
+      void listOfflineMutations().then((queue) => active && setOfflineMutations(queue));
+    });
+    const flushAndRefresh = async () => {
+      const clientIntents = (await listOfflineMutations().catch(() => [])).filter((row) => row.requiresClient);
+      const result = await flushOfflineQueue();
+      await refreshOfflineState();
+      if (result.synced.length > 0) {
+        setNotice(`${result.synced.length} queued action${result.synced.length === 1 ? "" : "s"} synced.`);
+        await refreshAll();
+      }
+      const latestCompIntent = clientIntents.filter((row) => row.kind === "comp-intent").at(-1);
+      if (latestCompIntent?.body) {
+        await Promise.all(clientIntents.filter((row) => row.kind === "comp-intent").map((row) => removeOfflineMutation(row.id)));
+        void lookupComp(latestCompIntent.body as LookupInput, { preserveCost: true });
+      }
+      const scanIntents = clientIntents.filter((row) => row.kind === "scan-intent");
+      for (const scanIntent of scanIntents) {
+        if (!scanIntent.body) continue;
+        try {
+          const response = await fetch(scanIntent.endpoint, {
+            method: "POST",
+            headers: { ...scanIntent.headers, "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": scanIntent.id, "X-Poke-Deal-Session-Id": getScanSessionId() },
+            body: JSON.stringify(scanIntent.body),
+          });
+          const payload = await readJson(response);
+          if (!response.ok) throw new Error(payload.error ?? "queued scan failed");
+          await removeOfflineMutation(scanIntent.id);
+          const identity = payload.identity as ScanIdentity | undefined;
+          if (identity) {
+            setScanEventId(typeof payload.scanEventId === "string" ? payload.scanEventId : null);
+            setScanOpen(true);
+            await handleScanIdentity(identity, String(payload.model ?? ""));
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Queued scan still needs a connection.");
+        }
+      }
+    };
+    const handleOnline = () => void flushAndRefresh();
+    const handleWorkerMessage = (event: MessageEvent<{ type?: string; synced?: number }>) => {
+      if (event.data?.type !== "POKE_DEAL_SYNC_STATE") return;
+      void refreshOfflineState();
+      if ((event.data.synced ?? 0) > 0) void refreshAll();
+    };
+    void registerOfflineWorker().then(() => {
+      void refreshOfflineState();
+      if (navigator.onLine) void flushAndRefresh();
+    }).catch(refreshOfflineState);
+    window.addEventListener("online", handleOnline);
+    navigator.serviceWorker?.addEventListener("message", handleWorkerMessage);
+    return () => {
+      active = false;
+      unsubscribe();
+      window.removeEventListener("online", handleOnline);
+      navigator.serviceWorker?.removeEventListener("message", handleWorkerMessage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (navigator.onLine) {
+      void refreshAll();
+    } else {
+      void getOfflineBootstrap<OfflineBootstrapPayload>().then((cached) => {
+        if (!cached) return;
+        setInventory(cached.payload.inventory);
+        setPriceHistoryPreviews(cached.payload.priceHistoryPreviews ?? {});
+        setListings(cached.payload.listings);
+        setDashboard(cached.payload.dashboard);
+        setPortfolio(cached.payload.portfolio);
+        setWatches(cached.payload.watches);
+        setAppAlerts(cached.payload.alerts);
+        setAppAlertUnreadCount(cached.payload.alertUnreadCount);
+        setExpenses(cached.payload.expenses);
+        setSystemStatus(cached.payload.systemStatus);
+        setDealSession(cached.payload.dealSession);
+        setOfflineBootstrapAgeHours(cached.ageHours);
+      });
+    }
     void loadSetCatalog();
+    if (navigator.onLine) void loadManualReviews();
     void fetch("/api/ebay/status")
       .then((r) => r.json() as Promise<EbayStatus>)
       .then(setEbayStatus)
@@ -1282,6 +1470,13 @@ export default function Home() {
     () => buildInventoryView(filteredInventory, { query: inventoryQuery, sort: inventorySort }),
     [filteredInventory, inventoryQuery, inventorySort],
   );
+  const priceHistoryTarget = useMemo(
+    () => inventory.find((item) => item.id === priceHistoryItemId) ?? null,
+    [inventory, priceHistoryItemId],
+  );
+  const priceHistoryTargetKey = priceHistoryTarget ? inventoryHistoryKey(priceHistoryTarget) : null;
+  const openPriceHistory = priceHistoryTargetKey ? priceHistoryByKey[priceHistoryTargetKey] ?? null : null;
+
   const stockCompItem = useMemo(
     () => inventory.find((item) => item.id === stockCompItemId && item.status !== "SOLD") ?? null,
     [inventory, stockCompItemId],
@@ -1336,13 +1531,14 @@ export default function Home() {
       },
       grade: item.grade,
       listPricePence: savedListPrice,
+      ...listingEvidenceFromPreview(priceHistoryPreviews[inventoryHistoryKey(item)]),
       costBasisPence: item.costBasis,
       condition: item.condition,
       certNumber: item.graderCert,
       copySettings: listingCopySettings,
       usesCatalogOnlyImages: listingPackTarget.channel === "EBAY" && photoSummary.catalogOnly && photoSummary.satisfiesEbayPhotoRequirement,
     });
-  }, [listingCopySettings, listingPackTarget]);
+  }, [listingCopySettings, listingPackTarget, priceHistoryPreviews]);
   const recentIntake = useMemo(() => inventory.slice(0, 4), [inventory]);
   const recentIntakeCostPence = useMemo(
     () => recentIntake.reduce((sum, item) => sum + item.costBasis * item.quantity, 0),
@@ -1780,6 +1976,10 @@ export default function Home() {
         : null,
     [quickStockCostPence, quickStockQuantity],
   );
+  const dealSessionPaidPence = poundsToPence(dealSessionPaid);
+  const dealSessionBudgetRemainingPence = dealSession
+    ? dealSession.summary.totalMaxCashPence - dealSessionPaidPence
+    : 0;
   const quickStockReady = Boolean(headline && !isAmbiguousComp && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
   const quickStockCanSubmit = quickStockReady && !requiresCheckedCompBeforeStock;
   const mobileNeedsCheckedComp = needsManualComp || requiresCheckedCompBeforeStock;
@@ -2181,57 +2381,330 @@ export default function Home() {
     if (options.user) setUserRefreshing(true);
     setError(null);
     try {
-      const [inventoryRes, listingsRes, dashboardRes, portfolioRes, watchesRes, alertsRes, expensesRes, systemRes, dealSessionRes] = await Promise.all([
-        fetch("/api/inventory"),
-        fetch("/api/listings"),
-        fetch("/api/dashboard"),
-        fetch("/api/snapshots/portfolio"),
-        fetch("/api/watches"),
-        fetch("/api/alerts/inbox"),
-        fetch("/api/expenses"),
-        fetch("/api/system/status"),
-        fetch("/api/deal-sessions"),
+      // Apply each independent dataset as soon as it arrives. A slow health or
+      // portfolio request must not keep Stock, Today, or List blank behind the
+      // slowest member of the nine-request bootstrap.
+      let nextInventory: InventoryItem[] | undefined;
+      let nextPriceHistoryPreviews: Record<string, CardPriceHistoryPreview> | undefined;
+      let nextListings: Listing[] | undefined;
+      let nextDashboard: Dashboard | undefined;
+      let nextPortfolio: PortfolioHistory | undefined;
+      let nextWatches: WatchRecord[] | undefined;
+      let nextAlerts: AppAlertRecord[] | undefined;
+      let nextAlertUnreadCount: number | undefined;
+      let nextExpenses: ExpenseRecord[] | undefined;
+      let nextSystemStatus: SystemStatus | undefined;
+      let nextDealSession: DealSessionPayload | undefined;
+
+      async function load<T>(url: string, label: string, apply: (payload: T) => void) {
+        const response = await fetch(url);
+        const payload = await readJson(response) as T & { error?: string };
+        if (!response.ok) throw new Error(payload.error ?? `${label} failed`);
+        apply(payload);
+      }
+
+      const results = await Promise.allSettled([
+        load<{ items?: InventoryItem[]; priceHistoryPreviews?: Record<string, CardPriceHistoryPreview> }>("/api/inventory", "inventory", (payload) => {
+          nextInventory = payload.items ?? [];
+          nextPriceHistoryPreviews = payload.priceHistoryPreviews ?? {};
+          setInventory(nextInventory);
+          setPriceHistoryPreviews(nextPriceHistoryPreviews);
+        }),
+        load<{ listings?: Listing[] }>("/api/listings", "listings", (payload) => {
+          nextListings = payload.listings ?? [];
+          setListings(nextListings);
+        }),
+        load<Dashboard>("/api/dashboard", "dashboard", (payload) => {
+          nextDashboard = payload;
+          setDashboard(payload);
+        }),
+        load<PortfolioHistory>("/api/snapshots/portfolio", "snapshot history", (payload) => {
+          nextPortfolio = payload;
+          setPortfolio(payload);
+        }),
+        load<{ watches?: WatchRecord[] }>("/api/watches", "watches", (payload) => {
+          nextWatches = payload.watches ?? [];
+          setWatches(nextWatches);
+          setWatchEdits((current) => {
+            const next: Record<string, string> = {};
+            for (const watch of nextWatches ?? []) next[watch.id] = current[watch.id] ?? penceToPounds(watch.targetPence);
+            return next;
+          });
+        }),
+        load<{ alerts?: AppAlertRecord[]; unreadCount?: number }>("/api/alerts/inbox", "alerts", (payload) => {
+          nextAlerts = payload.alerts ?? [];
+          nextAlertUnreadCount = Number(payload.unreadCount ?? 0);
+          setAppAlerts(nextAlerts);
+          setAppAlertUnreadCount(nextAlertUnreadCount);
+        }),
+        load<{ expenses?: ExpenseRecord[] }>("/api/expenses", "expenses", (payload) => {
+          nextExpenses = payload.expenses ?? [];
+          setExpenses(nextExpenses);
+        }),
+        load<SystemStatus>("/api/system/status", "system status", (payload) => {
+          nextSystemStatus = payload;
+          setSystemStatus(payload);
+        }),
+        load<DealSessionPayload>("/api/deal-sessions", "deal session", (payload) => {
+          nextDealSession = payload;
+          setDealSession(payload);
+        }),
       ]);
-      const inventoryJson = await readJson(inventoryRes);
-      const listingsJson = await readJson(listingsRes);
-      const dashboardJson = await readJson(dashboardRes);
-      const portfolioJson = await readJson(portfolioRes);
-      const watchesJson = await readJson(watchesRes);
-      const alertsJson = await readJson(alertsRes);
-      const expensesJson = await readJson(expensesRes);
-      const systemJson = await readJson(systemRes);
-      const dealSessionJson = await readJson(dealSessionRes);
-      if (!inventoryRes.ok) throw new Error(inventoryJson.error ?? "inventory failed");
-      if (!listingsRes.ok) throw new Error(listingsJson.error ?? "listings failed");
-      if (!dashboardRes.ok) throw new Error(dashboardJson.error ?? "dashboard failed");
-      if (!portfolioRes.ok) throw new Error(portfolioJson.error ?? "snapshot history failed");
-      if (!watchesRes.ok) throw new Error(watchesJson.error ?? "watches failed");
-      if (!alertsRes.ok) throw new Error(alertsJson.error ?? "alerts failed");
-      if (!expensesRes.ok) throw new Error(expensesJson.error ?? "expenses failed");
-      if (!systemRes.ok) throw new Error(systemJson.error ?? "system status failed");
-      if (!dealSessionRes.ok) throw new Error(dealSessionJson.error ?? "deal session failed");
-      setInventory(inventoryJson.items);
-      setListings(listingsJson.listings);
-      setDashboard(dashboardJson);
-      setPortfolio(portfolioJson);
-      setAppAlerts((alertsJson.alerts ?? []) as AppAlertRecord[]);
-      setAppAlertUnreadCount(Number(alertsJson.unreadCount ?? 0));
-      setExpenses(expensesJson.expenses ?? []);
-      setSystemStatus(systemJson);
-      setDealSession(dealSessionJson);
-      const nextWatches = (watchesJson.watches ?? []) as WatchRecord[];
-      setWatches(nextWatches);
-      setWatchEdits((current) => {
-        const next: Record<string, string> = {};
-        for (const watch of nextWatches) next[watch.id] = current[watch.id] ?? penceToPounds(watch.targetPence);
-        return next;
-      });
+
+      const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (
+        nextInventory &&
+        nextPriceHistoryPreviews &&
+        nextListings &&
+        nextDashboard &&
+        nextPortfolio &&
+        nextWatches &&
+        nextAlerts &&
+        nextAlertUnreadCount !== undefined &&
+        nextExpenses &&
+        nextSystemStatus &&
+        nextDealSession
+      ) {
+        setOfflineBootstrapAgeHours(null);
+        void putOfflineBootstrap<OfflineBootstrapPayload>({
+          inventory: nextInventory,
+          priceHistoryPreviews: nextPriceHistoryPreviews,
+          listings: nextListings,
+          dashboard: nextDashboard,
+          portfolio: nextPortfolio,
+          watches: nextWatches,
+          alerts: nextAlerts,
+          alertUnreadCount: nextAlertUnreadCount,
+          expenses: nextExpenses,
+          systemStatus: nextSystemStatus,
+          dealSession: nextDealSession,
+        }).catch(() => undefined);
+      }
+      if (failures.length > 0) {
+        throw failures[0]!.reason instanceof Error ? failures[0]!.reason : new Error("Some workspace data could not be refreshed");
+      }
       if (options.toast) setNotice("Refreshed.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "refresh failed");
     } finally {
       setRefreshing(false);
       if (options.user) setUserRefreshing(false);
+    }
+  }
+
+  async function loadManualReviews() {
+    if (!navigator.onLine) return;
+    try {
+      const response = await fetch("/api/comps/reviews?status=open&limit=50");
+      const payload = await readJson(response);
+      if (!response.ok) throw new Error(payload.error ?? "manual reviews failed");
+      setManualReviews((payload.reviews ?? []) as ManualCompReview[]);
+    } catch {
+      // Review work is additive; a failed refresh must not block the buy loop.
+    }
+  }
+
+  async function loadPriceHistory(item: InventoryItem, openSheet = true) {
+    if (openSheet) setPriceHistoryItemId(item.id);
+    const cardId = item.card.id;
+    if (!cardId) {
+      if (openSheet) setError("This older stock row has no card history id yet. Run a fresh comp first.");
+      return;
+    }
+    const key = inventoryHistoryKey(item);
+    if (Object.prototype.hasOwnProperty.call(priceHistoryByKey, key)) return;
+    if (!navigator.onLine) {
+      if (openSheet) setError("Price history has not been cached for this card. Reconnect to load it.");
+      return;
+    }
+    if (openSheet) setPriceHistoryLoading(true);
+    try {
+      const params = new URLSearchParams({ grade: item.grade, days: "365" });
+      const response = await fetch(`/api/cards/${encodeURIComponent(cardId)}/price-history?${params}`);
+      const payload = await readJson(response);
+      if (!response.ok) throw new Error(payload.error ?? "price history failed");
+      setPriceHistoryByKey((current) => ({ ...current, [key]: payload as CardPriceHistory }));
+    } catch (err) {
+      setPriceHistoryByKey((current) => ({ ...current, [key]: null }));
+      if (openSheet) setError(err instanceof Error ? err.message : "price history failed");
+    } finally {
+      if (openSheet) setPriceHistoryLoading(false);
+    }
+  }
+
+  async function bulkDraftInventory(items: InventoryItem[]) {
+    const targets = items.filter((item) => item.status !== "SOLD" && !item.listings.some((listing) => listing.state === "DRAFT" || listing.state === "ACTIVE"));
+    if (targets.length === 0) {
+      setNotice("Every selected row already has an open listing.");
+      return;
+    }
+    setBusy("bulk-draft");
+    setError(null);
+    let created = 0;
+    try {
+      for (const item of targets) {
+        const defaults = buildListingDraftDefaults({ card: item.card, grade: item.grade, costBasis: item.costBasis });
+        const response = await fetch("/api/listings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: item.id, channel: "EBAY", state: "DRAFT", listPricePence: defaults.listPricePence }),
+        });
+        const payload = await readJson(response);
+        if (!response.ok) throw new Error(payload.error ?? `Could not draft ${item.card.name}`);
+        created += 1;
+      }
+      await refreshAll();
+      setListingStateFilter("DRAFT");
+      setView("listings");
+      setNotice(`${created} listing draft${created === 1 ? "" : "s"} ready. Choose a channel and download the pack.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "bulk listing draft failed");
+      if (created > 0) await refreshAll();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function bulkMoveInventory(items: InventoryItem[], nextLocation: string) {
+    const locationValue = nextLocation.trim();
+    if (!locationValue) return;
+    setBusy("bulk-move");
+    setError(null);
+    try {
+      for (const item of items) {
+        const response = await fetch(`/api/inventory/${item.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ location: locationValue }),
+        });
+        const payload = await readJson(response);
+        if (!response.ok) throw new Error(payload.error ?? `Could not move ${item.card.name}`);
+      }
+      await refreshAll();
+      setNotice(`${items.length} stock row${items.length === 1 ? "" : "s"} moved to ${locationValue}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "bulk move failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function exportInventorySelection(items: InventoryItem[]) {
+    const rows = [
+      ["name", "set", "number", "grade", "quantity", "cost_pence", "status", "location"],
+      ...items.map((item) => [item.card.name, item.card.setName, item.card.number ?? "", item.grade, String(item.quantity), String(item.costBasis), item.status, item.location ?? ""]),
+    ];
+    const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+    downloadTextFile(`poke-deal-stock-${todayInputValue()}.csv`, csv, "text/csv;charset=utf-8");
+    setNotice(`${items.length} stock row${items.length === 1 ? "" : "s"} exported.`);
+  }
+
+  async function buildBulkListingPack(selected: Listing[], targetChannel: Channel, mode: "download" | "copy") {
+    const inputs = selected.flatMap((listing) => {
+      if (!listing.item) return [];
+      return [buildListingPackInputFromItem(listing.item, {
+        channel: targetChannel,
+        listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
+        copySettings: listingCopySettings,
+        historyPreview: priceHistoryPreviews[inventoryHistoryKey(listing.item)],
+      })];
+    });
+    if (inputs.length === 0) {
+      setError("Select listings with stock items before building a pack.");
+      return;
+    }
+    if (mode === "download") {
+      downloadTextFile(`poke-deal-${targetChannel.toLowerCase()}-pack-${todayInputValue()}.csv`, buildListingPackCsv(inputs), "text/csv;charset=utf-8");
+      setNotice(`${inputs.length} ${channelLabel(targetChannel)} listing${inputs.length === 1 ? "" : "s"} downloaded.`);
+      return;
+    }
+    try {
+      const copy = inputs.map((input) => buildListingPack(input).copyReady).join("\n\n---\n\n");
+      await navigator.clipboard.writeText(copy);
+      setNotice(`${inputs.length} ${channelLabel(targetChannel)} listing${inputs.length === 1 ? "" : "s"} copied.`);
+    } catch {
+      setError("Clipboard write failed. Download the pack instead.");
+    }
+  }
+
+  async function resolveManualReview(
+    review: ManualCompReview,
+    resolution: ManualReviewResolution,
+    note?: string,
+  ) {
+    const body = { id: review.id, resolution, ...(note?.trim() ? { note: note.trim() } : {}) };
+    const mutationId = crypto.randomUUID();
+    setManualReviewBusyId(review.id);
+    setError(null);
+    try {
+      if (!navigator.onLine) {
+        await enqueueOfflineMutation({
+          id: mutationId,
+          kind: "review-resolution",
+          endpoint: "/api/comps/reviews",
+          method: "PATCH",
+          body,
+          summary: {
+            label: `Resolve ${review.card.name}`,
+            detail: `${resolution.replace(/_/g, " ").toLowerCase()} · waiting for server`,
+            cardName: review.card.name,
+            grade: review.grade,
+          },
+        });
+        setManualReviews((current) => current.filter((row) => row.id !== review.id));
+        setNotice("Review resolution queued — the server record is unchanged until sync.");
+        return;
+      }
+      const response = await fetch("/api/comps/reviews", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId },
+        body: JSON.stringify(body),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) throw new Error(payload.error ?? "review resolution failed");
+      setManualReviews((current) => current.filter((row) => row.id !== review.id));
+      setNotice(`${review.card.name} review resolved.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "review resolution failed");
+    } finally {
+      setManualReviewBusyId(null);
+    }
+  }
+
+  async function addReviewCheckedComp(
+    review: ManualCompReview,
+    input: { pricePence: number; soldDate: string; note?: string },
+  ) {
+    if (!navigator.onLine) {
+      setError("Checked comp evidence needs a connection. The review is still open and nothing was recorded.");
+      return;
+    }
+    setManualReviewBusyId(review.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/checked-comps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card: {
+            id: review.card.id,
+            name: review.card.name,
+            setName: review.card.setName,
+            ...(review.card.number ? { number: review.card.number } : {}),
+          },
+          grade: review.grade,
+          pricePence: input.pricePence,
+          soldDate: input.soldDate,
+          platform: "ebay-uk",
+          ...(input.note ? { note: input.note } : {}),
+        }),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) throw new Error(payload.error ?? "checked comp save failed");
+      await resolveManualReview(review, "CHECKED_COMP_ADDED", input.note ?? `Checked UK sold ${gbp(input.pricePence)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "checked comp save failed");
+      setManualReviewBusyId(null);
     }
   }
 
@@ -2618,6 +3091,8 @@ export default function Home() {
     setScanIdentity(null);
     setScanMapping(null);
     setScanModel(null);
+    setScanEventId(null);
+    setScanCorrectionKey(null);
     setScanMessage(null);
     setScanPhotoPayload(null);
     if (!options.keepPreview) setScanPhotoPreview(null);
@@ -2688,15 +3163,35 @@ export default function Home() {
     setError(null);
     setScanMessage("Reading card...");
     try {
-      const processed = await compressPhotoForScan(blob);
+      const prepared = await preparePhotoForScan(blob);
+      const processed = prepared.photo;
       const dataUrl = await blobToDataUrl(processed.blob);
       setScanPhotoPreview(dataUrl);
       setScanPhotoPayload({ blob: processed.blob, width: processed.width, height: processed.height });
-      const imageBase64 = dataUrl.split(",")[1] ?? "";
+      const transmissionDataUrl = await blobToDataUrl(prepared.transmission.blob);
+      const imageBase64 = transmissionDataUrl.split(",")[1] ?? "";
+      const scanBody = { imageBase64, mimeType: "image/jpeg" };
+      const mutationId = crypto.randomUUID();
+      if (!navigator.onLine) {
+        await queueScanIntent(scanBody, mutationId, prepared.transmission.width, prepared.transmission.height);
+        updateScanMode("manual");
+        setScanMessage("Scan saved on this device. It will be read when signal returns; Quick Fill still works now.");
+        return;
+      }
+      let responseReceived = false;
       const res = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64, mimeType: "image/jpeg" }),
+        headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId, "X-Poke-Deal-Session-Id": getScanSessionId() },
+        body: JSON.stringify(scanBody),
+      }).then((response) => {
+        responseReceived = true;
+        return response;
+      }).catch(async (error) => {
+        if (!responseReceived) {
+          await queueScanIntent(scanBody, mutationId, prepared.transmission.width, prepared.transmission.height);
+          throw new Error("Scan queued on this device; it will retry when signal returns.");
+        }
+        throw error;
       });
       const payload = await readJson(res);
       if (!res.ok) {
@@ -2709,14 +3204,37 @@ export default function Home() {
       }
       const identity = payload.identity as ScanIdentity | undefined;
       if (!identity) throw new Error("Scan returned no card identity.");
+      setScanEventId(typeof payload.scanEventId === "string" ? payload.scanEventId : null);
       await handleScanIdentity(identity, String(payload.model ?? ""));
     } catch (err) {
       updateScanMode("manual");
-      setScanMessage("Couldn't read it — retake or type.");
-      setError(err instanceof Error ? err.message : "scan failed");
+      const message = err instanceof Error ? err.message : "scan failed";
+      setScanMessage(message.startsWith("Scan queued") ? message : "Couldn't read it — retake or type.");
+      setError(message.startsWith("Scan queued") ? null : message);
     } finally {
       setBusy(null);
     }
+  }
+
+  async function queueScanIntent(
+    body: { imageBase64: string; mimeType: string },
+    mutationId: string,
+    width: number,
+    height: number,
+  ) {
+    await enqueueOfflineMutation({
+      id: mutationId,
+      kind: "scan-intent",
+      endpoint: "/api/scan",
+      body,
+      headers: { "X-Poke-Deal-Session-Id": getScanSessionId() },
+      requiresClient: true,
+      summary: {
+        label: "Read queued card photo",
+        detail: `${width}×${height} JPEG · waiting for signal`,
+        photo: { width, height, mimeType: body.mimeType },
+      },
+    });
   }
 
   async function handleScanIdentity(identity: ScanIdentity, model: string) {
@@ -2828,7 +3346,63 @@ export default function Home() {
     setGrade(nextGrade);
     setCardArtUrl(catalogDisplayImage(card));
     setError(null);
+    if (scanEventId) void submitScanCorrection(lookup, "Dealer selected the exact catalog printing after scan.");
     void lookupComp(lookup);
+  }
+
+  async function submitScanCorrection(correction: LookupInput, note: string) {
+    if (!scanEventId) return;
+    const correctionKey = lookupIdentityKey(correction);
+    if (correctionKey === scanCorrectionKey) return;
+    setScanCorrectionKey(correctionKey);
+    const body = {
+      scanEventId,
+      correction: {
+        name: correction.name,
+        setName: correction.setName,
+        number: correction.number,
+        language: "EN",
+        grade: correction.grade,
+        condition: condition.trim() || "NM",
+      },
+      note,
+    };
+    const mutationId = crypto.randomUUID();
+    if (!navigator.onLine) {
+      await enqueueOfflineMutation({
+        id: mutationId,
+        kind: "scan-correction",
+        endpoint: "/api/scan/corrections",
+        body,
+        summary: { label: `Correct scan to ${correction.name}`, detail: "Waiting for server", cardName: correction.name, grade: correction.grade },
+      });
+      return;
+    }
+    let responseReceived = false;
+    try {
+      const response = await fetch("/api/scan/corrections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId },
+        body: JSON.stringify(body),
+      });
+      responseReceived = true;
+      if (!response.ok) {
+        const payload = await readJson(response);
+        throw new Error(payload.error ?? "scan correction failed");
+      }
+    } catch (err) {
+      if (!responseReceived) {
+        await enqueueOfflineMutation({
+          id: mutationId,
+          kind: "scan-correction",
+          endpoint: "/api/scan/corrections",
+          body,
+          summary: { label: `Correct scan to ${correction.name}`, detail: "Waiting for server", cardName: correction.name, grade: correction.grade },
+        });
+      } else {
+        console.warn("[scan correction]", err);
+      }
+    }
   }
 
   async function attachScannedPhotoToInventory(itemId: string, role: "FRONT" | "SLAB" = grade === "RAW" ? "FRONT" : "SLAB") {
@@ -2887,6 +3461,8 @@ export default function Home() {
   function clearCompEvidence() {
     setComp(null);
     setPendingLookup(null);
+    setCompProgressSources([]);
+    setCompProgressPhase(null);
     setStockCompItemId(null);
     setBuyResultSection(null);
     setSuggestion(null);
@@ -3171,6 +3747,11 @@ export default function Home() {
     setNotice(null);
     setSuggestion(null);
     clearCheckedComp();
+    setCompProgressSources([]);
+    setCompProgressPhase("catalog");
+    let catalogProgress: Extract<CompProgressEvent, { type: "catalog" }> | null = null;
+    let terminalReceipt: Reconciled | null = null;
+    let hapticSent = false;
     try {
       const qs = new URLSearchParams({ name: normalizedInput.name, grade: normalizedInput.grade });
       if (normalizedInput.setName) qs.set("set", normalizedInput.setName);
@@ -3178,9 +3759,54 @@ export default function Home() {
       if (normalizedInput.tcgApiId) qs.set("tcgApiId", normalizedInput.tcgApiId);
       if (normalizedInput.tcgDexId) qs.set("tcgDexId", normalizedInput.tcgDexId);
       if (normalizedInput.psaCert) qs.set("psaCert", normalizedInput.psaCert);
-      const res = await fetch(`/api/comps?${qs}`);
-      const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "lookup failed");
+      const res = await fetch(`/api/comps/stream?${qs}`, { headers: { Accept: "application/x-ndjson" } });
+      if (!res.ok) {
+        const payload = await readJson(res);
+        throw new Error(payload.error ?? "lookup failed");
+      }
+      await readCompProgress(res, (event) => {
+        if (event.type === "catalog") {
+          catalogProgress = event;
+          setCompProgressPhase("catalog");
+          if (event.catalog) setCardArtUrl(catalogDisplayImage(event.catalog));
+          return;
+        }
+        if (event.type === "source") {
+          setCompProgressSources((current) => [
+            ...current.filter((row) => row.source.name !== event.source.name),
+            {
+              source: event.source,
+              status: event.status,
+              latencyMs: event.latencyMs,
+              completed: event.completed,
+              total: event.total,
+            },
+          ]);
+          return;
+        }
+        if (event.type === "verdict") {
+          setCompProgressPhase(event.phase);
+          const provisional = {
+            ...event.receipt,
+            catalog: catalogProgress?.catalog ?? null,
+            alternatives: [],
+            ambiguous: event.ambiguity === true,
+            cardImage: null,
+            askEvidence: null,
+          } as Reconciled;
+          setComp(provisional);
+          if (!hapticSent && event.receipt.headline) {
+            hapticSent = true;
+            navigator.vibrate?.(24);
+          }
+          return;
+        }
+        if (event.type === "error") throw new Error(event.error);
+        terminalReceipt = event.receipt as Reconciled;
+        setCompProgressPhase("receipt");
+      });
+      const payload = terminalReceipt as Reconciled | null;
+      if (!payload) throw new Error("Comp stream ended before its receipt.");
       setComp(payload);
       if (payload.psaCert) setPsaResult(payload.psaCert);
       setCardArtUrl(payloadDisplayImage(payload));
@@ -3190,12 +3816,56 @@ export default function Home() {
       setGradeComp(null);
       setBuyResultSection(null);
       setScrollToComp(true);
+      void putOfflineComp(normalizedInput, payload, payload.headline?.asOf ?? new Date().toISOString());
+      if (payload.reconciliation?.manualCheck) void loadManualReviews();
     } catch (err) {
       setPendingLookup(null);
-      setError(err instanceof Error ? err.message : "lookup failed");
+      const cached = await getOfflineComp<Reconciled>(normalizedInput).catch(() => null);
+      if (cached) {
+        const cachedPayload: Reconciled = {
+          ...cached.payload,
+          cached: { asOf: cached.cachedAt, ageHours: cached.ageHours },
+        };
+        setComp(cachedPayload);
+        setCardArtUrl(payloadDisplayImage(cachedPayload));
+        setCompProgressPhase("receipt");
+        setNotice(`Offline receipt · ${cached.ageHours}h old · ${cachedPayload.headline?.sampleSize ?? 0} sold. Recheck before a big buy.`);
+        setError(null);
+      } else {
+        if (!navigator.onLine) {
+          await queueCompIntent(normalizedInput).catch(() => undefined);
+          setError("No cached receipt for this card. Comp check queued for reconnect.");
+        } else {
+          setError(err instanceof Error ? err.message : "lookup failed");
+        }
+      }
     } finally {
       setBusy(null);
     }
+  }
+
+  async function queueCompIntent(input: LookupInput) {
+    const duplicate = offlineMutations.find(
+      (mutation) => mutation.kind === "comp-intent" && lookupIdentityKey(mutation.body as LookupInput) === lookupIdentityKey(input),
+    );
+    if (duplicate) return duplicate;
+    // The comp queue is deliberately latest-intent-wins: only the card still in
+    // the dealer's hand should auto-open on reconnect. This collapse happens at
+    // enqueue time so the header count never promises work that will be dropped.
+    await Promise.all(offlineMutations.filter((mutation) => mutation.kind === "comp-intent").map((mutation) => removeOfflineMutation(mutation.id)));
+    return enqueueOfflineMutation({
+      kind: "comp-intent",
+      endpoint: "/api/comps/stream",
+      method: "GET",
+      body: input,
+      requiresClient: true,
+      summary: {
+        label: `Recheck ${input.name}`,
+        detail: [input.setName, input.number, input.grade.replace(/_/g, " ")].filter(Boolean).join(" · "),
+        cardName: input.name,
+        grade: input.grade,
+      },
+    });
   }
 
   // Tap a grade in the price ladder -> re-comp the same locked card at that grade.
@@ -3548,47 +4218,58 @@ export default function Home() {
       return;
     }
 
+    const acquireBody = {
+      card: {
+        name,
+        setName: setNameValue,
+        number,
+        ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
+      },
+      grade,
+      costBasisPence: poundsToPence(cost),
+      quantity: intakeQuantity,
+      acquiredFrom: source || undefined,
+      location: location || undefined,
+      condition: condition.trim() || undefined,
+      graderCert: graderCert.trim() || undefined,
+      strategy,
+      channel,
+      listPricePence: overrideListPricePence ?? undefined,
+      listingState: acquireListingState,
+      createListing: shouldCreateListing,
+      checkedComp: checkedComp
+        ? {
+            pricePence: checkedComp.medianPence,
+            sampleSize: checkedComp.sampleSize,
+            windowDays: checkedComp.windowDays,
+            source: checkedCompSource,
+            note: checkedCompNote.trim() || undefined,
+          }
+        : undefined,
+    };
+    const mutationId = crypto.randomUUID();
+
     setBusy("acquire");
     setError(null);
     setNotice(null);
+    if (!navigator.onLine) {
+      try {
+        await queueAcquireMutation(acquireBody, mutationId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not save this purchase offline.");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+    let responseReceived = false;
     try {
       const res = await fetch("/api/inventory/acquire", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          card: {
-            name,
-            setName: setNameValue,
-            number,
-            // Lock to the confirmed catalog printing — the route resolves by
-            // tcgApiId first, so a numberless query (e.g. Umbreon VMAX vs the
-            // Moonbreon alt-art) can't drift to a same-name sibling at the
-            // moment we commit it to stock/watch.
-            ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
-          },
-          grade,
-          costBasisPence: poundsToPence(cost),
-          quantity: intakeQuantity,
-          acquiredFrom: source || undefined,
-          location: location || undefined,
-          condition: condition.trim() || undefined,
-          graderCert: graderCert.trim() || undefined,
-          strategy,
-          channel,
-          listPricePence: overrideListPricePence ?? undefined,
-          listingState: acquireListingState,
-          createListing: shouldCreateListing,
-          checkedComp: checkedComp
-            ? {
-                pricePence: checkedComp.medianPence,
-                sampleSize: checkedComp.sampleSize,
-                windowDays: checkedComp.windowDays,
-                source: checkedCompSource,
-                note: checkedCompNote.trim() || undefined,
-              }
-            : undefined,
-        }),
+        headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId },
+        body: JSON.stringify(acquireBody),
       });
+      responseReceived = true;
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "acquire failed");
       const wasScanned = Boolean(scanIdentity || scanPhotoPreview);
@@ -3646,10 +4327,67 @@ export default function Home() {
         else closeScanCamera();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "acquire failed");
+      if (!responseReceived) {
+        try {
+          await queueAcquireMutation(acquireBody, mutationId);
+        } catch (queueError) {
+          setError(queueError instanceof Error ? queueError.message : "Purchase failed and could not be saved offline.");
+        }
+      } else {
+        setError(err instanceof Error ? err.message : "acquire failed");
+      }
     } finally {
       setBusy(null);
     }
+  }
+
+  async function queueAcquireMutation(body: Record<string, unknown>, mutationId: string) {
+    const itemName = catalogCard?.name ?? name;
+    const itemSetName = catalogCard?.setName ?? setNameValue;
+    const itemNumber = catalogCard?.number ?? number;
+    const itemQuantity = parseIntakeQuantity(quantity) ?? 1;
+    const costPence = poundsToPence(cost);
+    const mutation = await enqueueOfflineMutation({
+      id: mutationId,
+      kind: "acquire",
+      endpoint: "/api/inventory/acquire",
+      body,
+      summary: {
+        label: `Buy ${itemName}`,
+        detail: `${itemQuantity} @ ${gbp(costPence)} · waiting for server`,
+        cardName: itemName,
+        grade,
+        quantity: itemQuantity,
+        amountPence: costPence,
+        ...(scanPhotoPayload
+          ? { photo: { width: scanPhotoPayload.width, height: scanPhotoPayload.height, mimeType: "image/jpeg" } }
+          : {}),
+      },
+    });
+    setLastStocked({
+      itemId: mutation.id,
+      listingId: null,
+      name: itemName,
+      setName: itemSetName,
+      number: itemNumber,
+      grade,
+      quantity: itemQuantity,
+      costPence,
+      listPricePence: quickStockListPence,
+      channel,
+      listingState: acquireListingState,
+      imageUrl: selectedCardImage,
+      queued: true,
+    });
+    setNotice("Purchase queued on this device — not yet in server Stock or Profit.", {
+      label: "Undo",
+      onClick: () => void removeOfflineMutation(mutation.id).then(() => {
+        setLastStocked((current) => (current?.itemId === mutation.id ? null : current));
+        setNotice("Queued purchase removed.");
+      }),
+    });
+    applyPostStockFlow();
+    if (scanIdentity || scanPhotoPreview) finishScannedCardDecision("Purchase queued. Photo metadata kept; sync before closing the session.");
   }
 
   async function stockWithoutComp() {
@@ -3678,32 +4416,63 @@ export default function Home() {
       grade,
       costBasis: costBasisPence,
     });
+    const mutationId = crypto.randomUUID();
+    const inventoryBody = {
+      card: {
+        name,
+        setName: setNameValue,
+        number,
+        // Lock to the confirmed catalog printing — the route resolves by
+        // tcgApiId first, so a numberless query cannot drift on replay.
+        ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
+      },
+      grade,
+      quantity: intakeQuantity,
+      costBasisPence,
+      acquiredFrom: source || undefined,
+      location: location || undefined,
+      condition: condition.trim() || undefined,
+      graderCert: graderCert.trim() || undefined,
+      status: "IN_STOCK" as const,
+    };
+    const quickFillReplayBody = {
+      card: inventoryBody.card,
+      grade,
+      quantity: intakeQuantity,
+      costBasisPence,
+      acquiredFrom: source || undefined,
+      location: location || undefined,
+      condition: condition.trim() || undefined,
+      graderCert: graderCert.trim() || undefined,
+      strategy,
+      channel,
+      listPricePence: shouldCreateListing ? overrideListPricePence ?? draftDefaults.listPricePence : undefined,
+      listingState: acquireListingState,
+      createListing: shouldCreateListing,
+    };
 
+    if (!navigator.onLine) {
+      try {
+        await queueQuickFillMutation(quickFillReplayBody, mutationId, draftDefaults.listPricePence, {
+          endpoint: "/api/inventory/acquire",
+          listingQueued: shouldCreateListing,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not save this Quick Fill offline.");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+
+    let responseReceived = false;
     try {
       const res = await fetch("/api/inventory", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          card: {
-            name,
-            setName: setNameValue,
-            number,
-            // Lock to the confirmed catalog printing — the route resolves by
-            // tcgApiId first, so a numberless query (e.g. Umbreon VMAX vs the
-            // Moonbreon alt-art) can't drift to a same-name sibling at the
-            // moment we commit it to stock/watch.
-            ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
-          },
-          grade,
-          quantity: intakeQuantity,
-          costBasisPence,
-          acquiredFrom: source || undefined,
-          location: location || undefined,
-          condition: condition.trim() || undefined,
-          graderCert: graderCert.trim() || undefined,
-          status: "IN_STOCK",
-        }),
+        headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId },
+        body: JSON.stringify(inventoryBody),
       });
+      responseReceived = true;
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "manual stock failed");
 
@@ -3768,10 +4537,74 @@ export default function Home() {
         else closeScanCamera();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "manual stock failed");
+      if (!responseReceived) {
+        try {
+          await queueQuickFillMutation(inventoryBody, mutationId, draftDefaults.listPricePence, {
+            endpoint: "/api/inventory",
+            listingQueued: false,
+          });
+        } catch (queueError) {
+          setError(queueError instanceof Error ? queueError.message : "Quick Fill failed and could not be saved offline.");
+        }
+      } else {
+        setError(err instanceof Error ? err.message : "manual stock failed");
+      }
     } finally {
       setBusy(null);
     }
+  }
+
+  async function queueQuickFillMutation(
+    body: Record<string, unknown>,
+    mutationId: string,
+    fallbackListPence: number,
+    options: { endpoint: "/api/inventory" | "/api/inventory/acquire"; listingQueued: boolean },
+  ) {
+    const itemName = catalogCard?.name ?? name;
+    const itemSetName = catalogCard?.setName ?? setNameValue;
+    const itemNumber = catalogCard?.number ?? number;
+    const itemQuantity = parseIntakeQuantity(quantity) ?? 1;
+    const costPence = poundsToPence(cost);
+    const mutation = await enqueueOfflineMutation({
+      id: mutationId,
+      kind: "quick-fill",
+      endpoint: options.endpoint,
+      body,
+      summary: {
+        label: `Quick Fill ${itemName}`,
+        detail: `${itemQuantity} @ ${gbp(costPence)} · waiting for server`,
+        cardName: itemName,
+        grade,
+        quantity: itemQuantity,
+        amountPence: costPence,
+      },
+    });
+    setLastStocked({
+      itemId: mutation.id,
+      listingId: null,
+      name: itemName,
+      setName: itemSetName,
+      number: itemNumber,
+      grade,
+      quantity: itemQuantity,
+      costPence,
+      listPricePence: fallbackListPence,
+      channel,
+      listingState: options.listingQueued ? acquireListingState : "DRAFT",
+      imageUrl: selectedCardImage,
+      queued: true,
+    });
+    setNotice(options.listingQueued
+      ? "Quick Fill queued on this device — stock and its listing will sync once online."
+      : "Quick Fill queued on this device — stock will sync once online; create its listing from Stock afterwards.", {
+      label: "Undo",
+      onClick: () => void removeOfflineMutation(mutation.id).then(() => {
+        setLastStocked((current) => (current?.itemId === mutation.id ? null : current));
+        setNotice("Queued Quick Fill removed.");
+      }),
+    });
+    applyPostStockFlow();
+    if (scanIdentity || scanPhotoPreview) finishScannedCardDecision("Quick Fill queued. Sync before closing the session.");
   }
 
   function showStockedNotice(message: string, itemId: string | undefined, itemName: string) {
@@ -4721,20 +5554,34 @@ export default function Home() {
     setError(null);
     setNotice(null);
     const nextSaleListing = continueSelling ? nextSaleAfterCurrentTarget : null;
+    const saleBody = {
+      channel: saleChannel,
+      salePricePence: poundsToPence(salePrice),
+      feesPence: poundsToPence(fees),
+      postagePence: poundsToPence(postage),
+      quantity: soldQuantity,
+      soldAt: soldAtIso(soldAt),
+      listingId: sellingListingId ?? undefined,
+    };
+    const mutationId = crypto.randomUUID();
+    if (!navigator.onLine) {
+      try {
+        await queueMarkSoldMutation(item, saleBody, mutationId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not save this sale offline.");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+    let responseReceived = false;
     try {
       const res = await fetch(`/api/inventory/${sellingId}/sell`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          channel: saleChannel,
-          salePricePence: poundsToPence(salePrice),
-          feesPence: poundsToPence(fees),
-          postagePence: poundsToPence(postage),
-          quantity: soldQuantity,
-          soldAt: soldAtIso(soldAt),
-          listingId: sellingListingId ?? undefined,
-        }),
+        headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId },
+        body: JSON.stringify(saleBody),
       });
+      responseReceived = true;
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "mark sold failed");
       const saleNotice = `${soldQuantity > 1 ? `${soldQuantity} copies sold` : "Sold"}. Profit ${gbp(payload.profitPence)}.`;
@@ -4752,10 +5599,42 @@ export default function Home() {
         setView("pnl");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "mark sold failed");
+      if (!responseReceived) {
+        try {
+          await queueMarkSoldMutation(item, saleBody, mutationId);
+        } catch (queueError) {
+          setError(queueError instanceof Error ? queueError.message : "Sale failed and could not be saved offline.");
+        }
+      } else {
+        setError(err instanceof Error ? err.message : "mark sold failed");
+      }
     } finally {
       setBusy(null);
     }
+  }
+
+  async function queueMarkSoldMutation(item: InventoryItem, body: Record<string, unknown>, mutationId: string) {
+    const soldQuantity = Number(body.quantity ?? 1);
+    const mutation = await enqueueOfflineMutation({
+      id: mutationId,
+      kind: "mark-sold",
+      endpoint: `/api/inventory/${item.id}/sell`,
+      body,
+      summary: {
+        label: `Sale ${item.card.name}`,
+        detail: `${soldQuantity} @ ${gbp(Number(body.salePricePence ?? 0))} · waiting for server`,
+        cardName: item.card.name,
+        grade: item.grade,
+        quantity: soldQuantity,
+        amountPence: Number(body.salePricePence ?? 0),
+      },
+    });
+    setSellingId(null);
+    setSellingListingId(null);
+    setNotice("Sale queued on this device — stock and profit are unchanged until sync.", {
+      label: "Undo",
+      onClick: () => void removeOfflineMutation(mutation.id).then(() => setNotice("Queued sale removed.")),
+    });
   }
 
   function applyExpensePreset(preset: { category: ExpenseCategory; description: string; amount?: string; channel?: Channel }) {
@@ -5177,6 +6056,7 @@ export default function Home() {
         channel,
         listPricePence: listing?.listPrice ?? listing?.suggestedPrice ?? undefined,
         copySettings: listingCopySettings,
+        historyPreview: priceHistoryPreviews[inventoryHistoryKey(item)],
       }),
       channel,
     );
@@ -5192,6 +6072,7 @@ export default function Home() {
         channel,
         listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
         copySettings: listingCopySettings,
+        historyPreview: priceHistoryPreviews[inventoryHistoryKey(listing.item)],
       }),
       channel,
     );
@@ -6376,12 +7257,34 @@ export default function Home() {
           )}
         </div>
         <div className="topbar-actions">
-          <button className={view === "today" ? "topbar-secondary active" : "topbar-secondary"} type="button" onClick={() => setView("today")}>
-            Status
-            {appAlertUnreadCount > 0 && <span className="nav-badge">{appAlertUnreadCount}</span>}
+          <button
+            className={`sync-status ${offlineSync.online ? "online" : "offline"} ${offlineSync.failedCount > 0 ? "error" : ""}`}
+            type="button"
+            data-testid="offline-sync-status"
+            onClick={() => {
+              if (!offlineSync.online || offlineSync.pendingCount === 0) return;
+              void flushOfflineQueue().then((result) => {
+                if (result.synced.length > 0) void refreshAll();
+              });
+            }}
+            title={offlineSync.lastError ?? (offlineBootstrapAgeHours == null ? "Server data is current" : `Offline data snapshot ${offlineBootstrapAgeHours}h old`)}
+          >
+            <span aria-hidden="true" />
+            <strong>
+              {offlineSync.syncing
+                ? "Syncing"
+                : !offlineSync.online
+                  ? `Offline${offlineSync.pendingCount ? ` · ${offlineSync.pendingCount}` : ""}`
+                  : offlineSync.pendingCount
+                    ? `${offlineSync.pendingCount} queued`
+                    : "Synced"}
+            </strong>
           </button>
-          <button className="topbar-secondary" type="button" onClick={openBuyWatchesPanel}>
-            Watch
+          <button className="topbar-secondary quick-command-trigger" type="button" onClick={() => setCommandPaletteOpen(true)} aria-label="Open quick actions">
+            Quick
+          </button>
+          <button className="icon-button" type="button" onClick={() => setView("settings")} aria-label="Open setup and health">
+            ⚙
           </button>
           <button
             className={`icon-button ${refreshing ? "is-loading" : ""}`}
@@ -6397,7 +7300,7 @@ export default function Home() {
         </div>
       </header>
 
-      {!(view === "acquire" && headline) && <section className="hero-board" aria-label="Dealer command board">
+      {view === "acquire" && !headline && <section className="hero-board" aria-label="Dealer command board">
         <div className="hero-copy">
           <p className="eyebrow">Card fair mode</p>
           <strong>{chaseLine}</strong>
@@ -6407,17 +7310,6 @@ export default function Home() {
           <CardImage src={spotlightImage} fallbackClassName="card-back" alt="" />
           {selectedCardMarkUrl && <img className="set-mark" src={selectedCardMarkUrl} alt="" onError={hideBrokenImage} />}
         </div>
-      </section>}
-
-      {!(view === "acquire" && headline) && <section className="status-strip" aria-label="Business summary">
-        <Metric label="Stock" value={String(dashboard?.metrics.stockCount ?? 0)} loading={dashboardLoading} />
-        <Metric label="Listed" value={String(dashboard?.metrics.listedCount ?? 0)} loading={dashboardLoading} />
-        <Metric
-          label="Profit"
-          value={gbp(dashboard?.metrics.realizedProfitPence ?? 0)}
-          tone="good"
-          loading={dashboardLoading}
-        />
       </section>}
 
       <div className="toast-stack" aria-live="polite" aria-atomic="true">
@@ -6433,6 +7325,49 @@ export default function Home() {
         )}
         {error && <Toast tone="danger" message={error} onDismiss={() => setError(null)} />}
       </div>
+
+      {commandPaletteOpen && (
+        <section className="command-palette" role="dialog" aria-modal="true" aria-label="Quick actions">
+          <button className="command-palette-backdrop" type="button" onClick={() => setCommandPaletteOpen(false)} aria-label="Close quick actions" />
+          <div className="command-palette-sheet">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Pokédex shortcuts</span>
+                <h2>Quick actions</h2>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setCommandPaletteOpen(false)}>Close</button>
+            </div>
+            <div className="command-palette-grid">
+              {([
+                ["today", "Today", "Five next moves"],
+                ["acquire", "Buy", "Comp or Quick Fill"],
+                ["inventory", "Stock", "Search and sell"],
+                ["listings", "List", "Make listing pack"],
+                ["pnl", "Profit", "Sales and costs"],
+                ["settings", "Setup", "Health and integrations"],
+              ] as Array<[View, string, string]>).map(([target, label, detail]) => (
+                <button key={target} type="button" onClick={() => { setCommandPaletteOpen(false); setView(target); }}>
+                  <strong>{label}</strong>
+                  <small>{detail}</small>
+                </button>
+              ))}
+              <button type="button" onClick={() => { setCommandPaletteOpen(false); openScanCamera(); }}>
+                <strong>Scan card</strong>
+                <small>Open the Poké Ball camera</small>
+              </button>
+              <button type="button" onClick={() => {
+                setCommandPaletteOpen(false);
+                setView("acquire");
+                window.requestAnimationFrame(() => quickIntakeRef.current?.focus());
+              }}>
+                <strong>Quick Fill</strong>
+                <small>Paste a whole buy line</small>
+              </button>
+            </div>
+            <small className="command-palette-hint">⌘K / Ctrl K · Q from anywhere</small>
+          </div>
+        </section>
+      )}
 
       {view === "today" && (
         <TodayTab
@@ -6450,7 +7385,7 @@ export default function Home() {
             setListingSort("newest");
             setView("listings");
           }}
-          onRecordSale={(listing) => openSellFromListing(listing as Listing)}
+          onRecordSale={(listing: unknown) => openSellFromListing(listing as Listing)}
           launchPlan={launchPlan}
           onOpenLaunchPlan={openLaunchPlan}
           systemStatus={systemStatus}
@@ -6476,11 +7411,44 @@ export default function Home() {
           appAlerts={appAlerts}
           appAlertUnreadCount={appAlertUnreadCount}
           onMarkAlertsRead={() => void markAppAlertsRead()}
+          manualReviews={manualReviews}
+          manualReviewBusyId={manualReviewBusyId}
+          onAcceptManualReview={(review) => void resolveManualReview(review, "ACCEPT_HEADLINE")}
+          onAddReviewCheckedComp={(review, input) => void addReviewCheckedComp(review, input)}
         />
       )}
 
       {view === "acquire" && (
         <section className="workspace buy-workspace">
+          {offlineMutations.length > 0 && (
+            <section className="panel offline-queue-panel" aria-label="Actions waiting to sync">
+              <div className="panel-heading">
+                <div>
+                  <h2>Device queue</h2>
+                  <span className="muted">{offlineSync.online ? "waiting to sync" : "safe on this device · server unchanged"}</span>
+                </div>
+                <span className={`pill ${offlineSync.failedCount > 0 ? "warn" : "good"}`}>{offlineMutations.length} pending</span>
+              </div>
+              <div className="offline-queue-list">
+                {offlineMutations.slice(0, 5).map((mutation) => (
+                  <div className={`offline-queue-row freshness-${freshnessVisualKind(mutation.createdAt)}`} key={mutation.id} data-testid="offline-queue-item">
+                    <span className="scan-pokeball" aria-hidden="true" />
+                    <div>
+                      <strong>{mutation.summary.label}</strong>
+                      <small>{mutation.summary.detail ?? `Queued ${ageLabel(mutation.createdAt)}`}</small>
+                      {mutation.lastError && <small className="danger-text">{mutation.lastError}</small>}
+                    </div>
+                    <div className="offline-queue-actions">
+                      {mutation.lastError && (
+                        <button type="button" onClick={() => void retryOfflineMutation(mutation.id).then(() => flushOfflineQueue())}>Retry</button>
+                      )}
+                      <button className="ghost-button" type="button" onClick={() => void removeOfflineMutation(mutation.id)}>Remove</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           {!headline && (
           <form className="panel lookup-panel" onSubmit={lookup}>
             <div className="panel-heading">
@@ -6695,6 +7663,7 @@ export default function Home() {
                   </div>
                   <span className="lookup-spinner" aria-hidden="true" />
                 </div>
+                <ProgressSourceRail sources={compProgressSources} phase={compProgressPhase} />
                 {pendingRecentComp ? (
                   <div className={`lookup-cached-comp ${pendingRecentComp.confidenceTone}`}>
                     <span>Showing last local comp while sources refresh</span>
@@ -7305,7 +8274,10 @@ export default function Home() {
               onPack={openLastStockedPack}
               onSell={sellLastStocked}
               onNext={compNextFromLastStocked}
-              onDismiss={() => setLastStocked(null)}
+              onDismiss={() => {
+                if (lastStocked.queued) void removeOfflineMutation(lastStocked.itemId);
+                setLastStocked(null);
+              }}
             />
           )}
 
@@ -7315,6 +8287,7 @@ export default function Home() {
               ref={compPanelRef}
               style={selectedCardImage ? ({ "--ambient-card-art": `url("${selectedCardImage}")` } as CSSProperties) : undefined}
             >
+              {busy === "lookup" && <ProgressSourceRail sources={compProgressSources} phase={compProgressPhase} />}
               {comp?.ambiguous && (
                 <div className="manual-rescue-card soft">
                   <div>
@@ -7330,13 +8303,14 @@ export default function Home() {
               <div className="comp-hero">
                 <div>
                   <p className="eyebrow">
-                    {needsManualComp
-                      ? "manual comp required"
-                      : headline.source === "manual-check"
-                      ? checkedCompSourceLabel(headline.raw?.source)
-                      : headline.source}
+                    {needsManualComp ? "manual decision required" : "Pay up to"}
                   </p>
-                  <h2>{needsManualComp ? "No auto price" : gbp(headline.medianPence)}</h2>
+                  <h2>{offerCalc?.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}</h2>
+                  <small>
+                    Market {gbp(headline.medianPence)} · {headline.sampleSize} sold / {headline.windowDays}d · {ageLabel(headline.asOf)}
+                    {comp?.cached ? ` · cached ${comp.cached.ageHours}h` : ""}
+                    {compProgressPhase === "provisional" ? " · provisional" : ""}
+                  </small>
                 </div>
               </div>
               <div className="comp-identity-strip" aria-label="Comp card identity">
@@ -7370,19 +8344,19 @@ export default function Home() {
                   <strong>{dealerVerdict?.title ?? (needsManualComp ? "Check solds" : "Priced")}</strong>
                 </button>
                 <div>
-                  <span>Max offer</span>
-                  <strong>{offerCalc?.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}</strong>
-                  <small>{decisionBarOfferText}</small>
+                  <span>Recent market</span>
+                  <strong>{gbp(headline.medianPence)}</strong>
+                  <small>{headline.sampleSize} sold · {ageLabel(headline.asOf)} · {decisionBarOfferText}</small>
                 </div>
               </div>
               <div className="buy-result-action-row" aria-label="Buy actions">
-                <button className="primary-action" type="button" onClick={runDecisionBarBuy} disabled={busy === "acquire" || busy === "manual-stock"}>
-                  {busy === "acquire" ? "Stocking..." : "Buy"}
+                <button className="primary-action verdict-buy-action" type="button" onClick={runDecisionBarBuy} disabled={busy === "acquire" || busy === "manual-stock"}>
+                  {busy === "acquire" ? "Stocking..." : "Just bought it"}
                 </button>
-                <button type="button" onClick={watchDecisionTarget} disabled={busy === "watch-create" || decisionBarWatchTargetPence <= 0}>
+                <button className="verdict-watch-action" type="button" onClick={watchDecisionTarget} disabled={busy === "watch-create" || decisionBarWatchTargetPence <= 0}>
                   {busy === "watch-create" ? "Watching..." : "Watch"}
                 </button>
-                <button type="button" className="ghost-button" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
+                <button type="button" className="ghost-button verdict-pass-action" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
                   Pass
                 </button>
               </div>
@@ -7711,7 +8685,7 @@ export default function Home() {
                   )}
                   <div className="receipt-list">
                     {compReceipt.map((row) => (
-                      <div className={`receipt-row ${row.tone}`} key={row.key}>
+                      <div className={`receipt-row ${row.tone} source-${sourceVisualKind(row.source)} freshness-${row.freshness}`} key={row.key}>
                         <div>
                           <strong>{row.name}</strong>
                           <span>{row.basis}</span>
@@ -7951,6 +8925,19 @@ export default function Home() {
                 <Metric label="Max cash" value={gbp(dealSession.summary.totalMaxCashPence)} />
                 <Metric label="Max trade" value={gbp(dealSession.summary.totalMaxTradePence)} />
                 <Metric label="Profit plan" value={gbp(dealSession.summary.totalExpectedProfitPence)} />
+              </div>
+              <div className={`target-suggestion ${dealSessionBudgetRemainingPence >= 0 ? "active" : ""}`}>
+                <div>
+                  <span>{dealSessionBudgetRemainingPence >= 0 ? "Remaining budget" : "Over max cash"}</span>
+                  <strong>{gbp(Math.abs(dealSessionBudgetRemainingPence))}</strong>
+                  <small>Against the {gbp(dealSession.summary.totalMaxCashPence)} cash ceiling</small>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDealSessionPaid(penceToPounds(dealSession.summary.suggestedBundleOfferPence))}
+                >
+                  Use rounded offer
+                </button>
               </div>
               <div className="form-grid">
                 <label>
@@ -8492,6 +9479,9 @@ export default function Home() {
               onCatalogArt={addCatalogArtToInventory}
               onDelete={requestDeleteItem}
               onMoreActions={(target) => setInventoryActionSheetId(target.id)}
+              history={priceHistoryByKey[inventoryHistoryKey(item as InventoryItem)]}
+              historyPreview={priceHistoryPreviews[inventoryHistoryKey(item as InventoryItem)]}
+              onHistory={(target) => void loadPriceHistory(target, true)}
             />
           )}
           emptyInventoryFilterText={emptyInventoryFilterText}
@@ -8528,6 +9518,17 @@ export default function Home() {
           listingExternalUrl={listingExternalUrl}
           setListingExternalUrl={setListingExternalUrl}
           gbp={gbp}
+          onBulkDraft={(items) => void bulkDraftInventory(items as InventoryItem[])}
+          onBulkMove={(items, nextLocation) => void bulkMoveInventory(items as InventoryItem[], nextLocation)}
+          onBulkExport={(items) => exportInventorySelection(items as InventoryItem[])}
+        />
+      )}
+
+      {priceHistoryItemId && (
+        <PriceHistorySheet
+          history={openPriceHistory}
+          loading={priceHistoryLoading}
+          onClose={() => setPriceHistoryItemId(null)}
         />
       )}
 
@@ -8626,6 +9627,7 @@ export default function Home() {
               </form>
             ) : null
           }
+          onBulkPack={(selected, targetChannel, mode) => void buildBulkListingPack(selected as Listing[], targetChannel, mode)}
           listingPackSheet={
             listingPackTarget && listingPack ? (
               <ListingPackSheet
@@ -9046,11 +10048,11 @@ export default function Home() {
       )}
 
       <nav className="bottom-nav" aria-label="Primary">
+        <TabButton active={view === "today"} label="Today" onClick={() => setView("today")} />
         <TabButton active={view === "acquire"} label="Buy" onClick={() => setView("acquire")} />
-        <TabButton active={view === "inventory"} label="Inventory" onClick={() => setView("inventory")} />
-        <TabButton active={view === "listings"} label="Listings" onClick={() => setView("listings")} />
-        <TabButton active={view === "pnl"} label="P&L" onClick={() => setView("pnl")} />
-        <TabButton active={view === "settings"} label="Setup" onClick={() => setView("settings")} />
+        <TabButton active={view === "inventory"} label="Stock" onClick={() => setView("inventory")} />
+        <TabButton active={view === "listings"} label="List" onClick={() => setView("listings")} />
+        <TabButton active={view === "pnl"} label="Profit" onClick={() => setView("pnl")} />
       </nav>
     </main>
   );
@@ -9549,6 +10551,7 @@ function buildListingPackInputFromItem(
     channel: Channel;
     listPricePence?: number;
     copySettings?: Partial<ListingCopySettings>;
+    historyPreview?: CardPriceHistoryPreview;
   },
 ): ListingPackInput {
   const photoSummary = summarizeListingPhotos({
@@ -9566,6 +10569,7 @@ function buildListingPackInputFromItem(
     },
     grade: item.grade,
     listPricePence: options.listPricePence,
+    ...listingEvidenceFromPreview(options.historyPreview),
     costBasisPence: item.costBasis,
     condition: item.condition,
     certNumber: item.graderCert,
@@ -9756,6 +10760,9 @@ function InventoryRow({
   onCatalogArt,
   onDelete,
   onMoreActions,
+  history,
+  historyPreview,
+  onHistory,
 }: {
   item: InventoryItem;
   busy: string | null;
@@ -9767,6 +10774,9 @@ function InventoryRow({
   onCatalogArt: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
   onMoreActions: (item: InventoryItem) => void;
+  history: CardPriceHistory | null | undefined;
+  historyPreview: CardPriceHistoryPreview | undefined;
+  onHistory: (item: InventoryItem) => void;
 }) {
   const draftListing = item.listings.find((row) => row.state === "DRAFT");
   const activeListing = item.listings.find((row) => row.state === "ACTIVE");
@@ -9806,6 +10816,8 @@ function InventoryRow({
     !ebayPhotoSummary.hasCatalogPhoto,
   );
   const needsListing = item.status !== "SOLD" && !draftListing && !activeListing;
+  const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.createdAt).getTime()) / (24 * 60 * 60 * 1_000)));
+  const needsReprice = item.status !== "SOLD" && ageDays >= 30;
   const stockCost =
     item.quantity > 1
       ? `${gbp(item.costBasis)} each · ${gbp(item.costBasis * item.quantity)} total`
@@ -9908,13 +10920,18 @@ function InventoryRow({
           <div className="inventory-row-money">
             <span>{listingSummary}{soldNote}</span>
             {stockNotes && <span>{stockNotes}</span>}
+            <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`Open ${item.card.name} price history`}>
+              <StockHistorySparkline history={history} preview={historyPreview} />
+              <span>History</span>
+            </button>
           </div>
-          {(needsListing || needsPhotos || photoCount > 0) && (
+          {(needsListing || needsPhotos || photoCount > 0 || needsReprice) && (
             <div className="inventory-row-flags" aria-label="Stock tasks">
               {needsListing && <span>Needs listing</span>}
               {needsPhotos && <span>Needs photos</span>}
               {!needsPhotos && needsEbayPhotos && <span>Needs real photo</span>}
               {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
+              {needsReprice && <span className="reprice-nudge">Reprice · {ageDays}d held</span>}
             </div>
           )}
           {needsEbayPhotos && (
@@ -10258,6 +11275,33 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.closest("button, input, select, textarea, a, summary, details, label") != null;
 }
 
+function ProgressSourceRail({
+  sources,
+  phase,
+}: {
+  sources: CompSourceProgressView[];
+  phase: "catalog" | "provisional" | "quorum" | "receipt" | null;
+}) {
+  const total = sources[0]?.total ?? 0;
+  const remaining = Math.max(0, total - sources.length);
+  return (
+    <div className="progress-source-rail" aria-label="Live comp source progress">
+      <span className="source-progress-chip priced">Identity</span>
+      {sources.map((source) => (
+        <span className={`source-progress-chip ${source.status} source-${sourceVisualKind(source.source.name)}`} key={source.source.name}>
+          {source.source.name.replace(/^pokemon-/i, "")} · {source.status === "priced" ? `${source.latencyMs}ms` : source.status}
+        </span>
+      ))}
+      {Array.from({ length: remaining }, (_, index) => (
+        <span className="source-progress-chip waiting" key={`waiting-${index}`}>Source…</span>
+      ))}
+      <span className={`source-progress-chip verdict ${phase ?? "waiting"}`}>
+        {phase === "receipt" ? "Receipt final" : phase === "quorum" ? "Quorum" : phase === "provisional" ? "Provisional" : "Pricing…"}
+      </span>
+    </div>
+  );
+}
+
 function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button className={active ? "active" : ""} type="button" onClick={onClick}>
@@ -10282,7 +11326,7 @@ function TabIcon({ label }: { label: string }) {
       </svg>
     );
   }
-  if (label === "Inventory") {
+  if (label === "Stock") {
     return (
       <svg {...common}>
         <path d="M7 5.5h10a2 2 0 0 1 2 2v10H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" />
@@ -10292,7 +11336,7 @@ function TabIcon({ label }: { label: string }) {
       </svg>
     );
   }
-  if (label === "Listings") {
+  if (label === "List") {
     return (
       <svg {...common}>
         <path d="M5 6.5h9.5l4.5 4.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 17.5v-11Z" />
@@ -10302,7 +11346,7 @@ function TabIcon({ label }: { label: string }) {
       </svg>
     );
   }
-  if (label === "P&L") {
+  if (label === "Profit") {
     return (
       <svg {...common}>
         <circle cx="12" cy="12" r="7" />
@@ -10528,6 +11572,8 @@ function checkedCompPlatformLabel(platform: CheckedCompPlatform | string): strin
 
 function buildCompReceipt(comp: Reconciled): Array<{
   key: string;
+  source: string;
+  freshness: "live" | "recent" | "aging" | "stale" | "expired";
   name: string;
   basis: string;
   price: string;
@@ -10538,6 +11584,8 @@ function buildCompReceipt(comp: Reconciled): Array<{
     .sort((a, b) => receiptRank(a, comp.headline) - receiptRank(b, comp.headline))
     .map((result) => ({
       key: `${result.source}-${result.grade}-${result.asOf}`,
+      source: result.source,
+      freshness: freshnessVisualKind(result.asOf),
       name: result.source === "checked-comps"
         ? checkedCompReceiptName(result, result.source === comp.headline?.source)
         : sourceLabel(result.source, result.source === comp.headline?.source),
@@ -10618,6 +11666,26 @@ function sourceLabel(source: string, headline: boolean): string {
           ? "Your checked comps"
           : source.replace(/-/g, " ");
   return headline ? `${label} · used` : label;
+}
+
+function sourceVisualKind(source: string): "owned" | "checked" | "sold" | "market" | "cached" {
+  const normalized = source.toLowerCase();
+  if (normalized.includes("owned")) return "owned";
+  if (normalized.includes("checked") || normalized.includes("manual")) return "checked";
+  if (normalized.includes("cache") || normalized.includes("fallback")) return "cached";
+  if (normalized.includes("ebay") || normalized.includes("price-tracker") || normalized.includes("sold")) return "sold";
+  return "market";
+}
+
+function freshnessVisualKind(value: string): "live" | "recent" | "aging" | "stale" | "expired" {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return "expired";
+  const ageDays = Math.max(0, (Date.now() - timestamp) / (24 * 60 * 60 * 1_000));
+  if (ageDays <= 1) return "live";
+  if (ageDays <= 30) return "recent";
+  if (ageDays <= 90) return "aging";
+  if (ageDays <= 180) return "stale";
+  return "expired";
 }
 
 function lookupIdentityKey(input: Pick<LookupInput, "name" | "setName" | "number" | "grade">): string {
@@ -10863,12 +11931,64 @@ function dealCalcPrimaryReason(result: DealCalcResult): string {
 }
 
 function viewTitle(view: View): string {
-  if (view === "today") return "Status";
+  if (view === "today") return "Today";
   if (view === "acquire") return "Buy cards";
-  if (view === "inventory") return "Inventory";
-  if (view === "listings") return "Listings";
+  if (view === "inventory") return "Stock";
+  if (view === "listings") return "List";
   if (view === "settings") return "Setup";
-  return "P&L";
+  return "Profit";
+}
+
+function parseViewQuery(value: string | null): View {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "today" || normalized === "review") return "today";
+  if (normalized === "stock" || normalized === "inventory") return "inventory";
+  if (normalized === "list" || normalized === "listings") return "listings";
+  if (normalized === "profit" || normalized === "pnl" || normalized === "p&l") return "pnl";
+  if (normalized === "setup" || normalized === "settings" || normalized === "health") return "settings";
+  return "acquire";
+}
+
+function viewQueryValue(view: View): string {
+  if (view === "acquire") return "buy";
+  if (view === "inventory") return "stock";
+  if (view === "listings") return "list";
+  if (view === "pnl") return "profit";
+  if (view === "settings") return "setup";
+  return "today";
+}
+
+function inventoryHistoryKey(item: InventoryItem): string {
+  return cardGradeHistoryKey(item.card.id ?? item.card.name, item.grade);
+}
+
+function getScanSessionId(): string {
+  const key = "poke-deal.scan-session-id";
+  try {
+    const existing = window.localStorage.getItem(key)?.trim();
+    if (existing && /^[A-Za-z0-9._:-]{8,128}$/.test(existing)) return existing;
+    const created = `scan:${crypto.randomUUID()}`;
+    window.localStorage.setItem(key, created);
+    return created;
+  } catch {
+    volatileScanSessionId ??= `scan:${crypto.randomUUID()}`;
+    return volatileScanSessionId;
+  }
+}
+
+function csvCell(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function downloadTextFile(filename: string, contents: string, type: string) {
+  const url = URL.createObjectURL(new Blob([contents], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
 function channelLabel(channel: Channel): string {

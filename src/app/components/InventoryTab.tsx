@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { InventorySort } from "@/lib/dealer/tableControls";
 import { EmptyState, MoneyInput } from "./UiBits";
 
@@ -72,6 +72,9 @@ export function InventoryTab({
   listingExternalUrl,
   setListingExternalUrl,
   gbp,
+  onBulkDraft,
+  onBulkMove,
+  onBulkExport,
 }: {
   visibleInventory: InventoryItemLike[];
   filteredInventory: InventoryItemLike[];
@@ -122,7 +125,27 @@ export function InventoryTab({
   listingExternalUrl: string;
   setListingExternalUrl: (value: string) => void;
   gbp: (pence: number) => string;
+  onBulkDraft: (items: InventoryItemLike[]) => void;
+  onBulkMove: (items: InventoryItemLike[], location: string) => void;
+  onBulkExport: (items: InventoryItemLike[]) => void;
 }) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkLocation, setBulkLocation] = useState("To list");
+  const selectedItems = useMemo(
+    () => visibleInventory.filter((item) => selectedIds.has(item.id)),
+    [selectedIds, visibleInventory],
+  );
+  const allVisibleSelected = visibleInventory.length > 0 && selectedItems.length === visibleInventory.length;
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   return (
     <section className="workspace inventory-workspace">
       <div className="section-heading">
@@ -134,16 +157,21 @@ export function InventoryTab({
             </button>
           )}
           <span>{rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
+          <button className="ghost-button" type="button" onClick={() => {
+            setSelectedIds(allVisibleSelected ? new Set() : new Set(visibleInventory.map((item) => item.id)));
+          }} disabled={visibleInventory.length === 0}>
+            {allVisibleSelected ? "Clear" : "Select all"}
+          </button>
         </div>
       </div>
-      <div className="inventory-filter-tabs" role="tablist" aria-label="Inventory filters">
+      <div className="inventory-filter-tabs" role="group" aria-label="Inventory filters">
         {inventoryFilters.map((filter) => (
           <button
             key={filter.value}
             type="button"
             className={inventoryFilter === filter.value ? "selected" : ""}
             onClick={() => setInventoryFilter(filter.value)}
-            aria-selected={inventoryFilter === filter.value}
+            aria-pressed={inventoryFilter === filter.value}
           >
             <span>{filter.label}</span>
             <strong>{inventoryFilterCounts[filter.value]}</strong>
@@ -171,7 +199,28 @@ export function InventoryTab({
           </select>
         </label>
       </div>
-      {visibleInventory.map((item) => renderInventoryRow(item))}
+      {selectedItems.length > 0 && (
+        <div className="bulk-action-bar" aria-label="Bulk stock actions">
+          <strong>{selectedItems.length} selected</strong>
+          <button type="button" onClick={() => onBulkDraft(selectedItems)} disabled={Boolean(busy)}>Draft listings</button>
+          <label>
+            <span>Move</span>
+            <input value={bulkLocation} onChange={(event) => setBulkLocation(event.target.value)} placeholder="Box / binder" />
+          </label>
+          <button type="button" onClick={() => onBulkMove(selectedItems, bulkLocation)} disabled={Boolean(busy) || !bulkLocation.trim()}>Apply location</button>
+          <button type="button" onClick={() => onBulkExport(selectedItems)}>Export CSV</button>
+          <button className="ghost-button" type="button" onClick={() => setSelectedIds(new Set())}>Done</button>
+        </div>
+      )}
+      {visibleInventory.map((item) => (
+        <div className={`bulk-select-row${selectedIds.has(item.id) ? " selected" : ""}`} key={item.id}>
+          <label className="bulk-row-checkbox">
+            <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelected(item.id)} />
+            <span>Select {item.card.name}</span>
+          </label>
+          {renderInventoryRow(item)}
+        </div>
+      ))}
       {inventoryFilter === "all" && activeInventory.length === 0 ? (
         <EmptyState text="No active stock. Add your next buy from Buy." />
       ) : filteredInventory.length === 0 ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { ListingSort, ListingStateFilter } from "@/lib/dealer/tableControls";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
 import { formatGbp as gbp } from "@/lib/format/money";
@@ -101,6 +101,7 @@ export function ListingsTab({
   setEbayPublishTarget,
   listingPackSheet,
   editListingSheet,
+  onBulkPack,
 }: {
   dashboard: Dashboard | null;
   firstDraftListingTarget: Listing | null;
@@ -160,7 +161,32 @@ export function ListingsTab({
   setEbayPublishTarget: (id: string | null) => void;
   listingPackSheet: ReactNode;
   editListingSheet: ReactNode;
+  onBulkPack: (listings: Listing[], channel: Channel, mode: "download" | "copy") => void;
 }) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [packChannel, setPackChannel] = useState<Channel>("EBAY");
+  const selectedListings = useMemo(() => visibleListings.filter((listing) => selectedIds.has(listing.id)), [selectedIds, visibleListings]);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("poke-deal.listing-pack-channel");
+      if (saved === "EBAY" || saved === "CARDMARKET" || saved === "VINTED" || saved === "IN_PERSON") setPackChannel(saved);
+    } catch {
+      // Current channel remains usable when local storage is blocked.
+    }
+  }, []);
+  useEffect(() => {
+    try { window.localStorage.setItem("poke-deal.listing-pack-channel", packChannel); } catch { /* optional preference */ }
+  }, [packChannel]);
+
+  function toggleListing(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   return (
     <section className="workspace listings-workspace">
       <div className="detail-grid">
@@ -324,6 +350,30 @@ export function ListingsTab({
           eBay pack CSV
         </a>
       </div>
+      <section className="panel listing-workhorse" aria-label="Build selected listing pack">
+        <div className="panel-heading">
+          <div>
+            <h2>Pack builder</h2>
+            <span className="muted">select items → channel → download or copy</span>
+          </div>
+          <button className="ghost-button" type="button" onClick={() => {
+            setSelectedIds(selectedListings.length === visibleListings.length ? new Set() : new Set(visibleListings.map((listing) => listing.id)));
+          }} disabled={visibleListings.length === 0}>
+            {selectedListings.length === visibleListings.length && visibleListings.length > 0 ? "Clear" : "Select visible"}
+          </button>
+        </div>
+        <div className="listing-workhorse-actions">
+          <strong>{selectedListings.length} selected</strong>
+          <label>
+            Channel
+            <select value={packChannel} onChange={(event) => setPackChannel(event.target.value as Channel)}>
+              <option value="EBAY">eBay</option><option value="CARDMARKET">Cardmarket</option><option value="VINTED">Vinted</option><option value="IN_PERSON">In person</option>
+            </select>
+          </label>
+          <button type="button" className="primary-action" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "download")}>Download pack</button>
+          <button type="button" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "copy")}>Copy pack</button>
+        </div>
+      </section>
       <div className="dex-controls listings-controls" aria-label="Listing search and sort">
         <label className="search-control">
           Search
@@ -489,8 +539,12 @@ export function ListingsTab({
         </div>
       )}
       {visibleListings.map((listing) => (
-        <ListingRow
-          key={listing.id}
+        <div className={`bulk-select-row listing-select-row${selectedIds.has(listing.id) ? " selected" : ""}`} key={listing.id}>
+          <label className="bulk-row-checkbox">
+            <input type="checkbox" checked={selectedIds.has(listing.id)} onChange={() => toggleListing(listing.id)} />
+            <span>Select {listing.item?.card.name ?? listing.title ?? "listing"}</span>
+          </label>
+          <ListingRow
           listing={listing}
           busy={busy}
           ebayConnected={Boolean(ebayStatus?.connected)}
@@ -512,7 +566,8 @@ export function ListingsTab({
             setEbayPublishTarget(listing.id);
             openListingPack(listing);
           }}
-        />
+          />
+        </div>
       ))}
       {listings.length === 0 ? (
         <EmptyState text="No listings yet. Buy can create draft listings automatically." />

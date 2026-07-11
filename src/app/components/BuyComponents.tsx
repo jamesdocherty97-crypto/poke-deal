@@ -45,6 +45,7 @@ type LastStockedCard = {
   channel: Channel;
   listingState: string;
   imageUrl: string | null;
+  queued?: boolean;
 };
 
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
@@ -244,10 +245,14 @@ export function LastStockedPanel({
   onDismiss: () => void;
 }) {
   return (
-    <section className="last-stocked-panel" aria-label="Last stocked card">
+    <section
+      className={`last-stocked-panel${card.queued ? " queued" : ""}`}
+      aria-label={card.queued ? "Queued purchase" : "Last stocked card"}
+      data-testid={card.queued ? "offline-purchase" : undefined}
+    >
       <CardImage src={card.imageUrl} className="mini-card-art" fallbackClassName="mini-card-art blank" alt="" />
       <div className="last-stocked-copy">
-        <span>Last stocked</span>
+        <span>{card.queued ? "Queued on this device" : "Last stocked"}</span>
         <strong>{card.name}</strong>
         <small>
           {card.setName}
@@ -255,22 +260,24 @@ export function LastStockedPanel({
         </small>
         <small>
           {card.quantity} @ {gbp(card.costPence)} ·{" "}
-          {card.listingId
+          {card.queued
+            ? "not yet synced"
+            : card.listingId
             ? `${channelLabel(card.channel)} ${card.listingState.toLowerCase()} ${gbp(card.listPricePence)}`
             : "not listed"}
         </small>
       </div>
       <div className="last-stocked-actions">
-        <button type="button" onClick={onPack} disabled={!card.listingId}>
+        <button type="button" onClick={onPack} disabled={card.queued || !card.listingId}>
           Pack
         </button>
-        <button type="button" onClick={onSell}>
+        <button type="button" onClick={onSell} disabled={card.queued}>
           Sell
         </button>
         <button type="button" onClick={onNext}>
           Next
         </button>
-        <button className="danger-button" type="button" onClick={onDismiss} aria-label="Dismiss last stocked card">
+        <button className="danger-button" type="button" onClick={onDismiss} aria-label={card.queued ? "Remove queued purchase" : "Dismiss last stocked card"}>
           x
         </button>
       </div>
