@@ -14,6 +14,7 @@ The measured result is meaningful but not perfect:
 - Compressed 512px scans retained 12/12 semantic identities in the evaluation set. A 42 KB payload on simulated fast 4G measured 1.342 seconds median and about 1.555 seconds p95 across three samples. The requested “identity under 1.5 seconds p95 on 4G” is therefore narrowly unproven, and this report does not round it into a pass.
 - Today’s mobile Lighthouse LCP fell from 16.120 seconds to 3.178 seconds. Across the five final views, median performance is 95 and accessibility/best-practices are 100/100 throughout. Buy remains the slowest LCP at 5.304 seconds.
 - All final local release gates are green: 786/786 full tests, 7/7 overhaul tests, 10/10 UX tests, 10 pricing attacks with zero failures, 4/4 Playwright flows, TypeScript, Prisma validation, production build, migration status, and a zero-vulnerability production dependency audit.
+- The same gate passed on GitHub against disposable PostgreSQL, is now required on `main`, and merge commit `96333b8` is live and verified at `https://poke-deal.vercel.app`.
 - One external exit criterion remains blocked: the notifier and cron-failure delivery code is implemented and tested, but no `DISCORD_WEBHOOK_URL` was supplied, so an actual Discord-channel fire is not proven.
 
 In short: this is a release-worthy reliability and dealer-workflow improvement with two explicit follow-ups—live Discord proof and a larger physical-4G scan sample—not a claim that every aspirational target was met.
@@ -109,7 +110,7 @@ The private single-user Basic-auth boundary remains, with a distinct cron bearer
 
 The framework moved off the vulnerable Next 14 line to the smallest audit-clean target used in this pass: Next 15.5.20 with React/React DOM 18.3.1, plus a scoped PostCSS 8.5.16 override. Dynamic route parameters were converted to Next 15’s asynchronous contract. This was intentionally not combined with React 19.
 
-CI now boots disposable PostgreSQL, deploys the real migration set, then runs production dependency audit, Prisma validation, full unit tests, focused overhaul/UX suites, pricing red-team, TypeScript, production build and all Playwright flows in the `ship-gates` job. The repository workflow cannot itself prove that GitHub branch protection marks the job required; that is an external repository setting.
+CI now boots disposable PostgreSQL, deploys the real migration set, then runs production dependency audit, Prisma validation, full unit tests, focused overhaul/UX suites, pricing red-team, TypeScript, production build and all Playwright flows in the `ship-gates` job. GitHub branch protection now makes that check strict and required on `main`, including for administrators; force-push and deletion are disabled.
 
 The architectural rationale, rollbacks and no-action decisions are in [`ARCHITECTURE_REVIEW.md`](ARCHITECTURE_REVIEW.md) and [`DECISIONS.md`](DECISIONS.md).
 
@@ -128,6 +129,20 @@ Migration `20260711120000_architecture_reliability` was applied to production. `
 
 The portable backup lives under ignored output rather than Git because it contains the private ledger. The hash above is the integrity check; do not publish the bundle.
 
+## Production release evidence
+
+Pull request [#1](https://github.com/jamesdocherty97-crypto/poke-deal/pull/1) merged as `96333b895d85076ef71e4ab147751c9d0bcaac89`. Its branch gate passed in 3m13s; the resulting [`main` gate](https://github.com/jamesdocherty97-crypto/poke-deal/actions/runs/29163072388) also passed. Vercel promoted deployment `dpl_F1wc536RUKTM93g45msAakcVhTUC` to the canonical `https://poke-deal.vercel.app` alias.
+
+The live protected deployment was probed directly:
+
+- Anonymous root, inventory API, crafted RSC/prefetch, wrong password and the eBay account-deletion path each returned 401 with the intended Basic challenge. Authenticated root, inventory, manifest and service worker returned 200.
+- `verify:prod` passed all five live valuation probes. The Victini probe was made source-aware after it correctly degraded from an unavailable Price Tracker signal to £11.18/medium PokeTrace evidence; the verifier now guards exact identity, sample size, a broad live-market band and the expected fallback confidence instead of freezing one day’s price.
+- Production progressive comp returned NDJSON 200: catalog at 4.045s, provisional verdict at 5.582s, quorum at 6.061s and terminal receipt at 6.450s. This is provider/network evidence, not substituted for the controlled local before/after trace.
+- A production 512px Charizard scan returned the correct `4/102` identity in 3.231s total on a cold request, used `gemini-3.1-flash-lite`, and returned a durable scan-event ID—proof that the Postgres reservation completed before model spend.
+- Deep health returned 200 with every required source healthy and 17 inventory rows reachable. eBay Browse hit its explicit 3.5s optional timeout and degraded to `skipped`; the overall health response remained correct.
+
+Discord remains the only environment-level release gap: `alertDelivery` is false because no webhook secret exists.
+
 ## The six invariants: accounted for, not assumed
 
 | Prior | Final status | Evidence that protects the original failure mode |
@@ -137,7 +152,7 @@ The portable backup lives under ignored output rather than Git because it contai
 | `cleaning.ts` stays pure | Intact | No DB/network/framework dependency was introduced. `cleaning.test.ts`, `reconciler.test.ts`, the full suite and all 10 pricing attacks run without IO. Reconciler weights were not retuned. |
 | Sources degrade, never kill the lookup | Strengthened | `compService.test.ts` and adapter contract tests cover unavailable/timeout/cancelled sources; remote work is now actually aborted; progressive partial results and cached fallback remain usable. |
 | Domain stays card-agnostic | Intact | Inventory, Listing and Sale still reference generic Card/grade domain records. New idempotency, history and listing-evidence code keys generic IDs; Pokémon-specific catalog/visual logic stays at adapters/UI. |
-| Ship gates on every merge/release | Encoded and locally green | `.github/workflows/ci.yml` contains audit → Prisma → full/focused tests → red-team → typecheck → build → Playwright. Final local release rerun is green. Production `verify:prod` and the GitHub required-check setting remain external release evidence. |
+| Ship gates on every merge/release | Enforced and green | `.github/workflows/ci.yml` contains disposable-Postgres migration deploy → audit → Prisma → full/focused tests → red-team → typecheck → build → Playwright. GitHub requires `ship-gates` on `main`; PR, merge-commit and production verification all passed. |
 
 No invariant was silently redefined. The one-way/additive choices—pooling/indexes, progress protocol, audit persistence, scan budgets, idempotency, locks/leases, OAuth state and framework security upgrade—each have rationale, rollback and guards in `DECISIONS.md` A1–A8.
 
@@ -169,7 +184,7 @@ The final desktop Today view is also captured at [1440×900](docs/overhaul/final
 |---|---|---|
 | Scan → verdict measurably faster and progressive | Partial pass | Derived local span is 41–49% faster and progress streams. Simulated fast-4G identity p95 is ~1.555 s, so the strict <1.5 s condition is not yet proven. |
 | Offline buy loop | Pass | Two network-loss Playwright cases, durable IDs and once-only replay. Immediate pixel-matched offline photo lookup is not included. |
-| Golden path, contracts and red-team required gates | Local pass | 786 + 7 + 10 focused tests, 10/10 attacks and 4/4 browser flows. GitHub required-check enforcement is an external setting. |
+| Golden path, contracts and red-team required gates | Pass | 786 + 7 + 10 focused tests, 10/10 attacks and 4/4 browser flows passed locally and in the required GitHub gate. |
 | Discord for watches, repricing and cron failures | Code pass / live blocked | Bounded notifier and idempotent cron-failure delivery are tested. Missing webhook secret prevents a real-channel proof. |
 | Manual review in no more than two taps | Pass | Dedicated worklist, reasons/evidence side by side and one-action accept after opening. |
 | Per-card price history | Pass | Batched Stock previews and full owned-data overlay view. |
@@ -180,15 +195,14 @@ The final desktop Today view is also captured at [1440×900](docs/overhaul/final
 ## Deliberately deferred, in priority order
 
 1. **Prove Discord delivery.** Add `DISCORD_WEBHOOK_URL`, trigger a controlled test alert, then a controlled failed-cron path, and record the channel result. Until then the live-alert exit criterion is open.
-2. **Complete release-side evidence.** At this report’s capture, the production database migration and production environment configuration (except Discord) are complete. The final application deploy/Basic-auth smoke, `verify:prod`, GitHub run and required-check setting must be recorded separately; [`FINAL_METRICS.json`](docs/overhaul/FINAL_METRICS.json) keeps those booleans false rather than assuming success.
-3. **Validate scan latency on the real handset/network.** Run at least 30 representative cards on physical fast/poor 4G and report p50/p95, correction rate and total photo-to-quorum. The current three-sample simulated p95 is 55 ms over target and the end-to-end improvement is derived, so more precision would be false confidence.
-4. **Trace Buy’s 5.304-second LCP.** It is dramatically better than the earlier provisional result and the decision can progress before the terminal receipt, but it is still the slowest final view. Profile the largest element and remote-data timing before changing code.
-5. **Add a seeded Postgres browser lane.** CI now proves that every migration deploys to disposable PostgreSQL before the gates run. The current E2E tests still use the real UI with deterministic route fixtures, so they cannot expose ledger constraints or transaction behaviour that only a seeded database journey would exercise.
-6. **Finish externally gated eBay work only when the contracts are available.** Marketplace Insights and Sell await approval/eligibility. Account-deletion POST remains intentionally Basic-blocked until eBay’s signed-notification requirements are implemented and tested; do not add a broad middleware bypass.
-7. **Add offline photo fingerprint matching if field use justifies it.** The safe current behaviour queues scans and serves typed/recent stale-badged receipts. Pixel fingerprinting would improve instant dead-zone rescans but needs collision and privacy tests.
-8. **Persist operational telemetry only when there is somewhere useful to operate it.** Source freshness is runtime-local and logs/CompResult reconstruct verdicts, but this is not a cross-deployment percentile warehouse.
-9. **Expand generic idempotency only with queue scope.** It currently covers the offline money/quantity paths—acquire, Quick Fill and sell. A universal receipt table would add complexity without protecting another queued mutation today.
-10. **Decompose the root client orchestrator after release stabilises.** `src/app/page.tsx` is 12,099 lines, up from the 10,979-line baseline because the offline/progressive coordination landed there. Extracting screen controllers is worthwhile maintenance work, but doing it inside the reliability release would enlarge the regression surface without improving the dealer outcome.
+2. **Validate scan latency on the real handset/network.** Run at least 30 representative cards on physical fast/poor 4G and report p50/p95, correction rate and total photo-to-quorum. The current three-sample simulated p95 is 55 ms over target and the end-to-end improvement is derived, so more precision would be false confidence.
+3. **Trace Buy’s 5.304-second LCP.** It is dramatically better than the earlier provisional result and the decision can progress before the terminal receipt, but it is still the slowest final view. Profile the largest element and remote-data timing before changing code.
+4. **Add a seeded Postgres browser lane.** CI now proves that every migration deploys to disposable PostgreSQL before the gates run. The current E2E tests still use the real UI with deterministic route fixtures, so they cannot expose ledger constraints or transaction behaviour that only a seeded database journey would exercise.
+5. **Finish externally gated eBay work only when the contracts are available.** Marketplace Insights and Sell await approval/eligibility. Account-deletion POST remains intentionally Basic-blocked until eBay’s signed-notification requirements are implemented and tested; do not add a broad middleware bypass.
+6. **Add offline photo fingerprint matching if field use justifies it.** The safe current behaviour queues scans and serves typed/recent stale-badged receipts. Pixel fingerprinting would improve instant dead-zone rescans but needs collision and privacy tests.
+7. **Persist operational telemetry only when there is somewhere useful to operate it.** Source freshness is runtime-local and logs/CompResult reconstruct verdicts, but this is not a cross-deployment percentile warehouse.
+8. **Expand generic idempotency only with queue scope.** It currently covers the offline money/quantity paths—acquire, Quick Fill and sell. A universal receipt table would add complexity without protecting another queued mutation today.
+9. **Decompose the root client orchestrator after release stabilises.** `src/app/page.tsx` is 12,099 lines, up from the 10,979-line baseline because the offline/progressive coordination landed there. Extracting screen controllers is worthwhile maintenance work, but doing it inside the reliability release would enlarge the regression surface without improving the dealer outcome.
 
 ## Final assessment
 

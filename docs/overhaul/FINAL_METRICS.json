@@ -1,12 +1,13 @@
 {
-  "capturedAt": "2026-07-11T18:56:50+01:00",
+  "capturedAt": "2026-07-11T19:19:33+01:00",
   "timezone": "Europe/London",
-  "measurementContext": "Local Next production build against the migrated production database unless a field says simulated or derived",
+  "measurementContext": "Local Next production build against the migrated production database unless a field says simulated or derived; releaseEvidence and productionVerification were captured against the canonical Vercel deployment",
   "git": {
     "baselineSourceCommit": "9621e7b",
     "baselineEvidenceCommit": "c4357fe",
-    "finalCommit": null,
-    "workingTreeHadUncommittedOverhaul": true
+    "finalCommit": "96333b895d85076ef71e4ab147751c9d0bcaac89",
+    "workingTreeHadUncommittedOverhaul": false,
+    "mergedPullRequest": "https://github.com/jamesdocherty97-crypto/poke-deal/pull/1"
   },
   "baselineEvidence": "docs/overhaul/BASELINE_METRICS.json",
   "qualityGates": {
@@ -48,7 +49,12 @@
     "prismaValidatePassed": true,
     "buildPassed": true,
     "buildSeconds": 16.72,
-    "productionDependencyAuditVulnerabilities": 0
+    "productionDependencyAuditVulnerabilities": 0,
+    "githubShipGates": {
+      "status": "passed",
+      "requiredOnMain": true,
+      "mainRun": "https://github.com/jamesdocherty97-crypto/poke-deal/actions/runs/29163072388"
+    }
   },
   "framework": {
     "next": "15.5.20",
@@ -276,8 +282,52 @@
     "productionDatabaseMigrated": true,
     "productionEnvironmentConfiguredExceptDiscord": true,
     "discordWebhookConfigured": false,
-    "finalApplicationDeployVerified": false,
-    "githubRequiredCheckConfirmed": false
+    "finalApplicationDeployVerified": true,
+    "githubRequiredCheckConfirmed": true,
+    "canonicalUrl": "https://poke-deal.vercel.app",
+    "vercelDeploymentId": "dpl_F1wc536RUKTM93g45msAakcVhTUC",
+    "deployedApplicationCommit": "96333b895d85076ef71e4ab147751c9d0bcaac89"
+  },
+  "productionVerification": {
+    "basicAuth": {
+      "anonymousRoot": 401,
+      "anonymousInventoryApi": 401,
+      "anonymousRscPrefetch": 401,
+      "wrongPassword": 401,
+      "authenticatedRoot": 200,
+      "authenticatedInventoryApi": 200,
+      "anonymousEbayAccountDeletion": 401
+    },
+    "pwa": {
+      "authenticatedManifest": 200,
+      "authenticatedServiceWorker": 200
+    },
+    "verifyProd": {
+      "passed": 5,
+      "failed": 0,
+      "liveMarketProbeWasMadeSourceAware": true
+    },
+    "progressiveComp": {
+      "status": 200,
+      "contentType": "application/x-ndjson; charset=utf-8",
+      "catalogMs": 4045,
+      "provisionalVerdictMs": 5582,
+      "quorumVerdictMs": 6061,
+      "receiptMs": 6450
+    },
+    "scan": {
+      "status": 200,
+      "totalMs": 3231,
+      "identity": "Charizard 4/102",
+      "model": "gemini-3.1-flash-lite",
+      "durableReservation": true
+    },
+    "deepHealth": {
+      "status": 200,
+      "requiredSourcesPassed": true,
+      "databaseInventoryRows": 17,
+      "ebayBrowse": "skipped after its explicit timeout; lookup remained healthy"
+    }
   },
   "exitCriteria": {
     "scanToVerdictMeasurablyFaster": true,
