@@ -34,18 +34,27 @@ export function CardImage({
 }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   if (!src || failedSrc === src) return <span className={fallbackClassName} aria-hidden="true" />;
-  return <img className={className} src={src} alt={alt} onError={() => setFailedSrc(src)} />;
+  return (
+    <img
+      className={className}
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailedSrc(src)}
+    />
+  );
 }
 
 export type EmptyStateArt = "stock" | "sales" | "watches" | "alerts" | "session" | "search";
 
 const emptyStateArtPaths: Record<EmptyStateArt, string> = {
-  stock: "/visual/empty/stock.png",
-  sales: "/visual/empty/sales.png",
-  watches: "/visual/empty/watches.png",
-  alerts: "/visual/empty/alerts.png",
-  session: "/visual/empty/session.png",
-  search: "/visual/empty/search.png",
+  stock: "/visual/empty/stock.webp",
+  sales: "/visual/empty/sales.webp",
+  watches: "/visual/empty/watches.webp",
+  alerts: "/visual/empty/alerts.webp",
+  session: "/visual/empty/session.webp",
+  search: "/visual/empty/search.webp",
 };
 
 function inferEmptyStateArt(text: string): EmptyStateArt {
