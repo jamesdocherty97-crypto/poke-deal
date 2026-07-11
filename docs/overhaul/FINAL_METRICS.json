@@ -42,7 +42,7 @@
         "offline comp-backed buy survives reload and flushes once",
         "offline Quick Fill preserves stock and chosen listing"
       ],
-      "databaseMode": "fixture-routed real UI; not a disposable seeded Postgres instance"
+      "databaseMode": "fixture-routed real UI; CI deploys migrations to disposable PostgreSQL, but the browser journey is not seeded DB-backed"
     },
     "typecheckPassed": true,
     "prismaValidatePassed": true,
@@ -84,6 +84,7 @@
     "productionPrismaGlobalReuse": true,
     "durableAcquireAndSellIdempotency": true,
     "saleRowLock": true,
+    "ciDisposablePostgresMigrationDeploy": true,
     "scanBudgetDurableWhenDatabaseAvailable": true,
     "sourceFreshnessRegistry": "runtime-local"
   },
