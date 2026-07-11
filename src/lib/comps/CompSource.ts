@@ -18,7 +18,12 @@ export interface CompSource {
    *  - delegate cleaning to cleanToComp (do not reinvent stats),
    *  - never throw for "no data" — return a CompResult with sampleSize 0.
    */
-  lookup(card: CardRef, query?: CompQuery): Promise<CompResult>;
+  lookup(card: CardRef, query?: CompQuery, context?: CompSourceContext): Promise<CompResult>;
+}
+
+export interface CompSourceContext {
+  /** Aborted when the caller goes away or the orchestration budget expires. */
+  signal?: AbortSignal;
 }
 
 /** Optional capability: a source that can also return the underlying raw sales. */

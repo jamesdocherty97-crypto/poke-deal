@@ -16,6 +16,7 @@ export interface InventoryItemDraft {
   location?: string;
   condition?: string;
   graderCert?: string;
+  clientMutationId?: string;
   status: "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 }
 
@@ -38,6 +39,7 @@ export interface AcquireInput {
   location?: string;
   condition?: string;
   graderCert?: string;
+  clientMutationId?: string;
   comp: CompResult | null;
   strategy?: PricingStrategy;
   minMargin?: number;
@@ -73,6 +75,7 @@ export async function acquireToInventory(
     location: input.location,
     condition: input.condition,
     graderCert: input.graderCert,
+    clientMutationId: input.clientMutationId,
     status: "IN_STOCK",
   });
 

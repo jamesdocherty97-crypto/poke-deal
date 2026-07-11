@@ -21,6 +21,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { buildCheckedComp } from "@/lib/dealer/checkedComp";
 import { GRADE_VALUES, type CardRef } from "@/lib/domain/types";
 import { PrismaCheckedCompRepo, type CheckedCompDb, type CheckedCompPlatform } from "@/lib/comps/sources/checkedComps";
+import { readClientMutationId } from "@/lib/offline/clientMutation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,8 @@ const acquireSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const mutation = readClientMutationId(request);
+  if (!mutation.ok) return NextResponse.json({ error: mutation.error }, { status: 400 });
   const body = await request.json().catch(() => null);
   const parsed = acquireSchema.safeParse(body);
   if (!parsed.success) {
@@ -75,6 +78,10 @@ export async function POST(request: Request) {
   const card: CardRef = { ...d.card, game: "POKEMON", language: "EN" };
 
   try {
+    if (mutation.value) {
+      const replay = await replayAcquire(mutation.value, d.strategy);
+      if (replay) return replay;
+    }
     const catalogSource = new PokemonTcgApiCatalogSource();
     const catalog = await resolveCatalogCard(card, catalogSource);
     const compCard = catalog ? catalogToCardRef(catalog, card) : card;
@@ -152,6 +159,7 @@ export async function POST(request: Request) {
       location: d.location,
       condition: d.condition,
       graderCert: d.graderCert,
+      clientMutationId: mutation.value ?? undefined,
       comp: pricingComp,
       strategy: d.strategy,
       minMargin: d.minMargin,
@@ -209,11 +217,64 @@ export async function POST(request: Request) {
       listing,
     }, { status: 201 });
   } catch (err) {
+    if (mutation.value) {
+      const replay = await replayAcquire(mutation.value, d.strategy).catch(() => null);
+      if (replay) return replay;
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "acquire failed" },
       { status: 500 },
     );
   }
+}
+
+async function replayAcquire(clientMutationId: string, strategy: "quick" | "market" | "patient") {
+  const item = await getPrisma().inventoryItem.findUnique({
+    where: { clientMutationId },
+    include: {
+      card: true,
+      listings: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
+  });
+  if (!item) return null;
+  const listing = item.listings[0] ?? null;
+  return NextResponse.json({
+    item: {
+      id: item.id,
+      card: {
+        id: item.card.id,
+        name: item.card.name,
+        setName: item.card.setName,
+        number: item.card.number ?? undefined,
+        tcgApiId: item.card.tcgApiId ?? undefined,
+        game: item.card.game,
+        language: item.card.language,
+      },
+      grade: item.grade,
+      quantity: item.quantity,
+      costBasisPence: item.costBasis,
+      acquiredFrom: item.acquiredFrom ?? undefined,
+      location: item.location ?? undefined,
+      condition: item.condition ?? undefined,
+      graderCert: item.graderCert ?? undefined,
+      status: item.status,
+      createdAt: item.createdAt.toISOString(),
+      clientMutationId,
+    },
+    suggestion: {
+      pricePence: listing?.suggestedPrice ?? listing?.listPrice ?? 0,
+      strategy,
+      confidence: "none",
+      flooredToMargin: false,
+      rationale: "Idempotent replay of an acquisition already committed.",
+    },
+    comp: null,
+    comps: null,
+    catalog: null,
+    cardImage: null,
+    listing,
+    idempotent: true,
+  }, { status: 200 });
 }
 
 function checkedCompPlatformFromLegacySource(source: string | undefined): CheckedCompPlatform {

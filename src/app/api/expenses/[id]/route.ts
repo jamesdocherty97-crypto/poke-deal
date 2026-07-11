@@ -28,7 +28,8 @@ const expensePatchSchema = z.object({
   { message: "at least one expense field is required" },
 );
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   const parsed = expensePatchSchema.safeParse(body);
   if (!parsed.success) {
@@ -64,7 +65,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     await getPrisma().expense.delete({ where: { id: params.id } });
     return NextResponse.json({ ok: true });

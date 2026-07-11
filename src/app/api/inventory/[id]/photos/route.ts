@@ -24,8 +24,9 @@ const photoOrderSchema = z.object({
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   const prisma = getPrisma();
   const item = await prisma.inventoryItem.findUnique({
     where: { id: params.id },
@@ -44,8 +45,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   const parsed = photoCreateSchema.safeParse(body);
   if (!parsed.success) {
@@ -105,8 +107,9 @@ export async function POST(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   const parsed = photoOrderSchema.safeParse(body);
   if (!parsed.success) {
@@ -165,8 +168,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   const photoId = new URL(request.url).searchParams.get("photoId")?.trim();
   if (!photoId) {
     return NextResponse.json({ error: "photoId is required." }, { status: 400 });

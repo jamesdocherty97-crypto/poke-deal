@@ -183,6 +183,29 @@ test("fetchEbayAskEvidence uses app token, caches for one hour and applies the d
   assert.match(exhausted.reason ?? "", /budget exhausted/i);
 });
 
+test("fetchEbayAskEvidence bounds the terminal receipt path and degrades timeout to skipped evidence", async () => {
+  let observedSignal: AbortSignal | undefined;
+  const started = Date.now();
+  const evidence = await fetchEbayAskEvidence(moonbreon, {
+    grade: "RAW",
+    timeoutMs: 5,
+    fetchImpl: async (_url, init) => {
+      observedSignal = init?.signal ?? undefined;
+      return await new Promise<Response>((_resolve, reject) => {
+        observedSignal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+      });
+    },
+    rates,
+  });
+
+  assert.equal(evidence.skipped, true);
+  assert.match(evidence.reason ?? "", /timed out after 5ms/i);
+  assert.equal(evidence.count, 0);
+  assert.deepEqual(evidence.listings, []);
+  assert.equal(observedSignal?.aborted, true);
+  assert.ok(Date.now() - started < 500, "ask evidence must not hold the final comp receipt open");
+});
+
 test("attachAskEvidence never changes reconciliation inputs or headline", () => {
   const comp = {
     headline: { source: "poketrace", medianPence: 1200 },

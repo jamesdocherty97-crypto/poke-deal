@@ -1,10 +1,12 @@
+import { recordSourceSuccess } from "../system/sourceFreshness.js";
+
 export interface NotificationMessage {
   title: string;
   body: string;
 }
 
 export interface Notifier {
-  notify(message: NotificationMessage): Promise<void>;
+  notify(message: NotificationMessage, context?: { signal?: AbortSignal }): Promise<void>;
 }
 
 type FetchLike = typeof fetch;
@@ -13,18 +15,36 @@ export class DiscordNotifier implements Notifier {
   constructor(
     private readonly webhookUrl: string,
     private readonly fetchImpl: FetchLike = fetch,
+    private readonly timeoutMs = 5_000,
   ) {}
 
-  async notify(message: NotificationMessage): Promise<void> {
-    const content = `**${message.title}**\n${message.body}`;
-    const res = await this.fetchImpl(this.webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
+  async notify(message: NotificationMessage, context: { signal?: AbortSignal } = {}): Promise<void> {
+    const content = `**${message.title}**\n${message.body}`.slice(0, 2_000);
+    const started = Date.now();
+    const controller = new AbortController();
+    const relay = () => controller.abort(context.signal?.reason);
+    if (context.signal?.aborted) relay();
+    else context.signal?.addEventListener("abort", relay, { once: true });
+    const timer = setTimeout(() => controller.abort(new Error("Discord timeout")), this.timeoutMs);
+    let res: Response;
+    try {
+      res = await this.fetchImpl(this.webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+        signal: controller.signal,
+      });
+    } catch {
+      throw new Error(controller.signal.aborted ? "Discord webhook timed out or was cancelled" : "Discord webhook request failed");
+    } finally {
+      clearTimeout(timer);
+      context.signal?.removeEventListener("abort", relay);
+    }
     if (!res.ok) {
       throw new Error(`Discord webhook failed with HTTP ${res.status}`);
     }
+    recordSourceSuccess("push-alerts");
+    console.info(JSON.stringify({ event: "discord_delivery", status: "delivered", latencyMs: Date.now() - started }));
   }
 }
 

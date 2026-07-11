@@ -1,6 +1,7 @@
 import { getEbayConfig } from "./config.js";
 import { persistEbayRefreshToken, type EbayCredentialDb } from "./credentials.js";
 import { exchangeCodeForTokens, type EbayTokenResponse } from "./oauth.js";
+import { clearEbayOauthStateCookie, verifyEbayOauthState } from "./oauthState.js";
 
 export type EbayOauthCallbackDeps = {
   exchangeCodeForTokens?: typeof exchangeCodeForTokens;
@@ -16,26 +17,30 @@ export async function handleEbayOauthCallback(
   const error = url.searchParams.get("error");
   const code = url.searchParams.get("code");
 
+  const config = getEbayConfig();
+  if (!config) {
+    return Response.json({ error: "eBay not configured." }, { status: 503 });
+  }
+  const state = verifyEbayOauthState(request, config.clientSecret);
+  if (!state.ok) {
+    return finishOauthResponse(Response.json({ error: state.error }, { status: 400 }), request);
+  }
+
   if (error) {
-    return Response.json(
+    return finishOauthResponse(Response.json(
       {
         error: `eBay OAuth error: ${error}`,
         description: url.searchParams.get("error_description"),
       },
       { status: 400 },
-    );
+    ), request);
   }
 
   if (!code) {
-    return Response.json(
+    return finishOauthResponse(Response.json(
       { error: "No authorization code in callback." },
       { status: 400 },
-    );
-  }
-
-  const config = getEbayConfig();
-  if (!config) {
-    return Response.json({ error: "eBay not configured." }, { status: 503 });
+    ), request);
   }
 
   try {
@@ -44,15 +49,20 @@ export async function handleEbayOauthCallback(
     const tokens = await exchange(config, code);
     await persistReturnedRefreshToken(config, tokens, persist, deps.db);
 
-    return new Response(successHtml(), {
+    return finishOauthResponse(new Response(successHtml(), {
       headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+    }), request);
   } catch (err) {
-    return Response.json(
+    return finishOauthResponse(Response.json(
       { error: err instanceof Error ? err.message : "Token exchange failed" },
       { status: 500 },
-    );
+    ), request);
   }
+}
+
+function finishOauthResponse(response: Response, request: Request): Response {
+  response.headers.append("Set-Cookie", clearEbayOauthStateCookie(new URL(request.url).protocol === "https:"));
+  return response;
 }
 
 async function persistReturnedRefreshToken(

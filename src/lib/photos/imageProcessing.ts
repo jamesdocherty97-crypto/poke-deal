@@ -3,6 +3,8 @@ export const PHOTO_MIN_EBAY_EDGE_PX = 500;
 export const PHOTO_JPEG_QUALITY = 0.85;
 export const SCAN_IMAGE_MAX_EDGE_PX = 1024;
 export const SCAN_IMAGE_JPEG_QUALITY = 0.7;
+export const SCAN_TRANSMISSION_MAX_EDGE_PX = 512;
+export const SCAN_TRANSMISSION_JPEG_QUALITY = 0.5;
 
 export interface PhotoDimensions {
   width: number;
@@ -13,6 +15,13 @@ export interface CompressedPhoto {
   blob: Blob;
   width: number;
   height: number;
+}
+
+export interface PreparedScanPhoto {
+  /** Higher-resolution copy retained for the inventory photo and preview. */
+  photo: CompressedPhoto;
+  /** Smaller OCR-only copy sent over the mobile hot path. */
+  transmission: CompressedPhoto;
 }
 
 export function fitPhotoDimensions(
@@ -52,8 +61,31 @@ export async function compressPhotoForScan(file: File | Blob): Promise<Compresse
   return compressImage(file, SCAN_IMAGE_MAX_EDGE_PX, SCAN_IMAGE_JPEG_QUALITY);
 }
 
+export async function preparePhotoForScan(file: File | Blob): Promise<PreparedScanPhoto> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  try {
+    const photo = await compressBitmap(bitmap, SCAN_IMAGE_MAX_EDGE_PX, SCAN_IMAGE_JPEG_QUALITY);
+    const transmission = await compressBitmap(
+      bitmap,
+      SCAN_TRANSMISSION_MAX_EDGE_PX,
+      SCAN_TRANSMISSION_JPEG_QUALITY,
+    );
+    return { photo, transmission };
+  } finally {
+    bitmap.close();
+  }
+}
+
 async function compressImage(file: File | Blob, maxEdge: number, quality: number): Promise<CompressedPhoto> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  try {
+    return await compressBitmap(bitmap, maxEdge, quality);
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function compressBitmap(bitmap: ImageBitmap, maxEdge: number, quality: number): Promise<CompressedPhoto> {
   const { width, height } = fitPhotoDimensions(bitmap.width, bitmap.height, maxEdge);
 
   const canvas = document.createElement("canvas");
@@ -61,12 +93,10 @@ async function compressImage(file: File | Blob, maxEdge: number, quality: number
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    bitmap.close();
     throw new Error("Could not prepare photo.");
   }
 
   ctx.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((output) => {
       if (output) resolve(output);

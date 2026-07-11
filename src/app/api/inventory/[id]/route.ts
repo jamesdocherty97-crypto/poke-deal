@@ -17,8 +17,9 @@ const itemPatchSchema = z.object({
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   const parsed = itemPatchSchema.safeParse(body);
   if (!parsed.success) {
@@ -65,8 +66,9 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   try {
     await getPrisma().$transaction(async (tx) => {
       await tx.sale.deleteMany({ where: { itemId: params.id } });

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { CompResult } from "../domain/types.js";
+import type { CompResult, Grade } from "../domain/types.js";
 import { PrismaCompResultRepo, PrismaLastKnownCompCache } from "./prismaCompResultRepo.js";
 
 type FakeCard = {
@@ -32,7 +32,7 @@ type FakeCardData = {
 
 type FakeCompResultData = {
   cardId: string;
-  grade: "RAW" | "PSA_10";
+  grade: Grade;
   source: string;
   currency: "GBP";
   medianPence: number;
@@ -44,6 +44,10 @@ type FakeCompResultData = {
   trendPct: number | null;
   outliersRemoved: number;
   asOf: Date;
+  confidence?: string;
+  manualCheck?: boolean;
+  reasons?: unknown;
+  receipt?: unknown;
 };
 
 function comp(card: CompResult["card"]): CompResult {
@@ -145,7 +149,7 @@ function fakeDb(seedCards: FakeCard[] = []) {
           where,
           orderBy: _orderBy,
         }: {
-          where: { cardId: string; grade: "RAW" | "PSA_10" };
+          where: { cardId: string; grade: Grade };
           orderBy: { createdAt: "desc" };
         }) {
           return (
@@ -211,6 +215,27 @@ test("PrismaCompResultRepo persists against an existing card id", async () => {
   assert.equal(db.cards.length, 1);
   assert.equal(row.cardId, "card_existing");
   assert.equal(db.compResults[0]?.asOf.toISOString(), "2026-06-21T12:00:00.000Z");
+});
+
+test("PrismaCompResultRepo persists reconciliation evidence for the manual-check queue", async () => {
+  const db = fakeDb();
+  const repo = new PrismaCompResultRepo(db.client, null);
+  const row = await repo.create(comp({ name: "Gengar" }), {
+    reconciliation: {
+      headlinePence: 2778,
+      confidence: "low",
+      manualCheck: true,
+      reasons: ["source-disagreement"],
+      chosenSource: "pt-smart",
+      trendPct: null,
+    },
+    receipt: { all: [{ source: "pokemon-price-tracker", sampleSize: 8 }] },
+  });
+
+  assert.equal(row.manualCheck, true);
+  assert.equal(row.confidence, "low");
+  assert.deepEqual(db.compResults[0]?.reasons, ["source-disagreement"]);
+  assert.deepEqual(db.compResults[0]?.receipt, { all: [{ source: "pokemon-price-tracker", sampleSize: 8 }] });
 });
 
 test("PrismaLastKnownCompCache reads the latest stored comp for card and grade", async () => {

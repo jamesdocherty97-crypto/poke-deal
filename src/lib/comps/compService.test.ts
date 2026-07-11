@@ -307,6 +307,22 @@ test("CompService degrades a hanging source into a visible empty comp", async ()
   assert.equal(result.reconciliation?.manualCheck, true);
 });
 
+test("CompService aborts the underlying source when its orchestration budget expires", async () => {
+  let signal: AbortSignal | undefined;
+  const source: CompSource = {
+    name: "abort-aware-source",
+    live: true,
+    lookup: async (_card, _query, context) => {
+      signal = context?.signal;
+      return await new Promise<CompResult>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    },
+  };
+  await new CompService([source], 5).lookup({ name: "Gengar" });
+  assert.equal(signal?.aborted, true);
+});
+
 test("CompService records a timed-out source while using remaining priced sources", async () => {
   const hangingSource: CompSource = {
     name: "slow-source",
@@ -327,6 +343,40 @@ test("CompService records a timed-out source while using remaining priced source
   assert.equal(result.headline.medianPence, 4200);
   assert.equal(result.unavailableSources?.[0]?.name, "slow-source");
   assert.match(result.unavailableSources?.[0]?.reason ?? "", /timed out/);
+});
+
+test("CompService reports each source as it settles with a complete provisional receipt", async () => {
+  const progress: Array<{ source: string; completed: number; priced: boolean; sampleSize: number }> = [];
+  const first: CompSource = {
+    name: "checked-comps",
+    live: true,
+    lookup: async () => comp({ source: "checked-comps", medianPence: 4000, sampleSize: 4 }),
+  };
+  const second: CompSource = {
+    name: "poketrace",
+    live: true,
+    lookup: async () => comp({ source: "poketrace", medianPence: 4100, sampleSize: 12 }),
+  };
+
+  const result = await new CompService([first, second], 100).lookup(
+    { name: "Charizard ex", setName: "151", number: "199/165" },
+    { grade: "RAW" },
+    {
+      onProgress(event) {
+        progress.push({
+          source: event.source.name,
+          completed: event.completed,
+          priced: Boolean(event.receipt.headline),
+          sampleSize: event.result.sampleSize,
+        });
+      },
+    },
+  );
+
+  assert.equal(progress.length, 2);
+  assert.deepEqual(progress.map((event) => event.completed).sort(), [1, 2]);
+  assert.ok(progress.every((event) => event.priced && event.sampleSize > 0));
+  assert.equal(result.all.length, 2);
 });
 
 test("CompService keeps unavailable reasons visible for every comp source family", async () => {

@@ -41,8 +41,9 @@ type PublishListing = {
 
 export async function POST(
   _request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   if (!isEbayConfigured()) {
     return NextResponse.json(
       { error: "eBay is not configured." },

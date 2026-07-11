@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedCronRequest } from "@/lib/automation/cronAuth";
 import { dailyRunKey, runCronJobOnce } from "@/lib/automation/cronRunLog";
-import { createInboxAlert } from "@/lib/alerts/inbox";
+import { dispatchCronFailure } from "@/lib/alerts/cronFailure";
 import { runWatchCheck } from "@/lib/alerts/watchRunner";
 import { getPrisma } from "@/lib/db/prisma";
 import { syncOwnEbaySales } from "@/lib/ebay/orders";
@@ -82,8 +82,7 @@ export async function GET(request: Request) {
       ebaySales: serializeLoggedJob(ebaySales),
     }, { status: failed ? 500 : 200 });
   } catch (err) {
-    await createInboxAlert(getPrisma(), {
-      kind: "CRON_FAILURE",
+    await dispatchCronFailure(getPrisma(), {
       title: "Daily automation failed",
       message: err instanceof Error ? err.message : "daily cron failed",
       sourceKey: `cron:daily:${new Date().toISOString().slice(0, 10)}:route`,
@@ -106,8 +105,7 @@ function readDailyLimit(): number {
 
 async function alertFailedCron(result: Awaited<ReturnType<typeof runCronJobOnce>>, title: string) {
   if (result.status !== "FAILED") return;
-  await createInboxAlert(getPrisma(), {
-    kind: "CRON_FAILURE",
+  await dispatchCronFailure(getPrisma(), {
     title,
     message: result.error.message,
     sourceKey: `cron:${result.run.job}:${result.run.runKey}`,

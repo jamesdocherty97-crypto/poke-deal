@@ -1,0 +1,30 @@
+name: required-gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ship-gates:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/poke_deal_ci?schema=public
+      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/poke_deal_ci?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npx prisma validate
+      - run: npm test
+      - run: npm run test:overhaul
+      - run: npm run test:ux
+      - run: npm run test:pricing-redteam
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

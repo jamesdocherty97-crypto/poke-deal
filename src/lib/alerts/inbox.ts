@@ -46,7 +46,9 @@ export async function createInboxAlert(db: AppAlertDb, input: CreateAppAlertInpu
         message: data.message,
         pence: data.pence,
         href: data.href,
-        delivered: data.delivered,
+        // Never reopen an already-delivered idempotent alert merely because a
+        // cron or watch route retried with the default `delivered:false`.
+        ...(data.delivered ? { delivered: true } : {}),
       },
     });
   }

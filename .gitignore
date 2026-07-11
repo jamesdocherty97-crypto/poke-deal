@@ -17,6 +17,8 @@ APP_LOGIN_PASSWORD.txt
 output/backups/
 output/playwright/
 .playwright-cli/
+test-results/
+playwright-report/
 
 # sandbox-only artifacts
 .env.bak.*

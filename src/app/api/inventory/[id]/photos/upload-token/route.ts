@@ -12,8 +12,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   const body = (await request.json().catch(() => null)) as HandleUploadBody | null;
   if (!body) {
     return NextResponse.json({ error: "Invalid upload request." }, { status: 400 });

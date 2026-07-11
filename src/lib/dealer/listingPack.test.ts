@@ -9,10 +9,12 @@ import {
   buildListingPack,
   buildListingPackCsv,
   ebayCondition,
+  listingPackCsvHeader,
   listingPackCopyFields,
   suggestListPricePence,
   suggestPostage,
 } from "./listingPack.js";
+import { listingEvidenceFromPreview } from "./listingEvidence.js";
 
 const moonbreon = {
   card: { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203", rarity: "Secret Rare", language: "EN" },
@@ -29,6 +31,37 @@ const slab = {
   costBasisPence: 70000,
   certNumber: "84213567",
 };
+
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index]!;
+    if (character === '"') {
+      if (quoted && line[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === "," && !quoted) {
+      cells.push(cell);
+      cell = "";
+    } else {
+      cell += character;
+    }
+  }
+  cells.push(cell);
+  return cells;
+}
+
+function csvRecord(csv: string, row = 1): Record<string, string> {
+  const lines = csv.split("\n");
+  const headers = parseCsvLine(lines[0]!);
+  const values = parseCsvLine(lines[row]!);
+  return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+}
 
 test("eBay title stays within 80 chars and keeps whole words", () => {
   const title = buildEbayTitle(moonbreon);
@@ -128,6 +161,94 @@ test("manual marketplace packs use channel-specific copy and postage assumptions
   assert.match(cardmarketPack.description, /Cardmarket condition: NM/);
 });
 
+test("descriptions mention sold pricing only with a complete evidence receipt", () => {
+  const completeEvidence = {
+    sampleSize: 14,
+    windowDays: 30,
+    compAsOf: "2026-07-10T18:30:00Z",
+    sourceRegion: "  UK   sold listings ",
+  };
+
+  for (const channel of ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"] as const) {
+    const pack = buildListingPack({ ...moonbreon, channel, soldEvidence: completeEvidence });
+    assert.match(
+      pack.description,
+      /Recent sold evidence centres around £285\.00 \(n=14 across a 30-day window, as of 2026-07-10, UK sold listings\)\./,
+      channel,
+    );
+  }
+});
+
+test("history preview evidence maps atomically into buyer-facing listing fields", () => {
+  const fields = listingEvidenceFromPreview({
+    key: "card_1|RAW",
+    cardId: "card_1",
+    grade: "RAW",
+    range: { from: "2026-06-10T00:00:00.000Z", to: "2026-07-10T00:00:00.000Z" },
+    market: [{ takenAt: "2026-07-10T00:00:00.000Z", marketPence: 4_200 }],
+    soldEvidence: {
+      source: "checked-comps",
+      medianPence: 4_200,
+      sampleSize: 7,
+      windowDays: 90,
+      asOf: "2026-07-10T00:00:00.000Z",
+      sourceRegion: "EU",
+    },
+  });
+  assert.deepEqual(fields, {
+    compMedianPence: 4_200,
+    soldEvidence: {
+      sampleSize: 7,
+      windowDays: 90,
+      compAsOf: "2026-07-10T00:00:00.000Z",
+      sourceRegion: "EU",
+    },
+  });
+  assert.match(buildListingPack({ ...moonbreon, ...fields }).description, /£42\.00.*n=7.*90-day.*EU/);
+});
+
+test("history preview mapper drops incomplete evidence rather than exposing a bare median", () => {
+  const fields = listingEvidenceFromPreview({
+    key: "card_1|RAW",
+    cardId: "card_1",
+    grade: "RAW",
+    range: { from: "2026-06-10T00:00:00.000Z", to: "2026-07-10T00:00:00.000Z" },
+    market: [{ takenAt: "2026-07-10T00:00:00.000Z", marketPence: 4_200 }],
+    soldEvidence: {
+      source: "owned-sales",
+      medianPence: 4_200,
+      sampleSize: 0,
+      windowDays: 90,
+      asOf: "2026-07-10T00:00:00.000Z",
+    },
+  });
+  assert.deepEqual(fields, {});
+});
+
+test("descriptions never expose a bare comp price when evidence context is incomplete", () => {
+  const incompleteEvidence = [
+    undefined,
+    { sampleSize: 14 },
+    { sampleSize: 14, windowDays: 30 },
+    { sampleSize: 0, windowDays: 30, compAsOf: "2026-07-10" },
+    { sampleSize: 14, windowDays: 0, compAsOf: "2026-07-10" },
+    { sampleSize: 14, windowDays: 30, compAsOf: "not-a-date" },
+  ];
+
+  for (const soldEvidence of incompleteEvidence) {
+    const description = buildListingPack({ ...moonbreon, soldEvidence }).description;
+    assert.doesNotMatch(description, /Recent sold evidence/);
+    assert.doesNotMatch(description, /£285\.00/);
+  }
+
+  const missingMedian = buildListingPack({
+    ...moonbreon,
+    compMedianPence: 0,
+    soldEvidence: { sampleSize: 14, windowDays: 30, compAsOf: new Date("2026-07-10T12:00:00Z") },
+  });
+  assert.doesNotMatch(missingMedian.description, /Recent sold evidence|£0\.00/);
+});
+
 test("listing copy settings replace default eBay boilerplate", () => {
   const pack = buildListingPack({
     ...slab,
@@ -191,4 +312,125 @@ test("CSV export has a header and one row per item, with quoting", () => {
   assert.match(lines[1]!, /"Pikachu ""Promo""/);
   assert.match(lines[1]!, /"Scarlet, Violet Promos/);
   assert.match(lines[2]!, /Charizard ex/);
+});
+
+test("default and explicit eBay CSVs preserve the existing File Exchange schema", () => {
+  const expectedHeader = [
+    "Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)",
+    "Category",
+    "Title",
+    "Description",
+    "Condition",
+    "Quantity",
+    "Format",
+    "StartPrice",
+    "PostageService-1:Option",
+    "PostageService-1:Cost",
+    "DispatchTimeMax",
+    "ReturnsAcceptedOption",
+    "CustomLabel",
+    "ItemSpecifics:Game",
+    "ItemSpecifics:Card Name",
+    "ItemSpecifics:Set",
+    "ItemSpecifics:Card Number",
+    "ItemSpecifics:Professional Grader",
+    "ItemSpecifics:Grade",
+    "ItemSpecifics:Certification Number",
+  ].join(",");
+
+  assert.equal(listingPackCsvHeader(), expectedHeader);
+  assert.equal(buildListingPackCsv([]), expectedHeader);
+
+  const implicit = buildListingPackCsv([moonbreon]);
+  const explicit = buildListingPackCsv([{ ...moonbreon, channel: "EBAY" }]);
+  assert.equal(implicit, explicit);
+  assert.deepEqual(
+    {
+      action: csvRecord(explicit)[expectedHeader.split(",")[0]!],
+      category: csvRecord(explicit).Category,
+      format: csvRecord(explicit).Format,
+      startPrice: csvRecord(explicit).StartPrice,
+      postage: csvRecord(explicit)["PostageService-1:Option"],
+    },
+    {
+      action: "Add",
+      category: "183454",
+      format: "FixedPrice",
+      startPrice: "285.00",
+      postage: "UK_RoyalMailFirstClassStandard",
+    },
+  );
+});
+
+test("Cardmarket CSV uses stock-prep fields and Cardmarket condition codes", () => {
+  const csv = buildListingPackCsv([
+    { ...moonbreon, channel: "CARDMARKET" },
+    { ...slab, channel: "CARDMARKET" },
+  ]);
+  const lines = csv.split("\n");
+  assert.equal(
+    lines[0],
+    "Card Name,Expansion,Collector Number,Language,Condition,Professional Grader,Grade,Certification Number,Price (GBP),Quantity,Comments",
+  );
+  assert.equal(lines.length, 3);
+  assert.equal(csv.includes("Action(SiteID"), false);
+
+  const raw = csvRecord(csv, 1);
+  assert.equal(raw["Card Name"], "Umbreon VMAX");
+  assert.equal(raw.Expansion, "Evolving Skies");
+  assert.equal(raw.Language, "English");
+  assert.equal(raw.Condition, "NM");
+  assert.equal(raw["Price (GBP)"], "285.00");
+  assert.match(raw.Comments ?? "", /Cardmarket condition: NM/);
+
+  const graded = csvRecord(csv, 2);
+  assert.equal(graded.Condition, "Graded");
+  assert.equal(graded["Professional Grader"], "PSA");
+  assert.equal(graded.Grade, "10");
+  assert.equal(graded["Certification Number"], "84213567");
+});
+
+test("Vinted CSV uses manual-listing fields, buyer shipping assumptions and generic condition", () => {
+  const csv = buildListingPackCsv([{ ...moonbreon, channel: "VINTED", condition: "LP" }]);
+  assert.equal(
+    csv.split("\n")[0],
+    "Title,Description,Category,Brand,Condition,Price (GBP),Parcel Size,Quantity,Reference",
+  );
+  assert.equal(csv.includes("PostageService-1:Option"), false);
+
+  const row = csvRecord(csv);
+  assert.match(row.Title ?? "", /Umbreon VMAX/);
+  assert.match(row.Description ?? "", /Happy to bundle/);
+  assert.equal(row.Category, "Hobbies & collectables > Trading cards");
+  assert.equal(row.Brand, "Pokémon");
+  assert.equal(row.Condition, "Good");
+  assert.equal(row["Price (GBP)"], "285.00");
+  assert.equal(row["Parcel Size"], "Small");
+});
+
+test("in-person CSV is a handover price sheet rather than a marketplace upload", () => {
+  const csv = buildListingPackCsv([{ ...slab, channel: "IN_PERSON" }]);
+  assert.equal(
+    csv.split("\n")[0],
+    "Item,Set,Collector Number,Grade / Condition,Certification Number,Asking Price (GBP),Quantity,Handover,Notes",
+  );
+
+  const row = csvRecord(csv);
+  assert.equal(row.Item, "Charizard ex");
+  assert.equal(row["Grade / Condition"], "PSA 10 GEM MINT");
+  assert.equal(row["Certification Number"], "84213567");
+  assert.equal(row["Asking Price (GBP)"], "1063.00");
+  assert.equal(row.Handover, "Collection / handover");
+  assert.match(row.Notes ?? "", /Buyer can inspect before payment/);
+});
+
+test("CSV export rejects mixed channels instead of labelling rows with the wrong schema", () => {
+  assert.throws(
+    () => buildListingPackCsv([{ ...moonbreon, channel: "CARDMARKET" }, { ...slab, channel: "VINTED" }]),
+    /only contain one channel/,
+  );
+  assert.throws(
+    () => buildListingPackCsv([moonbreon, { ...slab, channel: "EBAY" }, { ...slab, channel: "IN_PERSON" }]),
+    /only contain one channel/,
+  );
 });

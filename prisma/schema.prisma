@@ -7,8 +7,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Runtime traffic uses the Neon pooler. Prisma migrations use the direct
+  // endpoint so DDL and advisory locks are not routed through PgBouncer.
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -21,12 +24,12 @@ model Card {
   game     Game     @default(POKEMON)
   language Language @default(EN)
 
-  name     String
-  setName  String
-  setCode  String?
-  number   String? // collector number within the set, e.g. "058/198"
-  rarity   String?
-  imageUrl String?
+  name            String
+  setName         String
+  setCode         String?
+  number          String? // collector number within the set, e.g. "058/198"
+  rarity          String?
+  imageUrl        String?
   displayImageUrl String? // display-only fallback art; never used as listing/photo-pipeline catalog art
 
   // External catalog references, for adapter lookups.
@@ -70,7 +73,8 @@ model InventoryItem {
   acquiredAt   DateTime @default(now())
   location     String? // bin / box / shelf reference
 
-  status InventoryStatus @default(IN_STOCK)
+  status           InventoryStatus @default(IN_STOCK)
+  clientMutationId String?         @unique
 
   listings         Listing[]
   sales            Sale[]
@@ -82,6 +86,7 @@ model InventoryItem {
 
   @@index([status])
   @@index([cardId, grade])
+  @@index([status, updatedAt])
 }
 
 model CardPhoto {
@@ -126,6 +131,7 @@ model Listing {
   updatedAt DateTime @updatedAt
 
   @@index([channel, state])
+  @@index([itemId, state])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -137,17 +143,21 @@ model Sale {
   item   InventoryItem @relation(fields: [itemId], references: [id])
   itemId String
 
-  channel   Channel
-  salePrice Int // GBP pence — gross
-  fees      Int      @default(0) // GBP pence — channel + payment fees
-  postage   Int      @default(0) // GBP pence — cost to me, net of what buyer paid
-  soldAt    DateTime @default(now())
+  channel          Channel
+  salePrice        Int // GBP pence — gross
+  fees             Int      @default(0) // GBP pence — channel + payment fees
+  postage          Int      @default(0) // GBP pence — cost to me, net of what buyer paid
+  soldAt           DateTime @default(now())
+  clientMutationId String?
+  mutationIndex    Int      @default(0)
 
   // realized profit = salePrice - fees - postage - (item.costBasis) ; computed in service layer
   createdAt       DateTime         @default(now())
   ebayOrderImport EbayOrderImport?
 
+  @@unique([clientMutationId, mutationIndex])
   @@index([soldAt])
+  @@index([itemId, soldAt])
 }
 
 model EbayOrderImport {
@@ -299,7 +309,19 @@ model CompResult {
   asOf      DateTime
   createdAt DateTime @default(now())
 
+  // Durable manual-check worklist metadata. The valuation evidence remains
+  // append-only; only the resolution fields are updated by the review API.
+  confidence     String?
+  manualCheck    Boolean   @default(false)
+  reasons        Json?
+  receipt        Json?
+  resolvedAt     DateTime?
+  resolution     String?
+  resolutionNote String?
+
   @@index([cardId, grade, asOf])
+  @@index([cardId, grade, createdAt])
+  @@index([manualCheck, resolvedAt, createdAt])
 }
 
 /// Dealer-observed comps logged after manually checking sold listings.
@@ -338,11 +360,11 @@ model PriceSnapshot {
 /// Append-only scan observations. Captures "dealer considered this card" even
 /// when it was not bought, stocked, or comped.
 model ScanEvent {
-  id     String @id @default(cuid())
-  card   Card?  @relation(fields: [cardId], references: [id])
+  id     String  @id @default(cuid())
+  card   Card?   @relation(fields: [cardId], references: [id])
   cardId String?
 
-  source      String @default("gemini-scan")
+  source      String    @default("gemini-scan")
   status      String
   name        String?
   setName     String?
@@ -355,12 +377,28 @@ model ScanEvent {
   model       String?
   raw         Json?
 
+  // Operational/evaluation telemetry. `sessionHash` is a one-way HMAC and
+  // never stores the caller's raw session token.
+  latencyMs     Int?
+  requestBytes  Int?
+  inputKind     String?
+  sessionHash   String?
+  correctionKey String? @unique
+
+  // A correction is a new append-only ScanEvent linked to the observation it
+  // corrects. Existing model output is never overwritten.
+  correctionOfId String?
+  correctionOf   ScanEvent?  @relation("ScanCorrections", fields: [correctionOfId], references: [id])
+  corrections    ScanEvent[] @relation("ScanCorrections")
+
   createdAt DateTime @default(now())
 
   @@index([createdAt])
   @@index([cardId, createdAt])
   @@index([source, status])
   @@index([name])
+  @@index([sessionHash, createdAt])
+  @@index([correctionOfId, createdAt])
 }
 
 model CronRun {
@@ -377,6 +415,7 @@ model CronRun {
   @@unique([job, runKey])
   @@index([job, startedAt])
   @@index([status])
+  @@index([status, startedAt])
 }
 
 model FxRate {
