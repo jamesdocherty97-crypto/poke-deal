@@ -12,6 +12,7 @@ import { PokemonPriceTrackerSource } from "./sources/pokemonPriceTracker.js";
 import { PokeTraceSource } from "./sources/pokeTrace.js";
 import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from "./sources/ebayMarketplaceInsights.js";
 import { reconcileComps, type ReconCandidate, type ReconQuery, type ReconResult, type ReconSource } from "./reconciler.js";
+import { recordSourceSuccess } from "../system/sourceFreshness.js";
 
 const DEFAULT_SOURCE_TIMEOUT_MS = 4000;
 const DEFAULT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -51,6 +52,25 @@ export interface ReconciledComp {
   cached?: CachedCompBadge;
 }
 
+export type CompSourceProgressStatus = "priced" | "empty" | "unavailable";
+
+export interface CompSourceProgress {
+  source: { name: string; live: boolean };
+  status: CompSourceProgressStatus;
+  latencyMs: number;
+  completed: number;
+  total: number;
+  result: CompResult;
+  /** A complete confidence receipt over evidence received so far. */
+  receipt: ReconciledComp;
+}
+
+export interface CompLookupOptions {
+  ambiguous?: boolean;
+  signal?: AbortSignal;
+  onProgress?: (progress: CompSourceProgress) => void | Promise<void>;
+}
+
 export class CompService {
   constructor(
     private readonly sources: CompSource[],
@@ -72,14 +92,33 @@ export class CompService {
   async lookup(
     card: CardRef,
     query: CompQuery = {},
-    options: { ambiguous?: boolean } = {},
+    options: CompLookupOptions = {},
   ): Promise<ReconciledComp> {
-    const settled = await Promise.allSettled(
-      this.sources.map((source) => this.lookupSource(source, card, query)),
+    const results: Array<CompResult | undefined> = new Array(this.sources.length);
+    let completed = 0;
+    await Promise.all(
+      this.sources.map(async (source, index) => {
+        const started = Date.now();
+        const result = await this.lookupSource(source, card, query, options.signal);
+        results[index] = result;
+        completed += 1;
+        const allSoFar = results.filter((item): item is CompResult => Boolean(item));
+        const receipt = reconcileFreshResults(allSoFar, card, query, options);
+        const progress: CompSourceProgress = {
+          source: { name: source.name, live: source.live },
+          status: sourceProgressStatus(result),
+          latencyMs: Date.now() - started,
+          completed,
+          total: this.sources.length,
+          result,
+          receipt,
+        };
+        if (progress.status === "priced") recordSourceSuccess(source.name);
+        logSourceProgress(progress);
+        await options.onProgress?.(progress);
+      }),
     );
-    const all = settled
-      .filter((r): r is PromiseFulfilledResult<CompResult> => r.status === "fulfilled")
-      .map((r) => r.value);
+    const all = results.filter((item): item is CompResult => Boolean(item));
     const unavailableSources = unavailableFromResults(all);
 
     if (all.length === 0) {
@@ -109,8 +148,8 @@ export class CompService {
       }
     }
 
-    const { headline, reconciliation } = pickHeadlineForQuery(all, card, query, options);
-    return { headline, all, sourcesDisagree: detectDisagreement(all) || reconciliation.manualCheck, reconciliation, unavailableSources };
+    const fresh = reconcileFreshResults(all, card, query, options);
+    return { ...fresh, unavailableSources };
   }
 
   private async readWarmCache(card: CardRef, query: CompQuery): Promise<CachedCompRecord | null> {
@@ -123,16 +162,32 @@ export class CompService {
     return cached;
   }
 
-  private async lookupSource(source: CompSource, card: CardRef, query: CompQuery): Promise<CompResult> {
+  private async lookupSource(
+    source: CompSource,
+    card: CardRef,
+    query: CompQuery,
+    callerSignal?: AbortSignal,
+  ): Promise<CompResult> {
     const fallback = (reason: string): CompResult => emptySourceComp(source.name, card, query, reason);
+    const controller = new AbortController();
+    const abortFromCaller = () => controller.abort(callerSignal?.reason);
+    if (callerSignal?.aborted) abortFromCaller();
+    else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
     try {
       return await withTimeout(
-        source.lookup(card, query),
+        source.lookup(card, query, { signal: controller.signal }),
         this.sourceTimeoutMs,
-        () => fallback(`${source.name} timed out`),
+        () => {
+          controller.abort(new Error(`${source.name} timed out`));
+          return fallback(`${source.name} timed out`);
+        },
+        callerSignal,
+        () => fallback(`${source.name} cancelled`),
       );
     } catch (err) {
       return fallback(err instanceof Error ? `${source.name} failed: ${err.message}` : `${source.name} failed`);
+    } finally {
+      callerSignal?.removeEventListener("abort", abortFromCaller);
     }
   }
 }
@@ -160,21 +215,71 @@ export class MemoryLastKnownCompCache implements LastKnownCompCache {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: () => T): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback: () => T,
+  signal?: AbortSignal,
+  cancelled: () => T = fallback,
+): Promise<T> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => resolve(fallback()), timeoutMs);
+    let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      callback();
+    };
+    const onAbort = () => finish(() => resolve(cancelled()));
+    const timer = setTimeout(() => finish(() => resolve(fallback())), timeoutMs);
+    if (signal?.aborted) return onAbort();
+    signal?.addEventListener("abort", onAbort, { once: true });
     promise.then(
       (value) => {
-        clearTimeout(timer);
-        resolve(value);
+        finish(() => resolve(value));
       },
       (err) => {
-        clearTimeout(timer);
-        reject(err);
+        finish(() => reject(err));
       },
     );
   });
+}
+
+function reconcileFreshResults(
+  all: CompResult[],
+  card: CardRef,
+  query: CompQuery,
+  options: Pick<CompLookupOptions, "ambiguous">,
+): ReconciledComp {
+  const { headline, reconciliation } = pickHeadlineForQuery(all, card, query, options);
+  return {
+    headline,
+    all,
+    sourcesDisagree: detectDisagreement(all) || reconciliation.manualCheck,
+    reconciliation,
+    unavailableSources: unavailableFromResults(all),
+  };
+}
+
+function sourceProgressStatus(result: CompResult): CompSourceProgressStatus {
+  if (result.sampleSize > 0 && result.medianPence > 0) return "priced";
+  return readRawString(result, "reason") ? "unavailable" : "empty";
+}
+
+function logSourceProgress(progress: CompSourceProgress): void {
+  console.info(JSON.stringify({
+    event: "comp_source_settled",
+    source: progress.source.name,
+    live: progress.source.live,
+    status: progress.status,
+    latencyMs: progress.latencyMs,
+    sampleSize: progress.result.sampleSize,
+    windowDays: progress.result.windowDays,
+    completed: progress.completed,
+    total: progress.total,
+  }));
 }
 
 function emptySourceComp(source: string, card: CardRef, query: CompQuery, reason: string): CompResult {
@@ -253,6 +358,22 @@ export function pickHeadlineForQuery(
     : null;
   const headline = chosen ? applyReconciliation(chosen, reconciliation) : null;
   return { headline, reconciliation };
+}
+
+/** Re-run only the pure reconciler when late identity/ambiguity evidence lands. */
+export function reconcileCompReceipt(
+  receipt: ReconciledComp,
+  card: CardRef,
+  query: CompQuery = {},
+  options: Pick<CompLookupOptions, "ambiguous"> = {},
+): ReconciledComp {
+  const revised = reconcileFreshResults(receipt.all, card, query, options);
+  return {
+    ...receipt,
+    ...revised,
+    unavailableSources: receipt.unavailableSources ?? revised.unavailableSources,
+    cached: receipt.cached,
+  };
 }
 
 /** Largest confident sample wins; fall back to largest sample of any. */

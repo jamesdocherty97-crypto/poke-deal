@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import type { CompResult, Grade } from "../domain/types.js";
 import { getPrisma } from "../db/prisma.js";
 import { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
@@ -7,6 +8,7 @@ import {
 } from "../catalog/prismaCardCache.js";
 import type { CatalogSource } from "../catalog/types.js";
 import type { CachedCompRecord, LastKnownCompCache } from "./compService.js";
+import type { ReconResult } from "./reconciler.js";
 
 type DbCompResult = {
   id: string;
@@ -24,7 +26,16 @@ type DbCompResult = {
   outliersRemoved: number;
   asOf: Date;
   createdAt: Date;
+  confidence?: string | null;
+  manualCheck?: boolean;
+  reasons?: unknown;
+  receipt?: unknown;
 };
+
+export interface CompResultAuditData {
+  reconciliation?: ReconResult;
+  receipt?: unknown;
+}
 
 type CompResultDb = PrismaCardDb & {
   compResult: {
@@ -43,6 +54,10 @@ type CompResultDb = PrismaCardDb & {
         trendPct: number | null;
         outliersRemoved: number;
         asOf: Date;
+        confidence?: string;
+        manualCheck?: boolean;
+        reasons?: Prisma.InputJsonValue;
+        receipt?: Prisma.InputJsonValue;
       };
     }): Promise<DbCompResult>;
     findFirst(args: {
@@ -66,6 +81,8 @@ export interface PersistedCompResultRecord {
   sampleSize: number;
   asOf: string;
   createdAt: string;
+  confidence?: string;
+  manualCheck: boolean;
 }
 
 export class PrismaCompResultRepo {
@@ -78,8 +95,9 @@ export class PrismaCompResultRepo {
     this.cardCache = new PrismaCardCache(this.db, catalogSource);
   }
 
-  async create(comp: CompResult): Promise<PersistedCompResultRecord> {
+  async create(comp: CompResult, audit: CompResultAuditData = {}): Promise<PersistedCompResultRecord> {
     const card = await this.cardCache.resolve(comp.card);
+    const reconciliation = audit.reconciliation;
     const row = await this.db.compResult.create({
       data: {
         cardId: card.id,
@@ -95,6 +113,14 @@ export class PrismaCompResultRepo {
         trendPct: comp.trendPct,
         outliersRemoved: comp.outliersRemoved,
         asOf: parseDate(comp.asOf),
+        ...(reconciliation
+          ? {
+              confidence: reconciliation.confidence,
+              manualCheck: reconciliation.manualCheck,
+              reasons: toJsonValue(reconciliation.reasons),
+            }
+          : {}),
+        ...(audit.receipt === undefined ? {} : { receipt: toJsonValue(audit.receipt) }),
       },
     });
 
@@ -107,6 +133,8 @@ export class PrismaCompResultRepo {
       sampleSize: row.sampleSize,
       asOf: row.asOf.toISOString(),
       createdAt: row.createdAt.toISOString(),
+      confidence: row.confidence ?? undefined,
+      manualCheck: row.manualCheck ?? false,
     };
   }
 
@@ -164,4 +192,8 @@ export class PrismaLastKnownCompCache implements LastKnownCompCache {
 function parseDate(value: string): Date {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function toJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }

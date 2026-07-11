@@ -7,7 +7,8 @@ import {
   stripLeadingZerosFromNumericSegment,
   stripProviderSetCodePrefix,
 } from "../../cards/identity.js";
-import type { CompSource } from "../CompSource.js";
+import type { CompSource, CompSourceContext } from "../CompSource.js";
+import { createAbortScope } from "../../http/abortScope.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
 import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
@@ -124,7 +125,7 @@ export class PokeTraceSource implements CompSource {
     this.live = Boolean(apiKey && apiKey.trim().length > 0);
   }
 
-  async lookup(card: CardRef, query: CompQuery = {}): Promise<CompResult> {
+  async lookup(card: CardRef, query: CompQuery = {}, context: CompSourceContext = {}): Promise<CompResult> {
     const grade = query.grade ?? "RAW";
     const windowDays = query.windowDays ?? DEFAULT_WINDOW_DAYS;
     const ctx = { source: this.name, card, grade, windowDays };
@@ -143,10 +144,10 @@ export class PokeTraceSource implements CompSource {
         continue;
       }
       // Respect the free-tier 1-req/2s burst limit before the fallback market call.
-      if (i > 0 && this.interMarketDelayMs > 0) await this.sleepImpl(this.interMarketDelayMs);
+      if (i > 0 && this.interMarketDelayMs > 0) await waitWithAbort(this.sleepImpl(this.interMarketDelayMs), context.signal);
       const midRunCooldown = readPokeTraceCooldown();
       if (midRunCooldown) return emptyComp(ctx, `PokeTrace source unavailable: ${midRunCooldown}`);
-      const payload = await this.fetchCards(card, market);
+      const payload = await this.fetchCards(card, market, context.signal);
       if (payload === "market-forbidden") {
         deniedMarkets += 1;
         lastEmpty = emptyComp(ctx, `PokeTrace ${market} market not permitted`);
@@ -167,7 +168,7 @@ export class PokeTraceSource implements CompSource {
     return lastEmpty ?? emptyComp(ctx, "PokeTrace lookup failed or returned no response");
   }
 
-  private async fetchCards(card: CardRef, market: PokeTraceMarket): Promise<unknown | "market-forbidden" | null> {
+  private async fetchCards(card: CardRef, market: PokeTraceMarket, parentSignal?: AbortSignal): Promise<unknown | "market-forbidden" | null> {
     for (const search of buildPokeTraceSearchVariants(card)) {
       const params = new URLSearchParams({
         search,
@@ -177,10 +178,10 @@ export class PokeTraceSource implements CompSource {
       });
 
       try {
-        if (this.useSharedThrottle) await waitForSharedPokeTraceSlot(this.interMarketDelayMs);
+        if (this.useSharedThrottle) await waitForSharedPokeTraceSlot(this.interMarketDelayMs, parentSignal);
         const cooldown = readPokeTraceCooldown();
         if (cooldown) return null;
-        const res = await this.fetchWithRetry(`${BASE_URL}/cards?${params.toString()}`, market);
+        const res = await this.fetchWithRetry(`${BASE_URL}/cards?${params.toString()}`, market, parentSignal);
         if (res === "market-forbidden") return "market-forbidden";
         if (res === "rate-limit-cooldown") return null;
         if (!res.ok) {
@@ -191,20 +192,22 @@ export class PokeTraceSource implements CompSource {
         if (findMatchingPokeTraceCard(json, card)) return json;
       } catch (err) {
         console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
+        if (parentSignal?.aborted) return null;
       }
     }
 
     return null;
   }
 
-  private async fetchWithRetry(url: string, market: PokeTraceMarket): Promise<PokeTraceFetchResult> {
+  private async fetchWithRetry(url: string, market: PokeTraceMarket, parentSignal?: AbortSignal): Promise<PokeTraceFetchResult> {
     let rateLimitCount = 0;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       sharedPokeTraceStats.calls += 1;
+      const abort = createAbortScope(parentSignal, this.fetchTimeoutMs);
       const res = await this.fetchImpl(url, {
         headers: { "X-API-Key": this.apiKey ?? "", Accept: "application/json" },
-        signal: timeoutSignal(this.fetchTimeoutMs),
-      });
+        signal: abort.signal,
+      }).finally(abort.cleanup);
       if (res.status === 403) {
         sharedPokeTraceStats.forbidden += 1;
         enterPokeTraceMarketDeny(market);
@@ -220,7 +223,7 @@ export class PokeTraceSource implements CompSource {
         console.warn(`[${this.name}] HTTP 429 - cooling source down`);
         return "rate-limit-cooldown";
       }
-      await this.sleepImpl(retryDelayMs(res, rateLimitCount));
+      await waitWithAbort(this.sleepImpl(retryDelayMs(res, rateLimitCount)), parentSignal);
     }
     return "rate-limit-cooldown";
   }
@@ -659,24 +662,39 @@ function trendPct(tier: PokeTracePriceTier): number | null {
   return Math.round(((current - older) / older) * 1000) / 10;
 }
 
-function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function waitForSharedPokeTraceSlot(intervalMs: number): Promise<void> {
+function waitForSharedPokeTraceSlot(intervalMs: number, signal?: AbortSignal): Promise<void> {
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) return Promise.resolve();
   const wait = sharedPokeTraceQueue.then(async () => {
     const elapsed = Date.now() - sharedPokeTraceRequestAt;
     const remaining = intervalMs - elapsed;
-    if (remaining > 0) await sleep(remaining);
+    if (remaining > 0) await waitWithAbort(sleep(remaining), signal);
     sharedPokeTraceRequestAt = Date.now();
   });
   sharedPokeTraceQueue = wait.catch(() => undefined);
   return wait;
+}
+
+function waitWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(signal.reason ?? new Error("request cancelled"));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason ?? new Error("request cancelled"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 function retryDelayMs(res: Response, rateLimitCount: number): number {

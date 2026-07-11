@@ -37,6 +37,7 @@ import {
   type EbayCredentialRow,
 } from "./credentials.js";
 import { handleEbayOauthCallback } from "./oauthCallback.js";
+import { EBAY_OAUTH_STATE_COOKIE, createEbayOauthState, ebayOauthStateCookie, verifyEbayOauthState } from "./oauthState.js";
 
 const TEST_CONFIG: EbayConfig = {
   clientId: "TestClient-123",
@@ -138,7 +139,7 @@ test("isEbayConfigured returns false when credentials are missing", () => {
 // ── OAuth URL builder ─────────────────────────────────────────────────────────
 
 test("buildAuthUrl produces correct sandbox consent URL", () => {
-  const url = buildAuthUrl(TEST_CONFIG);
+  const url = buildAuthUrl(TEST_CONFIG, "test-state-123");
   const parsed = new URL(url);
   const scopes = parsed.searchParams.get("scope")?.split(" ") ?? [];
   assert.match(url, /auth\.sandbox\.ebay\.com\/oauth2\/authorize/);
@@ -162,6 +163,21 @@ test("buildAuthUrl can force a clean eBay login for re-consent", () => {
   const url = new URL(buildAuthUrl(TEST_CONFIG, "ebay-force-reconnect", { forceLogin: true }));
   assert.equal(url.searchParams.get("state"), "ebay-force-reconnect");
   assert.equal(url.searchParams.get("prompt"), "login");
+});
+
+test("eBay OAuth state is random, signed, cookie-bound and tamper-evident", () => {
+  const first = createEbayOauthState(TEST_CONFIG.clientSecret);
+  const second = createEbayOauthState(TEST_CONFIG.clientSecret);
+  assert.notEqual(first, second);
+  const valid = new Request(`https://poke-deal.test/api/ebay/oauth?state=${encodeURIComponent(first)}`, {
+    headers: { cookie: `${EBAY_OAUTH_STATE_COOKIE}=${first}` },
+  });
+  assert.deepEqual(verifyEbayOauthState(valid, TEST_CONFIG.clientSecret), { ok: true });
+  const tampered = new Request(`https://poke-deal.test/api/ebay/oauth?state=${encodeURIComponent(`${first}x`)}`, {
+    headers: { cookie: `${EBAY_OAUTH_STATE_COOKIE}=${first}x` },
+  });
+  assert.equal(verifyEbayOauthState(tampered, TEST_CONFIG.clientSecret).ok, false);
+  assert.match(ebayOauthStateCookie(first), /HttpOnly; SameSite=Lax; Secure/);
 });
 
 // ── Token exchange ────────────────────────────────────────────────────────────
@@ -345,8 +361,11 @@ test("OAuth callback persists the returned refresh token and never displays it",
 
   const calls: Array<{ token: string; expires?: number }> = [];
   try {
+    const state = createEbayOauthState(TEST_CONFIG.clientSecret, "a".repeat(43));
     const response = await handleEbayOauthCallback(
-      new Request("https://poke-deal.test/api/ebay/oauth?code=auth-code-123"),
+      new Request(`https://poke-deal.test/api/ebay/oauth?code=auth-code-123&state=${encodeURIComponent(state)}`, {
+        headers: { cookie: `${EBAY_OAUTH_STATE_COOKIE}=${state}` },
+      }),
       {
         exchangeCodeForTokens: async () => ({
           access_token: "access-token",
@@ -368,7 +387,28 @@ test("OAuth callback persists the returned refresh token and never displays it",
     assert.match(html, /close this tab/);
     assert.doesNotMatch(html, /refresh-token-from-ebay/);
     assert.doesNotMatch(html, /EBAY_REFRESH_TOKEN/);
+    assert.match(response.headers.get("set-cookie") ?? "", /Max-Age=0/);
     assert.deepEqual(calls, [{ token: "refresh-token-from-ebay", expires: 47_304_000 }]);
+  } finally {
+    restoreEnv(saved);
+  }
+});
+
+test("OAuth callback rejects missing/mismatched state before token exchange", async () => {
+  const saved = saveEnv(["EBAY_CLIENT_ID", "EBAY_CLIENT_SECRET", "EBAY_RU_NAME", "EBAY_ENV"]);
+  process.env.EBAY_CLIENT_ID = TEST_CONFIG.clientId;
+  process.env.EBAY_CLIENT_SECRET = TEST_CONFIG.clientSecret;
+  process.env.EBAY_RU_NAME = TEST_CONFIG.ruName;
+  process.env.EBAY_ENV = TEST_CONFIG.env;
+  let exchanges = 0;
+  try {
+    const response = await handleEbayOauthCallback(
+      new Request("https://poke-deal.test/api/ebay/oauth?code=attacker-code&state=attacker-state"),
+      { exchangeCodeForTokens: async () => { exchanges += 1; throw new Error("must not run"); } },
+    );
+    assert.equal(response.status, 400);
+    assert.equal(exchanges, 0);
+    assert.match((await response.json()).error, /state/i);
   } finally {
     restoreEnv(saved);
   }

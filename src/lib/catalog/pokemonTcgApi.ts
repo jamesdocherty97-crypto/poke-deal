@@ -4,6 +4,8 @@ import { isApiUnavailableSetId, resolveSetIdForCard } from "./setCatalog.js";
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js";
 import { tokenizeSearchText } from "./fuzzy.js";
 import { normalizeCatalogCardSearchInput } from "./cardSearch.js";
+import { createAbortScope } from "../http/abortScope.js";
+import type { CatalogSourceContext } from "./types.js";
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
 const CARD_IDENTITY_FIELDS = "id,name,number,rarity,images,set";
@@ -76,7 +78,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     this.live = Boolean(apiKey?.trim());
   }
 
-  async resolve(card: CardRef): Promise<CatalogCard | null> {
+  async resolve(card: CardRef, context: CatalogSourceContext = {}): Promise<CatalogCard | null> {
     if ((card.game && card.game !== "POKEMON") || (card.language && card.language !== "EN")) {
       return null;
     }
@@ -86,14 +88,15 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     if (card.tcgApiId) {
       const json = await this.request(`/cards/${encodeURIComponent(card.tcgApiId)}`, {
         select: MARKET_SELECT_FIELDS,
-      });
+      }, context.signal);
       return mapPokemonTcgCard(readDataObject(json), rates);
     }
 
     for (const candidateId of buildPokemonTcgIdCandidates(card)) {
+      if (context.signal?.aborted) return null;
       const json = await this.request(`/cards/${encodeURIComponent(candidateId)}`, {
         select: MARKET_SELECT_FIELDS,
-      });
+      }, context.signal);
       const direct = mapPokemonTcgCard(readDataObject(json), rates);
       if (direct) return direct;
     }
@@ -111,11 +114,12 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     // zeroed out the whole search. Now one bad term just drops a level
     // instead of failing outright.
     for (const q of queries) {
+      if (context.signal?.aborted) return null;
       const json = await this.request("/cards", {
         q,
         pageSize: "10",
         select: MARKET_SELECT_FIELDS,
-      });
+      }, context.signal);
       const cards = readDataArray(json);
       if (cards.length > 0) {
         return pickBestPokemonTcgCard(cards, card, resolvedSetId, rates);
@@ -124,7 +128,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     return null;
   }
 
-  async search(card: CardRef, limit = 10): Promise<CatalogCard[]> {
+  async search(card: CardRef, limit = 10, context: CatalogSourceContext = {}): Promise<CatalogCard[]> {
     if ((card.game && card.game !== "POKEMON") || (card.language && card.language !== "EN")) {
       return [];
     }
@@ -134,11 +138,12 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     const resolvedSetId = resolveSetIdForCard(card.setName, card.number);
 
     for (const q of queries) {
+      if (context.signal?.aborted) return [];
       const json = await this.request("/cards", {
         q,
         pageSize: String(Math.min(Math.max(limit, 1), 25)),
         select: CARD_IDENTITY_FIELDS,
-      });
+      }, context.signal);
       const cards = rankPokemonTcgCards(readDataArray(json), card, resolvedSetId);
       if (cards.length > 0) return cards.slice(0, limit);
     }
@@ -166,7 +171,8 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
     };
   }
 
-  private async request(path: string, params: Record<string, string>): Promise<unknown> {
+  private async request(path: string, params: Record<string, string>, parentSignal?: AbortSignal): Promise<unknown> {
+    const abort = createAbortScope(parentSignal, this.fetchTimeoutMs);
     try {
       const url = new URL(`${this.baseUrl}${path}`);
       for (const [key, value] of Object.entries(params)) {
@@ -182,12 +188,14 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
         headers["X-Api-Key"] = this.apiKey.trim();
       }
 
-      const res = await this.fetchImpl(url, { headers, signal: timeoutSignal(this.fetchTimeoutMs) });
+      const res = await this.fetchImpl(url, { headers, signal: abort.signal });
       const value = res.ok ? await res.json() : null;
       if (cacheKey) writeCachedRequest(cacheKey, value);
       return value;
     } catch {
       return null;
+    } finally {
+      abort.cleanup();
     }
   }
 
@@ -213,10 +221,6 @@ function readCachedRequest(key: string): unknown | undefined {
 function writeCachedRequest(key: string, value: unknown): void {
   const ttl = value == null ? NULL_CACHE_TTL_MS : REQUEST_CACHE_TTL_MS;
   requestCache.set(key, { value, expiresAt: Date.now() + ttl });
-}
-
-function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
 }
 
 // Builds a list of progressively looser search queries, most specific

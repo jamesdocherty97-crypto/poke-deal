@@ -16,6 +16,7 @@ type CronRunDelegate = {
   findMany(args?: any): Promise<CronRunRow[]>;
   create(args: any): Promise<CronRunRow>;
   update(args: any): Promise<CronRunRow>;
+  updateMany(args: any): Promise<{ count: number }>;
 };
 
 type CronRunDb = {
@@ -27,6 +28,8 @@ export type LoggedCronJobResult<T> =
   | { status: "SKIPPED"; run: CronRunRow; result: null }
   | { status: "FAILED"; run: CronRunRow; error: Error };
 
+const DEFAULT_CRON_LEASE_MS = 15 * 60 * 1000;
+
 export async function runCronJobOnce<T>(
   db: CronRunDb,
   input: {
@@ -35,25 +38,49 @@ export async function runCronJobOnce<T>(
     now?: Date;
     execute: () => Promise<T>;
     summarize?: (result: T) => unknown;
+    leaseMs?: number;
   },
 ): Promise<LoggedCronJobResult<T>> {
+  const startedAt = input.now ?? new Date();
+  const leaseMs = normalizeLeaseMs(input.leaseMs);
   const existing = await db.cronRun.findUnique({
     where: { job_runKey: { job: input.job, runKey: input.runKey } },
   });
 
-  if (existing?.status === "SUCCESS" || existing?.status === "RUNNING") {
+  if (existing?.status === "SUCCESS") {
     return { status: "SKIPPED", run: existing, result: null };
   }
 
-  const startedAt = input.now ?? new Date();
-  const run = existing
-    ? await db.cronRun.update({
-        where: { id: existing.id },
-        data: { status: "RUNNING", startedAt, finishedAt: null, error: null, details: null },
-      })
-    : await db.cronRun.create({
-        data: { job: input.job, runKey: input.runKey, status: "RUNNING", startedAt },
+  if (existing?.status === "RUNNING" && !isStaleCronRun(existing, startedAt, leaseMs)) {
+    return { status: "SKIPPED", run: existing, result: null };
+  }
+
+  let run: CronRunRow;
+  if (existing?.status === "RUNNING") {
+    const claimed = await db.cronRun.updateMany({
+      where: { id: existing.id, status: "RUNNING", startedAt: existing.startedAt },
+      data: { status: "RUNNING", startedAt, finishedAt: null, error: null, details: null },
+    });
+    if (claimed.count === 0) {
+      const current = await db.cronRun.findUnique({
+        where: { job_runKey: { job: input.job, runKey: input.runKey } },
       });
+      return { status: "SKIPPED", run: current ?? existing, result: null };
+    }
+    run =
+      (await db.cronRun.findUnique({
+        where: { job_runKey: { job: input.job, runKey: input.runKey } },
+      })) ?? { ...existing, startedAt, finishedAt: null, error: null, details: null };
+  } else if (existing) {
+    run = await db.cronRun.update({
+      where: { id: existing.id },
+      data: { status: "RUNNING", startedAt, finishedAt: null, error: null, details: null },
+    });
+  } else {
+    run = await db.cronRun.create({
+      data: { job: input.job, runKey: input.runKey, status: "RUNNING", startedAt },
+    });
+  }
 
   try {
     const result = await input.execute();
@@ -79,6 +106,18 @@ export async function runCronJobOnce<T>(
     });
     return { status: "FAILED", run: saved, error };
   }
+}
+
+export function isStaleCronRun(
+  run: Pick<CronRunRow, "status" | "startedAt">,
+  now = new Date(),
+  leaseMs = DEFAULT_CRON_LEASE_MS,
+): boolean {
+  return run.status === "RUNNING" && now.getTime() - run.startedAt.getTime() >= normalizeLeaseMs(leaseMs);
+}
+
+function normalizeLeaseMs(value: number | undefined): number {
+  return Number.isFinite(value) ? Math.max(1_000, Math.min(60 * 60 * 1000, Math.round(value!))) : DEFAULT_CRON_LEASE_MS;
 }
 
 export function dailyRunKey(now = new Date()): string {

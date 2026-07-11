@@ -26,6 +26,7 @@ type DbInventoryItem = {
   graderCert: string | null;
   status: InventoryItemDraft["status"];
   createdAt: Date;
+  clientMutationId?: string | null;
 };
 
 type InventoryDb = PrismaCardDb & {
@@ -40,6 +41,7 @@ type InventoryDb = PrismaCardDb & {
         location?: string;
         condition?: string;
         graderCert?: string;
+        clientMutationId?: string;
         status: InventoryItemDraft["status"];
       };
       include: { card: true };
@@ -73,6 +75,7 @@ export class PrismaInventoryRepo implements InventoryRepo {
         location: draft.location,
         condition: draft.condition,
         graderCert: draft.graderCert,
+        clientMutationId: draft.clientMutationId,
         status: draft.status,
       },
       include: { card: true },
@@ -101,6 +104,7 @@ function toInventoryRecord(item: DbInventoryItem): InventoryItemRecord {
     location: item.location ?? undefined,
     condition: item.condition ?? undefined,
     graderCert: item.graderCert ?? undefined,
+    clientMutationId: item.clientMutationId ?? undefined,
     status: item.status,
     createdAt: item.createdAt.toISOString(),
   };

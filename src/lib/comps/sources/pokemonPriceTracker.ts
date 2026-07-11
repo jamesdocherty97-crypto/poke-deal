@@ -20,7 +20,8 @@ import {
   stripLeadingZerosFromNumericSegment,
   stripProviderSetCodePrefix,
 } from "../../cards/identity.js";
-import type { CompSource } from "../CompSource.js";
+import type { CompSource, CompSourceContext } from "../CompSource.js";
+import { createAbortScope } from "../../http/abortScope.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
 import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
@@ -49,7 +50,7 @@ export class PokemonPriceTrackerSource implements CompSource {
     this.live = Boolean(apiKey && apiKey.trim().length > 0);
   }
 
-  async lookup(card: CardRef, query: CompQuery = {}): Promise<CompResult> {
+  async lookup(card: CardRef, query: CompQuery = {}, context: CompSourceContext = {}): Promise<CompResult> {
     const grade: Grade = query.grade ?? "RAW";
     const windowDays = query.windowDays ?? DEFAULT_WINDOW_DAYS;
 
@@ -66,7 +67,7 @@ export class PokemonPriceTrackerSource implements CompSource {
       });
     }
 
-    const matchedCard = await this.fetchCard(card, windowDays, grade);
+    const matchedCard = await this.fetchCard(card, windowDays, grade, context.signal);
     if (matchedCard == null) {
       return emptyComp({ source: this.name, card, grade, windowDays }, "Price Tracker lookup failed or returned no response");
     }
@@ -75,7 +76,7 @@ export class PokemonPriceTrackerSource implements CompSource {
   }
 
   /** Fetch one card with eBay graded-sales aggregates. Returns null on any failure. */
-  private async fetchCard(card: CardRef, windowDays: number, grade: Grade): Promise<unknown | null> {
+  private async fetchCard(card: CardRef, windowDays: number, grade: Grade, parentSignal?: AbortSignal): Promise<unknown | null> {
     // BILLING: credits are charged on the requested `limit` (default 50!) — pass limit=1.
     const days = Math.min(Math.max(windowDays, 1), 180); // Pro plan caps history at 180d
     const search = buildPokemonPriceTrackerSearch(card);
@@ -90,10 +91,11 @@ export class PokemonPriceTrackerSource implements CompSource {
     const rounds = grade === "RAW" ? 1 : 2;
     for (let round = 0; round < rounds; round += 1) {
       for (const params of attempts) {
+        const abort = createAbortScope(parentSignal, this.fetchTimeoutMs);
         try {
           const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
             headers: { Authorization: `Bearer ${this.apiKey}`, Accept: "application/json" },
-            signal: timeoutSignal(this.fetchTimeoutMs),
+            signal: abort.signal,
           });
           if (!res.ok) {
             console.warn(`[${this.name}] HTTP ${res.status} — no comp returned`);
@@ -113,9 +115,12 @@ export class PokemonPriceTrackerSource implements CompSource {
         } catch (err) {
           // Degrade, don't explode: a dead provider must not break a lookup.
           console.warn(`[${this.name}] fetch failed: ${(err as Error).message}`);
+          if (parentSignal?.aborted) return null;
+        } finally {
+          abort.cleanup();
         }
       }
-      if (round < rounds - 1) await sleep(350);
+      if (round < rounds - 1 && !parentSignal?.aborted) await sleep(350);
     }
 
     return matchedWithoutGrade;
@@ -147,10 +152,6 @@ function providerHasGradeAggregate(json: unknown, grade: Grade): boolean {
   const agg = card?.ebay?.salesByGrade?.[gradeToProviderKey(grade)] as { count?: unknown; medianPrice?: unknown } | undefined;
   const count = Number(agg?.count ?? 0);
   return Boolean(agg && Number.isFinite(count) && count > 0);
-}
-
-function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
 }
 
 function sleep(ms: number): Promise<void> {

@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SCAN_IMAGE_MAX_EDGE_PX, fitPhotoDimensions, inventoryPhotoUploadPath } from "./imageProcessing.js";
+import {
+  SCAN_IMAGE_MAX_EDGE_PX,
+  SCAN_TRANSMISSION_MAX_EDGE_PX,
+  fitPhotoDimensions,
+  inventoryPhotoUploadPath,
+} from "./imageProcessing.js";
 
 test("fitPhotoDimensions downscales landscape photos to a 1600px longest edge", () => {
   assert.deepEqual(fitPhotoDimensions(4000, 3000), { width: 1600, height: 1200 });
@@ -16,6 +21,10 @@ test("fitPhotoDimensions leaves smaller photos unchanged", () => {
 
 test("fitPhotoDimensions supports the scan upload target size", () => {
   assert.deepEqual(fitPhotoDimensions(3024, 4032, SCAN_IMAGE_MAX_EDGE_PX), { width: 768, height: 1024 });
+});
+
+test("fitPhotoDimensions supports the low-latency OCR transmission size", () => {
+  assert.deepEqual(fitPhotoDimensions(3024, 4032, SCAN_TRANSMISSION_MAX_EDGE_PX), { width: 384, height: 512 });
 });
 
 test("fitPhotoDimensions rejects invalid dimensions", () => {

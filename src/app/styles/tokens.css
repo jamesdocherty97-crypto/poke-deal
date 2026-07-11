@@ -1,24 +1,39 @@
 :root {
   color-scheme: dark;
 
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-7: 28px;
-  --space-8: 32px;
+  /* Type: compact enough for a trading screen, calm enough for long sessions. */
+  --font-ui: "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: ui-rounded, "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-data: "SFMono-Regular", "Roboto Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --font-weight-regular: 500;
+  --font-weight-medium: 650;
+  --font-weight-bold: 800;
+  --font-weight-black: 950;
 
-  --text-xs-size: 0.75rem;
+  --font-size-micro: 0.75rem;
+  --font-size-label: 0.8125rem;
+  --font-size-body-sm: 0.875rem;
+  --font-size-body: 0.9375rem;
+  --font-size-body-lg: 1rem;
+  --font-size-title-sm: 1.125rem;
+  --font-size-title: 1.375rem;
+  --font-size-display: clamp(1.75rem, 7vw, 2.5rem);
+  --line-height-tight: 1.08;
+  --line-height-heading: 1.18;
+  --line-height-body: 1.45;
+  --letter-spacing-display: -0.035em;
+  --letter-spacing-label: 0.055em;
+
+  /* Legacy type aliases. Keep these until the component pass is complete. */
+  --text-xs-size: var(--font-size-micro);
   --text-xs-line: 1.25;
-  --text-sm-size: 0.8125rem;
+  --text-sm-size: var(--font-size-label);
   --text-sm-line: 1.35;
-  --text-md-size: 0.9375rem;
-  --text-md-line: 1.45;
-  --text-lg-size: 1.125rem;
-  --text-lg-line: 1.2;
-  --text-xl-size: 1.375rem;
+  --text-md-size: var(--font-size-body);
+  --text-md-line: var(--line-height-body);
+  --text-lg-size: var(--font-size-title-sm);
+  --text-lg-line: var(--line-height-heading);
+  --text-xl-size: var(--font-size-title);
   --text-xl-line: 1.12;
   --text-2xl-size: 1.75rem;
   --text-2xl-line: 1.04;
@@ -29,18 +44,144 @@
   --text-xl: var(--text-xl-size) / var(--text-xl-line);
   --text-2xl: var(--text-2xl-size) / var(--text-2xl-line);
 
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 16px;
+  /* Four-pixel workshop grid. */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 36px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --touch-target-min: 44px;
+  --touch-target-primary: 52px;
+
+  /* Tactile, not bubbly: cards use medium; controls use small. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+  --r-sm: var(--radius-sm);
+  --r-md: var(--radius-md);
+  --r-lg: var(--radius-lg);
+
+  /* Recognisable private-use franchise palette, separated from state colours. */
+  --brand-red: #ef3340;
+  --brand-red-deep: #a61e2b;
+  --brand-yellow: #ffcb05;
+  --brand-blue: #2a75bb;
+  --brand-blue-deep: #153c78;
+  --brand-sky: #69e8ff;
+  --brand-violet: #8b5cf6;
+  --brand-pink: #ff72d2;
+  --brand-cream: #f8fbff;
+  --brand-ink: #111827;
+
+  /* Dark is authored directly for a dim card hall, not inverted from light. */
+  --color-canvas: #080b13;
+  --color-canvas-raised: #0d1424;
+  --color-surface-1: rgba(13, 20, 36, 0.88);
+  --color-surface-2: rgba(18, 27, 47, 0.94);
+  --color-surface-3: #0d1424;
+  --color-surface-sunken: rgba(3, 8, 20, 0.76);
+  --color-text-primary: #f8fbff;
+  --color-text-secondary: #b8c3d7;
+  --color-text-tertiary: #8592aa;
+  --color-text-inverse: #111827;
+  --color-border-subtle: rgba(255, 255, 255, 0.1);
+  --color-border: rgba(255, 255, 255, 0.14);
+  --color-border-strong: rgba(255, 255, 255, 0.24);
+  --color-scrim: rgba(3, 6, 14, 0.76);
+  --color-focus: var(--brand-sky);
+  --color-selection: rgba(105, 232, 255, 0.22);
+
+  /* Operational state. Colour is always paired with a label and glyph. */
+  --color-success: #34d399;
+  --color-success-surface: rgba(52, 211, 153, 0.13);
+  --color-success-border: rgba(52, 211, 153, 0.38);
+  --color-warning: #ffd166;
+  --color-warning-surface: rgba(255, 209, 102, 0.13);
+  --color-warning-border: rgba(255, 209, 102, 0.4);
+  --color-danger: #fb7185;
+  --color-danger-surface: rgba(251, 113, 133, 0.13);
+  --color-danger-border: rgba(251, 113, 133, 0.4);
+  --color-info: var(--brand-sky);
+  --color-info-surface: rgba(105, 232, 255, 0.12);
+  --color-info-border: rgba(105, 232, 255, 0.36);
+
+  /* Confidence: three bars / two bars / one bar; never colour alone. */
+  --confidence-high-color: #69e8ff;
+  --confidence-high-surface: rgba(105, 232, 255, 0.13);
+  --confidence-high-border: rgba(105, 232, 255, 0.42);
+  --confidence-high-pattern: linear-gradient(90deg, transparent, transparent);
+  --confidence-medium-color: #ffd166;
+  --confidence-medium-surface: rgba(255, 209, 102, 0.13);
+  --confidence-medium-border: rgba(255, 209, 102, 0.42);
+  --confidence-medium-pattern: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 209, 102, 0.14) 6px 8px);
+  --confidence-low-color: #ff8bc2;
+  --confidence-low-surface: rgba(255, 139, 194, 0.13);
+  --confidence-low-border: rgba(255, 139, 194, 0.42);
+  --confidence-low-pattern: radial-gradient(circle, rgba(255, 139, 194, 0.24) 1px, transparent 1.5px) 0 0 / 7px 7px;
+
+  /* Deal Judge: tick / eye / minus-circle; always show the word too. */
+  --verdict-buy-color: #34d399;
+  --verdict-buy-surface: rgba(52, 211, 153, 0.14);
+  --verdict-buy-border: rgba(52, 211, 153, 0.44);
+  --verdict-watch-color: #ffd166;
+  --verdict-watch-surface: rgba(255, 209, 102, 0.14);
+  --verdict-watch-border: rgba(255, 209, 102, 0.44);
+  --verdict-pass-color: #fb7185;
+  --verdict-pass-surface: rgba(251, 113, 133, 0.14);
+  --verdict-pass-border: rgba(251, 113, 133, 0.44);
+
+  /* Freshness: timestamp + clock state + descending opacity. */
+  --freshness-live-color: #34d399;
+  --freshness-recent-color: #69e8ff;
+  --freshness-aging-color: #ffd166;
+  --freshness-stale-color: #aeb9cf;
+  --freshness-expired-color: #77849b;
+  --freshness-live-opacity: 1;
+  --freshness-recent-opacity: 0.9;
+  --freshness-aging-opacity: 0.76;
+  --freshness-stale-opacity: 0.62;
+  --freshness-expired-opacity: 0.48;
+
+  /* Source-mix segments: owned diamond, checked square, sold bar, market ring, cached dash. */
+  --source-owned-color: #34d399;
+  --source-checked-color: #69e8ff;
+  --source-sold-color: #b69cff;
+  --source-market-color: #ffd166;
+  --source-cached-color: #aeb9cf;
+
+  /* Gradients keep the app unmistakably Pokémon without carrying meaning. */
+  --brand-hero-gradient: linear-gradient(135deg, rgba(42, 117, 187, 0.24), transparent 38%), linear-gradient(225deg, rgba(239, 51, 64, 0.2), transparent 46%);
+  --brand-holo-gradient: linear-gradient(115deg, #69e8ff 0%, #8b5cf6 42%, #ff72d2 72%, #ffcb05 100%);
+  --brand-holo-subtle: linear-gradient(115deg, rgba(105, 232, 255, 0.16), rgba(139, 92, 246, 0.14) 42%, rgba(255, 114, 210, 0.12) 72%, rgba(255, 203, 5, 0.14));
+  --brand-grid: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
 
   --shadow-1: 0 10px 24px rgba(0, 0, 0, 0.26);
   --shadow-2: 0 18px 48px rgba(0, 0, 0, 0.34);
+  --shadow-focus: 0 0 0 3px rgba(105, 232, 255, 0.18);
   --elevation-base: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   --elevation-raised: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 16px 34px rgba(0, 0, 0, 0.24);
   --elevation-floating: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 22px 62px rgba(0, 0, 0, 0.42);
-  --surface-base: rgba(13, 20, 36, 0.88);
-  --surface-raised: rgba(18, 27, 47, 0.94);
-  --surface-floating: rgb(13, 20, 36);
+
+  --duration-instant: 90ms;
+  --duration-fast: 150ms;
+  --duration-standard: 190ms;
+  --duration-slow: 280ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --motion-fast: var(--duration-fast) var(--ease-out);
+  --motion-sheet: var(--duration-standard) var(--ease-out);
+  --press-scale: 0.98;
 
   --z-base: 1;
   --z-nav: 100;
@@ -48,36 +189,114 @@
   --z-overlay: 300;
   --z-toast: 400;
 
-  --bg: #080b13;
-  --ink: #f8fbff;
-  --muted: #aeb9cf;
+  /* Compatibility layer for the current component CSS. */
+  --surface-base: var(--color-surface-1);
+  --surface-raised: var(--color-surface-2);
+  --surface-floating: var(--color-surface-3);
+  --bg: var(--color-canvas);
+  --ink: var(--color-text-primary);
+  --text: var(--color-text-primary);
+  --muted: var(--color-text-secondary);
   --panel: var(--surface-base);
   --panel-2: var(--surface-raised);
-  --line: rgba(255, 255, 255, 0.14);
+  --line: var(--color-border);
   --border: var(--line);
-
-  --red: #ef3340;
-  --red-deep: #a61e2b;
-  --yellow: #ffcb05;
-  --blue: #2a75bb;
-  --blue-dark: #153c78;
-  --violet: #8b5cf6;
-
-  --ok: #34d399;
-  --warn: #ffcb05;
-  --danger: #fb7185;
-  --green: var(--ok);
-
-  --conf-high: var(--ok);
-  --conf-med: var(--warn);
-  --conf-low: var(--danger);
-
-  --holo: linear-gradient(115deg, #69e8ff 0%, #8b5cf6 42%, #ff72d2 72%, #ffcb05 100%);
-  --holo-subtle: linear-gradient(115deg, rgba(105, 232, 255, 0.16), rgba(139, 92, 246, 0.14) 42%, rgba(255, 114, 210, 0.12) 72%, rgba(255, 203, 5, 0.14));
-
-  --motion-fast: 150ms ease-out;
-  --motion-sheet: 190ms ease-out;
-  --press-scale: 0.98;
-
+  --red: var(--brand-red);
+  --red-deep: var(--brand-red-deep);
+  --yellow: var(--brand-yellow);
+  --blue: var(--brand-blue);
+  --blue-dark: var(--brand-blue-deep);
+  --violet: var(--brand-violet);
+  --ok: var(--color-success);
+  --warn: var(--color-warning);
+  --danger: var(--color-danger);
+  --green: var(--color-success);
+  --conf-high: var(--confidence-high-color);
+  --conf-med: var(--confidence-medium-color);
+  --conf-low: var(--confidence-low-color);
+  --holo: var(--brand-holo-gradient);
+  --holo-subtle: var(--brand-holo-subtle);
   --shadow: var(--shadow-2);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --color-canvas: #f3f6fa;
+  --color-canvas-raised: #ffffff;
+  --color-surface-1: rgba(255, 255, 255, 0.94);
+  --color-surface-2: #ffffff;
+  --color-surface-3: #ffffff;
+  --color-surface-sunken: #e9eef5;
+  --color-text-primary: #111827;
+  --color-text-secondary: #455166;
+  --color-text-tertiary: #657188;
+  --color-text-inverse: #f8fbff;
+  --color-border-subtle: rgba(17, 24, 39, 0.1);
+  --color-border: rgba(17, 24, 39, 0.16);
+  --color-border-strong: rgba(17, 24, 39, 0.28);
+  --color-scrim: rgba(17, 24, 39, 0.48);
+  --color-focus: #006f8d;
+  --color-selection: rgba(42, 117, 187, 0.18);
+
+  --color-success: #007a5e;
+  --color-success-surface: rgba(0, 122, 94, 0.1);
+  --color-success-border: rgba(0, 122, 94, 0.36);
+  --color-warning: #835b00;
+  --color-warning-surface: rgba(131, 91, 0, 0.1);
+  --color-warning-border: rgba(131, 91, 0, 0.34);
+  --color-danger: #a72d49;
+  --color-danger-surface: rgba(167, 45, 73, 0.1);
+  --color-danger-border: rgba(167, 45, 73, 0.34);
+  --color-info: #006f8d;
+  --color-info-surface: rgba(0, 111, 141, 0.09);
+  --color-info-border: rgba(0, 111, 141, 0.32);
+
+  --confidence-high-color: #006f8d;
+  --confidence-high-surface: rgba(0, 111, 141, 0.09);
+  --confidence-high-border: rgba(0, 111, 141, 0.34);
+  --confidence-medium-color: #835b00;
+  --confidence-medium-surface: rgba(131, 91, 0, 0.09);
+  --confidence-medium-border: rgba(131, 91, 0, 0.34);
+  --confidence-low-color: #96366f;
+  --confidence-low-surface: rgba(150, 54, 111, 0.09);
+  --confidence-low-border: rgba(150, 54, 111, 0.34);
+
+  --verdict-buy-color: #007a5e;
+  --verdict-buy-surface: rgba(0, 122, 94, 0.1);
+  --verdict-buy-border: rgba(0, 122, 94, 0.36);
+  --verdict-watch-color: #835b00;
+  --verdict-watch-surface: rgba(131, 91, 0, 0.1);
+  --verdict-watch-border: rgba(131, 91, 0, 0.36);
+  --verdict-pass-color: #a72d49;
+  --verdict-pass-surface: rgba(167, 45, 73, 0.1);
+  --verdict-pass-border: rgba(167, 45, 73, 0.36);
+
+  --freshness-live-color: #007a5e;
+  --freshness-recent-color: #006f8d;
+  --freshness-aging-color: #835b00;
+  --freshness-stale-color: #536074;
+  --freshness-expired-color: #758095;
+  --source-owned-color: #007a5e;
+  --source-checked-color: #006f8d;
+  --source-sold-color: #6847a8;
+  --source-market-color: #835b00;
+  --source-cached-color: #536074;
+
+  --brand-hero-gradient: linear-gradient(135deg, rgba(42, 117, 187, 0.14), transparent 38%), linear-gradient(225deg, rgba(239, 51, 64, 0.11), transparent 46%);
+  --brand-grid: linear-gradient(rgba(17, 24, 39, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(17, 24, 39, 0.04) 1px, transparent 1px);
+  --shadow-1: 0 8px 20px rgba(17, 24, 39, 0.1);
+  --shadow-2: 0 18px 42px rgba(17, 24, 39, 0.16);
+  --elevation-base: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  --elevation-raised: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 14px 28px rgba(17, 24, 39, 0.1);
+  --elevation-floating: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 20px 48px rgba(17, 24, 39, 0.17);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 1ms;
+    --duration-fast: 1ms;
+    --duration-standard: 1ms;
+    --duration-slow: 1ms;
+    --press-scale: 1;
+  }
 }

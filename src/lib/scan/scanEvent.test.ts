@@ -6,6 +6,7 @@ import { scanEventDataFromError, scanEventDataFromResult } from "./scanEvent.js"
 test("scanEventDataFromResult stores a readable raw-card observation", () => {
   const result: ScanResult = {
     model: "gemini-flash-latest",
+    usage: { promptTokens: 121, outputTokens: 34, totalTokens: 155 },
     identity: {
       name: "Tauros",
       setName: "Chaos Rising",
@@ -22,7 +23,7 @@ test("scanEventDataFromResult stores a readable raw-card observation", () => {
     },
   };
 
-  const event = scanEventDataFromResult(result);
+  const event = scanEventDataFromResult(result, "gemini-scan", { latencyMs: 912, requestBytes: 2048, inputKind: "camera" });
 
   assert.equal(event.source, "gemini-scan");
   assert.equal(event.status, "READABLE");
@@ -31,7 +32,10 @@ test("scanEventDataFromResult stores a readable raw-card observation", () => {
   assert.equal(event.language, "EN");
   assert.equal(event.grade, "RAW");
   assert.equal(event.model, "gemini-flash-latest");
-  assert.deepEqual(event.raw, { identity: result.identity });
+  assert.deepEqual(event.raw, { identity: result.identity, usage: result.usage });
+  assert.equal(event.latencyMs, 912);
+  assert.equal(event.requestBytes, 2048);
+  assert.equal(event.inputKind, "camera");
 });
 
 test("scanEventDataFromResult stores slab grade when canonical", () => {

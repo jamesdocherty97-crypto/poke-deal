@@ -36,6 +36,10 @@ export interface CatalogCard {
 export interface CatalogSource {
   readonly name: string;
   readonly live: boolean;
-  resolve(card: CardRef): Promise<CatalogCard | null>;
-  search?(card: CardRef, limit?: number): Promise<CatalogCard[]>;
+  resolve(card: CardRef, context?: CatalogSourceContext): Promise<CatalogCard | null>;
+  search?(card: CardRef, limit?: number, context?: CatalogSourceContext): Promise<CatalogCard[]>;
+}
+
+export interface CatalogSourceContext {
+  signal?: AbortSignal;
 }

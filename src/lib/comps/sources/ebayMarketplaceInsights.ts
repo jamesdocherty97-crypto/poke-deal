@@ -1,5 +1,6 @@
 import type { CardRef, CompQuery, CompResult, Currency, Grade, RawSale } from "../../domain/types.js";
-import type { CompSource } from "../CompSource.js";
+import type { CompSource, CompSourceContext } from "../CompSource.js";
+import { createAbortScope } from "../../http/abortScope.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { getEbayConfig, EBAY_UK_CATEGORY_POKEMON } from "../../ebay/config.js";
 import { getAccessToken } from "../../ebay/tokens.js";
@@ -65,7 +66,7 @@ export class EbayMarketplaceInsightsSource implements CompSource {
     this.live = Boolean(this.enabled && this.config);
   }
 
-  async lookup(card: CardRef, query: CompQuery = {}): Promise<CompResult> {
+  async lookup(card: CardRef, query: CompQuery = {}, context: CompSourceContext = {}): Promise<CompResult> {
     const grade = query.grade ?? "RAW";
     const windowDays = query.windowDays ?? DEFAULT_WINDOW_DAYS;
     const ctx = { source: this.name, card, grade, windowDays };
@@ -74,7 +75,7 @@ export class EbayMarketplaceInsightsSource implements CompSource {
 
     try {
       const accessToken = await getAccessToken(this.config, this.fetchImpl);
-      const payload = await this.fetchItemSales(this.config, accessToken, card, grade, windowDays);
+      const payload = await this.fetchItemSales(this.config, accessToken, card, grade, windowDays, context.signal);
       const comp = mapEbayMarketplaceInsightsToComp(payload, ctx);
       return comp.sampleSize > 0
         ? {
@@ -99,6 +100,7 @@ export class EbayMarketplaceInsightsSource implements CompSource {
     card: CardRef,
     grade: Grade,
     windowDays: number,
+    parentSignal?: AbortSignal,
   ): Promise<unknown> {
     const params = new URLSearchParams({
       q: buildEbayMarketplaceInsightsQuery(card, grade),
@@ -107,6 +109,7 @@ export class EbayMarketplaceInsightsSource implements CompSource {
       filter: buildMarketplaceInsightsFilter(windowDays),
       sort: "price",
     });
+    const abort = createAbortScope(parentSignal, this.fetchTimeoutMs);
     const response = await this.fetchImpl(
       `${config.apiBaseUrl}/buy/marketplace_insights/v1_beta/item_sales/search?${params.toString()}`,
       {
@@ -115,9 +118,9 @@ export class EbayMarketplaceInsightsSource implements CompSource {
           Accept: "application/json",
           "X-EBAY-C-MARKETPLACE-ID": config.marketplaceId,
         },
-        signal: timeoutSignal(this.fetchTimeoutMs),
+        signal: abort.signal,
       },
-    );
+    ).finally(abort.cleanup);
 
     if (!response.ok) {
       const detail = await readEbayError(response);
@@ -241,8 +244,4 @@ async function readEbayError(response: Response): Promise<string> {
   } catch {
     return response.text().then((text) => text.slice(0, 500)).catch(() => `HTTP ${response.status}`);
   }
-}
-
-function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
 }

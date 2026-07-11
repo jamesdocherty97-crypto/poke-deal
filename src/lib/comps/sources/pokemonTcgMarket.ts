@@ -3,7 +3,7 @@ import { catalogCardMatchesLookupContext, catalogCardMatchesSetContext } from ".
 import { PokemonTcgApiCatalogSource, pickCatalogPriceSignal } from "../../catalog/pokemonTcgApi.js";
 import { getSetById } from "../../catalog/setCatalog.js";
 import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
-import type { CompSource } from "../CompSource.js";
+import type { CompSource, CompSourceContext } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import {
   addRequestedVariantHint,
@@ -30,7 +30,7 @@ export class PokemonTcgMarketSource implements CompSource {
     this.live = catalog.live;
   }
 
-  async lookup(card: CardRef, query: CompQuery = {}): Promise<CompResult> {
+  async lookup(card: CardRef, query: CompQuery = {}, context: CompSourceContext = {}): Promise<CompResult> {
     const grade: Grade = query.grade ?? "RAW";
     const ctx = {
       source: this.name,
@@ -44,7 +44,7 @@ export class PokemonTcgMarketSource implements CompSource {
     }
 
     try {
-      const catalogCard = await this.catalog.resolve(card);
+      const catalogCard = await this.catalog.resolve(card, { signal: context.signal });
       if (!catalogCardMatchesSetContext(catalogCard, card.setName)) {
         return emptyMarketComp(ctx, "catalog card did not match requested set");
       }

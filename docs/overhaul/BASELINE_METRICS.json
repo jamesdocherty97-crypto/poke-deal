@@ -1,0 +1,72 @@
+{
+  "capturedAt": "2026-07-11T16:50:00+01:00",
+  "timezone": "Europe/London",
+  "gitCommit": "9621e7b",
+  "qualityGates": {
+    "testFiles": 78,
+    "tests": 743,
+    "passed": 743,
+    "failed": 0,
+    "durationSeconds": 3.43,
+    "pricingAttacks": 10,
+    "pricingAttackFails": 0,
+    "typecheckPassed": true,
+    "typecheckSeconds": 29.68,
+    "buildPassed": true,
+    "buildSeconds": 18.0
+  },
+  "bundle": {
+    "rootRouteKb": 135.0,
+    "rootFirstLoadKb": 222.0,
+    "sharedFirstLoadKb": 87.5,
+    "middlewareKb": 27.9
+  },
+  "architecture": {
+    "apiRouteFiles": 47,
+    "pageRoutes": 2,
+    "rootClientLines": 10979,
+    "componentCssLines": 7638,
+    "serviceWorker": false,
+    "indexedDbQueue": false,
+    "manualCheckWorklist": false,
+    "perCardPriceHistory": false,
+    "neonPoolerHostname": false,
+    "productionPrismaGlobalReuse": false
+  },
+  "runtimeMs": {
+    "liveScanSuccessful": [9119, 8998],
+    "liveScanUpstreamFailure": [8369],
+    "exactCompCold": 2547,
+    "exactCompWarm": [1777, 2089, 2088, 2091],
+    "estimatedScanToVerdictCold": 11666,
+    "inventoryApi": [944, 830, 792],
+    "dashboardApi": [1039, 1004, 1020]
+  },
+  "lighthouseMobileRoot": {
+    "performance": 74,
+    "accessibility": 89,
+    "bestPractices": 96,
+    "firstContentfulPaintMs": 1067,
+    "largestContentfulPaintMs": 16120,
+    "timeToInteractiveMs": 17073,
+    "speedIndexMs": 3301,
+    "totalBlockingTimeMs": 0,
+    "cumulativeLayoutShift": 0.004188,
+    "legibleTextPercent": 58.56
+  },
+  "security": {
+    "configuredSecretFoundInClientAssets": false,
+    "sharedBasicPasswordGate": true,
+    "durableBruteForceThrottle": false
+  },
+  "evidence": {
+    "screenshots": [
+      "docs/overhaul/baseline/buy-mobile.png",
+      "docs/overhaul/baseline/today-mobile.png",
+      "docs/overhaul/baseline/inventory-mobile.png",
+      "docs/overhaul/baseline/listings-mobile.png",
+      "docs/overhaul/baseline/profit-mobile.png"
+    ],
+    "localLighthouseReport": "output/playwright/baseline/lighthouse-buy.report.html"
+  }
+}

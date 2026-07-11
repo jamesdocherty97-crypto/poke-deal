@@ -26,7 +26,7 @@ export interface EbayTokenResponse {
 }
 
 /** Build the eBay OAuth consent URL. The redirect_uri param must be the RuName, not the raw URL. */
-export function buildAuthUrl(config: EbayConfig, state = "ebay-connect", options: { forceLogin?: boolean } = {}): string {
+export function buildAuthUrl(config: EbayConfig, state: string, options: { forceLogin?: boolean } = {}): string {
   const params = new URLSearchParams({
     client_id: config.clientId,
     redirect_uri: config.ruName,

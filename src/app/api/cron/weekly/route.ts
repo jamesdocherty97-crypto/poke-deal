@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createInboxAlert } from "@/lib/alerts/inbox";
+import { dispatchCronFailure } from "@/lib/alerts/cronFailure";
 import { runRepriceCheck } from "@/lib/alerts/repriceRunner";
 import { isAuthorizedCronRequest } from "@/lib/automation/cronAuth";
 import { runCronJobOnce, weeklyRunKey } from "@/lib/automation/cronRunLog";
@@ -36,8 +36,7 @@ export async function GET(request: Request) {
     });
 
     if (reprice.status === "FAILED") {
-      await createInboxAlert(prisma, {
-        kind: "CRON_FAILURE",
+      await dispatchCronFailure(prisma, {
         title: "Weekly reprice check failed",
         message: reprice.error.message,
         sourceKey: `cron:${reprice.run.job}:${reprice.run.runKey}`,
@@ -56,8 +55,7 @@ export async function GET(request: Request) {
       { status: reprice.status === "FAILED" ? 500 : 200 },
     );
   } catch (err) {
-    await createInboxAlert(getPrisma(), {
-      kind: "CRON_FAILURE",
+    await dispatchCronFailure(getPrisma(), {
       title: "Weekly automation failed",
       message: err instanceof Error ? err.message : "weekly cron failed",
       sourceKey: `cron:weekly:${new Date().toISOString().slice(0, 10)}:route`,

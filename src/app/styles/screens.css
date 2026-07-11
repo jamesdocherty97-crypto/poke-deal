@@ -65,7 +65,7 @@
     right: -8px;
     width: 150px;
     height: 150px;
-    opacity: 0.18;
+    opacity: 0.24;
   }
 
   .today-hero-panel {
@@ -947,6 +947,28 @@
     background: rgba(13, 20, 36, 0.94);
     padding: 8px 10px;
     backdrop-filter: blur(12px);
+  }
+
+  [data-theme="light"] .inventory-workspace .section-heading,
+  [data-theme="light"] .listings-workspace .section-heading,
+  [data-theme="light"] .pnl-workspace .section-heading {
+    border-color: var(--color-border);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--elevation-raised);
+  }
+
+  .inventory-workspace > .section-heading {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .inventory-workspace > .section-heading > h2 {
+    flex: 1 1 100%;
+  }
+
+  .inventory-workspace > .section-heading .heading-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .detail-grid,

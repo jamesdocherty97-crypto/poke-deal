@@ -19,6 +19,20 @@ export interface ListingPackCard {
   language?: string | null;
 }
 
+/**
+ * Context proving that `compMedianPence` came from a recent sold sample.
+ *
+ * Every core field is optional so callers can pass through partially available
+ * evidence, but listing copy only mentions pricing when sample size, window and
+ * as-of date are all valid. `sourceRegion` is useful context, not a prerequisite.
+ */
+export interface ListingSoldEvidenceContext {
+  sampleSize?: number;
+  windowDays?: number;
+  compAsOf?: string | Date;
+  sourceRegion?: string | null;
+}
+
 export interface ListingPackInput {
   card: ListingPackCard;
   /** Marketplace/channel the copy is being prepared for. Defaults to eBay. */
@@ -29,6 +43,8 @@ export interface ListingPackInput {
   listPricePence?: number;
   /** Cleaned comp median in pence (the value anchor). 0/undefined = unknown. */
   compMedianPence?: number;
+  /** Optional audit context for a genuine sold comp sample. Never inferred. */
+  soldEvidence?: ListingSoldEvidenceContext;
   /** What you paid, in pence. Used as a price floor with a minimum margin. */
   costBasisPence?: number;
   /** Minimum margin over cost when comp is missing/low. Default 0.35 (35%). */
@@ -225,12 +241,14 @@ export function buildDescription(input: ListingPackInput): string {
   const gradeLine = isGradedGrade(grade)
     ? `Graded ${gradeListingPhrase(grade)}${input.certNumber ? ` (cert ${input.certNumber})` : ""}.`
     : `Ungraded single, ${input.condition || "Near Mint"}.`;
+  const pricingEvidence = buildSoldEvidenceSentence(input);
   return [
     `${card.name}${idLine ? ` — ${idLine}` : ""}.`,
     gradeLine,
     conditionNote,
     input.usesCatalogOnlyImages ? STOCK_IMAGE_DISCLOSURE : null,
     "Genuine Pokémon TCG single from a UK seller.",
+    pricingEvidence,
     settings.postageTerms,
     settings.returnsLine,
   ].filter(Boolean).join("\n\n");
@@ -249,8 +267,9 @@ function buildVintedDescription(input: ListingPackInput): string {
     `Condition: ${condition}`,
     "Genuine Pokemon TCG single from a UK seller.",
     "Happy to bundle with other cards.",
+    buildSoldEvidenceSentence(input),
     settings.postageTerms,
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 function buildCardmarketDescription(input: ListingPackInput): string {
@@ -265,9 +284,10 @@ function buildCardmarketDescription(input: ListingPackInput): string {
     `${card.name}${card.number ? ` ${card.number}` : ""}${card.setName ? ` - ${card.setName}` : ""}`,
     `Condition/grade: ${condition}`,
     `Cardmarket condition: ${cmCondition}.`,
-    "English Pokemon TCG single.",
+    `${listingLanguage(card.language)} Pokemon TCG single.`,
+    buildSoldEvidenceSentence(input),
     settings.postageTerms,
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 function buildInPersonDescription(input: ListingPackInput): string {
@@ -280,7 +300,43 @@ function buildInPersonDescription(input: ListingPackInput): string {
     `${card.name}${card.number ? ` ${card.number}` : ""}${card.setName ? ` - ${card.setName}` : ""}`,
     condition,
     "In-person sale note. Buyer can inspect before payment.",
-  ].join("\n");
+    buildSoldEvidenceSentence(input),
+  ].filter(Boolean).join("\n");
+}
+
+/**
+ * An evidence sentence is deliberately all-or-nothing. A median without its
+ * sample, observation window and timestamp is useful for internal pricing, but
+ * is not honest buyer-facing evidence.
+ */
+function buildSoldEvidenceSentence(input: ListingPackInput): string | null {
+  const pricePence = positivePence(input.compMedianPence);
+  const evidence = input.soldEvidence;
+  const sampleSize = evidence?.sampleSize;
+  const windowDays = evidence?.windowDays;
+  const asOf = evidence ? normaliseEvidenceDate(evidence.compAsOf) : null;
+
+  if (
+    pricePence <= 0 ||
+    !Number.isInteger(sampleSize) ||
+    (sampleSize ?? 0) <= 0 ||
+    !Number.isInteger(windowDays) ||
+    (windowDays ?? 0) <= 0 ||
+    !asOf
+  ) {
+    return null;
+  }
+
+  const region = String(evidence?.sourceRegion ?? "").replace(/\s+/g, " ").trim();
+  const regionSuffix = region ? `, ${region}` : "";
+  return `Recent sold evidence centres around ${formatGbp(pricePence)} (n=${sampleSize} across a ${windowDays}-day window, as of ${asOf}${regionSuffix}).`;
+}
+
+function normaliseEvidenceDate(value: string | Date | undefined): string | null {
+  if (value == null || value === "") return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
 }
 
 export function buildListingPack(input: ListingPackInput): ListingPack {
@@ -331,7 +387,7 @@ export function listingPackCopyFields(pack: ListingPack): ListingPackCopyField[]
 
 // ── CSV export (eBay-style flat columns) ─────────────────────────────────────
 
-const CSV_COLUMNS = [
+const EBAY_CSV_COLUMNS = [
   "Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)",
   "Category",
   "Title",
@@ -354,11 +410,57 @@ const CSV_COLUMNS = [
   "ItemSpecifics:Certification Number",
 ] as const;
 
-export function listingPackCsvHeader(): string {
-  return CSV_COLUMNS.map(csvCell).join(",");
+const CARDMARKET_CSV_COLUMNS = [
+  "Card Name",
+  "Expansion",
+  "Collector Number",
+  "Language",
+  "Condition",
+  "Professional Grader",
+  "Grade",
+  "Certification Number",
+  "Price (GBP)",
+  "Quantity",
+  "Comments",
+] as const;
+
+const VINTED_CSV_COLUMNS = [
+  "Title",
+  "Description",
+  "Category",
+  "Brand",
+  "Condition",
+  "Price (GBP)",
+  "Parcel Size",
+  "Quantity",
+  "Reference",
+] as const;
+
+const IN_PERSON_CSV_COLUMNS = [
+  "Item",
+  "Set",
+  "Collector Number",
+  "Grade / Condition",
+  "Certification Number",
+  "Asking Price (GBP)",
+  "Quantity",
+  "Handover",
+  "Notes",
+] as const;
+
+export function listingPackCsvHeader(channel: ListingPackChannel = "EBAY"): string {
+  return csvColumnsForChannel(channel).map(csvCell).join(",");
 }
 
 export function listingPackToCsvRow(input: ListingPackInput): string {
+  const channel = input.channel ?? "EBAY";
+  if (channel === "CARDMARKET") return cardmarketCsvRow(input);
+  if (channel === "VINTED") return vintedCsvRow(input);
+  if (channel === "IN_PERSON") return inPersonCsvRow(input);
+  return ebayCsvRow(input);
+}
+
+function ebayCsvRow(input: ListingPackInput): string {
   const pack = buildListingPack(input);
   const row = [
     "Add",
@@ -386,7 +488,89 @@ export function listingPackToCsvRow(input: ListingPackInput): string {
 }
 
 export function buildListingPackCsv(inputs: ListingPackInput[]): string {
-  return [listingPackCsvHeader(), ...inputs.map(listingPackToCsvRow)].join("\n");
+  const channel = commonListingPackChannel(inputs);
+  return [listingPackCsvHeader(channel), ...inputs.map(listingPackToCsvRow)].join("\n");
+}
+
+function cardmarketCsvRow(input: ListingPackInput): string {
+  const pack = buildListingPack(input);
+  const graded = isGradedGrade(input.grade);
+  const row = [
+    input.card.name,
+    input.card.setName ?? "",
+    input.card.number ?? "",
+    listingLanguage(input.card.language),
+    graded ? "Graded" : cardmarketConditionCode(input.condition),
+    graded ? pack.itemSpecifics["Professional Grader"] ?? "" : "",
+    graded ? pack.itemSpecifics.Grade ?? "" : "",
+    graded ? input.certNumber ?? "" : "",
+    (pack.suggestedPricePence / 100).toFixed(2),
+    "1",
+    flattenCsvText(pack.description),
+  ];
+  return row.map(csvCell).join(",");
+}
+
+function vintedCsvRow(input: ListingPackInput): string {
+  const pack = buildListingPack(input);
+  const row = [
+    pack.title,
+    flattenCsvText(pack.description),
+    "Hobbies & collectables > Trading cards",
+    "Pokémon",
+    vintedCondition(input),
+    (pack.suggestedPricePence / 100).toFixed(2),
+    "Small",
+    "1",
+    buildCustomLabel(input),
+  ];
+  return row.map(csvCell).join(",");
+}
+
+function inPersonCsvRow(input: ListingPackInput): string {
+  const pack = buildListingPack(input);
+  const row = [
+    input.card.name,
+    input.card.setName ?? "",
+    input.card.number ?? "",
+    isGradedGrade(input.grade) ? gradeListingPhrase(input.grade) : input.condition || "Near Mint",
+    input.certNumber ?? "",
+    (pack.suggestedPricePence / 100).toFixed(2),
+    "1",
+    "Collection / handover",
+    flattenCsvText(pack.description),
+  ];
+  return row.map(csvCell).join(",");
+}
+
+function commonListingPackChannel(inputs: ListingPackInput[]): ListingPackChannel {
+  const channels = new Set<ListingPackChannel>(inputs.map((input) => input.channel ?? "EBAY"));
+  if (channels.size <= 1) return channels.values().next().value ?? "EBAY";
+  throw new Error("A listing-pack CSV can only contain one channel");
+}
+
+function csvColumnsForChannel(channel: ListingPackChannel): readonly string[] {
+  if (channel === "CARDMARKET") return CARDMARKET_CSV_COLUMNS;
+  if (channel === "VINTED") return VINTED_CSV_COLUMNS;
+  if (channel === "IN_PERSON") return IN_PERSON_CSV_COLUMNS;
+  return EBAY_CSV_COLUMNS;
+}
+
+function flattenCsvText(value: string): string {
+  return value.replace(/\s*\n+\s*/g, " | ").trim();
+}
+
+function listingLanguage(language: string | null | undefined): string {
+  if (!language || language === "EN") return "English";
+  return language;
+}
+
+function vintedCondition(input: ListingPackInput): "Very good" | "Good" | "Satisfactory" {
+  if (isGradedGrade(input.grade)) return "Very good";
+  const code = cardmarketConditionCode(input.condition);
+  if (code === "NM") return "Very good";
+  if (code === "EX") return "Good";
+  return "Satisfactory";
 }
 
 function csvCell(value: string): string {

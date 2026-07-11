@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dailyRunKey, latestSuccessfulRun, runCronJobOnce, weeklyRunKey, type CronRunRow } from "./cronRunLog.js";
+import { dailyRunKey, isStaleCronRun, latestSuccessfulRun, runCronJobOnce, weeklyRunKey, type CronRunRow } from "./cronRunLog.js";
 
 test("runCronJobOnce writes one successful run and skips a double fire", async () => {
   const db = fakeCronDb();
@@ -47,6 +47,46 @@ test("runCronJobOnce records failed runs for the inbox", async () => {
   assert.equal(db.rows[0]!.error, "source budget exhausted");
 });
 
+test("runCronJobOnce takes over an expired RUNNING lease and records a retry failure", async () => {
+  const db = fakeCronDb();
+  db.rows.push(cronRow({
+    id: "stale-run",
+    job: "daily-buy-watch-check",
+    runKey: "2026-07-03",
+    status: "RUNNING",
+    startedAt: new Date("2026-07-03T07:00:00.000Z"),
+  }));
+  const result = await runCronJobOnce(db, {
+    job: "daily-buy-watch-check",
+    runKey: "2026-07-03",
+    now: new Date("2026-07-03T07:20:00.000Z"),
+    leaseMs: 15 * 60 * 1000,
+    execute: async () => { throw new Error("retry still failed"); },
+  });
+
+  assert.equal(result.status, "FAILED");
+  assert.equal(db.rows[0]?.status, "FAILED");
+  assert.equal(db.rows[0]?.startedAt.toISOString(), "2026-07-03T07:20:00.000Z");
+  assert.equal(db.rows[0]?.error, "retry still failed");
+});
+
+test("fresh RUNNING leases remain single-flight", async () => {
+  const db = fakeCronDb();
+  const row = cronRow({ id: "fresh", job: "job", runKey: "key", startedAt: new Date("2026-07-03T07:10:00.000Z") });
+  db.rows.push(row);
+  let calls = 0;
+  const result = await runCronJobOnce(db, {
+    job: "job",
+    runKey: "key",
+    now: new Date("2026-07-03T07:20:00.000Z"),
+    leaseMs: 15 * 60 * 1000,
+    execute: async () => { calls += 1; },
+  });
+  assert.equal(result.status, "SKIPPED");
+  assert.equal(calls, 0);
+  assert.equal(isStaleCronRun(row, new Date("2026-07-03T07:25:00.000Z"), 15 * 60 * 1000), true);
+});
+
 test("run keys and latest successful run are deterministic", () => {
   assert.equal(dailyRunKey(new Date("2026-07-03T23:59:00.000Z")), "2026-07-03");
   assert.equal(weeklyRunKey(new Date("2026-07-03T12:00:00.000Z")), "2026-W27");
@@ -84,6 +124,15 @@ function fakeCronDb() {
         if (!row) throw new Error("missing row");
         Object.assign(row, data);
         return row;
+      },
+      async updateMany({ where, data }: { where: { id: string; status?: CronRunRow["status"]; startedAt?: Date }; data: Partial<CronRunRow> }) {
+        const matching = rows.filter((row) =>
+          row.id === where.id &&
+          (where.status === undefined || row.status === where.status) &&
+          (where.startedAt === undefined || row.startedAt.getTime() === where.startedAt.getTime()),
+        );
+        matching.forEach((row) => Object.assign(row, data));
+        return { count: matching.length };
       },
     },
   };

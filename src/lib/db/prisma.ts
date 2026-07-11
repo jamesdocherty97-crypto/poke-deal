@@ -11,9 +11,11 @@ export function getPrisma(): PrismaClient {
       log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
     });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = client;
-  }
+  // A serverless production isolate may serve many requests. Reuse the same
+  // Prisma pool for the lifetime of that isolate instead of constructing a
+  // fresh pool per request. Provider-side pooling is still recommended for
+  // DATABASE_URL; this guards the application side of the connection budget.
+  globalForPrisma.prisma = client;
 
   return client;
 }

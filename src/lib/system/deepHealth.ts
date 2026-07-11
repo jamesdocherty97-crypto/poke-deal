@@ -11,6 +11,7 @@ import { resolveEbayRefreshToken } from "../ebay/credentials.js";
 import { fetchEbayPolicies } from "../ebay/policies.js";
 import { getAccessTokenWithSource } from "../ebay/tokens.js";
 import { PsaCertLookup } from "../psa/psaCert.js";
+import { readSourceFreshness, recordSourceSuccess } from "./sourceFreshness.js";
 
 export type DeepHealthStatus = "ok" | "fail" | "skipped";
 
@@ -23,6 +24,8 @@ export type DeepHealthSource = {
   latencyMs: number;
   detail: string;
   checkedAt: string;
+  lastSuccessAt: string | null;
+  freshnessSeconds: number | null;
 };
 
 export type DeepHealthReport = {
@@ -206,8 +209,10 @@ async function runProbe(probe: HealthProbe, checkedAt: string): Promise<DeepHeal
     const outcome = await withTimeout(probe.run(), 12_000, `${probe.label} timed out.`);
     const latencyMs = Date.now() - started;
     if (typeof outcome === "string") {
+      recordSourceSuccess(probe.id, new Date(checkedAt));
       return { ...probeBase(probe, checkedAt, latencyMs), status: "ok", detail: outcome };
     }
+    if (outcome.status === "ok") recordSourceSuccess(probe.id, new Date(checkedAt));
     return { ...probeBase(probe, checkedAt, latencyMs), status: outcome.status, detail: outcome.detail };
   } catch (err) {
     return {
@@ -219,6 +224,7 @@ async function runProbe(probe: HealthProbe, checkedAt: string): Promise<DeepHeal
 }
 
 function probeBase(probe: HealthProbe, checkedAt: string, latencyMs: number) {
+  const freshness = readSourceFreshness(probe.id, new Date(checkedAt));
   return {
     id: probe.id,
     label: probe.label,
@@ -226,6 +232,7 @@ function probeBase(probe: HealthProbe, checkedAt: string, latencyMs: number) {
     required: probe.required,
     latencyMs,
     checkedAt,
+    ...freshness,
   };
 }
 

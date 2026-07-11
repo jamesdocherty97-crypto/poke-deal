@@ -16,7 +16,8 @@ const patchWatchSchema = z.object({
   message: "at least one watch field is required",
 });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   const parsed = patchWatchSchema.safeParse(body);
   if (!parsed.success) {
@@ -54,7 +55,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const prisma = getPrisma();
     await prisma.$transaction([

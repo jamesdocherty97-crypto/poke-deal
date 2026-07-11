@@ -4,7 +4,16 @@ import type { Grade, Language } from "../domain/types.js";
 import type { ScanIdentity, ScanResult } from "./cardScan.js";
 import { canonicalGrade } from "./scanIdentityMapper.js";
 
-export type ScanEventStatus = "READABLE" | "UNREADABLE" | "ERROR";
+export type ScanEventStatus = "STARTED" | "READABLE" | "UNREADABLE" | "ERROR" | "CORRECTED";
+
+export interface ScanEventTelemetry {
+  latencyMs?: number;
+  requestBytes?: number;
+  inputKind?: string;
+  sessionHash?: string;
+  correctionKey?: string;
+  correctionOfId?: string;
+}
 
 export interface ScanEventData {
   source: string;
@@ -17,9 +26,19 @@ export interface ScanEventData {
   grade?: Grade;
   model?: string;
   raw?: Prisma.InputJsonValue;
+  latencyMs?: number;
+  requestBytes?: number;
+  inputKind?: string;
+  sessionHash?: string;
+  correctionKey?: string;
+  correctionOfId?: string;
 }
 
-export function scanEventDataFromResult(result: ScanResult, source = "gemini-scan"): ScanEventData {
+export function scanEventDataFromResult(
+  result: ScanResult,
+  source = "gemini-scan",
+  telemetry: ScanEventTelemetry = {},
+): ScanEventData {
   const identity = result.identity;
   return compactScanEventData({
     source,
@@ -31,11 +50,19 @@ export function scanEventDataFromResult(result: ScanResult, source = "gemini-sca
     language: scanLanguage(identity.language),
     grade: scanGrade(identity),
     model: result.model,
-    raw: { identity } as unknown as Prisma.InputJsonValue,
+    raw: {
+      identity,
+      ...(result.usage ? { usage: result.usage } : {}),
+    } as unknown as Prisma.InputJsonValue,
+    ...telemetry,
   });
 }
 
-export function scanEventDataFromError(error: unknown, source = "gemini-scan"): ScanEventData {
+export function scanEventDataFromError(
+  error: unknown,
+  source = "gemini-scan",
+  telemetry: ScanEventTelemetry = {},
+): ScanEventData {
   const raw: Record<string, string> = {
     message: error instanceof Error ? error.message : "unknown scan error",
   };
@@ -44,6 +71,7 @@ export function scanEventDataFromError(error: unknown, source = "gemini-scan"): 
     source,
     status: "ERROR",
     raw: raw as Prisma.InputJsonValue,
+    ...telemetry,
   };
 }
 
@@ -51,6 +79,16 @@ export async function logScanEvent(data: ScanEventData): Promise<void> {
   if (!process.env.DATABASE_URL) return;
   await getPrisma().scanEvent.create({ data }).catch((err) => {
     console.warn("[scan] event persistence skipped:", err instanceof Error ? err.message : "unknown");
+  });
+}
+
+export async function completeScanEvent(id: string | null, data: ScanEventData): Promise<void> {
+  if (!process.env.DATABASE_URL || !id) {
+    await logScanEvent(data);
+    return;
+  }
+  await getPrisma().scanEvent.update({ where: { id }, data }).catch((err) => {
+    console.warn("[scan] event completion skipped:", err instanceof Error ? err.message : "unknown");
   });
 }
 

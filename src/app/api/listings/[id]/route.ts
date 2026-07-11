@@ -28,8 +28,9 @@ const listingPatchSchema = z.object({
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   const parsed = listingPatchSchema.safeParse(body);
   if (!parsed.success) {

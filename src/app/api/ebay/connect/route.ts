@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getEbayConfig } from "@/lib/ebay/config";
 import { resolveEbayRefreshToken } from "@/lib/ebay/credentials";
 import { buildAuthUrl } from "@/lib/ebay/oauth";
+import { createEbayOauthState, ebayOauthStateCookie } from "@/lib/ebay/oauthState";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,10 @@ export async function GET(request: Request) {
       });
     }
   }
-  return NextResponse.redirect(buildAuthUrl(config, forceLogin ? "ebay-force-reconnect" : "ebay-connect", { forceLogin }));
+  const state = createEbayOauthState(config.clientSecret);
+  const response = NextResponse.redirect(buildAuthUrl(config, state, { forceLogin }));
+  response.headers.append("Set-Cookie", ebayOauthStateCookie(state, new URL(request.url).protocol === "https:"));
+  return response;
 }
 
 function connectChoiceHtml(source: "db" | "env"): string {

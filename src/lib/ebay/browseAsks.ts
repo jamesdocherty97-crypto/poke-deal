@@ -71,12 +71,15 @@ export interface EbayAskLookupOptions {
   limit?: number;
   fetchImpl?: typeof fetch;
   rates?: FxRates;
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 const ASK_CACHE_MS = 60 * 60 * 1000;
 const DEFAULT_LIMIT = 20;
 const DEFAULT_DAILY_BUDGET = 500;
 const ASK_DISPLAY_LIMIT = 5;
+const DEFAULT_ASK_TIMEOUT_MS = 3_500;
 
 const askCache = new Map<string, CacheEntry>();
 let browseBudget: BrowseBudgetState = { dayKey: "", count: 0 };
@@ -119,35 +122,70 @@ export async function fetchEbayAskEvidence(
     return evidence;
   }
 
+  const controller = new AbortController();
+  const timeoutMs = boundedAskTimeout(options.timeoutMs);
+  let resolveBoundary!: (evidence: EbayAskEvidence) => void;
+  let boundarySettled = false;
+  const boundary = new Promise<EbayAskEvidence>((resolve) => {
+    resolveBoundary = resolve;
+  });
+  const stop = (reason: string) => {
+    if (boundarySettled) return;
+    boundarySettled = true;
+    controller.abort(new Error(reason));
+    resolveBoundary(baseEvidence({ skipped: true, reason }));
+  };
+  const onCallerAbort = () => stop("eBay Browse ask lookup cancelled");
+  if (options.signal?.aborted) onCallerAbort();
+  else options.signal?.addEventListener("abort", onCallerAbort, { once: true });
+  const timer = setTimeout(() => stop(`eBay Browse ask lookup timed out after ${timeoutMs}ms`), timeoutMs);
+  const rootFetch = options.fetchImpl ?? fetch;
+  const fetchImpl: typeof fetch = (input, init = {}) => rootFetch(input, { ...init, signal: controller.signal });
+
+  const lookup = (async (): Promise<EbayAskEvidence> => {
+    try {
+      const token = await getApplicationAccessToken(config, fetchImpl);
+      const path = buildEbayAskSearchPath(query, { limit: options.limit ?? DEFAULT_LIMIT });
+      const response = await ebayJson<BrowseSearchResponse>(
+        config,
+        path,
+        token,
+        { method: "GET", marketplaceId },
+        fetchImpl,
+      );
+      const rates = options.rates ?? await getRates();
+      if (controller.signal.aborted) return baseEvidence({ skipped: true, reason: "eBay Browse ask lookup cancelled" });
+      const listings = mapBrowseAskListings(response, card, grade, rates)
+        .sort((a, b) => a.totalPence - b.totalPence)
+        .slice(0, ASK_DISPLAY_LIMIT);
+      const lowestPence = listings[0]?.totalPence ?? null;
+      const evidence = baseEvidence({
+        count: listings.length,
+        listings,
+        lowestPence,
+        undercutPence: lowestPence == null ? null : undercutAskPence(lowestPence),
+      });
+      askCache.set(cacheKey, { evidence, expiresAt: now.getTime() + ASK_CACHE_MS });
+      return evidence;
+    } catch (err) {
+      const reason = controller.signal.aborted
+        ? "eBay Browse ask lookup cancelled"
+        : err instanceof Error ? err.message : "eBay Browse ask lookup failed.";
+      console.warn(`[ebay-browse] UK ask lookup failed: ${reason}`);
+      return baseEvidence({ skipped: true, reason });
+    }
+  })();
+
   try {
-    const fetchImpl = options.fetchImpl ?? fetch;
-    const token = await getApplicationAccessToken(config, fetchImpl);
-    const path = buildEbayAskSearchPath(query, { limit: options.limit ?? DEFAULT_LIMIT });
-    const response = await ebayJson<BrowseSearchResponse>(
-      config,
-      path,
-      token,
-      { method: "GET", marketplaceId },
-      fetchImpl,
-    );
-    const rates = options.rates ?? await getRates();
-    const listings = mapBrowseAskListings(response, card, grade, rates)
-      .sort((a, b) => a.totalPence - b.totalPence)
-      .slice(0, ASK_DISPLAY_LIMIT);
-    const lowestPence = listings[0]?.totalPence ?? null;
-    const evidence = baseEvidence({
-      count: listings.length,
-      listings,
-      lowestPence,
-      undercutPence: lowestPence == null ? null : undercutAskPence(lowestPence),
-    });
-    askCache.set(cacheKey, { evidence, expiresAt: now.getTime() + ASK_CACHE_MS });
-    return evidence;
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : "eBay Browse ask lookup failed.";
-    console.warn(`[ebay-browse] UK ask lookup failed: ${reason}`);
-    return baseEvidence({ skipped: true, reason });
+    return await Promise.race([lookup, boundary]);
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", onCallerAbort);
   }
+}
+
+function boundedAskTimeout(value: number | undefined): number {
+  return Number.isFinite(value) ? Math.max(1, Math.min(15_000, Math.round(value!))) : DEFAULT_ASK_TIMEOUT_MS;
 }
 
 export function buildEbayAskQuery(card: CardRef, grade: Grade): string {

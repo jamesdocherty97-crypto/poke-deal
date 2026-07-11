@@ -8,6 +8,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTracker";
 import { PsaCertLookup } from "@/lib/psa/psaCert";
 import { getFxHealth } from "@/lib/comps/currency";
+import { readSourceFreshness } from "@/lib/system/sourceFreshness";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -157,7 +158,7 @@ export async function GET() {
   ];
 
   return NextResponse.json({
-    sources,
+    sources: sources.map((source) => ({ ...source, ...readSourceFreshness(source.id) })),
     summary: {
       livePrimaryComps: priceTracker.live,
       liveCatalogKey: catalog.live,

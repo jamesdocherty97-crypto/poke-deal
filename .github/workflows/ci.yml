@@ -1,0 +1,45 @@
+name: required-gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ship-gates:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: poke_deal_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d poke_deal_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/poke_deal_ci?schema=public
+      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/poke_deal_ci?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npx prisma validate
+      - run: npx prisma migrate deploy
+      - run: npm test
+      - run: npm run test:overhaul
+      - run: npm run test:ux
+      - run: npm run test:pricing-redteam
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

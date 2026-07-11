@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
 import { realizedProfit } from "@/lib/comps/pricing";
 import { planSaleListingClosure, planUnitSale, splitPence } from "@/lib/dealer/unitSale";
+import { readClientMutationId, saleMutationFields } from "@/lib/offline/clientMutation";
+import { lockInventoryItemForSale, type SaleLockDb } from "@/lib/inventory/saleTransaction";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,8 +21,11 @@ const sellSchema = z.object({
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ) {
+  const params = await props.params;
+  const mutation = readClientMutationId(request);
+  if (!mutation.ok) return NextResponse.json({ error: mutation.error }, { status: 400 });
   const body = await request.json().catch(() => null);
   const parsed = sellSchema.safeParse(body);
   if (!parsed.success) {
@@ -38,7 +43,13 @@ export async function POST(
 
   try {
     const d = parsed.data;
+    if (mutation.value) {
+      const replay = await replaySale(mutation.value, params.id);
+      if (replay) return replay;
+    }
     const result = await getPrisma().$transaction(async (tx) => {
+      const locked = await lockInventoryItemForSale(tx as unknown as SaleLockDb, params.id);
+      if (!locked) throw new Error("Inventory item not found");
       const item = await tx.inventoryItem.findUnique({
         where: { id: params.id },
         include: { card: true },
@@ -65,6 +76,7 @@ export async function POST(
               fees: fees[index] ?? 0,
               postage: postage[index] ?? 0,
               soldAt,
+              ...saleMutationFields(mutation.value, index),
             },
           }),
         );
@@ -129,9 +141,55 @@ export async function POST(
       { status: 201 },
     );
   } catch (err) {
+    if (mutation.value) {
+      const replay = await replaySale(mutation.value, params.id).catch(() => null);
+      if (replay) return replay;
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "mark sold failed" },
       { status: 500 },
     );
   }
+}
+
+async function replaySale(clientMutationId: string, inventoryItemId: string) {
+  const prisma = getPrisma();
+  const sales = await prisma.sale.findMany({
+    where: { clientMutationId },
+    orderBy: { mutationIndex: "asc" },
+  });
+  if (sales.length === 0) return null;
+  if (sales.some((sale) => sale.itemId !== inventoryItemId)) {
+    return NextResponse.json({ error: "Mutation id was already used for another inventory item." }, { status: 409 });
+  }
+  const item = await prisma.inventoryItem.findUnique({
+    where: { id: inventoryItemId },
+    include: {
+      card: true,
+      listings: { orderBy: { createdAt: "desc" } },
+      sales: { orderBy: { soldAt: "desc" } },
+      photos: { orderBy: [{ order: "asc" }, { createdAt: "asc" }] },
+    },
+  });
+  if (!item) return NextResponse.json({ error: "Inventory item not found." }, { status: 404 });
+  const profitPence = sales.reduce((sum, sale) => sum + realizedProfit({
+    salePrice: sale.salePrice,
+    fees: sale.fees,
+    postage: sale.postage,
+    costBasis: item.costBasis,
+  }), 0);
+  return NextResponse.json({
+    item,
+    sale: sales[0] ?? null,
+    sales,
+    salePlan: {
+      soldQuantity: sales.length,
+      remainingQuantity: item.quantity,
+      status: item.status,
+      closeOpenListings: item.status === "SOLD",
+    },
+    profitPence,
+    quantitySold: sales.length,
+    idempotent: true,
+  }, { status: 200 });
 }

@@ -5,23 +5,17 @@
 html {
   min-height: 100%;
   scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom));
-  background:
-    linear-gradient(135deg, rgba(42, 117, 187, 0.18), transparent 34%),
-    linear-gradient(225deg, rgba(239, 51, 64, 0.16), transparent 42%),
-    var(--bg);
+  background: var(--brand-hero-gradient), var(--color-canvas);
 }
 
 body {
   position: relative;
   min-height: 100%;
   margin: 0;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    transparent;
+  background: var(--brand-grid);
   background-size: 28px 28px;
   color: var(--ink);
-  font-family: ui-rounded, "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-ui);
   font-variant-numeric: tabular-nums;
 }
 
@@ -126,6 +120,14 @@ textarea {
   color: var(--ink);
   padding: 11px 12px;
   outline: none;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  border-color: var(--color-border);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-primary);
 }
 
 input:focus,
@@ -235,7 +237,8 @@ label {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 0;
-  background: rgba(8, 11, 19, 0.9);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-canvas) 90%, transparent);
   backdrop-filter: blur(18px);
 }
 
@@ -259,6 +262,17 @@ label {
 .app-mark {
   width: 42px;
   height: 42px;
+}
+
+.app-mark:not(.app-mark-image) {
+  border: 1px solid color-mix(in srgb, var(--brand-yellow) 52%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas-raised) url("/brand/v2/app-icon-192-v1.png") center / cover no-repeat;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28), 0 9px 22px rgba(0, 0, 0, 0.32);
+}
+
+.app-mark:not(.app-mark-image)::after {
+  content: none;
 }
 
 .app-mark-image {

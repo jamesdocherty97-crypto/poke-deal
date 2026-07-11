@@ -1,0 +1,328 @@
+{
+  "capturedAt": "2026-07-11T18:56:50+01:00",
+  "timezone": "Europe/London",
+  "measurementContext": "Local Next production build against the migrated production database unless a field says simulated or derived",
+  "git": {
+    "baselineSourceCommit": "9621e7b",
+    "baselineEvidenceCommit": "c4357fe",
+    "finalCommit": null,
+    "workingTreeHadUncommittedOverhaul": true
+  },
+  "baselineEvidence": "docs/overhaul/BASELINE_METRICS.json",
+  "qualityGates": {
+    "fullUnit": {
+      "tests": 786,
+      "passed": 786,
+      "failed": 0,
+      "status": "passed on the final release rerun"
+    },
+    "focusedOverhaul": {
+      "tests": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    "focusedUx": {
+      "tests": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "pricingRedTeam": {
+      "attacks": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "playwright": {
+      "tests": 4,
+      "passed": 4,
+      "failed": 0,
+      "durationSeconds": 22.9,
+      "scope": [
+        "fixture dealer loop: comp to buy to stock to draft to sold to profit",
+        "scan to progressive confidence receipt to idempotent acquire",
+        "offline comp-backed buy survives reload and flushes once",
+        "offline Quick Fill preserves stock and chosen listing"
+      ],
+      "databaseMode": "fixture-routed real UI; CI deploys migrations to disposable PostgreSQL, but the browser journey is not seeded DB-backed"
+    },
+    "typecheckPassed": true,
+    "prismaValidatePassed": true,
+    "buildPassed": true,
+    "buildSeconds": 16.72,
+    "productionDependencyAuditVulnerabilities": 0
+  },
+  "framework": {
+    "next": "15.5.20",
+    "react": "18.3.1",
+    "reactDom": "18.3.1",
+    "nextBundledPostcssOverride": "8.5.16"
+  },
+  "bundle": {
+    "rootRouteKb": 145.0,
+    "rootFirstLoadKb": 247.0,
+    "sharedFirstLoadKb": 103.0,
+    "middlewareKb": 35.5,
+    "changeFromBaselinePercent": {
+      "rootRoute": 7.4,
+      "rootFirstLoad": 11.3,
+      "sharedFirstLoad": 17.7,
+      "middleware": 27.2,
+      "buildTime": -7.1
+    }
+  },
+  "architecture": {
+    "apiRouteFiles": 51,
+    "pageRoutes": 2,
+    "rootClientLines": 12099,
+    "componentCssLines": 8262,
+    "serviceWorker": true,
+    "indexedDbQueue": true,
+    "manualCheckWorklist": true,
+    "perCardPriceHistory": true,
+    "batchedStockHistoryPreviews": true,
+    "progressiveCompNdjson": true,
+    "neonPoolerHostname": true,
+    "productionPrismaGlobalReuse": true,
+    "durableAcquireAndSellIdempotency": true,
+    "saleRowLock": true,
+    "ciDisposablePostgresMigrationDeploy": true,
+    "scanBudgetDurableWhenDatabaseAvailable": true,
+    "sourceFreshnessRegistry": "runtime-local"
+  },
+  "runtimeMs": {
+    "rootHtml": {
+      "cold": 69,
+      "warm": [3, 4]
+    },
+    "inventoryApiWarm": [843, 854, 900, 916],
+    "dashboardApiWarm": [573, 585, 586, 596, 599],
+    "systemStatusApiWarm": [369, 371, 376, 382, 398],
+    "progressiveCompRuns": [
+      {
+        "firstCatalog": 3215,
+        "firstVerdict": 3215,
+        "quorum": 3735,
+        "receipt": 4410
+      },
+      {
+        "firstCatalog": 3658,
+        "firstVerdict": 4319,
+        "quorum": 4509,
+        "receipt": 4509
+      },
+      {
+        "firstCatalog": 2755,
+        "firstVerdict": 2755,
+        "quorum": 3362,
+        "receipt": 3585
+      }
+    ],
+    "latestDurableScanApiProbe": {
+      "total": 2379,
+      "modelLatency": 998,
+      "durableBudgetReservation": true,
+      "temperature": "cold total"
+    },
+    "estimatedPhotoToTerminalReceipt": {
+      "range": [5964, 6888],
+      "baseline": 11666,
+      "midpointImprovementPercent": 44.9,
+      "method": "derived by adding the latest durable cold scan API total to the three measured comp receipt times; not an end-to-end p95 trace"
+    }
+  },
+  "scanEvaluation": {
+    "model": "gemini-3.1-flash-lite",
+    "mediaResolution": "low",
+    "thinkingLevel": "minimal",
+    "outputTokenLimit": 512,
+    "semanticIdentityAt512Px": {
+      "correct": 12,
+      "evaluated": 12,
+      "modelMedianMsRange": [1000, 1250],
+      "collectorNumberComparison": "canonicalises leading-zero numeric segments"
+    },
+    "localApi149Kb": {
+      "warmMedianMs": 1325
+    },
+    "simulatedFast4g42Kb": {
+      "samplesMs": [1579, 1247, 1342],
+      "medianMs": 1342,
+      "p95MsApprox": 1555,
+      "strictIdentityUnder1500MsP95Proven": false
+    }
+  },
+  "lighthouseMobile": {
+    "baselineRoot": {
+      "performance": 74,
+      "accessibility": 89,
+      "bestPractices": 96,
+      "firstContentfulPaintMs": 1067,
+      "largestContentfulPaintMs": 16120,
+      "timeToInteractiveMs": 17073
+    },
+    "finalByView": {
+      "today": {
+        "performance": 93,
+        "accessibility": 100,
+        "bestPractices": 100,
+        "firstContentfulPaintMs": 1061,
+        "largestContentfulPaintMs": 3178,
+        "timeToInteractiveMs": 6919,
+        "speedIndexMs": 1278,
+        "totalBlockingTimeMs": 24,
+        "cumulativeLayoutShift": 0.0659
+      },
+      "buy": {
+        "performance": 80,
+        "accessibility": 100,
+        "bestPractices": 100,
+        "firstContentfulPaintMs": 1080,
+        "largestContentfulPaintMs": 5304,
+        "timeToInteractiveMs": 6304,
+        "speedIndexMs": 2459,
+        "totalBlockingTimeMs": 17,
+        "cumulativeLayoutShift": 0.0002
+      },
+      "stock": {
+        "performance": 95,
+        "accessibility": 100,
+        "bestPractices": 100,
+        "firstContentfulPaintMs": 1063,
+        "largestContentfulPaintMs": 2876,
+        "timeToInteractiveMs": 5685,
+        "speedIndexMs": 1972,
+        "totalBlockingTimeMs": 21,
+        "cumulativeLayoutShift": 0.0002
+      },
+      "list": {
+        "performance": 96,
+        "accessibility": 100,
+        "bestPractices": 100,
+        "firstContentfulPaintMs": 1063,
+        "largestContentfulPaintMs": 2803,
+        "timeToInteractiveMs": 6602,
+        "speedIndexMs": 2238,
+        "totalBlockingTimeMs": 21,
+        "cumulativeLayoutShift": 0.0069
+      },
+      "profit": {
+        "performance": 95,
+        "accessibility": 100,
+        "bestPractices": 100,
+        "firstContentfulPaintMs": 1059,
+        "largestContentfulPaintMs": 2896,
+        "timeToInteractiveMs": 6701,
+        "speedIndexMs": 1898,
+        "totalBlockingTimeMs": 37,
+        "cumulativeLayoutShift": 0.0002
+      }
+    },
+    "finalMedianAcrossViews": {
+      "performance": 95,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "firstContentfulPaintMs": 1063,
+      "largestContentfulPaintMs": 2896,
+      "timeToInteractiveMs": 6602,
+      "speedIndexMs": 1972,
+      "totalBlockingTimeMs": 21,
+      "cumulativeLayoutShift": 0.0002
+    },
+    "importantCaveat": "Buy has the lowest final performance score (80) and highest LCP (5.304 s); the cross-view median is reported alongside, not instead of, every view."
+  },
+  "dataSafety": {
+    "backup": {
+      "path": "output/backups/20260711-170314Z/poke-deal-backup-20260711-170314Z.json",
+      "tables": 18,
+      "rows": 42131,
+      "bytes": 24453944,
+      "sha256": "b2709d4ca20aadd2279470af8487ef539e7f7c87b1b3a5df56a3687b15ab2b08",
+      "keyRowCounts": {
+        "cards": 40267,
+        "inventoryItems": 17,
+        "cardPhotos": 16,
+        "listings": 14,
+        "sales": 1,
+        "imports": 1,
+        "checkedComps": 26,
+        "compResults": 1602,
+        "priceSnapshots": 88,
+        "scanEvents": 4,
+        "cronRuns": 28,
+        "fxRates": 36,
+        "watches": 6,
+        "alerts": 4,
+        "appAlerts": 21
+      }
+    },
+    "migration": {
+      "name": "20260711120000_architecture_reliability",
+      "productionApplied": true,
+      "prismaStatus": "up to date",
+      "rowCountsPreserved": true,
+      "newColumnsReadable": true,
+      "shape": "additive"
+    }
+  },
+  "security": {
+    "configuredSecretFoundInClientAssets": false,
+    "sharedBasicPasswordGate": true,
+    "durableAuthBruteForceThrottle": false,
+    "randomSignedEbayOauthState": true,
+    "scanRequestBodyAndDecodedImageCaps": true,
+    "boundedGeminiAndDiscordCalls": true,
+    "productionDependencyVulnerabilities": 0
+  },
+  "releaseEvidence": {
+    "productionDatabaseMigrated": true,
+    "productionEnvironmentConfiguredExceptDiscord": true,
+    "discordWebhookConfigured": false,
+    "finalApplicationDeployVerified": false,
+    "githubRequiredCheckConfirmed": false
+  },
+  "exitCriteria": {
+    "scanToVerdictMeasurablyFaster": true,
+    "progressiveRendering": true,
+    "identityUnder1500MsP95On4g": false,
+    "offlineBuyLoopE2e": true,
+    "goldenPathContractsAndRedTeamGreen": true,
+    "discordLiveChannelDeliveryProven": false,
+    "manualReviewInTwoTaps": true,
+    "perCardHistoryLive": true,
+    "brandSystemAndScreenshotsComplete": true,
+    "ebayAdaptersCodeReadyBehindGates": true,
+    "sixInvariantsAccountedFor": true
+  },
+  "evidence": {
+    "documents": [
+      "ARCHITECTURE_BASELINE.md",
+      "ARCHITECTURE_REVIEW.md",
+      "UX_REVIEW.md",
+      "BRAND.md",
+      "DECISIONS.md",
+      "OVERHAUL_REPORT.md"
+    ],
+    "baselineScreenshots": [
+      "docs/overhaul/baseline/today-mobile.png",
+      "docs/overhaul/baseline/buy-mobile.png",
+      "docs/overhaul/baseline/inventory-mobile.png",
+      "docs/overhaul/baseline/listings-mobile.png",
+      "docs/overhaul/baseline/profit-mobile.png"
+    ],
+    "finalScreenshots": [
+      "docs/overhaul/final/mobile-today-390x844.png",
+      "docs/overhaul/final/mobile-buy-390x844.png",
+      "docs/overhaul/final/mobile-stock-390x844.png",
+      "docs/overhaul/final/mobile-list-390x844.png",
+      "docs/overhaul/final/mobile-profit-390x844.png",
+      "docs/overhaul/final/desktop-today-1440x900.png"
+    ],
+    "finalScreenshotSha256": {
+      "desktopToday1440x900": "89f0ea33763cbc96471a373aa620f0d04109b0cffacef58d0783c2f0586ef552",
+      "mobileBuy390x844": "d2345b7ac03e56de4794a5dcdd2b2eccaf4c26f666473c86ba8b8b511bd94d6a",
+      "mobileList390x844": "b7bd74d7f6fc37348d08f3554e4e9d15fb4d9ab6f2da31ee536479a5d366e0db",
+      "mobileProfit390x844": "f44e0d02d7a153cdfbdd6ba8035d56a6f2f5a762b83c93035f2926f297f655af",
+      "mobileStock390x844": "3d7943429be5ec921e609bd5e1e405b2cf7849aa9f8235340783948455c3673a",
+      "mobileToday390x844": "3c1e21f551591b7a1188a862ce3c5e318cc54db1897205a450898673b1678902"
+    }
+  }
+}
