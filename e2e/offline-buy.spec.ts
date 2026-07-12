@@ -53,7 +53,7 @@ test("offline buy stays visibly queued across reload and flushes once on reconne
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
 
   await page.getByLabel("Smart comp search").fill("Gengar Lost Origin TG06/TG30 RAW £25");
-  await page.getByRole("button", { name: "Comp from smart search" }).click();
+  await page.getByRole("button", { name: "Comp current card" }).click();
   await expect(page.getByText("Pay up to")).toBeVisible();
   await expect(page.getByText(/7 sold \/ 90d/)).toBeVisible();
 
@@ -76,7 +76,7 @@ test("offline buy stays visibly queued across reload and flushes once on reconne
   await page.evaluate(() => window.dispatchEvent(new Event("offline")));
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByLabel("Smart comp search").fill("Gengar Lost Origin TG06/TG30 RAW £25");
-  await page.getByRole("button", { name: "Comp from smart search" }).click();
+  await page.getByRole("button", { name: "Comp current card" }).click();
   await expect(page.getByText(/Offline receipt · \d+h old · 7 sold/)).toBeVisible();
   await expect(page.getByText(/cached \d+h/)).toBeVisible();
 

@@ -65,6 +65,7 @@ import { normalizeListingUrl } from "@/lib/dealer/listingUrl";
 import { buildLaunchReadiness, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, buildLaunchProgress, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan, buildBuyTargetOptions, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
+import { buildQuickGradeOptions } from "@/lib/dealer/buyWorkspace";
 import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
 import {
   buildCheckedComp,
@@ -816,21 +817,6 @@ type OfflineBootstrapPayload = {
   dealSession: DealSessionPayload;
 };
 
-const quickGrades: Grade[] = [
-  "RAW",
-  "PSA_8",
-  "PSA_9",
-  "PSA_10",
-  "ACE_9",
-  "ACE_10",
-  "BGS_7_5",
-  "BGS_8_5",
-  "BGS_9_5",
-  "CGC_1_5",
-  "CGC_8_5",
-  "CGC_9_5",
-  "CGC_10",
-];
 const gradeOptions: Grade[] = [...GRADE_VALUES];
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
 const checkedCompPlatforms: Array<{ value: CheckedCompPlatform; label: string }> = [
@@ -7738,7 +7724,7 @@ export default function Home() {
               </details>
             )}
             <div className="smart-grade-strip" aria-label="Quick grade">
-              {quickGrades.map((g) => (
+              {buildQuickGradeOptions(grade).map((g) => (
                 <button
                   key={g}
                   className={grade === g ? "selected" : ""}
@@ -7753,7 +7739,6 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <section className="buy-advanced-details identity-details">
             <IntakeSessionCard
               source={source}
               location={location}
@@ -7768,6 +7753,20 @@ export default function Home() {
               onListingStateChange={setAcquireListingState}
               onKeepBuyingChange={setKeepBuying}
             />
+            <details className="buy-advanced-details identity-details">
+            <summary>
+              <span>
+                <strong>Exact card details</strong>
+                <small>Card, set, number, cert and every grade</small>
+              </span>
+              <em>
+                {name.trim() || setNameValue.trim() || number.trim()
+                  ? [name.trim(), setNameValue.trim(), number.trim() ? `#${number.trim()}` : "", grade.replace(/_/g, " ")]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "Optional"}
+              </em>
+            </summary>
             <label className="set-field">
               Card
               <input
@@ -8026,7 +8025,7 @@ export default function Home() {
                 {busy === "lookup" ? "..." : "Comp"}
               </button>
             </div>
-            </section>
+            </details>
             {!headline && hasBuyContext && renderManualCompLinks("compact")}
             {!headline && hasBuyContext && (
               <details className="panel optional-tool-panel manual-check-panel">
