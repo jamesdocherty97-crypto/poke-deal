@@ -13,6 +13,23 @@ const CARD = {
   language: "EN",
 };
 
+test("buy workspace keeps the fast path focused and reveals precision controls on demand", async ({ context, page }) => {
+  await mockDealerApis(context, new FixtureDealerLedger());
+
+  await page.goto("/?view=buy");
+
+  await expect(page.getByLabel("Smart comp search")).toBeVisible();
+  await expect(page.locator(".smart-grade-strip button")).toHaveCount(4);
+  await expect(page.getByLabel("Card", { exact: true })).toBeHidden();
+  await expect(page.getByRole("group", { name: "After stock" })).toBeHidden();
+
+  await page.getByText("Exact card details", { exact: true }).click();
+  await expect(page.getByLabel("Card", { exact: true })).toBeVisible();
+
+  await page.getByText("Buy defaults", { exact: true }).click();
+  await expect(page.getByRole("group", { name: "After stock" })).toBeVisible();
+});
+
 test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", async ({ context, page }) => {
   const ledger = new FixtureDealerLedger();
   await mockDealerApis(context, ledger);

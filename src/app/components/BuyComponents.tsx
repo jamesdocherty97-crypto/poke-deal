@@ -173,13 +173,23 @@ export function IntakeSessionCard({
   onKeepBuyingChange: (value: boolean) => void;
 }) {
   return (
-    <div className="intake-session-card" aria-label="Buy session defaults">
-      <div className="intake-session-heading">
+    <details className="intake-session-card">
+      <summary className="intake-session-summary">
         <div>
-          <span>Buy session</span>
+          <span>Buy defaults</span>
           <strong>
             {source || "Source"} · {location || "Place"} · {condition || "Condition"}
           </strong>
+        </div>
+        <small>
+          {channelLabel(channel)} · {listingState.toLowerCase()} · {keepBuying ? "next card" : "finish after stock"}
+        </small>
+      </summary>
+      <div className="intake-session-body">
+      <div className="intake-session-heading">
+        <div>
+          <span>After stocking</span>
+          <strong>{keepBuying ? "Keep this session moving" : "Finish this buy"}</strong>
         </div>
         <div className="intake-session-mode" role="group" aria-label="After stock">
           <button type="button" className={keepBuying ? "selected" : ""} onClick={() => onKeepBuyingChange(true)}>
@@ -227,7 +237,8 @@ export function IntakeSessionCard({
           </button>
         ))}
       </div>
-    </div>
+      </div>
+    </details>
   );
 }
 
