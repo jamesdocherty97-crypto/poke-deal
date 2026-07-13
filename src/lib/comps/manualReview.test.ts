@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ManualReviewDb } from "./manualReview.js";
-import { listManualCompReviews, resolveManualCompReview } from "./manualReview.js";
+import { listManualCompReviews, requestManualCompReview, resolveManualCompReview } from "./manualReview.js";
 
 function reviewRow() {
   return {
@@ -28,6 +28,8 @@ function reviewRow() {
     resolvedAt: null as Date | null,
     resolution: null as string | null,
     resolutionNote: null as string | null,
+    reviewRequestedAt: new Date("2026-07-11T09:02:00.000Z") as Date | null,
+    reviewExpiresAt: new Date("2099-08-10T09:02:00.000Z") as Date | null,
   };
 }
 
@@ -38,6 +40,9 @@ function fakeDb() {
       async findMany(args: any) {
         if (args.where.resolvedAt === null && row.resolvedAt) return [];
         return [row];
+      },
+      async findFirst() {
+        return row;
       },
       async findUnique() {
         return row;
@@ -87,4 +92,14 @@ test("repeating the same review resolution is idempotent but a different one con
     (await resolveManualCompReview(db, { id: "comp_1", resolution: "ACCEPT_HEADLINE", note: "Duplicate" })).kind,
     "conflict",
   );
+});
+
+test("explicit review request refreshes one expiring task", async () => {
+  const { db, row } = fakeDb();
+  const now = new Date("2026-07-13T10:00:00.000Z");
+  const result = await requestManualCompReview(db, { cardId: "card_1", grade: "RAW", now, ttlDays: 14 });
+  assert.equal(result.kind, "requested");
+  assert.equal(row.reviewRequestedAt?.toISOString(), now.toISOString());
+  assert.equal(row.reviewExpiresAt?.toISOString(), "2026-07-27T10:00:00.000Z");
+  assert.equal(row.resolvedAt, null);
 });

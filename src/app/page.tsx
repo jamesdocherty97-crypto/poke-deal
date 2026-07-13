@@ -202,7 +202,7 @@ type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type AcquireListingState = "DRAFT" | "ACTIVE";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
-type InventoryFilter = "all" | "needs-listing" | "listed" | "needs-photos" | "held" | "sold";
+type InventoryFilter = "needs-action" | "all" | "needs-listing" | "listed" | "needs-photos" | "held" | "sold";
 type ExpenseCategory = "SUPPLIES" | "POSTAGE" | "GRADING" | "TABLE_FEE" | "TRAVEL" | "PLATFORM" | "OTHER";
 type BuyFlowState = "done" | "current" | "wait" | "warn";
 type BuyFlowStep = {
@@ -827,6 +827,7 @@ const checkedCompPlatforms: Array<{ value: CheckedCompPlatform; label: string }>
 ];
 const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const inventoryFilters: Array<{ value: InventoryFilter; label: string }> = [
+  { value: "needs-action", label: "Needs action" },
   { value: "all", label: "All" },
   { value: "needs-listing", label: "Needs listing" },
   { value: "listed", label: "Listed" },
@@ -1024,7 +1025,7 @@ export default function Home() {
   const [scanCorrectionKey, setScanCorrectionKey] = useState<string | null>(null);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [inventoryQuery, setInventoryQuery] = useState("");
-  const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("all");
+  const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("needs-action");
   const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
   const [listingQuery, setListingQuery] = useState("");
   const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("ALL");
@@ -1043,6 +1044,9 @@ export default function Home() {
   });
   const [offlineMutations, setOfflineMutations] = useState<OfflineMutation[]>([]);
   const [offlineBootstrapAgeHours, setOfflineBootstrapAgeHours] = useState<number | null>(null);
+  const [inventoryLoaded, setInventoryLoaded] = useState(false);
+  const [listingsLoaded, setListingsLoaded] = useState(false);
+  const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [manualReviews, setManualReviews] = useState<ManualCompReview[]>([]);
   const [manualReviewBusyId, setManualReviewBusyId] = useState<string | null>(null);
@@ -1177,10 +1181,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (navigator.onLine) {
-      void refreshAll();
-    } else {
-      void getOfflineBootstrap<OfflineBootstrapPayload>().then((cached) => {
+    void getOfflineBootstrap<OfflineBootstrapPayload>().then((cached) => {
         if (!cached) return;
         setInventory(cached.payload.inventory);
         setPriceHistoryPreviews(cached.payload.priceHistoryPreviews ?? {});
@@ -1194,8 +1195,12 @@ export default function Home() {
         setSystemStatus(cached.payload.systemStatus);
         setDealSession(cached.payload.dealSession);
         setOfflineBootstrapAgeHours(cached.ageHours);
+        setInventoryLoaded(true);
+        setListingsLoaded(true);
+        setDashboardLoaded(true);
+      }).finally(() => {
+        if (navigator.onLine) void refreshAll();
       });
-    }
     void loadSetCatalog();
     if (navigator.onLine) void loadManualReviews();
     void fetch("/api/ebay/status")
@@ -1882,11 +1887,6 @@ export default function Home() {
       (needsManualComp || !catalogCard || comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
   );
   const requiresCheckedCompBeforeStock = Boolean(!checkedComp && dealerVerdict?.requiresCheckedComp);
-  const stockButtonLabel = checkedComp
-    ? "Stock checked comp"
-    : dealerVerdict && dealerVerdict.tone !== "good"
-      ? "Stock with caution"
-      : "Stock this";
   const confidenceLabel = dealerVerdict
     ? { label: dealerVerdict.label, tone: dealerVerdict.tone }
     : headline
@@ -1967,20 +1967,6 @@ export default function Home() {
     ? dealSession.summary.totalMaxCashPence - dealSessionPaidPence
     : 0;
   const quickStockReady = Boolean(headline && !isAmbiguousComp && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
-  const quickStockCanSubmit = quickStockReady && !requiresCheckedCompBeforeStock;
-  const mobileNeedsCheckedComp = needsManualComp || requiresCheckedCompBeforeStock;
-  const mobileCanStockLater = mobileNeedsCheckedComp && manualStockReady;
-  const acquireButtonLabel = busy === "acquire"
-    ? "Stocking..."
-    : isAmbiguousComp
-      ? "Choose exact card"
-    : !headline
-      ? "Look up comp first"
-      : !quickStockReady
-        ? "Add cost"
-        : requiresCheckedCompBeforeStock
-          ? "Add checked comp first"
-          : "Acquire + price";
   const quickOfferOptions = useMemo(() => {
     const targetPence = deal?.targetBuyPence ?? 0;
     const options: Array<{ label: string; valuePence: number }> = [];
@@ -2395,15 +2381,15 @@ export default function Home() {
           nextPriceHistoryPreviews = payload.priceHistoryPreviews ?? {};
           setInventory(nextInventory);
           setPriceHistoryPreviews(nextPriceHistoryPreviews);
-        }),
+        }).finally(() => setInventoryLoaded(true)),
         load<{ listings?: Listing[] }>("/api/listings", "listings", (payload) => {
           nextListings = payload.listings ?? [];
           setListings(nextListings);
-        }),
+        }).finally(() => setListingsLoaded(true)),
         load<Dashboard>("/api/dashboard", "dashboard", (payload) => {
           nextDashboard = payload;
           setDashboard(payload);
-        }),
+        }).finally(() => setDashboardLoaded(true)),
         load<PortfolioHistory>("/api/snapshots/portfolio", "snapshot history", (payload) => {
           nextPortfolio = payload;
           setPortfolio(payload);
@@ -3483,8 +3469,8 @@ export default function Home() {
   }
 
   function skipCurrentComp() {
-    clearCurrentComp("Skipped. Ready for next comp.");
-    finishScannedCardDecision("Skipped. Scan next?");
+    clearCurrentComp("Ready for next card.");
+    finishScannedCardDecision("Ready. Scan next?");
   }
 
   function openOpeningStockImport(options: { example?: boolean } = {}) {
@@ -4771,7 +4757,7 @@ export default function Home() {
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "watch create failed");
-      setNotice(`Watching ${name} at ${gbp(targetPence)}.`);
+      setNotice(`${payload.created === false ? "Updated watch for" : "Watching"} ${name} at ${gbp(targetPence)}.`);
       if (payload.watch?.id) {
         setWatchEdits((current) => ({ ...current, [payload.watch.id]: penceToPounds(payload.watch.targetPence) }));
       }
@@ -6777,10 +6763,7 @@ export default function Home() {
   }
 
   function runDecisionBarBuy() {
-    if (mobileNeedsCheckedComp && !mobileCanStockLater) {
-      jumpToCheckedComp();
-      return;
-    }
+    if (buyResultSection !== "deal" && requiresCheckedCompBeforeStock) void requestCurrentManualReview(true);
     runStockAction();
   }
 
@@ -6804,11 +6787,34 @@ export default function Home() {
       jumpToCostEntry();
       return;
     }
-    if (requiresCheckedCompBeforeStock) {
-      jumpToCheckedComp();
-      return;
-    }
     void acquire();
+  }
+
+  async function requestCurrentManualReview(quiet = false): Promise<boolean> {
+    const card = currentCheckedCompCard();
+    if (!card.name.trim()) return false;
+    try {
+      const res = await fetch("/api/comps/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card, grade }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "review request failed");
+      await loadManualReviews();
+      if (!quiet) setNotice("Review saved for this card and grade.");
+      return true;
+    } catch (err) {
+      if (!quiet) setError(err instanceof Error ? err.message : "review request failed");
+      return false;
+    }
+  }
+
+  async function saveReviewAndNext() {
+    setBusy("manual-review-request");
+    const saved = await requestCurrentManualReview();
+    setBusy(null);
+    if (saved) clearCurrentComp("Review saved. Ready for next card.");
   }
 
   function renderManualCompLinks(variant: "compact" | "full" | "priority" = "full") {
@@ -6822,8 +6828,8 @@ export default function Home() {
     return (
       <div className={`manual-comp-links ${variant}`} aria-label="Manual comp checks">
         <div className="manual-comp-heading">
-          <span>Manual checks</span>
-          <strong>UK sold first</strong>
+          <span>Step 1 · open sold listings</span>
+          <strong>Exact eBay UK search</strong>
         </div>
         <label className="manual-comp-search">
           <span>Search</span>
@@ -6849,7 +6855,7 @@ export default function Home() {
             Use fields
           </button>
           <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")} disabled={!ebayQuery.trim()}>
-            Open UK
+            eBay UK solds
           </button>
           <button type="button" onClick={() => void copyManualCompQuery()} disabled={!ebayQuery.trim()}>
             Copy
@@ -6895,7 +6901,7 @@ export default function Home() {
               alt=""
             />
             <div>
-              <span>Your checked comps</span>
+              <span>Step 2 · optional evidence</span>
               <strong>
                 {summary
                   ? `${summary.count} logged · median ${gbp(summary.medianPence)}`
@@ -7025,8 +7031,20 @@ export default function Home() {
         )}
         {!hasLoggedEntries && variant === "priority" && (
           <p className="hint">
-            Open eBay UK solds from Manual checks, then log the exact sold prices you trust here.
+            In a rush? Skip this. Otherwise log the exact sold prices you trust.
           </p>
+        )}
+        {variant === "priority" && (
+          <div className="checked-comp-finish-actions" aria-label="Finish manual comp">
+            {hasLoggedEntries ? (
+              <button type="button" onClick={() => clearCurrentComp("Comp saved. Ready for next card.")}>Save comp &amp; next</button>
+            ) : (
+              <button type="button" onClick={() => void saveReviewAndNext()} disabled={busy === "manual-review-request"}>
+                {busy === "manual-review-request" ? "Saving..." : "Save review & next"}
+              </button>
+            )}
+            <button className="ghost-button" type="button" onClick={skipCurrentComp}>Next card</button>
+          </div>
         )}
       </div>
     );
@@ -7040,7 +7058,7 @@ export default function Home() {
             <span>Ready to stock</span>
             <strong>
               {requiresCheckedCompBeforeStock
-                ? "Add checked comp"
+                ? "Manual check recommended"
                 : quickStockReady
                   ? shouldCreateListing
                     ? `${quickStockQuantity} + ${acquireListingState === "ACTIVE" ? "active listing" : "draft"}`
@@ -7186,17 +7204,15 @@ export default function Home() {
           className="primary-action"
           type="button"
           onClick={runStockAction}
-          disabled={busy === "acquire" || (quickStockReady && !quickStockCanSubmit)}
+          disabled={busy === "acquire"}
         >
           {busy === "acquire"
             ? "Stocking..."
             : !quickStockReady
               ? "Add cost"
-              : requiresCheckedCompBeforeStock
-                ? "Add checked comp first"
-                : shouldCreateListing
-                  ? `${stockButtonLabel} + listing`
-                  : stockButtonLabel}
+              : shouldCreateListing
+                ? "Confirm stock + listing"
+                : "Confirm stock"}
         </button>
       </div>
     );
@@ -7326,7 +7342,7 @@ export default function Home() {
             <div className="command-palette-grid">
               {([
                 ["today", "Today", "Five next moves"],
-                ["acquire", "Buy", "Comp or Quick Fill"],
+                ["acquire", "Comp / Buy", "Comp or Quick Fill"],
                 ["inventory", "Stock", "Search and sell"],
                 ["listings", "List", "Make listing pack"],
                 ["pnl", "Profit", "Sales and costs"],
@@ -7357,6 +7373,7 @@ export default function Home() {
 
       {view === "today" && (
         <TodayTab
+          loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
           launchProgress={launchProgress}
           primaryTodayAction={primaryTodayAction}
           todayActions={todayActions}
@@ -8349,21 +8366,30 @@ export default function Home() {
                 </div>
               </div>
               <div className="buy-result-action-row" aria-label="Buy actions">
-                <button className="primary-action verdict-buy-action" type="button" onClick={runDecisionBarBuy} disabled={busy === "acquire" || busy === "manual-stock"}>
-                  {busy === "acquire" ? "Stocking..." : "Just bought it"}
+                <button
+                  className="primary-action verdict-buy-action"
+                  type="button"
+                  aria-label={buyResultSection === "deal" ? "Add to stock" : "Just bought it"}
+                  onClick={runDecisionBarBuy}
+                  disabled={busy === "acquire" || busy === "manual-stock"}
+                >
+                  {busy === "acquire" ? "Stocking..." : buyResultSection === "deal" ? "Add to stock" : "Just bought it"}
+                </button>
+                <button className="verdict-ebay-action" type="button" aria-label="eBay UK" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
+                  eBay UK
                 </button>
                 <button className="verdict-watch-action" type="button" onClick={watchDecisionTarget} disabled={busy === "watch-create" || decisionBarWatchTargetPence <= 0}>
                   {busy === "watch-create" ? "Watching..." : "Watch"}
                 </button>
-                <button type="button" className="ghost-button verdict-pass-action" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
-                  Pass
+                <button type="button" className="ghost-button verdict-pass-action" aria-label="Next card" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
+                  Next card
                 </button>
               </div>
               <div className="buy-result-chip-row" aria-label="Comp sections">
                 {[
                   ["evidence", "Evidence"],
                   ["deal", "Deal tools"],
-                  ["log", "Log comps"],
+                  ["log", "Manual check"],
                   ["target", "Target"],
                 ].map(([section, label]) => (
                   <button
@@ -8493,7 +8519,7 @@ export default function Home() {
                   </ol>
                 </div>
               )}
-              {buyResultSection === "log" && shouldOfferManualComp && renderManualCompLinks(needsManualComp ? "priority" : "compact")}
+              {buyResultSection === "log" && shouldOfferManualComp && renderManualCompLinks("priority")}
               {buyResultSection === "log" && needsManualComp && renderCheckedCompCard("priority")}
               {buyResultSection === "confidence" && dealerVerdict && (
                 <div className={`dealer-verdict ${dealerVerdict.tone}`}>
@@ -8737,8 +8763,8 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              {buyResultSection === "log" && !needsManualComp && !shouldOfferManualComp && renderManualCompLinks()}
-              {buyResultSection === "log" && !needsManualComp && renderCheckedCompCard()}
+              {buyResultSection === "log" && !needsManualComp && !shouldOfferManualComp && renderManualCompLinks("priority")}
+              {buyResultSection === "log" && !needsManualComp && renderCheckedCompCard("priority")}
               {buyResultSection === "evidence" && marketBaseline && (
                 <div className="market-signal">
                   <span>Catalog baseline</span>
@@ -9451,6 +9477,7 @@ export default function Home() {
 
       {view === "inventory" && (
         <InventoryTab
+          loading={!inventoryLoaded}
           visibleInventory={visibleInventory}
           filteredInventory={filteredInventory}
           activeInventory={activeInventory}
@@ -9533,6 +9560,7 @@ export default function Home() {
 
       {view === "listings" && (
         <ListingsTab
+          loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
           dashboard={dashboard}
           firstDraftListingTarget={firstDraftListingTarget}
           firstSaleListingTarget={firstSaleListingTarget}
@@ -10048,7 +10076,7 @@ export default function Home() {
 
       <nav className="bottom-nav" aria-label="Primary">
         <TabButton active={view === "today"} label="Today" onClick={() => setView("today")} />
-        <TabButton active={view === "acquire"} label="Buy" onClick={() => setView("acquire")} />
+        <TabButton active={view === "acquire"} label="Comp / Buy" onClick={() => setView("acquire")} />
         <TabButton active={view === "inventory"} label="Stock" onClick={() => setView("inventory")} />
         <TabButton active={view === "listings"} label="List" onClick={() => setView("listings")} />
         <TabButton active={view === "pnl"} label="Profit" onClick={() => setView("pnl")} />
@@ -11316,7 +11344,7 @@ function TabIcon({ label }: { label: string }) {
     viewBox: "0 0 24 24",
     "aria-hidden": true,
   } as const;
-  if (label === "Buy") {
+  if (label === "Comp / Buy") {
     return (
       <svg {...common}>
         <circle cx="12" cy="12" r="8" />
@@ -11459,6 +11487,7 @@ function inventoryItemMatchesFilter(item: InventoryItem, filter: InventoryFilter
   if (filter === "sold") return item.status === "SOLD";
   if (item.status === "SOLD") return false;
   if (filter === "all") return true;
+  if (filter === "needs-action") return !hasOpenListing(item) || (item.photos?.length ?? 0) === 0;
   if (filter === "needs-listing") return !hasOpenListing(item);
   if (filter === "listed") return hasOpenListing(item) || item.status === "LISTED";
   if (filter === "needs-photos") return (item.photos?.length ?? 0) === 0;
@@ -11467,6 +11496,7 @@ function inventoryItemMatchesFilter(item: InventoryItem, filter: InventoryFilter
 }
 
 function emptyInventoryFilterText(filter: InventoryFilter): string {
+  if (filter === "needs-action") return "All active stock is caught up.";
   if (filter === "needs-listing") return "Everything has a draft or active listing.";
   if (filter === "listed") return "No listed stock yet.";
   if (filter === "needs-photos") return "Every active stock row has photos.";
@@ -11931,7 +11961,7 @@ function dealCalcPrimaryReason(result: DealCalcResult): string {
 
 function viewTitle(view: View): string {
   if (view === "today") return "Today";
-  if (view === "acquire") return "Buy cards";
+  if (view === "acquire") return "Comp / Buy";
   if (view === "inventory") return "Stock";
   if (view === "listings") return "List";
   if (view === "settings") return "Setup";

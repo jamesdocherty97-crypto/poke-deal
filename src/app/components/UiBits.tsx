@@ -77,6 +77,15 @@ export function EmptyState({ text, art }: { text: string; art?: EmptyStateArt })
   );
 }
 
+export function WorkspaceSkeleton({ label = "Loading workspace", rows = 4 }: { label?: string; rows?: number }) {
+  return (
+    <div className="workspace-skeleton" aria-busy="true" aria-label={label}>
+      <div className="skeleton-hero" />
+      {Array.from({ length: rows }, (_, index) => <div className="skeleton-row" key={index} />)}
+    </div>
+  );
+}
+
 export const MoneyInput = forwardRef<HTMLInputElement, {
   value: string;
   onChange: (value: string) => void;

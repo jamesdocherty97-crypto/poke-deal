@@ -5,6 +5,7 @@ import type { TodayAction, TodayActionTarget } from "@/lib/dealer/today";
 import type { ManualCompReview } from "@/lib/comps/manualReview";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { ManualReviewQueue } from "./ManualReviewQueue";
+import { WorkspaceSkeleton } from "./UiBits";
 
 type TodayDashboard = {
   metrics: { stockCount: number; soldCount: number; operatingExpensePence: number };
@@ -24,6 +25,7 @@ type TodayProps = {
   manualReviewBusyId: string | null;
   onAcceptManualReview: (review: ManualCompReview) => void;
   onAddReviewCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; note?: string }) => void;
+  loading?: boolean;
   [extra: string]: unknown;
 };
 
@@ -40,6 +42,7 @@ export function TodayTab({
   manualReviewBusyId,
   onAcceptManualReview,
   onAddReviewCheckedComp,
+  loading = false,
 }: TodayProps) {
   const greeting = useTodayGreeting();
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -49,6 +52,8 @@ export function TodayTab({
     .reduce((sum, sale) => sum + sale.profitPence, 0);
   const actionLimit = manualReviews.length > 0 ? 4 : 5;
   const sellStock = activeListingCount > 0 ? onSalesDesk : onInventory;
+
+  if (loading) return <section className="workspace today-workspace"><WorkspaceSkeleton label="Loading today's work" rows={3} /></section>;
 
   return (
     <section className="workspace today-workspace focused-today">
@@ -62,7 +67,7 @@ export function TodayTab({
           </p>
         </div>
         <div className="today-hero-actions">
-          <button type="button" onClick={onNewBuy}>Scan / buy</button>
+          <button type="button" onClick={onNewBuy}>Comp / buy</button>
           <button type="button" onClick={sellStock}>{activeListingCount > 0 ? "Book sale" : "Stock"}</button>
         </div>
       </section>

@@ -61,6 +61,22 @@ test("ledger backup exports every persisted table and round-trips into an empty 
   assert.deepEqual(restored.tables, backup.tables);
 });
 
+test("pre-migration backup falls back to the physical table when the generated client expects a new column", async () => {
+  const source = fakeBackupDb(seedRows());
+  source.client.compResult!.findMany = async () => {
+    throw Object.assign(new Error("missing next-schema column"), { code: "P2022" });
+  };
+  (source.client as unknown as { $queryRawUnsafe: (query: string) => Promise<PlainRow[]> }).$queryRawUnsafe = async (query) => {
+    assert.match(query, /FROM "CompResult"/);
+    return source.stores.compResult?.rows.map(cloneRow) ?? [];
+  };
+
+  const backup = await createLedgerBackup(source.client);
+
+  assert.equal(backup.tables.compResults.rowCount, 1);
+  assert.equal(backup.tables.compResults.rows[0]?.id, "comp-1");
+});
+
 test("ledger restore refuses a non-empty database unless force is set", async () => {
   const backup = await createLedgerBackup(fakeBackupDb(seedRows()).client);
   const target = fakeBackupDb({ cards: [{ id: "existing-card", name: "Already here" }] });

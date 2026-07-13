@@ -318,10 +318,13 @@ model CompResult {
   resolvedAt     DateTime?
   resolution     String?
   resolutionNote String?
+  reviewRequestedAt DateTime?
+  reviewExpiresAt   DateTime?
 
   @@index([cardId, grade, asOf])
   @@index([cardId, grade, createdAt])
   @@index([manualCheck, resolvedAt, createdAt])
+  @@index([reviewRequestedAt, reviewExpiresAt])
 }
 
 /// Dealer-observed comps logged after manually checking sold listings.
@@ -449,6 +452,7 @@ model Watch {
   alerts Alert[]
 
   @@index([active])
+  @@unique([cardId, grade])
 }
 
 model Alert {

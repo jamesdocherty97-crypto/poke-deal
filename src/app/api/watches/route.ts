@@ -59,18 +59,27 @@ export async function POST(request: Request) {
     const prisma = getPrisma();
     const cache = new PrismaCardCache(prisma, new PokemonTcgApiCatalogSource());
     const card = await cache.resolve({ ...parsed.data.card, game: "POKEMON", language: "EN" } as CardRef);
-    const watch = await prisma.watch.create({
-      data: {
+    const existing = await prisma.watch.findUnique({
+      where: { cardId_grade: { cardId: card.id, grade: parsed.data.grade as Grade } },
+      select: { id: true },
+    });
+    const watch = await prisma.watch.upsert({
+      where: { cardId_grade: { cardId: card.id, grade: parsed.data.grade as Grade } },
+      create: {
         cardId: card.id,
         grade: parsed.data.grade as Grade,
         targetPence: parsed.data.targetPence,
+      },
+      update: {
+        targetPence: parsed.data.targetPence,
+        active: true,
       },
       include: {
         card: true,
         alerts: { orderBy: { firedAt: "desc" }, take: 1 },
       },
     });
-    return NextResponse.json({ watch }, { status: 201 });
+    return NextResponse.json({ watch, created: !existing }, { status: existing ? 200 : 201 });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "watch create failed" },

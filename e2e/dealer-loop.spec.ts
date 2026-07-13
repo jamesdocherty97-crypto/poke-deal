@@ -30,6 +30,17 @@ test("buy workspace keeps the fast path focused and reveals precision controls o
   await expect(page.getByRole("group", { name: "After stock" })).toBeVisible();
 });
 
+test("stock and list show loading skeletons instead of false zero states", async ({ context, page }) => {
+  await mockDealerApis(context, new FixtureDealerLedger(), { criticalDelayMs: 900 });
+  const listPage = await context.newPage();
+  await Promise.all([page.goto("/?view=stock"), listPage.goto("/?view=list")]);
+  await expect(page.locator(".inventory-workspace .workspace-skeleton")).toBeVisible();
+  await expect(listPage.locator(".listings-workspace .workspace-skeleton")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
+  await expect(listPage.getByRole("heading", { name: "Listings" })).toBeVisible();
+  await listPage.close();
+});
+
 test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", async ({ context, page }) => {
   const ledger = new FixtureDealerLedger();
   await mockDealerApis(context, ledger);
@@ -49,6 +60,13 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
   await expect(compPanel).toContainText(/7 sold \/ 90d · (?:now|today|\d+[mhd])/);
   await expect(compPanel).toContainText("Holo · Usable");
   await expect(compPanel).toContainText("Good daily comp");
+  await expect(compPanel.getByRole("button", { name: "eBay UK", exact: true })).toBeVisible();
+  await expect(compPanel.getByRole("button", { name: "Next card", exact: true })).toBeVisible();
+  await compPanel.getByRole("button", { name: "Manual check", exact: true }).click();
+  await expect(compPanel).toContainText("Step 1 · open sold listings");
+  await compPanel.getByRole("button", { name: "Log what you saw", exact: true }).click();
+  await expect(compPanel.getByRole("textbox", { name: "Sold price", exact: true })).toBeVisible();
+  await compPanel.getByRole("button", { name: "Done", exact: true }).click();
   expect(ledger.compEventTypes).toEqual(["catalog", "source", "verdict", "source", "verdict", "receipt"]);
 
   // First tap reveals the buying maths; the second commits the ledger entry.
@@ -56,7 +74,7 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
   const quickStock = page.locator(".quick-stock-card");
   await expect(quickStock).toBeVisible();
   await expect(quickStock.getByRole("textbox", { name: "Cost", exact: true })).toHaveValue("25.00");
-  await page.getByRole("button", { name: "Just bought it" }).click();
+  await page.getByRole("button", { name: "Add to stock", exact: true }).click();
   await expect.poll(() => ledger.acquired).toBe(true);
   expect(ledger.acquireMutationId).toMatch(/^[0-9a-f-]{36}$/i);
   expect(ledger.acquireBody).toMatchObject({
@@ -81,6 +99,7 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
   await page.getByRole("button", { name: "List", exact: true }).click();
   const listingRow = page.locator(".listings-workspace .item-row").filter({ hasText: "Gengar" });
   await expect(listingRow).toContainText("draft");
+  await listingRow.getByText("More", { exact: true }).click();
   await listingRow.getByRole("button", { name: "Sell", exact: true }).click();
 
   const saleSheet = page.locator(".sell-sheet").filter({ has: page.getByRole("heading", { name: "Mark sold" }) });
@@ -331,7 +350,7 @@ function reconciled(all: ReturnType<typeof compResult>[]) {
   };
 }
 
-async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedger) {
+async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedger, options: { criticalDelayMs?: number } = {}) {
   await context.route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -341,6 +360,9 @@ async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedg
       contentType: "application/json",
       body: JSON.stringify(body),
     });
+    if (method === "GET" && options.criticalDelayMs && ["/api/inventory", "/api/listings", "/api/dashboard"].includes(url.pathname)) {
+      await new Promise((resolve) => setTimeout(resolve, options.criticalDelayMs));
+    }
 
     if (url.pathname === "/api/comps/stream") {
       const events = ledger.compEvents();

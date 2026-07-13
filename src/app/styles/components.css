@@ -598,6 +598,24 @@ label,
   flex-shrink: 0;
 }
 
+.workspace-skeleton { display: grid; gap: 12px; padding: 4px 0; }
+.skeleton-hero, .skeleton-row { position: relative; overflow: hidden; border-radius: 16px; background: var(--color-surface-raised, rgba(255,255,255,.08)); }
+.skeleton-hero { min-height: 132px; }
+.skeleton-row { min-height: 92px; }
+.skeleton-hero::after, .skeleton-row::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent); animation: workspace-shimmer 1.25s infinite; }
+@keyframes workspace-shimmer { to { transform: translateX(100%); } }
+
+.inventory-holding-group { margin: 10px 0; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); overflow: clip; }
+.inventory-holding-group > summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 16px; cursor: pointer; }
+.inventory-holding-group > summary > span { display: grid; gap: 3px; }
+.inventory-holding-group > summary > span:last-child { text-align: right; }
+.inventory-holding-group summary small { color: var(--color-text-secondary); }
+.inventory-lot-list { padding: 0 10px 10px; border-top: 1px solid var(--color-border); }
+
+@media (max-width: 620px) {
+  .buy-result-action-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .panel-heading > *,
 .section-heading > *,
 .item-title-line > *,
@@ -3693,6 +3711,8 @@ label,
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
+
+.buy-result-action-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 .buy-result-action-row button,
 .buy-result-chip-row button {
@@ -8227,6 +8247,12 @@ label,
 }
 
 .verdict-watch-action::before { border: 2px solid currentColor; border-radius: 50%; content: "•"; }
+
+.verdict-ebay-action { border-color: rgba(105, 232, 255, .5); background: rgba(105, 232, 255, .12); color: #c9f6ff; }
+.verdict-ebay-action::before { content: "↗"; }
+
+.checked-comp-finish-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.12); }
+.checked-comp-finish-actions::before { content: "Step 3 · finish"; grid-column: 1 / -1; color: var(--muted); font-size: 11px; font-weight: 950; text-transform: uppercase; letter-spacing: .04em; }
 
 .ghost-button.verdict-pass-action {
   border-color: var(--verdict-pass-border);

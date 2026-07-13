@@ -4,14 +4,29 @@ import {
   isManualReviewResolution,
   listManualCompReviews,
   resolveManualCompReview,
+  requestManualCompReview,
   type ManualReviewDb,
   type ManualReviewStatus,
 } from "@/lib/comps/manualReview";
+import { PrismaCardCache } from "@/lib/catalog/prismaCardCache";
+import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
+import { GRADE_VALUES, type CardRef, type Grade } from "@/lib/domain/types";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_PATCH_BODY_BYTES = 4 * 1024;
+const requestSchema = z.object({
+  card: z.object({
+    name: z.string().min(1),
+    setName: z.string().optional(),
+    number: z.string().optional(),
+    tcgApiId: z.string().optional(),
+    tcgDexId: z.string().optional(),
+  }),
+  grade: z.enum(GRADE_VALUES),
+});
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -19,12 +34,46 @@ export async function GET(request: Request) {
   const status: ManualReviewStatus = rawStatus === "resolved" || rawStatus === "all" ? rawStatus : "open";
   const limit = Number(params.get("limit") ?? 50);
   const cursor = params.get("cursor")?.trim() || undefined;
-  const result = await listManualCompReviews(getPrisma() as unknown as ManualReviewDb, {
-    status,
-    limit: Number.isFinite(limit) ? limit : 50,
-    cursor,
-  });
-  return NextResponse.json(result);
+  try {
+    const result = await listManualCompReviews(getPrisma() as unknown as ManualReviewDb, {
+      status,
+      limit: Number.isFinite(limit) ? limit : 50,
+      cursor,
+    });
+    return NextResponse.json(result);
+  } catch (error) {
+    if (isMissingWorkflowMigration(error)) {
+      return NextResponse.json({ reviews: [], nextCursor: null, migrationPending: true });
+    }
+    throw error;
+  }
+}
+
+export async function POST(request: Request) {
+  const parsed = requestSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "card and grade are required." }, { status: 400 });
+  try {
+    const prisma = getPrisma();
+    const cache = new PrismaCardCache(prisma, new PokemonTcgApiCatalogSource());
+    const card = await cache.resolve({ ...parsed.data.card, game: "POKEMON", language: "EN" } as CardRef);
+    const result = await requestManualCompReview(prisma as unknown as ManualReviewDb, {
+      cardId: card.id,
+      grade: parsed.data.grade as Grade,
+    });
+    if (result.kind === "not-found") {
+      return NextResponse.json({ error: "Run an automatic comp before saving a review task." }, { status: 404 });
+    }
+    return NextResponse.json({ review: result.review }, { status: 201 });
+  } catch (error) {
+    if (isMissingWorkflowMigration(error)) {
+      return NextResponse.json({ error: "Review tasks are temporarily unavailable while the workflow upgrade finishes." }, { status: 503 });
+    }
+    throw error;
+  }
+}
+
+function isMissingWorkflowMigration(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2022");
 }
 
 export async function PATCH(request: Request) {
