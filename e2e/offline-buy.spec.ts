@@ -84,7 +84,7 @@ test("offline buy stays visibly queued across reload and flushes once on reconne
   await page.getByRole("button", { name: "Just bought it" }).click();
   const costInput = page.locator('.quick-stock-card').getByRole("textbox", { name: "Cost" });
   if (await costInput.isVisible()) await costInput.fill("25.00");
-  await page.getByRole("button", { name: "Just bought it" }).click();
+  await page.getByRole("button", { name: "Add to stock", exact: true }).click();
 
   await expect(page.getByTestId("offline-purchase")).toContainText("not yet synced");
   await expect(page.getByTestId("offline-sync-status")).toContainText(/Offline.*1/);

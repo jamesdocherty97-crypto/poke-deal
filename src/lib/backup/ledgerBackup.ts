@@ -138,7 +138,18 @@ export async function createLedgerBackup(
   const tables = {} as Record<BackupTableName, LedgerBackupTable>;
 
   for (const definition of TABLES) {
-    const rows = await delegateFor(db, definition).findMany({ orderBy: { id: "asc" } });
+    let rows: PlainRow[];
+    try {
+      rows = await delegateFor(db, definition).findMany({ orderBy: { id: "asc" } });
+    } catch (error) {
+      // A pre-migration backup can run with a client generated from the next
+      // schema. Fall back to the physical table so missing new columns never
+      // prevent the safety copy that must happen before `migrate deploy`.
+      if (!isMissingColumnError(error)) throw error;
+      const rawQuery = (db as unknown as { $queryRawUnsafe?: (query: string) => Promise<PlainRow[]> }).$queryRawUnsafe;
+      if (!rawQuery) throw error;
+      rows = await rawQuery.call(db, `SELECT * FROM "${prismaTableName(definition)}" ORDER BY "id" ASC`);
+    }
     tables[definition.name] = {
       rowCount: rows.length,
       rows: normalizeRows(rows),
@@ -157,6 +168,14 @@ export async function createLedgerBackup(
       settings: "No Settings table exists in the current schema; app settings are code defaults or device-local UI state.",
     },
   };
+}
+
+function isMissingColumnError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2022");
+}
+
+function prismaTableName(definition: TableDefinition): string {
+  return String(definition.delegate).replace(/^./, (character) => character.toUpperCase());
 }
 
 export async function writeLedgerBackupFiles(

@@ -2,9 +2,10 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { InventorySort } from "@/lib/dealer/tableControls";
-import { EmptyState, MoneyInput } from "./UiBits";
+import { EmptyState, MoneyInput, WorkspaceSkeleton } from "./UiBits";
+import { groupInventoryHoldings } from "@/lib/dealer/inventoryGroups";
 
-type InventoryFilter = "all" | "needs-listing" | "listed" | "needs-photos" | "held" | "sold";
+type InventoryFilter = "needs-action" | "all" | "needs-listing" | "listed" | "needs-photos" | "held" | "sold";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
@@ -18,8 +19,13 @@ type InventoryItemLike = {
   id: string;
   costBasis: number;
   card: {
+    id?: string;
     name: string;
+    setName?: string | null;
+    number?: string | null;
   };
+  grade: string;
+  quantity: number;
 };
 
 export function InventoryTab({
@@ -75,6 +81,7 @@ export function InventoryTab({
   onBulkDraft,
   onBulkMove,
   onBulkExport,
+  loading = false,
 }: {
   visibleInventory: InventoryItemLike[];
   filteredInventory: InventoryItemLike[];
@@ -128,6 +135,7 @@ export function InventoryTab({
   onBulkDraft: (items: InventoryItemLike[]) => void;
   onBulkMove: (items: InventoryItemLike[], location: string) => void;
   onBulkExport: (items: InventoryItemLike[]) => void;
+  loading?: boolean;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkLocation, setBulkLocation] = useState("To list");
@@ -136,6 +144,7 @@ export function InventoryTab({
     [selectedIds, visibleInventory],
   );
   const allVisibleSelected = visibleInventory.length > 0 && selectedItems.length === visibleInventory.length;
+  const holdings = useMemo(() => groupInventoryHoldings(visibleInventory), [visibleInventory]);
 
   function toggleSelected(id: string) {
     setSelectedIds((current) => {
@@ -148,6 +157,7 @@ export function InventoryTab({
 
   return (
     <section className="workspace inventory-workspace">
+      {loading ? <WorkspaceSkeleton label="Loading stock" rows={5} /> : <>
       <div className="section-heading">
         <h2>Inventory</h2>
         <div className="heading-actions">
@@ -156,7 +166,7 @@ export function InventoryTab({
               {warmCompsBusy ? "Refreshing..." : "Refresh comps"}
             </button>
           )}
-          <span>{rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
+          <span>{holdings.length} holding{holdings.length === 1 ? "" : "s"} · {rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
           <button className="ghost-button" type="button" onClick={() => {
             setSelectedIds(allVisibleSelected ? new Set() : new Set(visibleInventory.map((item) => item.id)));
           }} disabled={visibleInventory.length === 0}>
@@ -212,24 +222,29 @@ export function InventoryTab({
           <button className="ghost-button" type="button" onClick={() => setSelectedIds(new Set())}>Done</button>
         </div>
       )}
-      {visibleInventory.map((item) => (
-        <div className={`bulk-select-row${selectedIds.has(item.id) ? " selected" : ""}`} key={item.id}>
-          <label className="bulk-row-checkbox">
-            <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelected(item.id)} />
-            <span>Select {item.card.name}</span>
-          </label>
-          {renderInventoryRow(item)}
-        </div>
+      {holdings.map((holding) => holding.items.length === 1 ? (
+        <InventoryLotRow key={holding.key} item={holding.items[0]!} selectedIds={selectedIds} onToggle={toggleSelected} renderInventoryRow={renderInventoryRow} />
+      ) : (
+        <details className="inventory-holding-group" key={holding.key}>
+          <summary>
+            <span><strong>{holding.items[0]!.card.name}</strong><small>{holding.items[0]!.grade.replace(/_/g, " ")} · {holding.items.length} cost lots</small></span>
+            <span><strong>qty {holding.quantity}</strong><small>avg {gbp(holding.averageUnitCostPence)} each</small></span>
+          </summary>
+          <div className="inventory-lot-list">
+            {holding.items.map((item) => <InventoryLotRow key={item.id} item={item} selectedIds={selectedIds} onToggle={toggleSelected} renderInventoryRow={renderInventoryRow} />)}
+          </div>
+        </details>
       ))}
       {inventoryFilter === "all" && activeInventory.length === 0 ? (
-        <EmptyState text="No active stock. Add your next buy from Buy." />
+        <EmptyState text="No active stock. Add your next card from Comp / Buy." />
       ) : filteredInventory.length === 0 ? (
         <EmptyState text={emptyInventoryFilterText(inventoryFilter)} />
       ) : visibleInventory.length === 0 ? (
         <EmptyState text="No matching stock. Clear the search or change the sort." />
       ) : null}
 
-      {editingItemId && (
+      </>}
+      {!loading && editingItemId && (
         <form className="sell-sheet" onSubmit={saveInventoryItem}>
           <div className="panel-heading">
             <h2>Edit stock</h2>
@@ -345,6 +360,23 @@ export function InventoryTab({
         </form>
       )}
     </section>
+  );
+}
+
+function InventoryLotRow({ item, selectedIds, onToggle, renderInventoryRow }: {
+  item: InventoryItemLike;
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  renderInventoryRow: (item: InventoryItemLike) => ReactNode;
+}) {
+  return (
+    <div className={`bulk-select-row${selectedIds.has(item.id) ? " selected" : ""}`}>
+      <label className="bulk-row-checkbox">
+        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => onToggle(item.id)} />
+        <span>Select {item.card.name}</span>
+      </label>
+      {renderInventoryRow(item)}
+    </div>
   );
 }
 

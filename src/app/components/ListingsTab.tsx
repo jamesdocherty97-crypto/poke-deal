@@ -6,7 +6,7 @@ import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { orderListingPhotos, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { InventoryPhotoTools } from "./InventoryPhotoTools";
-import { CardImage, EmptyState, Metric } from "./UiBits";
+import { CardImage, EmptyState, Metric, WorkspaceSkeleton } from "./UiBits";
 
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
@@ -102,6 +102,7 @@ export function ListingsTab({
   listingPackSheet,
   editListingSheet,
   onBulkPack,
+  loading = false,
 }: {
   dashboard: Dashboard | null;
   firstDraftListingTarget: Listing | null;
@@ -162,6 +163,7 @@ export function ListingsTab({
   listingPackSheet: ReactNode;
   editListingSheet: ReactNode;
   onBulkPack: (listings: Listing[], channel: Channel, mode: "download" | "copy") => void;
+  loading?: boolean;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [packChannel, setPackChannel] = useState<Channel>("EBAY");
@@ -186,6 +188,8 @@ export function ListingsTab({
       return next;
     });
   }
+
+  if (loading) return <section className="workspace listings-workspace"><WorkspaceSkeleton label="Loading listings" rows={5} /></section>;
 
   return (
     <section className="workspace listings-workspace">
@@ -570,7 +574,7 @@ export function ListingsTab({
         </div>
       ))}
       {listings.length === 0 ? (
-        <EmptyState text="No listings yet. Buy can create draft listings automatically." />
+        <EmptyState text="No listings yet. Comp / Buy can create draft listings automatically." />
       ) : visibleListings.length === 0 ? (
         <EmptyState text="No matching listings. Clear the search or change the state filter." />
       ) : null}
@@ -645,14 +649,20 @@ function ListingQueueRow({
           onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
           onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
         />
-        <div className="row-actions">
+        <div className="next-action-strip listing-next-action">
           <button
+            className="next-action-button"
             type="button"
             onClick={() => onDraft(item)}
             disabled={busy?.startsWith("create-listing-") || busy?.startsWith("listing-")}
           >
             Draft + pack
           </button>
+          <span>Recommended: turn this stock row into a channel-ready draft.</span>
+        </div>
+        <details className="row-more-actions">
+          <summary>More</summary>
+          <div className="row-actions">
           <button type="button" onClick={() => onSell(item)} disabled={busy?.startsWith("sell-")}>
             Sell
           </button>
@@ -668,7 +678,8 @@ function ListingQueueRow({
           <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
             Edit
           </button>
-        </div>
+          </div>
+        </details>
       </div>
     </article>
   );
@@ -794,16 +805,6 @@ function ListingRow({
                     }}
                   />
                 </label>
-                {canUseCatalogArt && (
-                  <button
-                    className="next-action-button"
-                    type="button"
-                    onClick={() => onCatalogArt(listing.item)}
-                    disabled={busy === `photo-${listing.item.id}`}
-                  >
-                    Use catalog art
-                  </button>
-                )}
               </>
             ) : isEbay && ebayConnected && hasOffer && !isPublished ? (
               <button className="next-action-button" type="button" onClick={onEbayPublish} disabled={isEbayPublishBusy}>
@@ -843,7 +844,14 @@ function ListingRow({
             </span>
           </div>
         )}
-        <div className="row-actions">
+        <details className="row-more-actions">
+          <summary>More</summary>
+          <div className="row-actions">
+          {canUseCatalogArt && listing.item && (
+            <button type="button" onClick={() => onCatalogArt(listing.item)} disabled={busy === `photo-${listing.item.id}`}>
+              Use catalog art
+            </button>
+          )}
           <button type="button" onClick={() => onEdit(listing)} disabled={isBusy || listing.state === "SOLD"}>
             Edit
           </button>
@@ -912,7 +920,8 @@ function ListingRow({
               View on eBay
             </a>
           )}
-        </div>
+          </div>
+        </details>
       </div>
     </article>
   );

@@ -33,6 +33,8 @@ export type ManualCompReview = {
   resolvedAt: string | null;
   resolution: string | null;
   resolutionNote: string | null;
+  reviewRequestedAt: string | null;
+  reviewExpiresAt: string | null;
 };
 
 type ManualReviewRow = {
@@ -52,11 +54,14 @@ type ManualReviewRow = {
   resolvedAt: Date | null;
   resolution: string | null;
   resolutionNote: string | null;
+  reviewRequestedAt: Date | null;
+  reviewExpiresAt: Date | null;
 };
 
 export type ManualReviewDb = {
   compResult: {
     findMany(args: unknown): Promise<ManualReviewRow[]>;
+    findFirst(args: unknown): Promise<ManualReviewRow | null>;
     findUnique(args: unknown): Promise<ManualReviewRow | null>;
     updateMany(args: unknown): Promise<{ count: number }>;
   };
@@ -68,22 +73,69 @@ export async function listManualCompReviews(
 ): Promise<{ reviews: ManualCompReview[]; nextCursor: string | null }> {
   const status = options.status ?? "open";
   const limit = Math.max(1, Math.min(100, Math.round(options.limit ?? 50)));
+  const now = new Date();
   const rows = await db.compResult.findMany({
     where: {
       manualCheck: true,
-      ...(status === "open" ? { resolvedAt: null } : status === "resolved" ? { resolvedAt: { not: null } } : {}),
+      reviewRequestedAt: { not: null },
+      ...(status === "open"
+        ? { resolvedAt: null, OR: [{ reviewExpiresAt: null }, { reviewExpiresAt: { gt: now } }] }
+        : status === "resolved" ? { resolvedAt: { not: null } } : {}),
     },
     include: { card: true },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: limit + 1,
+    take: Math.min(401, (limit + 1) * 4),
     ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
   });
-  const hasMore = rows.length > limit;
-  const page = rows.slice(0, limit);
+  const deduped = rows.filter((row, index, all) =>
+    all.findIndex((candidate) => candidate.card.id === row.card.id && candidate.grade === row.grade) === index,
+  );
+  const hasMore = deduped.length > limit;
+  const page = deduped.slice(0, limit);
   return {
     reviews: page.map(toManualCompReview),
     nextCursor: hasMore ? page.at(-1)?.id ?? null : null,
   };
+}
+
+export async function requestManualCompReview(
+  db: ManualReviewDb,
+  input: { cardId: string; grade: Grade; now?: Date; ttlDays?: number },
+): Promise<{ kind: "requested"; review: ManualCompReview } | { kind: "not-found" }> {
+  const row = await db.compResult.findFirst({
+    where: { cardId: input.cardId, grade: input.grade },
+    include: { card: true },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+  if (!row) return { kind: "not-found" };
+  const now = input.now ?? new Date();
+  const expiresAt = new Date(now.getTime() + Math.max(1, input.ttlDays ?? 30) * 24 * 60 * 60 * 1_000);
+  await db.compResult.updateMany({
+    where: {
+      cardId: input.cardId,
+      grade: input.grade,
+      reviewRequestedAt: { not: null },
+      resolvedAt: null,
+    },
+    data: {
+      resolvedAt: now,
+      resolution: "DISMISSED",
+      resolutionNote: "Superseded by a newer review request.",
+    },
+  });
+  await db.compResult.updateMany({
+    where: { id: row.id },
+    data: {
+      manualCheck: true,
+      reviewRequestedAt: now,
+      reviewExpiresAt: expiresAt,
+      resolvedAt: null,
+      resolution: null,
+      resolutionNote: null,
+    },
+  });
+  const requested = await db.compResult.findUnique({ where: { id: row.id }, include: { card: true } });
+  return requested ? { kind: "requested", review: toManualCompReview(requested) } : { kind: "not-found" };
 }
 
 export async function resolveManualCompReview(
@@ -134,5 +186,7 @@ function toManualCompReview(row: ManualReviewRow): ManualCompReview {
     resolvedAt: row.resolvedAt?.toISOString() ?? null,
     resolution: row.resolution,
     resolutionNote: row.resolutionNote,
+    reviewRequestedAt: row.reviewRequestedAt?.toISOString() ?? null,
+    reviewExpiresAt: row.reviewExpiresAt?.toISOString() ?? null,
   };
 }
