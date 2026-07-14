@@ -252,8 +252,9 @@ export function InventoryTab({
           </div>
           <div className="form-grid">
             <label>
-              Cost
+              What I paid
               <MoneyInput value={itemCost} onChange={setItemCost} disabled={busy === `edit-${editingItemId}`} />
+              <small>Your purchase cost or cost basis—not the card comp or sell price.</small>
             </label>
             <label>
               Qty
@@ -265,6 +266,9 @@ export function InventoryTab({
               />
             </label>
           </div>
+          <button className="no-cost-button" type="button" onClick={() => setItemCost("0.00")} disabled={busy === `edit-${editingItemId}`}>
+            No tracked cost · £0.00
+          </button>
           <div className="form-grid">
             <label>
               Source
@@ -327,14 +331,15 @@ export function InventoryTab({
           <div className="panel-heading">
             <div>
               <h2>Create listing</h2>
-              <span className="muted">{creatingListingItem.card.name} · cost {gbp(creatingListingItem.costBasis)}</span>
+              <span className="muted">{creatingListingItem.card.name} · paid {gbp(creatingListingItem.costBasis)}</span>
             </div>
             <button className="ghost-button" type="button" onClick={closeCreateListing}>Close</button>
           </div>
           <div className="form-grid">
             <label>
-              List price
+              Your list price
               <MoneyInput value={listingPrice} onChange={setListingPrice} />
+              <small>The suggestion is prefilled. Edit it freely before saving.</small>
             </label>
             <label>
               Channel
@@ -343,6 +348,9 @@ export function InventoryTab({
               </select>
             </label>
           </div>
+          {listingChannel === "EBAY" && Number(listingPrice || 0) < 0.99 && (
+            <p className="price-rule-warning">eBay requires a listing price of at least £0.99. What you paid can still be £0.00.</p>
+          )}
           <label>
             State
             <select value={listingState} onChange={(event) => setListingState(event.target.value as Exclude<ListingState, "SOLD">)}>
@@ -354,7 +362,7 @@ export function InventoryTab({
             Listing URL
             <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
           </label>
-          <button className="primary-action" type="submit" disabled={busy === `create-listing-${creatingListingItemId}`}>
+          <button className="primary-action" type="submit" disabled={busy === `create-listing-${creatingListingItemId}` || (listingChannel === "EBAY" && Number(listingPrice || 0) < 0.99)}>
             {busy === `create-listing-${creatingListingItemId}` ? "Saving..." : "Create listing"}
           </button>
         </form>

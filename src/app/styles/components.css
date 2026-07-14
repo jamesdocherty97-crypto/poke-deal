@@ -3637,6 +3637,85 @@ label,
   white-space: nowrap;
 }
 
+.stock-reprice-actions {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px !important;
+}
+
+.no-cost-button {
+  justify-self: start;
+  border-color: rgba(136, 200, 255, 0.3);
+  color: #b9dcff;
+}
+
+.price-rule-warning {
+  margin: 0;
+  border: 1px solid rgba(251, 113, 133, 0.38);
+  border-radius: var(--r-sm);
+  background: rgba(251, 113, 133, 0.1);
+  color: #ffc2ce;
+  padding: 9px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pricing-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pricing-context-grid > div,
+.listing-price-summary {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-sm);
+  background: rgba(3, 8, 20, 0.28);
+  padding: 8px 9px;
+}
+
+.pricing-context-grid span,
+.listing-price-summary span,
+.listing-price-summary small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.pricing-context-grid strong,
+.listing-price-summary strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.listing-price-summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.listing-price-summary span,
+.listing-price-summary small {
+  grid-column: 1;
+}
+
+.listing-price-summary strong {
+  grid-column: 1;
+}
+
+.listing-price-summary button {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+}
+
+.listing-paid-price {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
 .quick-stock-card {
   display: grid;
   gap: 10px;

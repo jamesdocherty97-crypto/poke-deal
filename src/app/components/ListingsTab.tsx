@@ -629,7 +629,7 @@ function ListingQueueRow({
           </span>
         </div>
         <p>
-          {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · cost {gbp(item.costBasis)}
+          {item.card.setName} {item.card.number ?? "no number"} · qty {item.quantity} · Paid {gbp(item.costBasis)}
         </p>
         {stockNotes && <p>{stockNotes}</p>}
         {photoCount > 0 && (
@@ -676,7 +676,7 @@ function ListingQueueRow({
             Copy Vinted
           </button>
           <button type="button" onClick={() => onEdit(item)} disabled={busy === `edit-${item.id}`}>
-            Edit
+            Edit what I paid
           </button>
           </div>
         </details>
@@ -714,8 +714,8 @@ function ListingRow({
 }) {
   const card = listing.item?.card;
   const title = listing.title ?? card?.name ?? "Untitled listing";
-  const price = listing.listPrice ?? listing.suggestedPrice ?? 0;
-  const economics = listing.item
+  const price = listing.listPrice ?? 0;
+  const economics = listing.item && listing.listPrice != null
     ? buildListingEconomics({
         channel: listing.channel,
         grade: listing.item.grade,
@@ -735,6 +735,7 @@ function ListingRow({
   const hasOffer = listing.externalRef?.startsWith("offer:");
   const isPublished = listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl;
   const canPasteUrl = listing.state !== "SOLD" && !listing.externalUrl;
+  const belowEbayMinimum = isEbay && price < 99;
   const photoCount = listing.item?.photos?.length ?? 0;
   const photoSummary = listing.item
     ? summarizeListingPhotos({
@@ -757,7 +758,7 @@ function ListingRow({
     !photoSummary.hasCatalogPhoto,
   );
   const ebayStatusLabel = hasOffer
-    ? " · offer pending"
+    ? " · offer pending · sync before publish"
     : isPublished
       ? " · eBay live"
       : listing.externalRef
@@ -781,7 +782,22 @@ function ListingRow({
           {stockNotes ? ` · ${stockNotes}` : ""}
           {ebayStatusLabel}
         </p>
-        <p className="listing-row-price">{gbp(price)}</p>
+        <div className="listing-price-summary">
+          <span>Your list price</span>
+          <strong>{listing.listPrice != null ? gbp(price) : "Not chosen"}</strong>
+          {listing.suggestedPrice != null && (
+            <small>Suggested list price {gbp(listing.suggestedPrice)}</small>
+          )}
+          {listing.state !== "SOLD" && (
+            <button type="button" onClick={() => onEdit(listing)} disabled={isBusy}>
+              Edit price
+            </button>
+          )}
+        </div>
+        {listing.item && <p className="listing-paid-price">Paid {gbp(listing.item.costBasis)}</p>}
+        {belowEbayMinimum && (
+          <p className="price-rule-warning">eBay minimum is £0.99. Raise Your list price before syncing or publishing.</p>
+        )}
         {economics && (
           <p className={`listing-row-economics ${economics.profitPence >= 0 ? "good" : "warn"}`}>
             Profit {gbp(economics.profitPence)} · net {gbp(economics.netPence)} · {formatPct(economics.roiPct)} ROI
@@ -807,8 +823,8 @@ function ListingRow({
                 </label>
               </>
             ) : isEbay && ebayConnected && hasOffer && !isPublished ? (
-              <button className="next-action-button" type="button" onClick={onEbayPublish} disabled={isEbayPublishBusy}>
-                {isEbayPublishBusy ? "Publishing..." : "Publish to eBay"}
+              <button className="next-action-button" type="button" onClick={onEbayPublish} disabled={isEbayPublishBusy || belowEbayMinimum}>
+                {isEbayPublishBusy ? "Syncing..." : belowEbayMinimum ? "Edit price first" : "Sync & publish to eBay"}
               </button>
             ) : isEbay && isPublished ? (
               <a className="next-action-button good" href={listing.externalUrl!} target="_blank" rel="noreferrer">
@@ -835,7 +851,7 @@ function ListingRow({
                 : listing.state === "DRAFT"
                   ? "copy fields, create offer, or activate"
                 : hasOffer
-                  ? "offer created, publish when ready"
+                  ? "Poke Deal will sync the latest price and details before publish"
                   : isPublished
                     ? "live on eBay"
                     : listing.state === "ACTIVE"
@@ -853,7 +869,7 @@ function ListingRow({
             </button>
           )}
           <button type="button" onClick={() => onEdit(listing)} disabled={isBusy || listing.state === "SOLD"}>
-            Edit
+            Edit listing details
           </button>
           {listing.item && (
             <button type="button" onClick={() => onPack(listing)} disabled={isBusy}>
@@ -906,9 +922,9 @@ function ListingRow({
             <button
               type="button"
               onClick={onEbayPublish}
-              disabled={isEbayPublishBusy}
+              disabled={isEbayPublishBusy || belowEbayMinimum}
             >
-              {isEbayPublishBusy ? "Publishing..." : "Publish"}
+              {isEbayPublishBusy ? "Syncing..." : belowEbayMinimum ? "Edit price first" : "Sync & publish"}
             </button>
           )}
           {isEbay && isPublished && (

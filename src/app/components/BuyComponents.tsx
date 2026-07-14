@@ -41,7 +41,7 @@ type LastStockedCard = {
   grade: string;
   quantity: number;
   costPence: number;
-  listPricePence: number;
+  listPricePence: number | null;
   channel: Channel;
   listingState: string;
   imageUrl: string | null;
@@ -274,7 +274,9 @@ export function LastStockedPanel({
           {card.queued
             ? "not yet synced"
             : card.listingId
-            ? `${channelLabel(card.channel)} ${card.listingState.toLowerCase()} ${gbp(card.listPricePence)}`
+            ? `${channelLabel(card.channel)} ${card.listingState.toLowerCase()} ${
+                card.listPricePence != null ? gbp(card.listPricePence) : "unpriced"
+              }`
             : "not listed"}
         </small>
       </div>

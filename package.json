@@ -22,7 +22,7 @@
     "typecheck": "tsc -p tsconfig.check.json --noEmit",
     "test:overhaul": "node --import tsx --test src/lib/dealer/inventoryGroups.test.ts src/lib/comps/clientProgress.test.ts src/lib/offline/policy.test.ts src/lib/inventory/saleTransaction.test.ts",
     "test:pricing-redteam": "node --import tsx --test src/lib/comps/redteamPricingBrain.attacks.test.ts",
-    "test:e2e": "PLAYWRIGHT_PORT=3110 playwright test e2e/dealer-loop.spec.ts e2e/golden-path.spec.ts e2e/offline-buy.spec.ts",
+    "test:e2e": "PLAYWRIGHT_PORT=3110 playwright test e2e/dealer-loop.spec.ts e2e/golden-path.spec.ts e2e/offline-buy.spec.ts e2e/pricing-semantics.spec.ts",
     "test:e2e:offline": "PLAYWRIGHT_PORT=3110 playwright test e2e/offline-buy.spec.ts",
     "test:ux": "node --import tsx --test src/lib/offline/policy.test.ts src/lib/offline/clientMutation.test.ts src/lib/comps/clientProgress.test.ts src/app/components/PriceHistory.test.ts",
     "db:generate": "prisma generate",

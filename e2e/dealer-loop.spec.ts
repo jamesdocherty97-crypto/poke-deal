@@ -31,7 +31,7 @@ test("buy workspace keeps the fast path focused and reveals precision controls o
 });
 
 test("stock and list show loading skeletons instead of false zero states", async ({ context, page }) => {
-  await mockDealerApis(context, new FixtureDealerLedger(), { criticalDelayMs: 900 });
+  await mockDealerApis(context, new FixtureDealerLedger(), { criticalDelayMs: 2500 });
   const listPage = await context.newPage();
   await Promise.all([page.goto("/?view=stock"), listPage.goto("/?view=list")]);
   await expect(page.locator(".inventory-workspace .workspace-skeleton")).toBeVisible();
@@ -55,14 +55,14 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
   await page.getByRole("button", { name: "Comp current card" }).click();
 
   const compPanel = page.locator(".comp-panel");
-  await expect(compPanel.getByText("Pay up to", { exact: true })).toBeVisible();
+  await expect(compPanel.getByText("Suggested maximum buy", { exact: true })).toBeVisible();
   await expect(compPanel).toContainText("7 sold / 90d");
   await expect(compPanel).toContainText(/7 sold \/ 90d · (?:now|today|\d+[mhd])/);
   await expect(compPanel).toContainText("Holo · Usable");
   await expect(compPanel).toContainText("Good daily comp");
   await expect(compPanel.getByRole("button", { name: "eBay UK", exact: true })).toBeVisible();
   await expect(compPanel.getByRole("button", { name: "Next card", exact: true })).toBeVisible();
-  await compPanel.getByRole("button", { name: "Manual check", exact: true }).click();
+  await compPanel.getByRole("button", { name: "Manual sold comps", exact: true }).click();
   await expect(compPanel).toContainText("Step 1 · open sold listings");
   await compPanel.getByRole("button", { name: "Log what you saw", exact: true }).click();
   await expect(compPanel.getByRole("textbox", { name: "Sold price", exact: true })).toBeVisible();
@@ -73,7 +73,7 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
   await page.getByRole("button", { name: "Just bought it" }).click();
   const quickStock = page.locator(".quick-stock-card");
   await expect(quickStock).toBeVisible();
-  await expect(quickStock.getByRole("textbox", { name: "Cost", exact: true })).toHaveValue("25.00");
+  await expect(quickStock.getByLabel(/^What I paid/)).toHaveValue("25.00");
   await page.getByRole("button", { name: "Add to stock", exact: true }).click();
   await expect.poll(() => ledger.acquired).toBe(true);
   expect(ledger.acquireMutationId).toMatch(/^[0-9a-f-]{36}$/i);
@@ -89,6 +89,12 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
   const stockRow = page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" });
   await expect(stockRow).toContainText("Needs listing");
   await stockRow.getByRole("button", { name: "Draft listing" }).click();
+
+  const listingCreator = page.locator(".sell-sheet").filter({
+    has: page.getByRole("heading", { name: "Create listing" }),
+  });
+  await expect(listingCreator.getByLabel(/^Your list price/)).toHaveValue("33.75");
+  await listingCreator.getByRole("button", { name: "Create listing" }).click();
 
   await expect.poll(() => ledger.listingState).toBe("DRAFT");
   expect(ledger.listingBody).toMatchObject({ itemId: "item-fixture-gengar", channel: "EBAY", state: "DRAFT" });

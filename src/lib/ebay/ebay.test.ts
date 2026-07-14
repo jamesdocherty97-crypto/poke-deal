@@ -7,6 +7,11 @@ import { buildInventoryItemPayload, upsertInventoryItem } from "./inventoryItem.
 import { buildOfferPayload } from "./offer.js";
 import { buildEbayOfferPreflight, toEbaySku } from "./preflight.js";
 import {
+  synchronizeEbayOffer,
+  validateEbayListPricePence,
+  type EbayOfferSyncDependencies,
+} from "./offerSync.js";
+import {
   EbayTradingApiError,
   buildTradingFixedPriceItemXml,
   buildTradingVerifyFixedPriceItemXml,
@@ -660,6 +665,108 @@ test("buildEbayOfferPreflight reports missing item photos", () => {
 
   assert.equal(preflight.hasImage, false);
   assert.equal(preflight.inventoryItem.product.imageUrls, undefined);
+});
+
+test("buildEbayOfferPreflight preserves user-edited listing copy during a price sync", () => {
+  const preflight = buildEbayOfferPreflight({
+    listingId: "listing-custom-copy",
+    title: "My exact eBay title",
+    description: "My saved condition notes and description.",
+    packInput: slabInput,
+    quantity: 1,
+    policies: MOCK_POLICIES,
+    config: TEST_CONFIG,
+  });
+
+  assert.equal(preflight.title, "My exact eBay title");
+  assert.equal(preflight.inventoryItem.product.title, "My exact eBay title");
+  assert.equal(
+    preflight.inventoryItem.product.description,
+    "My saved condition notes and description.",
+  );
+});
+
+test("validateEbayListPricePence distinguishes the chosen sell price from cost and comps", () => {
+  assert.match(validateEbayListPricePence(null) ?? "", /Your list price/i);
+  assert.match(validateEbayListPricePence(1) ?? "", /at least £0\.99/i);
+  assert.match(validateEbayListPricePence(98) ?? "", /What I paid can still be £0\.00 or £0\.01/i);
+  assert.equal(validateEbayListPricePence(99), null);
+  assert.equal(validateEbayListPricePence(500), null);
+});
+
+test("synchronizeEbayOffer refreshes a stale pending offer with the exact chosen price", async () => {
+  const preflight = buildEbayOfferPreflight({
+    listingId: "listing-norman",
+    itemId: "item-norman",
+    packInput: { ...rawInput, costBasisPence: 1, compMedianPence: 350, listPricePence: 500 },
+    quantity: 1,
+    imageUrls: ["https://blob.vercel-storage.com/norman-front.jpg"],
+    policies: MOCK_POLICIES,
+    config: TEST_CONFIG,
+  });
+  const calls: string[] = [];
+  let syncedPrice = "";
+  const dependencies: EbayOfferSyncDependencies = {
+    async upsertInventoryItem() {
+      calls.push("inventory");
+    },
+    async getOfferBySku() {
+      calls.push("lookup");
+      return null;
+    },
+    async createEbayOffer() {
+      calls.push("create");
+      return { offerId: "should-not-create" };
+    },
+    async updateEbayOffer(_config, offerId, payload) {
+      calls.push(`update:${offerId}`);
+      syncedPrice = payload.pricingSummary.price.value;
+    },
+  };
+
+  const result = await synchronizeEbayOffer({
+    config: TEST_CONFIG,
+    accessToken: "access-token",
+    preflight,
+    listPricePence: 500,
+    offerId: "201067726011",
+  }, dependencies);
+
+  assert.deepEqual(calls, ["inventory", "update:201067726011"]);
+  assert.equal(syncedPrice, "5.00");
+  assert.deepEqual(result, {
+    offerId: "201067726011",
+    created: false,
+    syncedPricePence: 500,
+  });
+});
+
+test("synchronizeEbayOffer rejects a payload that differs from Your list price before writing", async () => {
+  const preflight = buildEbayOfferPreflight({
+    listingId: "listing-mismatch",
+    packInput: { ...rawInput, listPricePence: 500 },
+    quantity: 1,
+    policies: MOCK_POLICIES,
+    config: TEST_CONFIG,
+  });
+  let wrote = false;
+  const dependencies: EbayOfferSyncDependencies = {
+    async upsertInventoryItem() { wrote = true; },
+    async getOfferBySku() { return null; },
+    async createEbayOffer() { return { offerId: "new-offer" }; },
+    async updateEbayOffer() {},
+  };
+
+  await assert.rejects(
+    synchronizeEbayOffer({
+      config: TEST_CONFIG,
+      accessToken: "access-token",
+      preflight,
+      listPricePence: 600,
+    }, dependencies),
+    /does not match Your list price/i,
+  );
+  assert.equal(wrote, false);
 });
 
 // ── Trading API fallback ─────────────────────────────────────────────────────
