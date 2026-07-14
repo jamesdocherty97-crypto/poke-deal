@@ -3,8 +3,9 @@ import { getPrisma } from "@/lib/db/prisma";
 import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
 import { publishEbayOffer } from "@/lib/ebay/offer";
-import { fetchEbaySellingPrivileges } from "@/lib/ebay/policies";
-import { fetchEbayPolicies } from "@/lib/ebay/policies";
+import { fetchEbayPolicies, fetchEbaySellingPrivileges } from "@/lib/ebay/policies";
+import { buildEbayOfferPreflight } from "@/lib/ebay/preflight";
+import { synchronizeEbayOffer, validateEbayListPricePence } from "@/lib/ebay/offerSync";
 import { readEbayLocationSetup } from "@/lib/ebay/location";
 import { addTradingFixedPriceItem } from "@/lib/ebay/trading";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
@@ -66,12 +67,22 @@ export async function POST(
   if (listing.item.status === "SOLD") {
     return NextResponse.json({ error: "Item is already sold." }, { status: 400 });
   }
+  if (listing.state === "ACTIVE" && listing.externalRef && !listing.externalRef.startsWith("offer:")) {
+    return NextResponse.json(
+      { error: "Listing is already published on eBay.", listingId: listing.externalRef },
+      { status: 409 },
+    );
+  }
 
-  const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? 0;
+  const priceError = validateEbayListPricePence(listing.listPrice);
+  if (priceError) {
+    return NextResponse.json({ error: priceError }, { status: 400 });
+  }
+  const listPricePence = listing.listPrice!;
   const photoSummary = summarizeListingPhotos({
     photos: listing.item.photos,
     grade: listing.item.grade,
-    pricePence: effectivePricePence,
+    pricePence: listPricePence,
   });
   if (!photoSummary.satisfiesEbayPhotoRequirement) {
     return NextResponse.json(
@@ -79,10 +90,6 @@ export async function POST(
       { status: 400 },
     );
   }
-
-  const offerId = listing.externalRef?.startsWith("offer:")
-    ? listing.externalRef.slice("offer:".length)
-    : null;
 
   const config = getEbayConfig()!;
 
@@ -99,14 +106,56 @@ export async function POST(
       });
     }
 
-    if (!offerId) {
-      return NextResponse.json(
-        { error: "No pending eBay offer found. Create an offer first." },
-        { status: 400 },
-      );
-    }
+    const policies = await fetchEbayPolicies(config, accessToken);
+    const preflight = buildEbayOfferPreflight({
+      listingId: params.id,
+      itemId: listing.itemId,
+      title: listing.title,
+      description: listing.description,
+      packInput: {
+        card: {
+          name: listing.item.card.name,
+          setName: listing.item.card.setName,
+          number: listing.item.card.number,
+          rarity: listing.item.card.rarity,
+          language: listing.item.card.language,
+        },
+        grade: listing.item.grade,
+        listPricePence,
+        condition: listing.item.condition ?? undefined,
+        certNumber: listing.item.graderCert ?? undefined,
+        usesCatalogOnlyImages: photoSummary.catalogOnly,
+      },
+      quantity: listing.item.quantity ?? 1,
+      imageUrls: photoSummary.imageUrls,
+      policies,
+      config,
+    });
+    const storedOfferId = listing.ebayOfferId
+      ?? (listing.externalRef?.startsWith("offer:")
+        ? listing.externalRef.slice("offer:".length)
+        : null);
+    const synced = await synchronizeEbayOffer({
+      config,
+      accessToken,
+      preflight,
+      listPricePence,
+      offerId: storedOfferId,
+    });
 
-    const result = await publishEbayOffer(config, offerId, accessToken);
+    // Save the successful sync before the irreversible publish call. If eBay
+    // rejects publish, the corrected offer remains recoverable and retryable.
+    await prisma.listing.update({
+      where: { id: params.id },
+      data: {
+        externalRef: `offer:${synced.offerId}`,
+        ebayOfferId: synced.offerId,
+        offerSyncedAt: new Date(),
+        offerSyncedPrice: synced.syncedPricePence,
+      },
+    });
+
+    const result = await publishEbayOffer(config, synced.offerId, accessToken);
     const listingId = result.listingId;
     const listingUrl = ebayListingUrl(listingId);
 
@@ -118,6 +167,8 @@ export async function POST(
           externalRef: listingId,
           externalUrl: listingUrl,
           listedAt: new Date(),
+          ebayOfferId: synced.offerId,
+          offerSyncedPrice: synced.syncedPricePence,
         },
       });
       if (listing.item.status !== "SOLD") {
@@ -158,18 +209,12 @@ async function publishViaTradingApiFallback({
   accessToken: string;
   prisma: ReturnType<typeof getPrisma>;
 }) {
-  const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? 0;
-  if (effectivePricePence <= 0) {
-    return NextResponse.json(
-      { error: "Set a price on the listing before publishing to eBay." },
-      { status: 400 },
-    );
-  }
+  const listPricePence = listing.listPrice!;
 
   const photoSummary = summarizeListingPhotos({
     photos: listing.item.photos,
     grade: listing.item.grade,
-    pricePence: effectivePricePence,
+    pricePence: listPricePence,
   });
   if (!photoSummary.satisfiesEbayPhotoRequirement) {
     return NextResponse.json(
@@ -193,7 +238,7 @@ async function publishViaTradingApiFallback({
           language: listing.item.card.language,
         },
         grade: listing.item.grade,
-        listPricePence: effectivePricePence,
+        listPricePence,
         condition: listing.item.condition ?? undefined,
         certNumber: listing.item.graderCert ?? undefined,
         usesCatalogOnlyImages: photoSummary.catalogOnly,

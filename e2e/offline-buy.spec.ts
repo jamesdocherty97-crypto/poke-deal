@@ -54,7 +54,7 @@ test("offline buy stays visibly queued across reload and flushes once on reconne
 
   await page.getByLabel("Smart comp search").fill("Gengar Lost Origin TG06/TG30 RAW £25");
   await page.getByRole("button", { name: "Comp current card" }).click();
-  await expect(page.getByText("Pay up to")).toBeVisible();
+  await expect(page.getByText("Suggested maximum buy")).toBeVisible();
   await expect(page.getByText(/7 sold \/ 90d/)).toBeVisible();
 
   await expect.poll(() => page.evaluate(() => new Promise<number>((resolve, reject) => {
@@ -126,9 +126,10 @@ test("Quick Fill queues stock and its chosen listing when signal drops", async (
   await expect(fill).toBeVisible();
   await fill.click();
   const quickFill = page.locator(".fallback-stock-panel");
-  await expect(quickFill.getByRole("heading", { name: "Stock this card" })).toBeVisible();
-  await quickFill.getByRole("textbox", { name: "Cost" }).fill("9.00");
+  await expect(quickFill.getByRole("heading", { name: "Add to stock" })).toBeVisible();
+  await quickFill.getByLabel(/^What I paid/).fill("9.00");
   await quickFill.getByText("More stock and listing details", { exact: true }).click();
+  await quickFill.getByLabel(/^Your list price/).fill("18.00");
   await quickFill.getByRole("button", { name: "Draft", exact: true }).click();
 
   await context.setOffline(true);

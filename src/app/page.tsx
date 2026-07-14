@@ -255,7 +255,7 @@ type LastStockedCard = {
   grade: Grade;
   quantity: number;
   costPence: number;
-  listPricePence: number;
+  listPricePence: number | null;
   channel: Channel;
   listingState: ListingState;
   imageUrl: string | null;
@@ -1506,7 +1506,7 @@ export default function Home() {
   const listingPack = useMemo(() => {
     if (!listingPackTarget?.item) return null;
     const { item } = listingPackTarget;
-    const savedListPrice = listingPackTarget.listPrice ?? listingPackTarget.suggestedPrice ?? undefined;
+    const savedListPrice = listingPackTarget.listPrice ?? undefined;
     const photoSummary = summarizeListingPhotos({
       photos: item.photos ?? [],
       grade: item.grade,
@@ -1954,7 +1954,8 @@ export default function Home() {
   const quickStockListPence = listPriceOverride.trim()
     ? poundsToPence(listPriceOverride)
     : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
-  const manualStockReady = Boolean(name.trim() && quickStockQuantity > 0 && quickStockCostPence > 0);
+  const hasEnteredBuyCost = cost.trim().length > 0;
+  const manualStockReady = Boolean(name.trim() && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence >= 0);
   const totalCostSplit = useMemo(
     () =>
       quickStockQuantity > 1 && quickStockCostPence > 0
@@ -1966,7 +1967,7 @@ export default function Home() {
   const dealSessionBudgetRemainingPence = dealSession
     ? dealSession.summary.totalMaxCashPence - dealSessionPaidPence
     : 0;
-  const quickStockReady = Boolean(headline && !isAmbiguousComp && quickStockQuantity > 0 && quickStockCostPence > 0 && quickStockListPence > 0);
+  const quickStockReady = Boolean(headline && !isAmbiguousComp && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence >= 0 && quickStockListPence > 0);
   const quickOfferOptions = useMemo(() => {
     const targetPence = deal?.targetBuyPence ?? 0;
     const options: Array<{ label: string; valuePence: number }> = [];
@@ -2041,13 +2042,13 @@ export default function Home() {
       ? "Choose exact card"
       : deal?.targetBuyPence
       ? `Target ${gbp(deal.targetBuyPence)}`
-      : "Add cost for buy maths";
+      : "Add what you paid for profit maths";
   const buyFlowSteps = useMemo<BuyFlowStep[]>(() => {
     const cardReady = Boolean(name.trim() && (setNameValue.trim() || number.trim()));
     const compReady = Boolean(headline && !isAmbiguousComp);
     const costPence = poundsToPence(cost);
     const qty = parseIntakeQuantity(quantity) ?? 0;
-    const stockReady = costPence > 0 && qty > 0;
+    const stockReady = cost.trim().length > 0 && costPence >= 0 && qty > 0;
     const decisionTone = confidenceLabel?.tone ?? "wait";
 
     return [
@@ -2074,7 +2075,7 @@ export default function Home() {
       },
       {
         label: "Stock",
-        detail: stockReady ? `${qty} @ ${gbp(costPence)}` : "cost + qty",
+        detail: stockReady ? `${qty} @ ${gbp(costPence)} paid` : "what I paid + qty",
         state: compReady ? "current" : "wait",
       },
     ];
@@ -2515,11 +2516,10 @@ export default function Home() {
     let created = 0;
     try {
       for (const item of targets) {
-        const defaults = buildListingDraftDefaults({ card: item.card, grade: item.grade, costBasis: item.costBasis });
         const response = await fetch("/api/listings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId: item.id, channel: "EBAY", state: "DRAFT", listPricePence: defaults.listPricePence }),
+          body: JSON.stringify({ itemId: item.id, channel: "EBAY", state: "DRAFT" }),
         });
         const payload = await readJson(response);
         if (!response.ok) throw new Error(payload.error ?? `Could not draft ${item.card.name}`);
@@ -2528,7 +2528,7 @@ export default function Home() {
       await refreshAll();
       setListingStateFilter("DRAFT");
       setView("listings");
-      setNotice(`${created} listing draft${created === 1 ? "" : "s"} ready. Choose a channel and download the pack.`);
+      setNotice(`${created} unpriced listing draft${created === 1 ? "" : "s"} ready. Set Your list price before publishing.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "bulk listing draft failed");
       if (created > 0) await refreshAll();
@@ -2576,7 +2576,7 @@ export default function Home() {
       if (!listing.item) return [];
       return [buildListingPackInputFromItem(listing.item, {
         channel: targetChannel,
-        listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
+        listPricePence: listing.listPrice ?? undefined,
         copySettings: listingCopySettings,
         historyPreview: priceHistoryPreviews[inventoryHistoryKey(listing.item)],
       })];
@@ -3700,7 +3700,7 @@ export default function Home() {
     if (input.number !== number) setNumber(input.number);
   }
 
-  async function lookupComp(input: LookupInput, options: { preserveCost?: boolean } = {}) {
+  async function lookupComp(input: LookupInput, options: { preserveCost?: boolean; resultSection?: BuyResultSection } = {}) {
     const normalizedInput = normalizeLookupInput(input);
     const identityChanged =
       lookupIdentityKey(normalizedInput) !==
@@ -3786,7 +3786,7 @@ export default function Home() {
       rememberRecentComp(payload, normalizedInput);
       setPendingLookup(null);
       setGradeComp(null);
-      setBuyResultSection(null);
+      setBuyResultSection(options.resultSection ?? null);
       setScrollToComp(true);
       void putOfflineComp(normalizedInput, payload, payload.headline?.asOf ?? new Date().toISOString());
       if (payload.reconciliation?.manualCheck) void loadManualReviews();
@@ -3799,6 +3799,7 @@ export default function Home() {
           cached: { asOf: cached.cachedAt, ageHours: cached.ageHours },
         };
         setComp(cachedPayload);
+        setBuyResultSection(options.resultSection ?? null);
         setCardArtUrl(payloadDisplayImage(cachedPayload));
         setCompProgressPhase("receipt");
         setNotice(`Offline receipt · ${cached.ageHours}h old · ${cachedPayload.headline?.sampleSize ?? 0} sold. Recheck before a big buy.`);
@@ -4180,8 +4181,8 @@ export default function Home() {
       setError("Quantity must be a whole number above 0.");
       return;
     }
-    if (poundsToPence(cost) <= 0) {
-      setError("Cost must be above £0.");
+    if (!cost.trim() || poundsToPence(cost) < 0) {
+      setError("Enter what you paid, or choose No tracked cost (£0.00).");
       return;
     }
     const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
@@ -4207,8 +4208,8 @@ export default function Home() {
       strategy,
       channel,
       listPricePence: overrideListPricePence ?? undefined,
-      listingState: acquireListingState,
-      createListing: shouldCreateListing,
+      listingState: overrideListPricePence != null ? acquireListingState : "DRAFT",
+      createListing: shouldCreateListing && overrideListPricePence != null,
       checkedComp: checkedComp
         ? {
             pricePence: checkedComp.medianPence,
@@ -4267,7 +4268,7 @@ export default function Home() {
       }
       setCardArtUrl(payloadDisplayImage(payload));
       pinRecentSetName(payload.catalog?.setName ?? setNameValue);
-      const listedPence = payload.listing?.listPrice ?? payload.listing?.suggestedPrice ?? payload.suggestion.pricePence;
+      const listedPence = payload.listing?.listPrice ?? null;
       const listingVerb = payload.listing
         ? payload.listing.state === "ACTIVE" ? "Listed" : "Drafted"
         : "Not listed";
@@ -4287,7 +4288,11 @@ export default function Home() {
       });
       showStockedNotice(
         `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${
-          payload.listing ? `${listingVerb} at ${gbp(listedPence)}.` : "Listing skipped."
+          payload.listing
+            ? listedPence != null
+              ? `${listingVerb} at ${gbp(listedPence)}.`
+              : "Unpriced draft saved. Choose Your list price when ready."
+            : "Listing skipped."
         }${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
         payload.item.id,
         payload.catalog?.name ?? name,
@@ -4345,7 +4350,7 @@ export default function Home() {
       grade,
       quantity: itemQuantity,
       costPence,
-      listPricePence: quickStockListPence,
+      listPricePence: listPriceOverride.trim() ? poundsToPence(listPriceOverride) : 0,
       channel,
       listingState: acquireListingState,
       imageUrl: selectedCardImage,
@@ -4374,8 +4379,8 @@ export default function Home() {
       setError("List price must be above £0 or left blank.");
       return;
     }
-    if (poundsToPence(cost) <= 0) {
-      setError("Cost must be above £0.");
+    if (!cost.trim() || poundsToPence(cost) < 0) {
+      setError("Enter what you paid, or choose No tracked cost (£0.00).");
       return;
     }
 
@@ -4418,16 +4423,16 @@ export default function Home() {
       graderCert: graderCert.trim() || undefined,
       strategy,
       channel,
-      listPricePence: shouldCreateListing ? overrideListPricePence ?? draftDefaults.listPricePence : undefined,
-      listingState: acquireListingState,
-      createListing: shouldCreateListing,
+      listPricePence: shouldCreateListing ? overrideListPricePence ?? undefined : undefined,
+      listingState: overrideListPricePence != null ? acquireListingState : "DRAFT",
+      createListing: shouldCreateListing && overrideListPricePence != null,
     };
 
     if (!navigator.onLine) {
       try {
-        await queueQuickFillMutation(quickFillReplayBody, mutationId, draftDefaults.listPricePence, {
+        await queueQuickFillMutation(quickFillReplayBody, mutationId, overrideListPricePence ?? 0, {
           endpoint: "/api/inventory/acquire",
-          listingQueued: shouldCreateListing,
+          listingQueued: shouldCreateListing && overrideListPricePence != null,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not save this Quick Fill offline.");
@@ -4460,8 +4465,8 @@ export default function Home() {
       }
 
       let createdListing: Listing | null = null;
-      if (shouldCreateListing && payload.item?.id) {
-        const listPricePence = overrideListPricePence ?? draftDefaults.listPricePence;
+      if (shouldCreateListing && overrideListPricePence != null && payload.item?.id) {
+        const listPricePence = overrideListPricePence ?? undefined;
         const listingRes = await fetch("/api/listings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -4469,7 +4474,7 @@ export default function Home() {
             itemId: payload.item.id,
             channel,
             state: acquireListingState,
-            listPricePence,
+            ...(listPricePence != null ? { listPricePence } : {}),
           }),
         });
         const listingPayload = await readJson(listingRes);
@@ -4490,14 +4495,14 @@ export default function Home() {
         grade,
         quantity: intakeQuantity,
         costPence: costBasisPence,
-        listPricePence: createdListing?.listPrice ?? createdListing?.suggestedPrice ?? overrideListPricePence ?? draftDefaults.listPricePence,
+        listPricePence: createdListing?.listPrice ?? overrideListPricePence ?? 0,
         channel,
         listingState: createdListing?.state ?? acquireListingState,
         imageUrl: stockedItem?.card?.imageUrl ?? cardArtUrl,
       });
       showStockedNotice(
         createdListing
-          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${acquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(overrideListPricePence ?? draftDefaults.listPricePence)}.${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`
+          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${overrideListPricePence != null ? `${acquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(overrideListPricePence)}.` : "Unpriced draft created; choose Your list price before publishing."}${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`
           : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
         stockedItem?.id ?? payload.item?.id,
         stockedItem?.card?.name ?? name,
@@ -4650,11 +4655,6 @@ export default function Home() {
         stocked += 1;
 
         if (stockPayload.item?.id) {
-          const draftDefaults = buildListingDraftDefaults({
-            card: { name: row.card.name, number: row.card.number },
-            grade: row.grade,
-            costBasis: row.costBasisPence,
-          });
           const listingRes = await fetch("/api/listings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -4662,7 +4662,7 @@ export default function Home() {
               itemId: stockPayload.item.id,
               channel: row.channel ?? channel,
               state: row.listingState ?? "DRAFT",
-              listPricePence: row.listPricePence ?? draftDefaults.listPricePence,
+              ...(row.listPricePence != null ? { listPricePence: row.listPricePence } : {}),
             }),
           });
           const listingPayload = await readJson(listingRes);
@@ -5145,7 +5145,7 @@ export default function Home() {
     if (parsed.number) setNumber(parsed.number);
   }
 
-  function loadRecentBuy(item: InventoryItem, options: { lookupAfter?: boolean; repeatBuy?: boolean } = {}) {
+  function loadRecentBuy(item: InventoryItem, options: { lookupAfter?: boolean; repeatBuy?: boolean; resultSection?: BuyResultSection } = {}) {
     const nextGrade = item.grade as Grade;
     const nextCondition = item.condition ?? (nextGrade === "RAW" ? "NM" : "");
     const existingListing = listingForInventoryItem(item);
@@ -5194,7 +5194,7 @@ export default function Home() {
 
     if (options.lookupAfter) {
       setNotice(`Looking up ${item.card.name}...`);
-      void lookupComp(nextLookup);
+      void lookupComp(nextLookup, { resultSection: options.resultSection });
       return;
     }
 
@@ -5202,7 +5202,7 @@ export default function Home() {
   }
 
   function compInventoryItem(item: InventoryItem) {
-    loadRecentBuy(item, { lookupAfter: true });
+    loadRecentBuy(item, { lookupAfter: true, resultSection: "deal" });
     setStockCompItemId(item.id);
   }
 
@@ -5784,49 +5784,10 @@ export default function Home() {
     }
   }
 
-  async function quickDraftListingForItem(item: InventoryItem): Promise<Listing | null> {
-    const defaults = buildListingDraftDefaults({
-      card: item.card,
-      grade: item.grade,
-      costBasis: item.costBasis,
-    });
-
-    setBusy(`create-listing-${item.id}`);
-    setError(null);
-    setNotice(null);
-    try {
-      const res = await fetch("/api/listings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemId: item.id,
-          channel: "EBAY",
-          state: "DRAFT",
-          listPricePence: defaults.listPricePence,
-        }),
-      });
-      const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "listing create failed");
-      const listing = payload.listing as Listing;
-      setNotice(`${item.card.name} draft created. Listing pack is ready.`);
-      setCreatingListingItemId(null);
-      setListingStateFilter("DRAFT");
-      setView("listings");
-      openListingPack(listing);
-      await refreshAll();
-      return listing;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "listing create failed");
-      return null;
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function listInventoryItem(item: InventoryItem) {
     const listing = item.listings.find((row) => row.state !== "SOLD" && row.state !== "ENDED") ?? item.listings[0];
     if (!listing) {
-      await quickDraftListingForItem(item);
+      openListingCreator(item);
       return;
     }
     const isUnpublishedEbay =
@@ -5859,7 +5820,7 @@ export default function Home() {
     setView("listings");
     if (!listing) {
       setListingStateFilter("DRAFT");
-      void quickDraftListingForItem(item);
+      openListingCreator(item);
       return;
     }
     setListingStateFilter(listing.state === "ACTIVE" || listing.state === "DRAFT" ? listing.state : "ALL");
@@ -5950,10 +5911,14 @@ export default function Home() {
   }
 
   function openListingEditor(listing: Listing) {
+    setView("listings");
+    setListingStateFilter(
+      listing.state === "ACTIVE" || listing.state === "DRAFT" ? listing.state : "ALL",
+    );
     setEditingListingId(listing.id);
     setCreatingListingItemId(null);
     setListingPackId(null);
-    setListingPrice(penceToPounds(listing.listPrice ?? listing.suggestedPrice ?? 0));
+    setListingPrice(listing.listPrice != null ? penceToPounds(listing.listPrice) : "");
     setListingState(listing.state === "SOLD" ? "ENDED" : listing.state);
     setListingChannel(listing.channel);
     setListingExternalUrl(listing.externalUrl ?? "");
@@ -6026,7 +5991,7 @@ export default function Home() {
     await copyGeneratedListingCopy(
       buildListingPackInputFromItem(item, {
         channel,
-        listPricePence: listing?.listPrice ?? listing?.suggestedPrice ?? undefined,
+        listPricePence: listing?.listPrice ?? undefined,
         copySettings: listingCopySettings,
         historyPreview: priceHistoryPreviews[inventoryHistoryKey(item)],
       }),
@@ -6042,7 +6007,7 @@ export default function Home() {
     await copyGeneratedListingCopy(
       buildListingPackInputFromItem(listing.item, {
         channel,
-        listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
+        listPricePence: listing.listPrice ?? undefined,
         copySettings: listingCopySettings,
         historyPreview: priceHistoryPreviews[inventoryHistoryKey(listing.item)],
       }),
@@ -6096,7 +6061,7 @@ export default function Home() {
     }
     setView("listings");
     setListingStateFilter("DRAFT");
-    void quickDraftListingForItem(item);
+    openListingCreator(item);
   }
 
   async function activateListingPackTarget() {
@@ -6306,17 +6271,17 @@ export default function Home() {
     event.preventDefault();
     const listing = listings.find((row) => row.id === editingListingId);
     if (!listing) return;
-    await patchListing(
+    const saved = await patchListing(
       listing,
       {
         channel: listingChannel,
         state: listingState,
-        listPricePence: poundsToPence(listingPrice),
+        listPricePence: listingPrice.trim() ? poundsToPence(listingPrice) : null,
         externalUrl: listingExternalUrl.trim() || null,
       },
       "Listing saved.",
     );
-    setEditingListingId(null);
+    if (saved) setEditingListingId(null);
   }
 
   async function checkReprices() {
@@ -7063,17 +7028,18 @@ export default function Home() {
                   ? shouldCreateListing
                     ? `${quickStockQuantity} + ${acquireListingState === "ACTIVE" ? "active listing" : "draft"}`
                     : `${quickStockQuantity} to stock`
-                  : "Add cost"}
+                  : "Add what I paid"}
             </strong>
           </div>
-          <span className={`pill ${quickStockCostPence > 0 ? buyPlan?.tone ?? "warn" : "warn"}`}>
-            {quickStockCostPence > 0 ? buyPlan?.label ?? "Check" : "Add cost"}
+          <span className={`pill ${hasEnteredBuyCost ? buyPlan?.tone ?? "warn" : "warn"}`}>
+            {hasEnteredBuyCost ? buyPlan?.label ?? "Check" : "Add buy price"}
           </span>
         </div>
         <div className="quick-stock-grid">
           <label>
-            Cost
+            What I paid
             <MoneyInput ref={costInputRef} value={cost} onChange={setManualBuyCost} />
+            <small>Your purchase cost—not the market comp or listing price.</small>
           </label>
           <label>
             Qty
@@ -7087,17 +7053,22 @@ export default function Home() {
           </label>
           <Metric
             label="Profit"
-            value={quickStockCostPence > 0 && buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
-            tone={quickStockCostPence > 0 && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
+            value={hasEnteredBuyCost && buyPlan ? gbp(buyPlan.totalProfitPence) : "n/a"}
+            tone={hasEnteredBuyCost && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
           />
-          <Metric label="List" value={quickStockListPence > 0 ? gbp(quickStockListPence) : "auto"} />
+          <Metric label="Suggested list price" value={projectedListSuggestion ? gbp(projectedListSuggestion.pricePence) : "not available"} />
+          <Metric label="Your list price" value={listPriceOverride.trim() ? gbp(poundsToPence(listPriceOverride)) : "not chosen"} />
         </div>
+        <button className="no-cost-button" type="button" onClick={() => setManualBuyCost("0.00")}>
+          No tracked cost · £0.00
+        </button>
         <details className="buy-advanced-details optional-listing-details">
           <summary>Optional listing after stock</summary>
           <div className="form-grid">
             <label>
-              List price
-              <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="auto" />
+              Your list price
+              <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="Use suggestion" />
+              <small>You choose this. It can be above, below or equal to the comp.</small>
             </label>
             <label>
               Channel
@@ -7165,7 +7136,7 @@ export default function Home() {
             ))}
           </div>
         )}
-        {buyPlan && quickStockCostPence > 0 && (
+        {buyPlan && hasEnteredBuyCost && (
           <div className={`buy-plan compact ${buyPlan.tone}`} aria-label="Buy decision">
             <div className="buy-plan-heading">
               <span>Verdict</span>
@@ -7209,7 +7180,7 @@ export default function Home() {
           {busy === "acquire"
             ? "Stocking..."
             : !quickStockReady
-              ? "Add cost"
+              ? "Add what I paid"
               : shouldCreateListing
                 ? "Confirm stock + listing"
                 : "Confirm stock"}
@@ -8319,7 +8290,7 @@ export default function Home() {
               <div className="comp-hero">
                 <div>
                   <p className="eyebrow">
-                    {needsManualComp ? "manual decision required" : "Pay up to"}
+                    {needsManualComp ? "Manual comp recommended" : "Suggested maximum buy"}
                   </p>
                   <h2>{offerCalc?.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}</h2>
                   <small>
@@ -8360,7 +8331,7 @@ export default function Home() {
                   <strong>{dealerVerdict?.title ?? (needsManualComp ? "Check solds" : "Priced")}</strong>
                 </button>
                 <div>
-                  <span>Recent market</span>
+                  <span>Market comp</span>
                   <strong>{gbp(headline.medianPence)}</strong>
                   <small>{headline.sampleSize} sold · {ageLabel(headline.asOf)} · {decisionBarOfferText}</small>
                 </div>
@@ -8389,7 +8360,7 @@ export default function Home() {
                 {[
                   ["evidence", "Evidence"],
                   ["deal", "Deal tools"],
-                  ["log", "Manual check"],
+                  ["log", "Manual sold comps"],
                   ["target", "Target"],
                 ].map(([section, label]) => (
                   <button
@@ -8519,8 +8490,8 @@ export default function Home() {
                   </ol>
                 </div>
               )}
-              {buyResultSection === "log" && shouldOfferManualComp && renderManualCompLinks("priority")}
-              {buyResultSection === "log" && needsManualComp && renderCheckedCompCard("priority")}
+              {buyResultSection === "log" && renderManualCompLinks("priority")}
+              {buyResultSection === "log" && renderCheckedCompCard("priority")}
               {buyResultSection === "confidence" && dealerVerdict && (
                 <div className={`dealer-verdict ${dealerVerdict.tone}`}>
                   <div className="dealer-verdict-main">
@@ -8580,22 +8551,30 @@ export default function Home() {
               {buyResultSection === "deal" && !needsManualComp && stockCompItem && stockCompSuggestion && (
                 <div className="stock-reprice-card">
                   <div>
-                    <span>Stock reprice</span>
+                    <span>Price card</span>
                     <strong>{stockCompItem.card.name}</strong>
                     <small>
                       {stockCompListing
-                        ? `Current ${gbp(stockCompListing.listPrice ?? stockCompListing.suggestedPrice ?? 0)} · suggested ${gbp(stockCompSuggestion.pricePence)}`
-                        : `Suggested ${gbp(stockCompSuggestion.pricePence)} · no draft listing yet`}
+                        ? `Your list price ${stockCompListing.listPrice != null ? gbp(stockCompListing.listPrice) : "not chosen"} · suggested list price ${gbp(stockCompSuggestion.pricePence)}`
+                        : `Suggested list price ${gbp(stockCompSuggestion.pricePence)} · no draft listing yet`}
                     </small>
                   </div>
                   {stockCompListing ? (
-                    <button
-                      type="button"
-                      onClick={() => void applyStockCompReprice()}
-                      disabled={busy === `listing-${stockCompListing.id}`}
-                    >
-                      {busy === `listing-${stockCompListing.id}` ? "Updating..." : "Update listing"}
-                    </button>
+                    <div className="stock-reprice-actions">
+                      <button type="button" className="ghost-button" onClick={() => setStockCompItemId(null)}>
+                        Keep current
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void applyStockCompReprice()}
+                        disabled={busy === `listing-${stockCompListing.id}`}
+                      >
+                        {busy === `listing-${stockCompListing.id}` ? "Updating..." : "Use suggestion"}
+                      </button>
+                      <button type="button" className="ghost-button" onClick={() => openListingEditor(stockCompListing)}>
+                        Enter another
+                      </button>
+                    </div>
                   ) : (
                     <button type="button" onClick={() => void listInventoryItem(stockCompItem)} disabled={busy?.startsWith("create-listing-")}>
                       Draft listing
@@ -8763,8 +8742,6 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              {buyResultSection === "log" && !needsManualComp && !shouldOfferManualComp && renderManualCompLinks("priority")}
-              {buyResultSection === "log" && !needsManualComp && renderCheckedCompCard("priority")}
               {buyResultSection === "evidence" && marketBaseline && (
                 <div className="market-signal">
                   <span>Catalog baseline</span>
@@ -9082,13 +9059,17 @@ export default function Home() {
             }}
           >
             <div className="panel-heading">
-              <h2>Stock this card</h2>
-              <span className="muted">{quickStockListPence > 0 ? `List ${gbp(quickStockListPence)}` : "price later"}</span>
+              <div>
+                <h2>Add to stock</h2>
+                <span className="muted">Record the purchase separately from its market value and your eventual listing price.</span>
+              </div>
+              <span className="muted">{quickStockListPence > 0 ? `Suggested list ${gbp(quickStockListPence)}` : "price later"}</span>
             </div>
             <div className="form-grid">
               <label>
-                Cost
+                What I paid
                 <MoneyInput ref={costInputRef} value={cost} onChange={setManualBuyCost} />
+                <small>Your purchase cost—not the comp or sell price.</small>
               </label>
               <label>
                 Qty
@@ -9102,6 +9083,9 @@ export default function Home() {
                 />
               </label>
             </div>
+            <button className="no-cost-button" type="button" onClick={() => setManualBuyCost("0.00")}>
+              No tracked cost · £0.00
+            </button>
             {totalCostSplit && (
               <div className="split-cost-card">
                 <div>
@@ -9125,8 +9109,9 @@ export default function Home() {
               <summary>More stock and listing details</summary>
               <div className="form-grid">
                 <label>
-                  List price
-                  <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="auto" />
+                  Your list price
+                  <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="Use suggestion" />
+                  <small>You always choose the price sent to the marketplace.</small>
                 </label>
                 <label>
                   Listing
@@ -9251,7 +9236,7 @@ export default function Home() {
             {projectedListSuggestion && !needsManualComp && (
               <div className={`price-preview ${projectedListSuggestion.confidence}`}>
                 <div>
-                  <span>Auto list</span>
+                  <span>Suggested list price</span>
                   <strong>{gbp(projectedListSuggestion.pricePence)}</strong>
                   <small>
                     {projectedListSuggestion.confidence}
@@ -9308,7 +9293,7 @@ export default function Home() {
                     : "Stock + draft"
                   : "Stock now"}
             </button>
-            {!manualStockReady && <p className="hint">Add card, cost and quantity to stock without an auto comp.</p>}
+            {!manualStockReady && <p className="hint">Add a card, quantity and what you paid—or choose No tracked cost.</p>}
             {suggestion && (
               <p className="hint">
                 Suggested list price {gbp(suggestion.pricePence)}. {suggestion.rationale}
@@ -9390,7 +9375,7 @@ export default function Home() {
                             {row.quantity}x {row.card.name} · {row.card.setName ?? "No set"} · {gbp(row.costBasisPence)}
                             {row.condition ? ` · ${row.condition}` : ""}
                             {row.graderCert ? ` · cert ${row.graderCert}` : ""}
-                            {row.listPricePence != null ? ` · list ${gbp(row.listPricePence)}` : " · draft auto"}
+                            {row.listPricePence != null ? ` · Your list price ${gbp(row.listPricePence)}` : " · unpriced draft"}
                           </span>
                         ))}
                         {stockImportPreview.rows.length > 3 && <span>+{stockImportPreview.rows.length - 3} more</span>}
@@ -9621,13 +9606,27 @@ export default function Home() {
             editingListingId ? (
               <form className="sell-sheet" onSubmit={saveListing}>
                 <div className="panel-heading">
-                  <h2>Edit listing</h2>
+                  <div>
+                    <h2>Edit your list price</h2>
+                    <span className="muted">Comps suggest. You decide what price goes to the marketplace.</span>
+                  </div>
                   <button className="ghost-button" type="button" onClick={() => setEditingListingId(null)}>Close</button>
+                </div>
+                <div className="pricing-context-grid">
+                  <div>
+                    <span>What I paid</span>
+                    <strong>{gbp(listings.find((row) => row.id === editingListingId)?.item?.costBasis ?? 0)}</strong>
+                  </div>
+                  <div>
+                    <span>Suggested list price</span>
+                    <strong>{gbp(listings.find((row) => row.id === editingListingId)?.suggestedPrice ?? 0)}</strong>
+                  </div>
                 </div>
                 <div className="form-grid">
                   <label>
-                    List price
+                    Your list price
                     <MoneyInput value={listingPrice} onChange={setListingPrice} />
+                    <small>You choose this price. Comps are guidance, not a gate.</small>
                   </label>
                   <label>
                     Channel
@@ -9636,6 +9635,9 @@ export default function Home() {
                     </select>
                   </label>
                 </div>
+                {listingChannel === "EBAY" && poundsToPence(listingPrice) < 99 && (
+                  <p className="price-rule-warning">eBay requires Your list price to be at least £0.99. What you paid can still be £0.00.</p>
+                )}
                 <label>
                   State
                   <select value={listingState} onChange={(event) => setListingState(event.target.value as Exclude<ListingState, "SOLD">)}>
@@ -9648,7 +9650,7 @@ export default function Home() {
                   Listing URL
                   <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
                 </label>
-                <button className="primary-action" type="submit" disabled={busy === `listing-${editingListingId}`}>
+                <button className="primary-action" type="submit" disabled={busy === `listing-${editingListingId}` || (listingChannel === "EBAY" && poundsToPence(listingPrice) < 99)}>
                   {busy === `listing-${editingListingId}` ? "Saving..." : "Save listing"}
                 </button>
               </form>
@@ -9794,7 +9796,7 @@ export default function Home() {
               <h2>Mark sold</h2>
               {sellingItem && (
                 <span className="muted">
-                  {sellingItem.card.name} · cost {gbp(sellingItem.costBasis)} each · {sellingItem.quantity} in stock
+                  {sellingItem.card.name} · paid {gbp(sellingItem.costBasis)} each · {sellingItem.quantity} in stock
                 </span>
               )}
               {sellingListing && (
@@ -9912,7 +9914,7 @@ export default function Home() {
           </div>
           <div className="form-grid">
             <label>
-              Buyer total
+              Actual sale price · buyer total
               <MoneyInput value={salePrice} onChange={setSalePrice} />
             </label>
             <label>
@@ -10211,7 +10213,7 @@ function ListingPackSheet({
   // eBay listings can only be marked active via the real publish flow (or by
   // pasting a genuine live URL) — never via this generic shortcut.
   const canActivate = listing.state === "DRAFT" && !(isEbayListing && !isPublished);
-  const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? pack.suggestedPricePence;
+  const effectivePricePence = listing.listPrice ?? 0;
   const photoSummary = item
     ? summarizeListingPhotos({
         photos: item.photos ?? [],
@@ -10381,8 +10383,12 @@ function ListingPackSheet({
           <strong>{pack.title}</strong>
         </div>
         <div>
-          <span>Price</span>
-          <strong>{gbp(pack.suggestedPricePence)}</strong>
+          <span>Suggested list price</span>
+          <strong>{gbp(listing.suggestedPrice ?? pack.suggestedPricePence)}</strong>
+        </div>
+        <div>
+          <span>Your list price</span>
+          <strong>{listing.listPrice != null ? gbp(listing.listPrice) : "Not chosen"}</strong>
         </div>
         <div>
           <span>Postage</span>
@@ -10849,9 +10855,11 @@ function InventoryRow({
     item.quantity > 1
       ? `${gbp(item.costBasis)} each · ${gbp(item.costBasis * item.quantity)} total`
       : gbp(item.costBasis);
+  const latestMarketPoint = historyPreview?.market[historyPreview.market.length - 1];
+  const marketCompPence = historyPreview?.soldEvidence?.medianPence ?? latestMarketPoint?.marketPence ?? null;
   const listingSummary = listing
-    ? `${listingStateLabel} ${channelLabel(listing.channel)}${listPrice ? ` · ${gbp(listPrice)}` : ""}`
-    : "No listing";
+    ? `Your list price ${listPrice != null ? gbp(listPrice) : "not set"} · ${listingStateLabel} ${channelLabel(listing.channel)}`
+    : "Your list price not set";
   const primaryAction = item.status === "SOLD" || needsEbayPhotos
     ? null
     : draftListing
@@ -10941,11 +10949,12 @@ function InventoryRow({
           <div className="inventory-row-meta">
             <span>{item.card.setName} {item.card.number ?? "no number"}</span>
             <span>qty {item.quantity}</span>
-            <span>cost {stockCost}</span>
+            <span>Paid {stockCost}</span>
             <span>{ageLabel(item.createdAt)}</span>
           </div>
           <div className="inventory-row-money">
             <span>{listingSummary}{soldNote}</span>
+            <span>Market comp {marketCompPence != null ? gbp(marketCompPence) : "refresh needed"}</span>
             {stockNotes && <span>{stockNotes}</span>}
             <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`Open ${item.card.name} price history`}>
               <StockHistorySparkline history={history} preview={historyPreview} />
@@ -11005,7 +11014,7 @@ function InventoryRow({
           <div className="row-primary-actions" aria-label="Quick row actions">
             {item.status !== "SOLD" && (
               <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
-                Comp
+                Price card
               </button>
             )}
             {canSell && primaryAction?.label !== "Record sale" && (
@@ -11085,8 +11094,8 @@ function InventoryActionSheet({
       <div className="row-action-sheet-list">
         {!isSold && (
           <button type="button" onClick={() => onComp(item)} disabled={busy === "lookup"}>
-            <span>Comp this card</span>
-            <small>Recheck live comps and repricing</small>
+            <span>Price this card</span>
+            <small>Refresh market comp, log solds and choose a list price</small>
           </button>
         )}
         {!isSold && (

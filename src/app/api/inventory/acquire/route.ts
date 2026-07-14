@@ -75,6 +75,20 @@ export async function POST(request: Request) {
   }
 
   const d = parsed.data;
+  if (
+    d.createListing &&
+    d.channel === "EBAY" &&
+    d.listPricePence !== undefined &&
+    d.listPricePence < 99
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Your eBay list price must be at least £0.99. Enter what you paid separately; the list price is what buyers will see.",
+      },
+      { status: 400 },
+    );
+  }
   const card: CardRef = { ...d.card, game: "POKEMON", language: "EN" };
 
   try {
@@ -174,6 +188,7 @@ export async function POST(request: Request) {
       listPrice: number | null;
     } | null = null;
     if (d.createListing) {
+      const effectiveListingState = d.channel === "EBAY" ? "DRAFT" : d.listingState;
       const title = [compCard.name, compCard.number, d.grade === "RAW" ? "" : d.grade.replace(/_/g, " ")]
         .filter(Boolean)
         .join(" ");
@@ -183,16 +198,16 @@ export async function POST(request: Request) {
             data: {
               itemId: item.id,
               channel: d.channel,
-              state: d.listingState,
+              state: effectiveListingState,
               title,
               suggestedPrice: suggestion.pricePence,
               listPrice: d.listPricePence ?? null,
-              listedAt: d.listingState === "ACTIVE" ? new Date() : null,
+              listedAt: effectiveListingState === "ACTIVE" ? new Date() : null,
             },
             select: { id: true, channel: true, state: true, suggestedPrice: true, listPrice: true },
           });
 
-          if (d.listingState === "ACTIVE") {
+          if (effectiveListingState === "ACTIVE") {
             await tx.inventoryItem.update({
               where: { id: item.id },
               data: { status: "LISTED" },

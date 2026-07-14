@@ -3,9 +3,8 @@ import { getPrisma } from "@/lib/db/prisma";
 import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
-import { upsertInventoryItem } from "@/lib/ebay/inventoryItem";
-import { createEbayOffer, getOfferBySku, updateEbayOffer } from "@/lib/ebay/offer";
 import { buildEbayOfferPreflight } from "@/lib/ebay/preflight";
+import { synchronizeEbayOffer, validateEbayListPricePence } from "@/lib/ebay/offerSync";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 import { photoRequirementMessage, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 
@@ -46,13 +45,14 @@ export async function POST(
     );
   }
 
-  const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? 0;
-  if (effectivePricePence <= 0) {
+  const priceError = validateEbayListPricePence(listing.listPrice);
+  if (priceError) {
     return NextResponse.json(
-      { error: "Set a price on the listing before creating an eBay offer." },
+      { error: priceError },
       { status: 400 },
     );
   }
+  const listPricePence = listing.listPrice!;
 
   const config = getEbayConfig()!;
 
@@ -69,7 +69,7 @@ export async function POST(
         language: listing.item.card.language,
       },
       grade: listing.item.grade,
-      listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
+      listPricePence,
       condition: listing.item.condition ?? undefined,
       certNumber: listing.item.graderCert ?? undefined,
       usesCatalogOnlyImages: false,
@@ -77,7 +77,7 @@ export async function POST(
     const photoSummary = summarizeListingPhotos({
       photos: listing.item.photos,
       grade: listing.item.grade,
-      pricePence: effectivePricePence,
+      pricePence: listPricePence,
     });
     if (!photoSummary.satisfiesEbayPhotoRequirement) {
       return NextResponse.json(
@@ -90,6 +90,8 @@ export async function POST(
     const preflight = buildEbayOfferPreflight({
       listingId: params.id,
       itemId: listing.itemId,
+      title: listing.title,
+      description: listing.description,
       packInput,
       quantity: listing.item.quantity ?? 1,
       imageUrls: photoSummary.imageUrls,
@@ -97,30 +99,32 @@ export async function POST(
       config,
     });
 
-    // Upsert the inventory item (idempotent — safe to call multiple times)
-    await upsertInventoryItem(config, preflight.sku, preflight.inventoryItem, accessToken);
+    const storedOfferId = listing.ebayOfferId
+      ?? (listing.externalRef?.startsWith("offer:")
+        ? listing.externalRef.slice("offer:".length)
+        : null);
+    const synced = await synchronizeEbayOffer({
+      config,
+      accessToken,
+      preflight,
+      listPricePence,
+      offerId: storedOfferId,
+    });
 
-    // Use existing offer if one already exists for this SKU, but always sync it
-    // with the latest preflight payload (price, policies, merchant location).
-    // Without this, an offer created before e.g. the merchant location was set
-    // up would stay stale forever and fail to publish with a vague eBay error.
-    let offerId = await getOfferBySku(config, preflight.sku, accessToken);
-    if (!offerId) {
-      const created = await createEbayOffer(config, preflight.offer, accessToken);
-      offerId = created.offerId;
-    } else {
-      await updateEbayOffer(config, offerId, preflight.offer, accessToken);
-    }
-
-    // Persist offer ID with prefix so we can distinguish it from a published listing ID
+    // Keep the offer ID after publish too: eBay uses it for later live revisions.
     await prisma.listing.update({
       where: { id: params.id },
-      data: { externalRef: `offer:${offerId}` },
+      data: {
+        externalRef: `offer:${synced.offerId}`,
+        ebayOfferId: synced.offerId,
+        offerSyncedAt: new Date(),
+        offerSyncedPrice: synced.syncedPricePence,
+      },
     });
 
     return NextResponse.json({
       success: true,
-      offerId,
+      offerId: synced.offerId,
       sku: preflight.sku,
       title: preflight.title,
       priceGbp: preflight.priceGbp,

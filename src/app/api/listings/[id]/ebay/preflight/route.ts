@@ -5,6 +5,7 @@ import { getAccessToken } from "@/lib/ebay/tokens";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { getOfferBySku } from "@/lib/ebay/offer";
 import { buildEbayOfferPreflight, toEbaySku } from "@/lib/ebay/preflight";
+import { validateEbayListPricePence } from "@/lib/ebay/offerSync";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 import { summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 
@@ -39,13 +40,14 @@ export async function GET(
     return NextResponse.json({ error: "Item is already sold." }, { status: 400 });
   }
 
-  const effectivePricePence = listing.listPrice ?? listing.suggestedPrice ?? 0;
-  if (effectivePricePence <= 0) {
+  const priceError = validateEbayListPricePence(listing.listPrice);
+  if (priceError) {
     return NextResponse.json(
-      { error: "Set a price on the listing before creating an eBay offer." },
+      { error: priceError },
       { status: 400 },
     );
   }
+  const listPricePence = listing.listPrice!;
 
   const config = getEbayConfig()!;
 
@@ -64,7 +66,7 @@ export async function GET(
         language: listing.item.card.language,
       },
       grade: listing.item.grade,
-      listPricePence: listing.listPrice ?? listing.suggestedPrice ?? undefined,
+      listPricePence,
       condition: listing.item.condition ?? undefined,
       certNumber: listing.item.graderCert ?? undefined,
       usesCatalogOnlyImages: false,
@@ -72,13 +74,15 @@ export async function GET(
     const photoSummary = summarizeListingPhotos({
       photos: listing.item.photos,
       grade: listing.item.grade,
-      pricePence: effectivePricePence,
+      pricePence: listPricePence,
     });
     packInput.usesCatalogOnlyImages = photoSummary.catalogOnly && photoSummary.satisfiesEbayPhotoRequirement;
 
     const preflight = buildEbayOfferPreflight({
       listingId: params.id,
       itemId: listing.itemId,
+      title: listing.title,
+      description: listing.description,
       packInput,
       quantity: listing.item.quantity ?? 1,
       imageUrls: photoSummary.satisfiesEbayPhotoRequirement ? photoSummary.imageUrls : [],

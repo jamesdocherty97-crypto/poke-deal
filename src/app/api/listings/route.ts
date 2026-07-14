@@ -15,6 +15,7 @@ const listingCreateSchema = z.object({
   itemId: z.string().min(1),
   channel: z.enum(["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"]).default("EBAY"),
   state: z.enum(["DRAFT", "ACTIVE"]).default("DRAFT"),
+  suggestedPricePence: z.coerce.number().int().nonnegative().nullable().optional(),
   listPricePence: z.coerce.number().int().nonnegative().nullable().optional(),
   externalUrl: nullableUrl,
 });
@@ -60,6 +61,26 @@ export async function POST(request: Request) {
 
   const d = parsed.data;
 
+  if (d.state === "ACTIVE" && (!d.listPricePence || d.listPricePence <= 0)) {
+    return NextResponse.json(
+      {
+        error:
+          "Choose Your list price before activating this listing. Suggested prices are guidance and are never sent automatically.",
+      },
+      { status: 400 },
+    );
+  }
+
+  if (d.channel === "EBAY" && d.listPricePence != null && d.listPricePence < 99) {
+    return NextResponse.json(
+      {
+        error:
+          "Your eBay list price must be at least £0.99. This is the price buyers will see, not what you paid or the market comp.",
+      },
+      { status: 400 },
+    );
+  }
+
   // Guard: a brand-new EBAY listing can only be created ACTIVE if a genuine
   // live eBay URL is supplied with it (e.g. tracking a listing made outside
   // the app). Otherwise it must start as DRAFT and go through the real
@@ -91,7 +112,7 @@ export async function POST(request: Request) {
           channel: d.channel,
           state: d.state,
           title: buildListingTitle(item.card, item.grade),
-          suggestedPrice: d.listPricePence ?? null,
+          suggestedPrice: d.suggestedPricePence ?? null,
           listPrice: d.listPricePence ?? null,
           externalUrl: d.externalUrl ?? null,
           listedAt: d.state === "ACTIVE" ? new Date() : null,
