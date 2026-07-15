@@ -351,19 +351,27 @@ export function InventoryTab({
           {listingChannel === "EBAY" && Number(listingPrice || 0) < 0.99 && (
             <p className="price-rule-warning">eBay requires a listing price of at least £0.99. What you paid can still be £0.00.</p>
           )}
-          <label>
-            State
-            <select value={listingState} onChange={(event) => setListingState(event.target.value as Exclude<ListingState, "SOLD">)}>
-              <option value="DRAFT">draft</option>
-              <option value="ACTIVE">active</option>
-            </select>
-          </label>
-          <label>
-            Listing URL
-            <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
-          </label>
+          {listingChannel !== "EBAY" && (
+            <>
+              <label>
+                State
+                <select value={listingState} onChange={(event) => setListingState(event.target.value as Exclude<ListingState, "SOLD">)}>
+                  <option value="DRAFT">draft</option>
+                  <option value="ACTIVE">active</option>
+                </select>
+              </label>
+              <label>
+                Listing URL
+                <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
+              </label>
+            </>
+          )}
           <button className="primary-action" type="submit" disabled={busy === `create-listing-${creatingListingItemId}` || (listingChannel === "EBAY" && Number(listingPrice || 0) < 0.99)}>
-            {busy === `create-listing-${creatingListingItemId}` ? "Saving..." : "Create listing"}
+            {busy === `create-listing-${creatingListingItemId}`
+              ? "Saving..."
+              : listingChannel === "EBAY"
+                ? "Continue to eBay review"
+                : "Create listing"}
           </button>
         </form>
       )}

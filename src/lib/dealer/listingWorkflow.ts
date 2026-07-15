@@ -137,27 +137,20 @@ export function buildListingNextAction(input: ListingSellFlowInput): ListingNext
 
 function buildEbaySellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
   const sold = input.state === "SOLD" || input.sellable === false;
-  const hasOffer = Boolean(input.externalRef?.startsWith("offer:"));
   const published = Boolean(input.externalRef && !input.externalRef.startsWith("offer:"));
 
   return [
     {
       id: "review",
-      label: "Review pack",
-      detail: "Check title, price, image and specifics.",
-      state: hasOffer || published || sold ? "done" : "current",
-    },
-    {
-      id: "offer",
-      label: "Create offer",
-      detail: "Create the eBay offer without publishing live.",
-      state: hasOffer || published || sold ? "done" : input.ebayReady ? "current" : "blocked",
+      label: "Review listing",
+      detail: "Confirm the exact title, price and photo.",
+      state: published || sold ? "done" : input.ebayReady ? "current" : "blocked",
     },
     {
       id: "publish",
-      label: "Publish live",
-      detail: "Final confirmation before it appears on eBay.",
-      state: published || sold ? "done" : hasOffer ? "current" : "next",
+      label: "Publish on eBay",
+      detail: "One confirmation syncs the offer and puts it live.",
+      state: published || sold ? "done" : input.ebayReady ? "next" : "blocked",
     },
     {
       id: "sale",
@@ -184,18 +177,18 @@ function buildEbayNextAction(input: ListingSellFlowInput): ListingNextAction {
   if (hasOffer) {
     return {
       id: "publish",
-      title: "Publish eBay offer",
-      detail: "The offer exists. Final confirmation puts it live.",
-      cta: "Publish",
+      title: "Review & publish",
+      detail: "The offer exists. Poke Deal will resync the latest title, price and photos before it goes live.",
+      cta: "Review & publish",
     };
   }
 
   if (input.ebayReady) {
     return {
-      id: "create-offer",
-      title: "Create eBay offer",
-      detail: "Send inventory and offer details to eBay without publishing yet.",
-      cta: "Create offer",
+      id: "publish",
+      title: "Review & publish",
+      detail: "One confirmation creates the eBay offer with the latest details and publishes it live.",
+      cta: "Review & publish",
     };
   }
 

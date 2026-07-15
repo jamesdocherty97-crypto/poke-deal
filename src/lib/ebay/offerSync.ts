@@ -9,6 +9,26 @@ import type { EbayOfferPreflight } from "./preflight.js";
 
 export const EBAY_UK_MIN_LIST_PRICE_PENCE = 99;
 
+export interface EbayOfferPresentation {
+  listPricePence: number | null;
+  title: string | null;
+  titleCustomized: boolean;
+}
+
+/**
+ * Detect fields that change what a buyer sees on an eBay offer. Live edits
+ * use this to decide whether eBay must accept the rebuilt offer before the
+ * local listing is allowed to change.
+ */
+export function hasEbayOfferPresentationChanged(
+  before: EbayOfferPresentation,
+  after: EbayOfferPresentation,
+): boolean {
+  return before.listPricePence !== after.listPricePence
+    || before.title !== after.title
+    || before.titleCustomized !== after.titleCustomized;
+}
+
 /**
  * Validate the price the user explicitly chose for eBay.
  *

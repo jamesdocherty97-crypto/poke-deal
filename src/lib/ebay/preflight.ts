@@ -19,6 +19,8 @@ export interface EbayOfferPreflightInput {
   itemId?: string;
   /** Persisted user copy, when the listing has been edited in the app. */
   title?: string | null;
+  /** True only when the user explicitly replaced the generated eBay title. */
+  titleCustomized?: boolean;
   description?: string | null;
   packInput: ListingPackInput;
   quantity: number;
@@ -56,7 +58,7 @@ export function buildEbayOfferPreflight(input: EbayOfferPreflightInput): EbayOff
   const quantity = Math.max(1, input.quantity);
   const imageUrls = (input.imageUrls ?? []).map((url) => url.trim()).filter(Boolean).slice(0, 12);
   const inventoryItem = buildInventoryItemPayload(input.packInput, quantity, imageUrls);
-  if (input.title?.trim()) inventoryItem.product.title = input.title.trim();
+  if (input.titleCustomized && input.title?.trim()) inventoryItem.product.title = input.title.trim();
   if (input.description?.trim()) inventoryItem.product.description = input.description.trim();
   const offer = buildOfferPayload(sku, pack, input.policies, input.config, quantity);
 

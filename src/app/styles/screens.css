@@ -472,6 +472,7 @@
 
   .next-action-strip,
   .listing-next-action,
+  .listing-price-editor,
   .target-suggestion,
   .channel-row,
   .expense-row,
@@ -485,6 +486,11 @@
   .target-suggestion button,
   .reprice-row button {
     width: 100%;
+  }
+
+  .listing-price-editor .money-input {
+    grid-column: 1;
+    grid-row: auto;
   }
 
   .row-actions {
@@ -572,6 +578,10 @@
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.04);
   padding: 7px;
+}
+
+.ebay-preflight-card dl .ebay-preflight-title {
+  grid-column: 1 / -1;
 }
 
 .ebay-preflight-card dd {

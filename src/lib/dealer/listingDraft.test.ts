@@ -3,10 +3,16 @@ import test from "node:test";
 
 import { buildListingDraftDefaults, buildListingTitle, defaultManualListPricePence } from "./listingDraft.js";
 
-test("buildListingTitle includes number and slab grade, but keeps raw titles tidy", () => {
-  assert.equal(buildListingTitle({ name: "Gengar", number: "TG06/TG30" }, "RAW"), "Gengar TG06/TG30");
-  assert.equal(buildListingTitle({ name: "Gengar", number: "TG06/TG30" }, "PSA_10"), "Gengar TG06/TG30 PSA 10");
-  assert.equal(buildListingTitle({ name: "Bulk Pikachu" }, "RAW"), "Bulk Pikachu");
+test("buildListingTitle creates descriptive marketplace-ready defaults", () => {
+  assert.equal(
+    buildListingTitle({ name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30", language: "EN" }, "RAW"),
+    "Pokemon TCG Gengar Lost Origin Trainer Gallery TG06/TG30 Near Mint Raw English",
+  );
+  assert.equal(
+    buildListingTitle({ name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" }, "PSA_10"),
+    "Pokemon TCG Gengar Lost Origin Trainer Gallery TG06/TG30 PSA 10 GEM MINT English",
+  );
+  assert.equal(buildListingTitle({ name: "Bulk Pikachu" }, "RAW"), "Pokemon TCG Bulk Pikachu Near Mint Raw English");
 });
 
 test("defaultManualListPricePence protects a practical gross margin for manually stocked cards", () => {
@@ -24,7 +30,7 @@ test("buildListingDraftDefaults produces title and price from stock context", ()
       costBasis: 12000,
     }),
     {
-      title: "Greninja ex 214/167",
+      title: "Pokemon TCG Greninja ex 214/167 Near Mint Raw English",
       listPricePence: 16200,
     },
   );

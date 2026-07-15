@@ -61,7 +61,7 @@ test("listingVenueAction gives marketplace handoff entrypoints", () => {
   assert.equal(listingVenueAction("IN_PERSON"), null);
 });
 
-test("buildListingSellFlow walks eBay drafts through review, offer, publish and sale", () => {
+test("buildListingSellFlow keeps eBay review and publish in one continuous path", () => {
   const draft = buildListingSellFlow({
     channel: "EBAY",
     state: "DRAFT",
@@ -73,7 +73,6 @@ test("buildListingSellFlow walks eBay drafts through review, offer, publish and 
     draft.map((step) => [step.id, step.state]),
     [
       ["review", "current"],
-      ["offer", "current"],
       ["publish", "next"],
       ["sale", "next"],
     ],
@@ -86,8 +85,7 @@ test("buildListingSellFlow walks eBay drafts through review, offer, publish and 
     ebayReady: true,
     sellable: true,
   });
-  assert.equal(offer.find((step) => step.id === "offer")?.state, "done");
-  assert.equal(offer.find((step) => step.id === "publish")?.state, "current");
+  assert.equal(offer.find((step) => step.id === "publish")?.state, "next");
 
   const live = buildListingSellFlow({
     channel: "EBAY",
@@ -100,7 +98,7 @@ test("buildListingSellFlow walks eBay drafts through review, offer, publish and 
   assert.equal(live.find((step) => step.id === "sale")?.state, "current");
 });
 
-test("buildListingSellFlow blocks eBay offer creation until readiness passes", () => {
+test("buildListingSellFlow blocks eBay publish until readiness passes", () => {
   const flow = buildListingSellFlow({
     channel: "EBAY",
     state: "DRAFT",
@@ -109,7 +107,8 @@ test("buildListingSellFlow blocks eBay offer creation until readiness passes", (
     sellable: true,
   });
 
-  assert.equal(flow.find((step) => step.id === "offer")?.state, "blocked");
+  assert.equal(flow.find((step) => step.id === "review")?.state, "blocked");
+  assert.equal(flow.find((step) => step.id === "publish")?.state, "blocked");
 });
 
 test("buildListingSellFlow keeps manual channels simple", () => {
@@ -166,7 +165,7 @@ test("buildListingNextAction prompts for a live URL after a manual copy", () => 
   assert.equal(action.cta, "Paste URL");
 });
 
-test("buildListingNextAction walks eBay automation from offer to sale", () => {
+test("buildListingNextAction walks eBay automation from review-and-publish to sale", () => {
   assert.equal(
     buildListingNextAction({
       channel: "EBAY",
@@ -175,7 +174,7 @@ test("buildListingNextAction walks eBay automation from offer to sale", () => {
       ebayReady: true,
       sellable: true,
     }).id,
-    "create-offer",
+    "publish",
   );
   assert.equal(
     buildListingNextAction({

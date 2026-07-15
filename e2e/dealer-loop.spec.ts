@@ -94,7 +94,7 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
     has: page.getByRole("heading", { name: "Create listing" }),
   });
   await expect(listingCreator.getByLabel(/^Your list price/)).toHaveValue("33.75");
-  await listingCreator.getByRole("button", { name: "Create listing" }).click();
+  await listingCreator.getByRole("button", { name: "Continue to eBay review" }).click();
 
   await expect.poll(() => ledger.listingState).toBe("DRAFT");
   expect(ledger.listingBody).toMatchObject({ itemId: "item-fixture-gengar", channel: "EBAY", state: "DRAFT" });

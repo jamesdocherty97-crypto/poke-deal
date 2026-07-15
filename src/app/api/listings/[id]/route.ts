@@ -7,7 +7,11 @@ import { getAccessToken } from "@/lib/ebay/tokens";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { getOfferBySku } from "@/lib/ebay/offer";
 import { buildEbayOfferPreflight, toEbaySku } from "@/lib/ebay/preflight";
-import { synchronizeEbayOffer, validateEbayListPricePence } from "@/lib/ebay/offerSync";
+import {
+  hasEbayOfferPresentationChanged,
+  synchronizeEbayOffer,
+  validateEbayListPricePence,
+} from "@/lib/ebay/offerSync";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 import { photoRequirementMessage, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 
@@ -28,6 +32,7 @@ const listingPatchSchema = z.object({
   channel: z.enum(["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"]).optional(),
   state: z.enum(["DRAFT", "ACTIVE", "ENDED"]).optional(),
   title: nullableText,
+  titleCustomized: z.boolean().optional(),
   description: nullableText,
   suggestedPricePence: z.coerce.number().int().nonnegative().nullable().optional(),
   listPricePence: z.coerce.number().int().nonnegative().nullable().optional(),
@@ -65,6 +70,21 @@ export async function PATCH(
     const effectiveChannel = d.channel ?? existing.channel;
     const effectiveListPrice =
       d.listPricePence !== undefined ? d.listPricePence : existing.listPrice;
+    const effectiveTitle = d.title !== undefined ? d.title : existing.title;
+    const effectiveTitleCustomized =
+      d.titleCustomized ?? (d.title !== undefined ? Boolean(d.title) : existing.titleCustomized);
+    const ebayOfferPresentationChanged = hasEbayOfferPresentationChanged(
+      {
+        listPricePence: existing.listPrice,
+        title: existing.title,
+        titleCustomized: existing.titleCustomized,
+      },
+      {
+        listPricePence: effectiveListPrice,
+        title: effectiveTitle,
+        titleCustomized: effectiveTitleCustomized,
+      },
+    );
 
     if (d.state === "ACTIVE" && (!effectiveListPrice || effectiveListPrice <= 0)) {
       return NextResponse.json(
@@ -93,7 +113,7 @@ export async function PATCH(
 
     // Guard: EBAY-channel listings must not be flipped to ACTIVE through this
     // generic patch unless they are genuinely live on eBay already. The real
-    // publish flow (offer -> publish) sets state/externalRef/externalUrl
+    // reviewed publish flow sets state/externalRef/externalUrl
     // together via /api/listings/[id]/ebay/publish and never goes through
     // this route, so this only blocks bypasses (e.g. a stray "Activate"
     // button) from faking a live listing without ever calling eBay.
@@ -108,7 +128,7 @@ export async function PATCH(
           return NextResponse.json(
             {
               error:
-                "EBAY listings can only be activated by publishing them on eBay (Create offer -> Publish) or by pasting a genuine live eBay URL. Use the eBay publish flow instead of marking active directly.",
+                "EBAY listings can only be activated through Review & publish or by pasting a genuine live eBay URL. Use the eBay publish flow instead of marking active directly.",
             },
             { status: 400 },
           );
@@ -116,24 +136,30 @@ export async function PATCH(
       }
     }
 
-    // A live eBay price edit is remote-first: eBay must accept the complete,
-    // rebuilt offer before the local price can change. This prevents the app
-    // claiming a price that buyers cannot actually see on the marketplace.
-    let liveEbaySync: { offerId: string; pricePence: number; syncedAt: Date } | null = null;
-    const editingLiveEbayPrice =
+    // Buyer-visible edits to a live eBay offer are remote-first: eBay must
+    // accept the rebuilt offer before the local title or price can change.
+    // This prevents the app claiming copy that buyers cannot actually see.
+    let liveEbaySync: {
+      offerId: string;
+      pricePence: number;
+      syncedAt: Date;
+      title: string;
+      titleCustomized: boolean;
+    } | null = null;
+    const editingLiveEbayOffer =
       effectiveChannel === "EBAY" &&
+      existing.channel === "EBAY" &&
       existing.state === "ACTIVE" &&
-      d.listPricePence !== undefined &&
-      d.listPricePence !== existing.listPrice;
+      ebayOfferPresentationChanged;
 
-    if (editingLiveEbayPrice) {
-      const priceError = validateEbayListPricePence(d.listPricePence);
+    if (editingLiveEbayOffer) {
+      const priceError = validateEbayListPricePence(effectiveListPrice);
       if (priceError) {
         return NextResponse.json({ error: priceError }, { status: 400 });
       }
       if (!isEbayConfigured()) {
         return NextResponse.json(
-          { error: "eBay is not configured, so the live price was not changed." },
+          { error: "eBay is not configured, so the live listing was not changed." },
           { status: 503 },
         );
       }
@@ -153,7 +179,7 @@ export async function PATCH(
         return NextResponse.json({ error: "Listing not found" }, { status: 404 });
       }
 
-      const listPricePence = d.listPricePence!;
+      const listPricePence = effectiveListPrice!;
       const photoSummary = summarizeListingPhotos({
         photos: current.item.photos,
         grade: current.item.grade,
@@ -162,7 +188,7 @@ export async function PATCH(
       if (!photoSummary.satisfiesEbayPhotoRequirement) {
         return NextResponse.json(
           {
-            error: `${photoRequirementMessage(photoSummary)} The live price was not changed.`,
+            error: `${photoRequirementMessage(photoSummary)} The live listing was not changed.`,
             canUseCatalogArt: photoSummary.catalogPhotoAllowed,
           },
           { status: 400 },
@@ -179,7 +205,7 @@ export async function PATCH(
           return NextResponse.json(
             {
               error:
-                "This live eBay listing is not linked to an editable eBay offer. Its local price was not changed; edit it on eBay, then reconnect or refresh the listing.",
+                "This live eBay listing is not linked to an editable eBay offer. The app was not changed; edit it on eBay, then reconnect or refresh the listing.",
             },
             { status: 409 },
           );
@@ -188,7 +214,8 @@ export async function PATCH(
         const preflight = buildEbayOfferPreflight({
           listingId: current.id,
           itemId: current.itemId,
-          title: current.title,
+          title: effectiveTitle,
+          titleCustomized: effectiveTitleCustomized,
           description: current.description,
           packInput: {
             card: {
@@ -220,13 +247,15 @@ export async function PATCH(
           offerId: synced.offerId,
           pricePence: synced.syncedPricePence,
           syncedAt: new Date(),
+          title: preflight.title,
+          titleCustomized: effectiveTitleCustomized,
         };
       } catch (err) {
         if (isEbayApiError(err)) {
-          console.error("[ebay] live price sync failed", ebayApiErrorLogBody(err));
+          console.error("[ebay] live listing sync failed", ebayApiErrorLogBody(err));
         }
         return NextResponse.json(
-          ebayApiErrorResponseBody(err, "eBay rejected the price update; the local price was not changed"),
+          ebayApiErrorResponseBody(err, "eBay rejected the live listing update; the app was not changed"),
           { status: 502 },
         );
       }
@@ -242,6 +271,7 @@ export async function PATCH(
       const data: Prisma.ListingUpdateInput = {
         channel: d.channel,
         title: d.title,
+        titleCustomized: d.titleCustomized ?? (d.title !== undefined ? Boolean(d.title) : undefined),
         description: d.description,
         suggestedPrice: d.suggestedPricePence,
         listPrice: d.listPricePence,
@@ -253,12 +283,14 @@ export async function PATCH(
         data.ebayOfferId = liveEbaySync.offerId;
         data.offerSyncedAt = liveEbaySync.syncedAt;
         data.offerSyncedPrice = liveEbaySync.pricePence;
+        data.title = liveEbaySync.title;
+        data.titleCustomized = liveEbaySync.titleCustomized;
       }
 
       const pendingEbayOffer =
         effectiveChannel === "EBAY" &&
         Boolean(current.ebayOfferId || current.externalRef?.startsWith("offer:"));
-      if (d.listPricePence !== undefined && pendingEbayOffer && !liveEbaySync) {
+      if (ebayOfferPresentationChanged && pendingEbayOffer && !liveEbaySync) {
         data.offerSyncedAt = null;
         data.offerSyncedPrice = null;
       }

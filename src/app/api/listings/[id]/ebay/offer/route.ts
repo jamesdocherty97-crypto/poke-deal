@@ -91,6 +91,7 @@ export async function POST(
       listingId: params.id,
       itemId: listing.itemId,
       title: listing.title,
+      titleCustomized: listing.titleCustomized,
       description: listing.description,
       packInput,
       quantity: listing.item.quantity ?? 1,
@@ -119,6 +120,7 @@ export async function POST(
         ebayOfferId: synced.offerId,
         offerSyncedAt: new Date(),
         offerSyncedPrice: synced.syncedPricePence,
+        title: preflight.title,
       },
     });
 

@@ -517,6 +517,7 @@ type Listing = {
   channel: Channel;
   state: ListingState;
   title: string | null;
+  titleCustomized?: boolean;
   externalRef: string | null;
   externalUrl: string | null;
   suggestedPrice: number | null;
@@ -525,6 +526,12 @@ type Listing = {
   listedAt: string | null;
   endedAt: string | null;
   item?: InventoryItem;
+};
+
+type EbayPublishReview = {
+  title: string;
+  titleCustomized: boolean;
+  listPricePence: number;
 };
 
 type EbayStatus = {
@@ -5744,7 +5751,7 @@ export default function Home() {
     setError(null);
     setNotice(null);
     // EBAY listings can only start ACTIVE if a genuine live URL is supplied —
-    // otherwise they must go through Create offer -> Publish. Other channels
+    // otherwise they must go through the reviewed eBay publish flow. Other channels
     // (Cardmarket/Vinted/in-person) are manually tracked, so direct activate
     // is fine.
     const trimmedExternalUrl = listingExternalUrl.trim();
@@ -5773,7 +5780,7 @@ export default function Home() {
         canActivateDirect
           ? `${item.card.name} listing activated. Listing pack is ready.`
           : listingState === "ACTIVE" && listingChannel === "EBAY"
-            ? `${item.card.name} listing drafted. Create the eBay offer and publish it to go live.`
+            ? `${item.card.name} listing drafted. Review the exact title and price, then publish it to eBay.`
             : `${item.card.name} listing drafted. Listing pack is ready.`,
       );
       await refreshAll();
@@ -5795,11 +5802,11 @@ export default function Home() {
       !(listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl);
     if (isUnpublishedEbay) {
       // eBay listings can't be activated directly — route to the listing
-      // pack so the real Create offer -> Publish flow runs.
+      // pack so the real reviewed publish flow runs.
       setView("listings");
       setListingStateFilter(listing.state === "DRAFT" ? "DRAFT" : "ALL");
       openListingPack(listing);
-      setNotice("Create the eBay offer and publish it to make this listing live.");
+      setNotice("Review the exact title and price, then publish it to eBay.");
       return;
     }
     await patchListing(listing, { state: "ACTIVE" }, "Listing activated.");
@@ -6110,40 +6117,26 @@ export default function Home() {
     await pasteListingUrlForListing(listingPackTarget);
   }
 
-  async function runEbayPreflight(listingId: string) {
+  async function runEbayPreflight(
+    listingId: string,
+    review: EbayPublishReview,
+  ) {
     setBusy(`ebay-preflight-${listingId}`);
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(`/api/listings/${listingId}/ebay/preflight`);
+      const params = new URLSearchParams({
+        title: review.title,
+        titleCustomized: review.titleCustomized ? "1" : "0",
+        listPricePence: String(review.listPricePence),
+      });
+      const res = await fetch(`/api/listings/${listingId}/ebay/preflight?${params.toString()}`);
       const payload = await readJson(res);
       if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay preflight failed"));
       setEbayPreflight({ ...payload, listingId });
-      setNotice("eBay preflight passed. No offer was created.");
+      setNotice("Exact eBay title and payload checked. No offer was created.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "eBay preflight failed");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function createEbayOfferForListing(listingId: string) {
-    setBusy(`ebay-offer-${listingId}`);
-    setError(null);
-    setNotice(null);
-    try {
-      const res = await fetch(`/api/listings/${listingId}/ebay/offer`, { method: "POST" });
-      const payload = await readJson(res);
-      if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay offer creation failed"));
-      setEbayPreflight((current) =>
-        current?.listingId === listingId
-          ? { ...current, writesToEbay: true, existingOfferId: payload.offerId ?? current.existingOfferId, policySummary: payload.policySummary ?? current.policySummary }
-          : null,
-      );
-      setNotice(payload.message ?? "eBay offer created.");
-      await refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "eBay offer creation failed");
     } finally {
       setBusy(null);
     }
@@ -6191,19 +6184,26 @@ export default function Home() {
     }
   }
 
-  async function publishEbayListing(listingId: string) {
+  async function publishEbayListing(
+    listingId: string,
+    review: EbayPublishReview,
+  ) {
     const publishedListing = listings.find((listing) => listing.id === listingId);
-    setEbayPublishTarget(null);
     setBusy(`ebay-publish-${listingId}`);
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(`/api/listings/${listingId}/ebay/publish`, { method: "POST" });
+      const res = await fetch(`/api/listings/${listingId}/ebay/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(review),
+      });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(apiErrorMessage(payload, "eBay publish failed"));
       setNoticeArt(inventoryDisplayImage(publishedListing?.item));
       setNotice(payload.message ?? "Published on eBay.");
       await refreshAll();
+      setEbayPublishTarget(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "eBay publish failed");
     } finally {
@@ -9666,7 +9666,6 @@ export default function Home() {
                 copiedField={listingPackCopiedField}
                 busy={busy === `listing-${listingPackTarget.id}` ||
                   busy === `ebay-preflight-${listingPackTarget.id}` ||
-                  busy === `ebay-offer-${listingPackTarget.id}` ||
                   busy === `ebay-publish-${listingPackTarget.id}`}
                 nextListingLabel={nextListingPackTarget ? listingQueueLabel(nextListingPackTarget) : null}
                 ebayStatus={ebayStatus}
@@ -9679,10 +9678,9 @@ export default function Home() {
                 onPasteLiveUrl={pasteListingUrlAndActivate}
                 onSell={openSellFromListingPack}
                 onNext={openNextListingPack}
-                onPreflight={() => void runEbayPreflight(listingPackTarget.id)}
-                onCreateOffer={() => void createEbayOfferForListing(listingPackTarget.id)}
+                onPreflight={(titleReview) => void runEbayPreflight(listingPackTarget.id, titleReview)}
                 onRequestPublish={() => setEbayPublishTarget(listingPackTarget.id)}
-                onPublish={() => void publishEbayListing(listingPackTarget.id)}
+                onPublish={(review) => void publishEbayListing(listingPackTarget.id, review)}
                 onCancelPublish={() => setEbayPublishTarget(null)}
                 onClose={() => {
                   setListingPackId(null);
@@ -10163,7 +10161,6 @@ function ListingPackSheet({
   onNext,
   onClose,
   onPreflight,
-  onCreateOffer,
   onRequestPublish,
   onPublish,
   onCancelPublish,
@@ -10185,10 +10182,9 @@ function ListingPackSheet({
   onSell: (listing: Listing) => void;
   onNext: () => void;
   onClose: () => void;
-  onPreflight: () => void;
-  onCreateOffer: () => void;
+  onPreflight: (review: EbayPublishReview) => void;
   onRequestPublish: () => void;
-  onPublish: () => void;
+  onPublish: (review: EbayPublishReview) => void;
   onCancelPublish: () => void;
   onCopyAndOpen: () => void;
   onPasteLiveUrl: () => void;
@@ -10198,22 +10194,33 @@ function ListingPackSheet({
   const copyFields = listingPackCopyFields(pack);
   const venueAction = listingVenueAction(listing.channel, { query: listingPackSearchQuery(listing, pack) });
   const canSell = Boolean(item && item.status !== "SOLD" && listing.state !== "SOLD");
+  const isEbayListing = listing.channel === "EBAY";
+  const suggestedEbayTitle = pack.title;
+  const [ebayTitleDraft, setEbayTitleDraft] = useState(
+    listing.titleCustomized && listing.title ? listing.title : suggestedEbayTitle,
+  );
+  const [ebayListPriceDraft, setEbayListPriceDraft] = useState(
+    listing.listPrice != null ? penceToPounds(listing.listPrice) : "",
+  );
+  const reviewedEbayTitle = ebayTitleDraft.trim();
+  const ebayTitleCustomized = reviewedEbayTitle !== suggestedEbayTitle;
+  const ebayTitleReady = reviewedEbayTitle.length > 0 && reviewedEbayTitle.length <= 80;
+  const reviewedListPricePence = poundsToPence(ebayListPriceDraft);
+  const ebayPriceReady = reviewedListPricePence >= 99;
+  const effectivePricePence = isEbayListing ? reviewedListPricePence : listing.listPrice ?? 0;
   const economics = item
     ? buildListingEconomics({
         channel: listing.channel,
         grade: item.grade,
-        itemPricePence: pack.suggestedPricePence,
+        itemPricePence: isEbayListing ? effectivePricePence : pack.suggestedPricePence,
         costBasisPence: item.costBasis,
       })
     : null;
 
-  const isEbayListing = listing.channel === "EBAY";
-  const hasOffer = Boolean(listing.externalRef?.startsWith("offer:"));
   const isPublished = Boolean(listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl);
   // eBay listings can only be marked active via the real publish flow (or by
   // pasting a genuine live URL) — never via this generic shortcut.
   const canActivate = listing.state === "DRAFT" && !(isEbayListing && !isPublished);
-  const effectivePricePence = listing.listPrice ?? 0;
   const photoSummary = item
     ? summarizeListingPhotos({
         photos: item.photos ?? [],
@@ -10240,18 +10247,17 @@ function ListingPackSheet({
         merchantLocationKey: ebayStatus?.locationSetup?.merchantLocationKey ?? ebayStatus?.policies?.merchantLocationKey ?? null,
       })
     : null;
-  const ebayOfferReady = ebayReadiness?.offerReady ?? false;
   const ebayPublishReady = ebayReadiness?.publishReady ?? false;
   const policySummary = ebayPreflight?.policySummary ?? ebayStatusPolicySummary(ebayStatus);
   const ambientImage = inventoryDisplayImage(item);
   const sheetStyle = ambientImage ? ({ "--ambient-card-art": `url("${ambientImage}")` } as CSSProperties) : undefined;
-  const sheetRef = useRef<HTMLFormElement | null>(null);
+  const attentionChecks = ebayReadiness?.checks.filter((check) => check.status !== "pass") ?? [];
   const sellingSteps = buildListingSellFlow({
     channel: listing.channel,
     state: listing.state,
     externalRef: listing.externalRef,
     externalUrl: listing.externalUrl,
-    ebayReady: hasOffer ? ebayPublishReady : ebayOfferReady,
+    ebayReady: ebayPublishReady,
     sellable: canSell,
   });
   const nextAction = buildListingNextAction({
@@ -10259,15 +10265,16 @@ function ListingPackSheet({
     state: listing.state,
     externalRef: listing.externalRef,
     externalUrl: listing.externalUrl,
-    ebayReady: hasOffer ? ebayPublishReady : ebayOfferReady,
+    ebayReady: ebayPublishReady,
     sellable: canSell,
     hasVenueAction: Boolean(venueAction),
     packCopied: copied,
   });
 
   useEffect(() => {
-    if (publishConfirmActive) sheetRef.current?.scrollTo({ top: 0 });
-  }, [publishConfirmActive]);
+    setEbayTitleDraft(listing.titleCustomized && listing.title ? listing.title : suggestedEbayTitle);
+    setEbayListPriceDraft(listing.listPrice != null ? penceToPounds(listing.listPrice) : "");
+  }, [listing.id, listing.listPrice, listing.title, listing.titleCustomized, suggestedEbayTitle]);
 
   function runNextAction() {
     if (nextAction.id === "copy-open") {
@@ -10286,10 +10293,6 @@ function ListingPackSheet({
       onActivate();
       return;
     }
-    if (nextAction.id === "create-offer") {
-      onCreateOffer();
-      return;
-    }
     if (nextAction.id === "publish") {
       onRequestPublish();
       return;
@@ -10301,12 +10304,12 @@ function ListingPackSheet({
 
   if (publishConfirmActive) {
     return (
-      <form ref={sheetRef} className="sell-sheet listing-pack-sheet listing-pack-publish-step" style={sheetStyle} onSubmit={(event) => event.preventDefault()}>
+      <form className="sell-sheet listing-pack-sheet listing-pack-publish-step" style={sheetStyle} onSubmit={(event) => event.preventDefault()}>
         <div className="panel-heading ambient-heading">
           <div>
             <p className="eyebrow">eBay live publish</p>
             <h2>Final check</h2>
-            <span className="muted">One clean slide pushes this listing live.</span>
+            <span className="muted">The latest title, price and photos are synced before eBay puts it live.</span>
           </div>
           <div className="sheet-heading-actions">
             <button className="ghost-button" type="button" onClick={onCancelPublish}>Back</button>
@@ -10321,7 +10324,7 @@ function ListingPackSheet({
             alt=""
           />
           <p>
-            <strong>{listing.title ?? item?.card.name ?? "Untitled listing"}</strong>
+            <strong>{reviewedEbayTitle || "Untitled listing"}</strong>
             <small>
               {item?.card.setName ? `${item.card.setName} · ` : ""}
               {item?.card.number ?? "no number"}
@@ -10334,10 +10337,9 @@ function ListingPackSheet({
             </span>
           </p>
         </div>
-        {policySummary && <EbayPolicySummaryList summary={policySummary} />}
-        {ebayReadiness && (
+        {attentionChecks.length > 0 ? (
           <ul className="ebay-readiness-list compact" aria-label="Publish readiness">
-            {ebayReadiness.checks.map((check) => (
+            {attentionChecks.map((check) => (
               <li key={check.key} className={`readiness-${check.status}`}>
                 <span className="readiness-icon">
                   {check.status === "pass" ? "✓" : check.status === "warn" ? "!" : "✗"}
@@ -10349,24 +10351,55 @@ function ListingPackSheet({
               </li>
             ))}
           </ul>
+        ) : (
+          <div className="ebay-ready-summary">
+            <strong>Ready for eBay</strong>
+            <span>Title, price, photo, account and seller policies have passed.</span>
+          </div>
         )}
+        <details className="listing-pack-details compact">
+          <summary>View eBay policies and all checks</summary>
+          {policySummary && <EbayPolicySummaryList summary={policySummary} />}
+          {ebayReadiness && (
+            <ul className="ebay-readiness-list compact" aria-label="All publish checks">
+              {ebayReadiness.checks.map((check) => (
+                <li key={check.key} className={`readiness-${check.status}`}>
+                  <span className="readiness-icon">
+                    {check.status === "pass" ? "✓" : check.status === "warn" ? "!" : "✗"}
+                  </span>
+                  <span>{check.label}{check.detail && check.status !== "pass" ? ` — ${check.detail}` : ""}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
         <SlideConfirm
           tone="publish"
           label="slide to publish live"
           valueLabel={`${gbp(effectivePricePence)} on eBay`}
           completeLabel={busy ? "Publishing..." : "Release to publish"}
-          disabled={busy || !ebayPublishReady}
-          onConfirm={onPublish}
+          disabled={busy || !ebayPublishReady || !ebayTitleReady || !ebayPriceReady}
+          onConfirm={() => onPublish({
+            title: reviewedEbayTitle,
+            titleCustomized: ebayTitleCustomized,
+            listPricePence: reviewedListPricePence,
+          })}
         />
-        {!ebayPublishReady && (
-          <p className="hint danger-text">Publish is blocked until every required eBay readiness check passes.</p>
+        {(!ebayPublishReady || !ebayTitleReady || !ebayPriceReady) && (
+          <p className="hint danger-text">
+            {!ebayTitleReady
+              ? "Use a title between 1 and 80 characters before publishing."
+              : !ebayPriceReady
+                ? "Your eBay list price must be at least £0.99."
+              : "Publish is blocked until every required eBay readiness check passes."}
+          </p>
         )}
       </form>
     );
   }
 
   return (
-    <form ref={sheetRef} className="sell-sheet listing-pack-sheet" style={sheetStyle} onSubmit={(event) => event.preventDefault()}>
+    <form className="sell-sheet listing-pack-sheet" style={sheetStyle} onSubmit={(event) => event.preventDefault()}>
       <div className="panel-heading ambient-heading">
         <div>
           <h2>Listing pack</h2>
@@ -10377,19 +10410,52 @@ function ListingPackSheet({
         </div>
         <button className="ghost-button" type="button" onClick={onClose}>Close</button>
       </div>
-      <div className="listing-pack-summary">
-        <div>
-          <span>Title</span>
-          <strong>{pack.title}</strong>
+      {isEbayListing && (
+        <div className={`listing-title-editor ${ebayTitleReady ? "" : "invalid"}`}>
+          <div>
+            <span>Exact eBay title</span>
+            <strong>{reviewedEbayTitle.length}/80</strong>
+          </div>
+          <input
+            aria-label="Exact eBay title"
+            value={ebayTitleDraft}
+            maxLength={80}
+            onChange={(event) => setEbayTitleDraft(event.target.value)}
+          />
+          <small>This exact title is shown again on the final check and sent to eBay.</small>
+          {ebayTitleCustomized && (
+            <button className="ghost-button" type="button" onClick={() => setEbayTitleDraft(suggestedEbayTitle)}>
+              Reset to suggested title
+            </button>
+          )}
         </div>
+      )}
+      {isEbayListing && (
+        <label className={`listing-price-editor ${ebayPriceReady ? "" : "invalid"}`}>
+          <span>Exact eBay price</span>
+          <MoneyInput value={ebayListPriceDraft} onChange={setEbayListPriceDraft} />
+          <small>
+            Buyers will see {ebayPriceReady ? gbp(reviewedListPricePence) : "this price"}. The comp is guidance; you choose the live price.
+          </small>
+        </label>
+      )}
+      <div className={`listing-pack-summary ${isEbayListing ? "compact" : ""}`}>
+        {!isEbayListing && (
+          <div>
+            <span>Title</span>
+            <strong>{pack.title}</strong>
+          </div>
+        )}
         <div>
           <span>Suggested list price</span>
           <strong>{gbp(listing.suggestedPrice ?? pack.suggestedPricePence)}</strong>
         </div>
-        <div>
-          <span>Your list price</span>
-          <strong>{listing.listPrice != null ? gbp(listing.listPrice) : "Not chosen"}</strong>
-        </div>
+        {!isEbayListing && (
+          <div>
+            <span>Your list price</span>
+            <strong>{listing.listPrice != null ? gbp(listing.listPrice) : "Not chosen"}</strong>
+          </div>
+        )}
         <div>
           <span>Postage</span>
           <strong>{gbp(pack.postage.pricePence)}</strong>
@@ -10430,145 +10496,88 @@ function ListingPackSheet({
           </div>
         </div>
       )}
-      <ListingNextActionCard action={nextAction} busy={busy} onRun={runNextAction} />
-      <ListingFlowSteps steps={sellingSteps} />
-      <div className="listing-field-actions" aria-label="Copy listing fields">
-        {copyFields.map((field) => (
-          <button
-            key={field.key}
-            className={copiedField === field.key ? "selected" : ""}
-            type="button"
-            onClick={() => onCopyField(field)}
-          >
-            {copiedField === field.key ? `${field.label} copied` : `Copy ${field.label}`}
-          </button>
-        ))}
-      </div>
-      <div className="listing-pack-specifics">
-        {specifics.map(([label, value]) => (
-          <span key={label}>
-            <strong>{label}</strong>
-            {value}
-          </span>
-        ))}
-      </div>
-      <label>
-        Copy block
-        <textarea readOnly value={pack.copyReady} rows={9} />
-      </label>
-      <div className="listing-pack-actions">
-        {venueAction && (
-          <button className="primary-action" type="button" onClick={onCopyAndOpen} disabled={busy}>
-            {busy ? "Working..." : "Copy + open"}
-          </button>
+      <ListingNextActionCard
+        action={nextAction}
+        busy={busy}
+        disabled={isEbayListing && (!ebayTitleReady || !ebayPriceReady || nextAction.id === "publish" && !ebayPublishReady)}
+        onRun={runNextAction}
+      />
+      <details className="listing-pack-details" open={!isEbayListing}>
+        <summary>{isEbayListing ? "Workflow and eBay checks" : "Listing workflow"}</summary>
+        <ListingFlowSteps steps={sellingSteps} />
+        {isEbayListing && ebayReadiness && (
+          <div className="listing-pack-ebay-actions">
+            {ebayStatus?.configured && !ebayStatus.connected && (
+              <p className="hint danger-text ebay-reconnect-callout">
+                eBay automation is unavailable because the seller connection is stale
+                {ebayStatus.error ? `: ${ebayStatus.error}` : "."}{" "}
+                <a href={ebayStatus.reconnectUrl ?? "/api/ebay/connect?force=1"} target="_blank" rel="noreferrer">
+                  Reconnect eBay
+                </a>
+              </p>
+            )}
+            {!isPublished && (
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => onPreflight({
+                  title: reviewedEbayTitle,
+                  titleCustomized: ebayTitleCustomized,
+                  listPricePence: reviewedListPricePence,
+                })}
+                disabled={busy || !ebayReadiness.ready || !ebayTitleReady || !ebayPriceReady}
+              >
+                {busy ? "Checking..." : "Run read-only preflight"}
+              </button>
+            )}
+            {ebayPreflight && <EbayPreflightCard preflight={ebayPreflight} />}
+            <ul className="ebay-readiness-list">
+              {ebayReadiness.checks.map((check) => (
+                <li key={check.key} className={`readiness-${check.status}`}>
+                  <span className="readiness-icon">{check.status === "pass" ? "✓" : check.status === "warn" ? "!" : "✗"}</span>
+                  <span>{check.label}{check.detail && check.status !== "pass" ? ` — ${check.detail}` : ""}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-        <button className={venueAction ? "ghost-button" : "primary-action"} type="button" onClick={onCopy}>
-          {copied ? "Copied" : venueAction ? "Copy only" : "Copy listing pack"}
-        </button>
-        {venueAction && (
-          <a className="export-link" href={venueAction.url} target="_blank" rel="noreferrer">
-            {venueAction.label}
-          </a>
-        )}
-        {canActivate && (
-          <button className="ghost-button" type="button" onClick={onActivate} disabled={busy}>
-            {busy ? "Activating..." : "Mark active"}
-          </button>
-        )}
-        {listing.externalUrl ? (
-          <a className="export-link" href={listing.externalUrl} target="_blank" rel="noreferrer">
-            View live
-          </a>
-        ) : (
-          <button className="ghost-button" type="button" onClick={onPasteLiveUrl} disabled={busy}>
-            Paste URL + active
-          </button>
-        )}
-        {canSell && (
-          <button className="ghost-button listing-pack-sale-action" type="button" onClick={() => onSell(listing)} disabled={busy}>
-            Record sale
-          </button>
-        )}
-        {nextListingLabel && (
-          <button className="ghost-button" type="button" onClick={onNext}>
-            Next: {nextListingLabel}
-          </button>
-        )}
-      </div>
-      {isEbayListing && ebayReadiness && (
-        <div className="listing-pack-ebay-actions">
-          {ebayStatus?.configured && !ebayStatus.connected && (
-            <p className="hint danger-text ebay-reconnect-callout">
-              eBay automation is unavailable because the seller connection is stale
-              {ebayStatus.error ? `: ${ebayStatus.error}` : "."}{" "}
-              <a href={ebayStatus.reconnectUrl ?? "/api/ebay/connect?force=1"} target="_blank" rel="noreferrer">
-                Reconnect eBay
-              </a>
-            </p>
-          )}
-          {!isPublished && (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={onPreflight}
-              disabled={busy || !ebayReadiness.ready}
-            >
-              {busy ? "Checking..." : "Preflight eBay offer"}
+      </details>
+      <details className="listing-pack-details" open={!isEbayListing}>
+        <summary>{isEbayListing ? "Manual copy and fallback tools" : "Listing fields and actions"}</summary>
+        <div className="listing-field-actions" aria-label="Copy listing fields">
+          {copyFields.map((field) => (
+            <button key={field.key} className={copiedField === field.key ? "selected" : ""} type="button" onClick={() => onCopyField(field)}>
+              {copiedField === field.key ? `${field.label} copied` : `Copy ${field.label}`}
             </button>
-          )}
-          {ebayPreflight && <EbayPreflightCard preflight={ebayPreflight} />}
-          {isPublished ? (
-            <a
-              className="export-link"
-              href={listing.externalUrl!}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View on eBay
-            </a>
-          ) : hasOffer ? (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={onRequestPublish}
-              disabled={busy || !ebayPublishReady}
-            >
-              {busy ? "Working..." : "Publish to eBay"}
-            </button>
-          ) : ebayOfferReady ? (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={onCreateOffer}
-              disabled={busy}
-            >
-              {busy ? "Creating offer..." : "Create eBay offer"}
-            </button>
-          ) : (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={onCreateOffer}
-              disabled={busy || !ebayOfferReady}
-            >
-              {busy ? "Creating offer..." : "Create eBay offer"}
-            </button>
-          )}
-          <ul className="ebay-readiness-list">
-            {ebayReadiness.checks.map((check) => (
-              <li key={check.key} className={`readiness-${check.status}`}>
-                <span className="readiness-icon">
-                  {check.status === "pass" ? "✓" : check.status === "warn" ? "!" : "✗"}
-                </span>
-                <span>
-                  {check.label}
-                  {check.detail && check.status !== "pass" ? ` — ${check.detail}` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
+          ))}
         </div>
-      )}
+        <div className="listing-pack-specifics">
+          {specifics.map(([label, value]) => (
+            <span key={label}><strong>{label}</strong>{value}</span>
+          ))}
+        </div>
+        <label>
+          Copy block
+          <textarea readOnly value={pack.copyReady} rows={9} />
+        </label>
+        <div className="listing-pack-actions">
+          {venueAction && (
+            <button className="primary-action" type="button" onClick={onCopyAndOpen} disabled={busy}>{busy ? "Working..." : "Copy + open"}</button>
+          )}
+          <button className={venueAction ? "ghost-button" : "primary-action"} type="button" onClick={onCopy}>
+            {copied ? "Copied" : venueAction ? "Copy only" : "Copy listing pack"}
+          </button>
+          {venueAction && <a className="export-link" href={venueAction.url} target="_blank" rel="noreferrer">{venueAction.label}</a>}
+          {canActivate && <button className="ghost-button" type="button" onClick={onActivate} disabled={busy}>{busy ? "Activating..." : "Mark active"}</button>}
+          {listing.externalUrl ? (
+            <a className="export-link" href={listing.externalUrl} target="_blank" rel="noreferrer">View live</a>
+          ) : (
+            <button className="ghost-button" type="button" onClick={onPasteLiveUrl} disabled={busy}>Paste URL + active</button>
+          )}
+          {canSell && <button className="ghost-button listing-pack-sale-action" type="button" onClick={() => onSell(listing)} disabled={busy}>Record sale</button>}
+          {nextListingLabel && <button className="ghost-button" type="button" onClick={onNext}>Next: {nextListingLabel}</button>}
+        </div>
+      </details>
     </form>
   );
 }
@@ -10625,6 +10634,10 @@ function EbayPreflightCard({ preflight }: { preflight: EbayPreflight }) {
         <strong>{preflight.writesToEbay ? "Will write on next action" : "No eBay write made"}</strong>
       </div>
       <dl>
+        <div className="ebay-preflight-title">
+          <dt>Exact eBay title</dt>
+          <dd>{preflight.title}</dd>
+        </div>
         <div>
           <dt>SKU</dt>
           <dd>{preflight.sku}</dd>
@@ -10711,10 +10724,12 @@ function policySummaryLabel(policy: EbayPolicyChoice): string {
 function ListingNextActionCard({
   action,
   busy,
+  disabled = false,
   onRun,
 }: {
   action: ListingNextAction;
   busy: boolean;
+  disabled?: boolean;
   onRun: () => void;
 }) {
   const done = action.id === "done";
@@ -10725,7 +10740,7 @@ function ListingNextActionCard({
         <strong>{action.title}</strong>
         <small>{action.detail}</small>
       </div>
-      <button type="button" onClick={onRun} disabled={busy || done}>
+      <button type="button" onClick={onRun} disabled={busy || done || disabled}>
         {busy ? "Working..." : action.cta}
       </button>
     </div>

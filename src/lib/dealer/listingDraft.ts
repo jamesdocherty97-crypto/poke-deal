@@ -2,7 +2,9 @@ export type ListingDraftGrade = string;
 
 export interface ListingDraftCard {
   name: string;
+  setName?: string | null;
   number?: string | null;
+  language?: string | null;
 }
 
 export interface ListingDraftItem {
@@ -11,10 +13,12 @@ export interface ListingDraftItem {
   costBasis: number;
 }
 
-export function buildListingTitle(card: ListingDraftCard, grade: ListingDraftGrade): string {
-  return [card.name, card.number, grade === "RAW" ? "" : grade.replace(/_/g, " ")]
-    .filter(Boolean)
-    .join(" ");
+export function buildListingTitle(
+  card: ListingDraftCard,
+  grade: ListingDraftGrade,
+  condition?: string | null,
+): string {
+  return buildEbayTitle({ card, grade, condition: condition ?? undefined });
 }
 
 export function defaultManualListPricePence(costBasisPence: number, minMargin = 0.35): number {
@@ -32,3 +36,4 @@ export function buildListingDraftDefaults(item: ListingDraftItem): {
     listPricePence: defaultManualListPricePence(item.costBasis),
   };
 }
+import { buildEbayTitle } from "./listingPack.js";

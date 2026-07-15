@@ -78,6 +78,33 @@ test("graded title includes exact slab wording", () => {
   assert.ok(title.length <= 80);
 });
 
+test("Kofu keeps the complete catalogue identity in the eBay title", () => {
+  assert.equal(
+    buildEbayTitle({
+      card: { name: "Kofu", setName: "Stellar Crown", number: "165/142", language: "EN" },
+      grade: "RAW",
+      condition: "NM",
+    }),
+    "Pokemon TCG Kofu Stellar Crown 165/142 NM Raw English",
+  );
+});
+
+test("long eBay titles preserve collector number and slab grade within 80 characters", () => {
+  const title = buildEbayTitle({
+    card: {
+      name: "Reshiram & Charizard-GX Special Alternate Art Promotional Card",
+      setName: "Sun & Moon Unbroken Bonds Collector Anniversary Collection",
+      number: "SM247",
+      language: "EN",
+    },
+    grade: "PSA_10",
+  });
+
+  assert.ok(title.length <= 80, `title too long: ${title.length}`);
+  assert.match(title, /SM247/);
+  assert.match(title, /PSA 10 GEM MINT/);
+});
+
 test("grade listing phrase handles common whole and half grades", () => {
   assert.equal(gradeListingPhrase("PSA_10"), "PSA 10 GEM MINT");
   assert.equal(gradeListingPhrase("BGS_9.5"), "BGS 9.5 GEM MINT");

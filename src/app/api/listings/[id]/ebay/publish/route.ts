@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
 import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
@@ -8,11 +9,18 @@ import { buildEbayOfferPreflight } from "@/lib/ebay/preflight";
 import { synchronizeEbayOffer, validateEbayListPricePence } from "@/lib/ebay/offerSync";
 import { readEbayLocationSetup } from "@/lib/ebay/location";
 import { addTradingFixedPriceItem } from "@/lib/ebay/trading";
+import { buildEbayTitle, type ListingPackInput } from "@/lib/dealer/listingPack";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 import { photoRequirementMessage, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const publishRequestSchema = z.object({
+  title: z.string().trim().min(1).max(80).optional(),
+  titleCustomized: z.boolean().optional(),
+  listPricePence: z.coerce.number().int().positive().optional(),
+});
 
 function ebayListingUrl(listingId: string): string {
   return `https://www.ebay.co.uk/itm/${listingId}`;
@@ -21,6 +29,9 @@ function ebayListingUrl(listingId: string): string {
 type PublishListing = {
   id: string;
   itemId: string;
+  title: string | null;
+  titleCustomized: boolean;
+  description: string | null;
   listPrice: number | null;
   suggestedPrice: number | null;
   item: {
@@ -41,10 +52,24 @@ type PublishListing = {
 };
 
 export async function POST(
-  _request: Request,
+  request: Request,
   props: { params: Promise<{ id: string }> },
 ) {
   const params = await props.params;
+  const body = await request.json().catch(() => ({}));
+  const parsedBody = publishRequestSchema.safeParse(body);
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      {
+        error: "Check the exact eBay title and price before publishing.",
+        issues: parsedBody.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      },
+      { status: 400 },
+    );
+  }
   if (!isEbayConfigured()) {
     return NextResponse.json(
       { error: "eBay is not configured." },
@@ -74,11 +99,12 @@ export async function POST(
     );
   }
 
-  const priceError = validateEbayListPricePence(listing.listPrice);
+  const requestedListPricePence = parsedBody.data.listPricePence ?? listing.listPrice;
+  const priceError = validateEbayListPricePence(requestedListPricePence);
   if (priceError) {
     return NextResponse.json({ error: priceError }, { status: 400 });
   }
-  const listPricePence = listing.listPrice!;
+  const listPricePence = requestedListPricePence!;
   const photoSummary = summarizeListingPhotos({
     photos: listing.item.photos,
     grade: listing.item.grade,
@@ -92,6 +118,12 @@ export async function POST(
   }
 
   const config = getEbayConfig()!;
+  const requestedTitle = parsedBody.data.title;
+  const requestedTitleCustomized = requestedTitle !== undefined
+    ? Boolean(parsedBody.data.titleCustomized)
+    : listing.titleCustomized;
+  const reviewedTitle = requestedTitle
+    ?? (listing.titleCustomized ? listing.title ?? undefined : undefined);
 
   try {
     const accessToken = await getAccessToken(config);
@@ -100,6 +132,9 @@ export async function POST(
       return await publishViaTradingApiFallback({
         listing,
         listingId: params.id,
+        title: reviewedTitle,
+        titleCustomized: requestedTitleCustomized,
+        listPricePence,
         config,
         accessToken,
         prisma,
@@ -110,7 +145,8 @@ export async function POST(
     const preflight = buildEbayOfferPreflight({
       listingId: params.id,
       itemId: listing.itemId,
-      title: listing.title,
+      title: requestedTitle ?? listing.title,
+      titleCustomized: requestedTitle !== undefined ? requestedTitleCustomized : listing.titleCustomized,
       description: listing.description,
       packInput: {
         card: {
@@ -152,6 +188,9 @@ export async function POST(
         ebayOfferId: synced.offerId,
         offerSyncedAt: new Date(),
         offerSyncedPrice: synced.syncedPricePence,
+        listPrice: listPricePence,
+        title: preflight.title,
+        titleCustomized: requestedTitleCustomized,
       },
     });
 
@@ -199,18 +238,22 @@ export async function POST(
 async function publishViaTradingApiFallback({
   listing,
   listingId,
+  title,
+  titleCustomized,
+  listPricePence,
   config,
   accessToken,
   prisma,
 }: {
   listing: PublishListing;
   listingId: string;
+  title?: string;
+  titleCustomized: boolean;
+  listPricePence: number;
   config: NonNullable<ReturnType<typeof getEbayConfig>>;
   accessToken: string;
   prisma: ReturnType<typeof getPrisma>;
 }) {
-  const listPricePence = listing.listPrice!;
-
   const photoSummary = summarizeListingPhotos({
     photos: listing.item.photos,
     grade: listing.item.grade,
@@ -225,25 +268,29 @@ async function publishViaTradingApiFallback({
 
   const policies = await fetchEbayPolicies(config, accessToken);
   const locationSetup = readEbayLocationSetup();
+  const packInput: ListingPackInput = {
+    card: {
+      name: listing.item.card.name,
+      setName: listing.item.card.setName,
+      number: listing.item.card.number,
+      rarity: listing.item.card.rarity,
+      language: listing.item.card.language,
+    },
+    grade: listing.item.grade,
+    listPricePence,
+    condition: listing.item.condition ?? undefined,
+    certNumber: listing.item.graderCert ?? undefined,
+    usesCatalogOnlyImages: photoSummary.catalogOnly,
+  };
+  const effectiveTitle = title?.trim() || buildEbayTitle(packInput);
   let result;
   try {
     result = await addTradingFixedPriceItem(config, accessToken, {
       listingId: `pdos-${listing.itemId}`,
-      packInput: {
-        card: {
-          name: listing.item.card.name,
-          setName: listing.item.card.setName,
-          number: listing.item.card.number,
-          rarity: listing.item.card.rarity,
-          language: listing.item.card.language,
-        },
-        grade: listing.item.grade,
-        listPricePence,
-        condition: listing.item.condition ?? undefined,
-        certNumber: listing.item.graderCert ?? undefined,
-        usesCatalogOnlyImages: photoSummary.catalogOnly,
-      },
+      packInput,
       quantity: listing.item.quantity ?? 1,
+      title: effectiveTitle,
+      description: listing.description ?? undefined,
       imageUrls: photoSummary.imageUrls,
       policies,
       location: locationSetup?.address.city ?? null,
@@ -280,6 +327,9 @@ async function publishViaTradingApiFallback({
         externalRef: ebayItemId,
         externalUrl: listingUrl,
         listedAt: new Date(),
+        listPrice: listPricePence,
+        title: effectiveTitle,
+        titleCustomized,
       },
     });
     if (listing.item.status !== "SOLD") {

@@ -230,7 +230,7 @@ export function ListingsTab({
                 </small>
               </div>
               <button type="button" onClick={startListingDesk}>
-                Open pack
+                {firstDraftListingTarget.channel === "EBAY" ? "Review & publish" : "Open pack"}
               </button>
             </div>
           ) : (
@@ -832,7 +832,7 @@ function ListingRow({
               </a>
             ) : listing.state === "DRAFT" ? (
               <button className="next-action-button" type="button" onClick={() => onPack(listing)} disabled={isBusy}>
-                Open listing pack
+                {isEbay && ebayConnected ? "Review & publish to eBay" : "Open listing pack"}
               </button>
             ) : canSell ? (
               <button className="next-action-button good" type="button" onClick={() => onSell(listing)} disabled={Boolean(busy?.startsWith("sell-"))}>
@@ -849,7 +849,9 @@ function ListingRow({
                   ? "eBay needs images. Low-value raw stock can use catalog art."
                   : "eBay needs real photos before publish."
                 : listing.state === "DRAFT"
-                  ? "copy fields, create offer, or activate"
+                  ? isEbay
+                    ? "confirm the exact title and price, then publish"
+                    : "copy fields or activate"
                 : hasOffer
                   ? "Poke Deal will sync the latest price and details before publish"
                   : isPublished
@@ -915,7 +917,7 @@ function ListingRow({
               onClick={() => onPack(listing)}
               disabled={isBusy}
             >
-              Prepare eBay
+              Review & publish
             </button>
           )}
           {isEbay && ebayConnected && hasOffer && !isPublished && (
