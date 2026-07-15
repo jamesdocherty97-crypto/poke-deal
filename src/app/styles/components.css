@@ -7018,6 +7018,98 @@ label,
   gap: 8px;
 }
 
+.listing-pack-summary.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.listing-title-editor {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(255, 203, 5, 0.32);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(120deg, rgba(255, 203, 5, 0.1), transparent 62%),
+    rgba(3, 8, 20, 0.36);
+  padding: 10px;
+}
+
+.listing-price-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(118px, 0.45fr);
+  align-items: center;
+  gap: 5px 10px;
+  border: 1px solid rgba(42, 117, 187, 0.34);
+  border-radius: var(--r-md);
+  background: rgba(42, 117, 187, 0.1);
+  padding: 10px;
+}
+
+.listing-price-editor.invalid {
+  border-color: rgba(251, 113, 133, 0.5);
+}
+
+.listing-price-editor > span:first-child {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.listing-price-editor .money-input {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.listing-price-editor input {
+  min-height: 44px;
+  color: var(--yellow);
+  font-size: 18px;
+  font-weight: 1000;
+}
+
+.listing-price-editor small {
+  color: #cfe6ff;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.listing-title-editor.invalid {
+  border-color: rgba(251, 113, 133, 0.5);
+}
+
+.listing-title-editor > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.listing-title-editor span,
+.listing-title-editor > div strong {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.listing-title-editor input {
+  width: 100%;
+  min-height: 44px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.listing-title-editor small {
+  color: #cfe6ff;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.listing-title-editor button {
+  width: max-content;
+  min-height: 34px;
+}
+
 .listing-pack-summary div,
 .listing-pack-specifics span {
   display: grid;
@@ -7145,6 +7237,54 @@ label,
 .listing-next-action.done {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(3, 8, 20, 0.3);
+}
+
+.listing-pack-details {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-md);
+  background: rgba(3, 8, 20, 0.3);
+  padding: 0 10px 10px;
+}
+
+.listing-pack-details > summary {
+  min-height: 42px;
+  padding: 11px 0 9px;
+  color: #d9e9ff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.listing-pack-details > summary + * {
+  margin-top: 2px;
+}
+
+.listing-pack-details > * + * {
+  margin-top: 10px;
+}
+
+.listing-pack-details.compact {
+  padding-bottom: 8px;
+}
+
+.ebay-ready-summary {
+  display: grid;
+  gap: 2px;
+  border: 1px solid rgba(52, 211, 153, 0.36);
+  border-radius: var(--r-md);
+  background: rgba(52, 211, 153, 0.1);
+  padding: 10px;
+}
+
+.ebay-ready-summary strong {
+  color: var(--green);
+  font-size: 14px;
+}
+
+.ebay-ready-summary span {
+  color: #c7f7df;
+  font-size: 11px;
+  font-weight: 850;
 }
 
 .listing-flow-steps {

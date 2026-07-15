@@ -8,6 +8,8 @@ import type { EbayPolicies } from "./policies.js";
 export interface TradingListingInput {
   listingId: string;
   packInput: ListingPackInput;
+  title?: string;
+  description?: string;
   quantity: number;
   imageUrls: string[];
   policies: EbayPolicies;
@@ -79,8 +81,8 @@ export function buildTradingFixedPriceItemXml(input: TradingListingInput): strin
     "  <WarningLevel>High</WarningLevel>",
     "  <Item>",
     `    <SKU>${xml(input.listingId)}</SKU>`,
-    `    <Title>${xml(pack.title)}</Title>`,
-    `    <Description>${xml(pack.description)}</Description>`,
+    `    <Title>${xml(input.title?.trim() || pack.title)}</Title>`,
+    `    <Description>${xml(input.description?.trim() || pack.description)}</Description>`,
     `    <PrimaryCategory><CategoryID>${EBAY_UK_CATEGORY_POKEMON}</CategoryID></PrimaryCategory>`,
     `    <StartPrice currencyID="GBP">${priceGbp}</StartPrice>`,
     "    <CategoryMappingAllowed>true</CategoryMappingAllowed>",

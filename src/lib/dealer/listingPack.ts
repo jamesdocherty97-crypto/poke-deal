@@ -117,16 +117,41 @@ export function isGradedGrade(grade: string): boolean {
 export function buildEbayTitle(input: ListingPackInput): string {
   const { card, grade } = input;
   const graded = isGradedGrade(grade);
-  const parts = [
-    "Pokemon TCG",
-    card.name,
-    card.setName ?? "",
-    card.number ? `${card.number}` : "",
-    graded ? gradeListingPhrase(grade) : `${input.condition || "Near Mint"} Raw`,
-    card.language && card.language !== "EN" ? card.language : "English",
-  ].filter((p) => p && p.trim().length > 0);
+  const identity = ["Pokemon TCG", card.name];
+  const setName = card.setName?.trim() ?? "";
+  const number = card.number?.trim() ?? "";
+  const gradeOrCondition = graded
+    ? gradeListingPhrase(grade)
+    : `${input.condition || "Near Mint"} Raw`;
+  const language = card.language && card.language !== "EN" ? card.language : "English";
 
-  return trimEbayTitle(parts.join(" ").replace(/\s+/g, " ").trim());
+  const candidates = [
+    [...identity, setName, number, gradeOrCondition, language],
+    [...identity, setName, number, gradeOrCondition],
+    [...identity, number, gradeOrCondition, language],
+    [...identity, number, gradeOrCondition],
+  ].map(joinTitleParts);
+  const fitting = candidates.find((candidate) => candidate.length <= EBAY_TITLE_MAX);
+  if (fitting) return fitting;
+
+  // Keep identity, collector number and grade/condition intact. A long set is
+  // shortened before the search-critical tail is touched.
+  const withoutSet = joinTitleParts([...identity, number, gradeOrCondition]);
+  const setBudget = EBAY_TITLE_MAX - withoutSet.length - 1;
+  if (setName && setBudget >= 4) {
+    const shortenedSet = trimTitlePart(setName, setBudget);
+    const withShortSet = joinTitleParts([...identity, shortenedSet, number, gradeOrCondition]);
+    if (withShortSet.length <= EBAY_TITLE_MAX) return withShortSet;
+  }
+
+  const fixedPrefix = "Pokemon TCG";
+  const fixedTail = joinTitleParts([number, gradeOrCondition]);
+  const nameBudget = EBAY_TITLE_MAX - fixedPrefix.length - fixedTail.length - 2;
+  return joinTitleParts([
+    fixedPrefix,
+    trimTitlePart(card.name, Math.max(1, nameBudget)),
+    fixedTail,
+  ]).slice(0, EBAY_TITLE_MAX).trim();
 }
 
 export function buildEbaySubtitle(input: ListingPackInput): string {
@@ -624,6 +649,18 @@ function trimEbayTitle(title: string): string {
   const trimmed = title.slice(0, EBAY_TITLE_MAX);
   const lastSpace = trimmed.lastIndexOf(" ");
   return (lastSpace > 0 ? trimmed.slice(0, lastSpace) : trimmed).trim();
+}
+
+function joinTitleParts(parts: Array<string | null | undefined>): string {
+  return parts.filter((part) => Boolean(part?.trim())).join(" ").replace(/\s+/g, " ").trim();
+}
+
+function trimTitlePart(value: string, maxLength: number): string {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLength) return clean;
+  const slice = clean.slice(0, Math.max(1, maxLength));
+  const lastSpace = slice.lastIndexOf(" ");
+  return (lastSpace >= 3 ? slice.slice(0, lastSpace) : slice).trim();
 }
 
 function gradeSuffix(score: string): string {

@@ -7,6 +7,7 @@ import { buildInventoryItemPayload, upsertInventoryItem } from "./inventoryItem.
 import { buildOfferPayload } from "./offer.js";
 import { buildEbayOfferPreflight, toEbaySku } from "./preflight.js";
 import {
+  hasEbayOfferPresentationChanged,
   synchronizeEbayOffer,
   validateEbayListPricePence,
   type EbayOfferSyncDependencies,
@@ -671,6 +672,7 @@ test("buildEbayOfferPreflight preserves user-edited listing copy during a price 
   const preflight = buildEbayOfferPreflight({
     listingId: "listing-custom-copy",
     title: "My exact eBay title",
+    titleCustomized: true,
     description: "My saved condition notes and description.",
     packInput: slabInput,
     quantity: 1,
@@ -686,12 +688,57 @@ test("buildEbayOfferPreflight preserves user-edited listing copy during a price 
   );
 });
 
+test("buildEbayOfferPreflight replaces a legacy short Kofu draft label with the rich generated title", () => {
+  const preflight = buildEbayOfferPreflight({
+    listingId: "listing-kofu",
+    title: "Kofu 165/142",
+    titleCustomized: false,
+    packInput: {
+      card: { name: "Kofu", setName: "Stellar Crown", number: "165/142", language: "EN" },
+      grade: "RAW",
+      condition: "NM",
+      listPricePence: 500,
+    },
+    quantity: 1,
+    policies: MOCK_POLICIES,
+    config: TEST_CONFIG,
+  });
+
+  assert.equal(preflight.title, "Pokemon TCG Kofu Stellar Crown 165/142 NM Raw English");
+  assert.equal(preflight.inventoryItem.product.title, preflight.title);
+});
+
 test("validateEbayListPricePence distinguishes the chosen sell price from cost and comps", () => {
   assert.match(validateEbayListPricePence(null) ?? "", /Your list price/i);
   assert.match(validateEbayListPricePence(1) ?? "", /at least £0\.99/i);
   assert.match(validateEbayListPricePence(98) ?? "", /What I paid can still be £0\.00 or £0\.01/i);
   assert.equal(validateEbayListPricePence(99), null);
   assert.equal(validateEbayListPricePence(500), null);
+});
+
+test("live eBay offer presentation changes include generated-title source changes", () => {
+  const before = {
+    listPricePence: 500,
+    title: "Kofu 165/142",
+    titleCustomized: false,
+  };
+
+  assert.equal(hasEbayOfferPresentationChanged(before, { ...before }), false);
+  assert.equal(
+    hasEbayOfferPresentationChanged(before, { ...before, listPricePence: 550 }),
+    true,
+  );
+  assert.equal(
+    hasEbayOfferPresentationChanged(before, {
+      ...before,
+      title: "Pokemon TCG Kofu Stellar Crown 165/142 NM Raw English",
+    }),
+    true,
+  );
+  assert.equal(
+    hasEbayOfferPresentationChanged(before, { ...before, titleCustomized: true }),
+    true,
+  );
 });
 
 test("synchronizeEbayOffer refreshes a stale pending offer with the exact chosen price", async () => {
@@ -807,6 +854,24 @@ test("buildTradingFixedPriceItemXml emits graded descriptors and cert additional
   assert.match(xml, /<Name>27501<\/Name>\s*<Value>275010<\/Value>/);
   assert.match(xml, /<Name>27502<\/Name>\s*<Value>275020<\/Value>/);
   assert.match(xml, /<Name>27503<\/Name>\s*<AdditionalInfo>84213567<\/AdditionalInfo>/);
+});
+
+test("buildTradingFixedPriceItemXml sends the exact reviewed title when supplied", () => {
+  const xml = buildTradingFixedPriceItemXml({
+    listingId: "pdos-kofu",
+    packInput: {
+      card: { name: "Kofu", setName: "Stellar Crown", number: "165/142", language: "EN" },
+      grade: "RAW",
+      condition: "NM",
+      listPricePence: 500,
+    },
+    title: "Pokemon TCG Kofu Stellar Crown 165/142 NM Raw English",
+    quantity: 1,
+    imageUrls: ["https://img.example.com/kofu.jpg"],
+    policies: MOCK_POLICIES,
+  });
+
+  assert.match(xml, /<Title>Pokemon TCG Kofu Stellar Crown 165\/142 NM Raw English<\/Title>/);
 });
 
 test("buildTradingVerifyFixedPriceItemXml swaps the Trading API request wrapper", () => {

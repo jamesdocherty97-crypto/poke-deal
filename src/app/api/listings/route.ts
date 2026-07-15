@@ -84,12 +84,12 @@ export async function POST(request: Request) {
   // Guard: a brand-new EBAY listing can only be created ACTIVE if a genuine
   // live eBay URL is supplied with it (e.g. tracking a listing made outside
   // the app). Otherwise it must start as DRAFT and go through the real
-  // offer -> publish flow before it can become ACTIVE.
+  // reviewed publish flow before it can become ACTIVE.
   if (d.state === "ACTIVE" && d.channel === "EBAY" && !d.externalUrl) {
     return NextResponse.json(
       {
         error:
-          "New EBAY listings must start as DRAFT and be activated via Create offer -> Publish, unless you provide a genuine live eBay URL.",
+          "New EBAY listings must start as DRAFT and be activated via Review & publish, unless you provide a genuine live eBay URL.",
       },
       { status: 400 },
     );
@@ -111,7 +111,8 @@ export async function POST(request: Request) {
           itemId: item.id,
           channel: d.channel,
           state: d.state,
-          title: buildListingTitle(item.card, item.grade),
+          title: buildListingTitle(item.card, item.grade, item.condition),
+          titleCustomized: false,
           suggestedPrice: d.suggestedPricePence ?? null,
           listPrice: d.listPricePence ?? null,
           externalUrl: d.externalUrl ?? null,

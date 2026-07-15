@@ -13,10 +13,21 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   props: { params: Promise<{ id: string }> },
 ) {
   const params = await props.params;
+  const requestUrl = new URL(request.url);
+  const reviewedTitle = requestUrl.searchParams.get("title")?.trim() || null;
+  if (reviewedTitle && reviewedTitle.length > 80) {
+    return NextResponse.json({ error: "The eBay title must be 80 characters or fewer." }, { status: 400 });
+  }
+  const reviewedTitleCustomized = requestUrl.searchParams.get("titleCustomized") === "1";
+  const reviewedListPriceRaw = requestUrl.searchParams.get("listPricePence");
+  const reviewedListPricePence = reviewedListPriceRaw == null ? null : Number(reviewedListPriceRaw);
+  if (reviewedListPriceRaw != null && (!Number.isInteger(reviewedListPricePence) || reviewedListPricePence! <= 0)) {
+    return NextResponse.json({ error: "Check the exact eBay list price." }, { status: 400 });
+  }
   if (!isEbayConfigured()) {
     return NextResponse.json(
       { error: "eBay is not configured. Set EBAY_CLIENT_ID, EBAY_CLIENT_SECRET and EBAY_RU_NAME." },
@@ -40,14 +51,15 @@ export async function GET(
     return NextResponse.json({ error: "Item is already sold." }, { status: 400 });
   }
 
-  const priceError = validateEbayListPricePence(listing.listPrice);
+  const requestedListPricePence = reviewedListPricePence ?? listing.listPrice;
+  const priceError = validateEbayListPricePence(requestedListPricePence);
   if (priceError) {
     return NextResponse.json(
       { error: priceError },
       { status: 400 },
     );
   }
-  const listPricePence = listing.listPrice!;
+  const listPricePence = requestedListPricePence!;
 
   const config = getEbayConfig()!;
 
@@ -81,7 +93,8 @@ export async function GET(
     const preflight = buildEbayOfferPreflight({
       listingId: params.id,
       itemId: listing.itemId,
-      title: listing.title,
+      title: reviewedTitle ?? listing.title,
+      titleCustomized: reviewedTitle ? reviewedTitleCustomized : listing.titleCustomized,
       description: listing.description,
       packInput,
       quantity: listing.item.quantity ?? 1,

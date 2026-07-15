@@ -116,7 +116,8 @@ model Listing {
   channel Channel
   state   ListingState @default(DRAFT)
 
-  title          String?
+  title           String?
+  titleCustomized Boolean @default(false)
   description    String?
   suggestedPrice Int? // GBP pence — from the comp engine
   listPrice      Int? // GBP pence — what I actually listed at

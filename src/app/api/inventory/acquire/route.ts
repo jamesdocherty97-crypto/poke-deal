@@ -19,6 +19,7 @@ import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
 import { acquireToInventory } from "@/lib/inventory/inventoryService";
 import { getPrisma } from "@/lib/db/prisma";
 import { buildCheckedComp } from "@/lib/dealer/checkedComp";
+import { buildListingTitle } from "@/lib/dealer/listingDraft";
 import { GRADE_VALUES, type CardRef } from "@/lib/domain/types";
 import { PrismaCheckedCompRepo, type CheckedCompDb, type CheckedCompPlatform } from "@/lib/comps/sources/checkedComps";
 import { readClientMutationId } from "@/lib/offline/clientMutation";
@@ -189,9 +190,7 @@ export async function POST(request: Request) {
     } | null = null;
     if (d.createListing) {
       const effectiveListingState = d.channel === "EBAY" ? "DRAFT" : d.listingState;
-      const title = [compCard.name, compCard.number, d.grade === "RAW" ? "" : d.grade.replace(/_/g, " ")]
-        .filter(Boolean)
-        .join(" ");
+      const title = buildListingTitle(compCard, d.grade, d.condition);
       listing = await getPrisma()
         .$transaction(async (tx) => {
           const created = await tx.listing.create({
@@ -200,6 +199,7 @@ export async function POST(request: Request) {
               channel: d.channel,
               state: effectiveListingState,
               title,
+              titleCustomized: false,
               suggestedPrice: suggestion.pricePence,
               listPrice: d.listPricePence ?? null,
               listedAt: effectiveListingState === "ACTIVE" ? new Date() : null,

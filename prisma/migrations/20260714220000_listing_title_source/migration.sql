@@ -1,0 +1,2 @@
+ALTER TABLE "Listing"
+ADD COLUMN "titleCustomized" BOOLEAN NOT NULL DEFAULT false;
