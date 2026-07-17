@@ -54,6 +54,7 @@ export function middleware(req: NextRequest) {
     status: 401,
     headers: {
       "Content-Type": "text/html; charset=UTF-8",
+      "Cache-Control": "no-store",
       "WWW-Authenticate": 'Basic realm="Poke Deal", charset="UTF-8"',
     },
   });
