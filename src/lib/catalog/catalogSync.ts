@@ -116,7 +116,9 @@ async function upsertCatalogCard(db: ReturnType<typeof getPrisma>, card: Catalog
       language: data.language,
       name: data.name,
       setName: data.setName,
-      ...(data.number ? { number: data.number } : {}),
+      number: data.number ?? null,
+      edition: data.edition ?? null,
+      finish: data.finish ?? null,
     },
   });
   if (existingByIdentity) {
@@ -138,10 +140,14 @@ async function findExistingByProviderId(db: ReturnType<typeof getPrisma>, data: 
     const existing = await db.card.findUnique({ where: { tcgDexId: data.tcgDexId } });
     if (existing) return existing;
   }
+  if (data.cardmarketId) {
+    const existing = await db.card.findFirst({ where: { cardmarketId: data.cardmarketId } });
+    if (existing) return existing;
+  }
   return null;
 }
 
-function mergeCardDataForUpdate<T extends { imageUrl: string | null; displayImageUrl?: string | null; tcgApiId: string | null; tcgDexId: string | null }>(
+function mergeCardDataForUpdate<T extends { imageUrl: string | null; displayImageUrl?: string | null; tcgApiId: string | null; tcgDexId: string | null; cardmarketId?: string | null; edition?: string | null; finish?: string | null }>(
   existing: T,
   data: PrismaCardData,
 ): PrismaCardData {
@@ -151,5 +157,8 @@ function mergeCardDataForUpdate<T extends { imageUrl: string | null; displayImag
     displayImageUrl: data.displayImageUrl ?? existing.displayImageUrl ?? undefined,
     tcgApiId: data.tcgApiId ?? existing.tcgApiId ?? undefined,
     tcgDexId: data.tcgDexId ?? existing.tcgDexId ?? undefined,
+    cardmarketId: data.cardmarketId ?? existing.cardmarketId ?? undefined,
+    edition: data.edition ?? existing.edition ?? undefined,
+    finish: data.finish ?? existing.finish ?? undefined,
   };
 }

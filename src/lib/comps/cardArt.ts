@@ -13,6 +13,7 @@ export type CompCardImageEvidence = {
   source: CompCardImageSource;
   /** True only for listing-safe catalog artwork. Provider CDN fallbacks are app-display-only. */
   listingSafe: boolean;
+  candidates: Array<{ imageUrl: string; source: CompCardImageSource; listingSafe: boolean }>;
 };
 
 export function resolveCompCardImage(input: {
@@ -20,39 +21,45 @@ export function resolveCompCardImage(input: {
   headline?: CompResult | null;
   all?: readonly CompResult[];
 }): CompCardImageEvidence {
-  const catalogUrl = cleanUrl(input.catalog?.imageUrl);
-  if (catalogUrl) return { imageUrl: catalogUrl, source: "catalog", listingSafe: true };
-
-  const cachedDisplayUrl = cleanUrl(input.catalog?.displayImageUrl);
-  if (cachedDisplayUrl) return { imageUrl: cachedDisplayUrl, source: "cached-display", listingSafe: false };
+  const candidates: CompCardImageEvidence["candidates"] = [];
+  const add = (imageUrl: string | null, source: CompCardImageSource, listingSafe: boolean) => {
+    if (imageUrl && !candidates.some((candidate) => candidate.imageUrl === imageUrl)) candidates.push({ imageUrl, source, listingSafe });
+  };
+  add(cleanUrl(input.catalog?.imageUrl), "catalog", true);
+  add(cleanUrl(input.catalog?.displayImageUrl), "cached-display", false);
 
   for (const result of rankedCompResults(input.headline, input.all ?? [])) {
-    const imageUrl = providerImageFromCompResult(result);
-    if (!imageUrl) continue;
-    return {
-      imageUrl,
-      source: result.source === "poketrace" ? "poketrace" : result.source === "pokemon-price-tracker" ? "pokemon-price-tracker" : "none",
-      listingSafe: false,
-    };
+    const source = result.source === "poketrace" ? "poketrace" : result.source === "pokemon-price-tracker" ? "pokemon-price-tracker" : "none";
+    for (const imageUrl of providerImageCandidates(result)) add(imageUrl, source, false);
   }
 
-  return { imageUrl: null, source: "none", listingSafe: false };
+  const first = candidates[0];
+  return {
+    imageUrl: first?.imageUrl ?? null,
+    source: first?.source ?? "none",
+    listingSafe: first?.listingSafe ?? false,
+    candidates,
+  };
 }
 
 export function providerImageFromCompResult(result: CompResult | null | undefined): string | null {
-  if (!result?.raw || typeof result.raw !== "object") return null;
+  return providerImageCandidates(result)[0] ?? null;
+}
+
+export function providerImageCandidates(result: CompResult | null | undefined): string[] {
+  if (!result?.raw || typeof result.raw !== "object") return [];
   const raw = result.raw as Record<string, unknown>;
   const providerCard = isRecord(raw.providerCard) ? raw.providerCard : null;
-  return firstCleanUrl(
+  return uniqueCleanUrls(
+    providerCard?.imageCdnUrl800,
+    providerCard?.imageCdnUrl400,
+    providerCard?.imageCdnUrl200,
+    providerCard?.imageCdnUrl,
     raw.displayImageUrl,
     raw.imageUrl,
     raw.image,
     providerCard?.imageUrl,
     providerCard?.image,
-    providerCard?.imageCdnUrl800,
-    providerCard?.imageCdnUrl400,
-    providerCard?.imageCdnUrl200,
-    providerCard?.imageCdnUrl,
   );
 }
 
@@ -75,12 +82,13 @@ function imageSourceRank(source: string): number {
   return 2;
 }
 
-function firstCleanUrl(...values: unknown[]): string | null {
+function uniqueCleanUrls(...values: unknown[]): string[] {
+  const urls: string[] = [];
   for (const value of values) {
     const url = cleanUrl(value);
-    if (url) return url;
+    if (url && !urls.includes(url)) urls.push(url);
   }
-  return null;
+  return urls;
 }
 
 function cleanUrl(value: unknown): string | null {

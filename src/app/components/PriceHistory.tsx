@@ -100,6 +100,7 @@ export function PriceHistorySheet({
             <CardImage src={history.card.displayImageUrl ?? history.card.imageUrl} className="mini-card-art" fallbackClassName="mini-card-art blank" alt="" />
             <div><span>Range</span><strong>{gbp(low)}–{gbp(high)}</strong><small>{shortDate(history.range.from)} to {shortDate(history.range.to)}</small></div>
           </div>
+          {history.receipt && <PriceHistoryMetrics receipt={history.receipt} />}
           <div className="price-history-chart" aria-label="Market, cost, listing and sold price history">
             <svg viewBox="0 0 640 240" role="img" aria-label={`Prices from ${gbp(low)} to ${gbp(high)}`}>
               <line className="history-grid-line" x1="0" x2="640" y1="0" y2="0" />
@@ -132,6 +133,69 @@ export function PriceHistorySheet({
   );
 }
 
+function PriceHistoryMetrics({ receipt }: { receipt: NonNullable<CardPriceHistory["receipt"]> }) {
+  const { liquidity, volatility, trend30Days, trend90Days, sourceDisagreement } = receipt.metrics;
+  return (
+    <div className="history-metric-grid" aria-label="Price evidence quality">
+      <div>
+        <span>Sales velocity</span>
+        <strong>{liquidity.status === "available" ? `${liquidity.salesPer30Days?.toFixed(1)} / 30d` : "Not enough data"}</strong>
+        <small>{liquidity.status === "available"
+          ? `${historyProviderLabel(liquidity.provider)}${liquidity.market ? ` ${liquidity.market}` : ""} · n=${liquidity.sampleSize}/${liquidity.windowDays}d · ${liquidity.ageDays ?? 0}d old`
+          : metricReasonLabel(liquidity.reason)}</small>
+      </div>
+      <div>
+        <span>Price volatility</span>
+        <strong>{volatility.status === "available" ? `${volatility.madPct?.toFixed(1)}% MAD` : "Not enough data"}</strong>
+        <small>{volatility.status === "available"
+          ? `${historyProviderLabel(volatility.provider)}${volatility.market ? ` ${volatility.market}` : ""} · ${volatility.observationCount} observations`
+          : metricReasonLabel(volatility.reason)}</small>
+      </div>
+      <div>
+        <span>Market trend</span>
+        <strong>{trend30Days.status === "available" ? signedPercent(trend30Days.changePct) : "Not enough data"}</strong>
+        <small>{trend30Days.status === "available"
+          ? `30d · ${historyProviderLabel(trend30Days.provider)} · 90d ${trend90Days.status === "available" ? signedPercent(trend90Days.changePct) : metricReasonLabel(trend90Days.reason)}`
+          : metricReasonLabel(trend30Days.reason)}</small>
+      </div>
+      <div>
+        <span>Provider agreement</span>
+        <strong>{sourceDisagreement.status === "available" ? `${sourceDisagreement.spreadPct?.toFixed(1)}% spread` : "Not comparable"}</strong>
+        <small>{sourceDisagreement.status === "available"
+          ? `${sourceDisagreement.sourceCount} sources · ${gbp(sourceDisagreement.lowPence ?? 0)}–${gbp(sourceDisagreement.highPence ?? 0)} · ${sourceDisagreement.evidence.map((row) => historyProviderLabel(row.provider)).join(", ")}`
+          : metricReasonLabel(sourceDisagreement.reason)}</small>
+      </div>
+    </div>
+  );
+}
+
+function signedPercent(value: number | null): string {
+  if (value == null) return "—";
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
+function historyProviderLabel(provider: string | null): string {
+  if (!provider) return "Unknown source";
+  if (provider === "pokemon-price-tracker") return "Price Tracker";
+  if (provider === "ebay-marketplace-insights") return "eBay UK sold";
+  if (provider === "owned-sales") return "Your sales";
+  if (provider === "checked-comps") return "Checked comps";
+  if (provider === "pokemon-tcg-market") return "Catalog market";
+  if (provider === "poketrace") return "PokeTrace";
+  return provider.replace(/-/g, " ");
+}
+
+function metricReasonLabel(reason: string | null): string {
+  if (reason === "no-sold-evidence") return "No genuine sold evidence yet";
+  if (reason === "stale-evidence") return "Evidence is stale — run a fresh comp";
+  if (reason === "minimum-sample") return "Sample is too small for a trustworthy metric";
+  if (reason === "minimum-observations") return "More observations are needed";
+  if (reason === "minimum-span") return "More time is needed before measuring change";
+  if (reason === "minimum-sources") return "Only one comparable source is available";
+  if (reason === "invalid-window") return "Provider window is not comparable";
+  return "Insufficient trustworthy evidence";
+}
+
 function legendLabel(kind: HistoryPointKind): string {
   if (kind === "cost") return "Your cost";
   if (kind === "listing") return "Listed";
@@ -144,11 +208,10 @@ function shortDate(value: string): string {
   return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
 }
 
-function historyFreshnessKind(value: string): "live" | "recent" | "aging" | "stale" | "expired" {
+function historyFreshnessKind(value: string): "recent" | "aging" | "stale" | "expired" {
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) return "expired";
   const ageDays = Math.max(0, (Date.now() - timestamp) / (24 * 60 * 60 * 1_000));
-  if (ageDays <= 1) return "live";
   if (ageDays <= 30) return "recent";
   if (ageDays <= 90) return "aging";
   if (ageDays <= 180) return "stale";

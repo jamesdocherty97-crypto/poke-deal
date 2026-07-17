@@ -1,14 +1,14 @@
 :root {
   color-scheme: dark;
 
-  /* Type: compact enough for a trading screen, calm enough for long sessions. */
-  --font-ui: "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: ui-rounded, "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Type: field-kit clarity first; display type is reserved for hierarchy, not dense evidence. */
+  --font-ui: "Avenir Next", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Avenir Next Condensed", "DIN Alternate", "Arial Narrow", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --font-data: "SFMono-Regular", "Roboto Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --font-weight-regular: 500;
-  --font-weight-medium: 650;
-  --font-weight-bold: 800;
-  --font-weight-black: 950;
+  --font-weight-medium: 600;
+  --font-weight-bold: 750;
+  --font-weight-black: 850;
 
   --font-size-micro: 0.75rem;
   --font-size-label: 0.8125rem;
@@ -62,90 +62,100 @@
 
   /* Tactile, not bubbly: cards use medium; controls use small. */
   --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
   --radius-pill: 999px;
+  --card-art-ratio: 5 / 7;
   --r-sm: var(--radius-sm);
   --r-md: var(--radius-md);
   --r-lg: var(--radius-lg);
 
-  /* Recognisable private-use franchise palette, separated from state colours. */
-  --brand-red: #ef3340;
-  --brand-red-deep: #a61e2b;
-  --brand-yellow: #ffcb05;
-  --brand-blue: #2a75bb;
-  --brand-blue-deep: #153c78;
-  --brand-sky: #69e8ff;
-  --brand-violet: #8b5cf6;
-  --brand-pink: #ff72d2;
-  --brand-cream: #f8fbff;
-  --brand-ink: #111827;
+  /* Card-back Twilight: warm League-night equipment and illuminated binder sleeves. */
+  --brand-red: #e96a74;
+  --brand-red-deep: #dd5d68;
+  --brand-yellow: #f0c65a;
+  --brand-blue: #79bde6;
+  --brand-blue-deep: #1a2440;
+  --brand-sky: #7ad4e8;
+  --brand-violet: #a99bef;
+  --brand-pink: #e69acd;
+  --brand-cream: #f4f0e7;
+  --brand-ink: #12172d;
 
-  /* Dark is authored directly for a dim card hall, not inverted from light. */
-  --color-canvas: #080b13;
-  --color-canvas-raised: #0d1424;
-  --color-surface-1: rgba(13, 20, 36, 0.88);
-  --color-surface-2: rgba(18, 27, 47, 0.94);
-  --color-surface-3: #0d1424;
-  --color-surface-sunken: rgba(3, 8, 20, 0.76);
-  --color-text-primary: #f8fbff;
-  --color-text-secondary: #b8c3d7;
-  --color-text-tertiary: #8592aa;
-  --color-text-inverse: #111827;
-  --color-border-subtle: rgba(255, 255, 255, 0.1);
-  --color-border: rgba(255, 255, 255, 0.14);
-  --color-border-strong: rgba(255, 255, 255, 0.24);
-  --color-scrim: rgba(3, 6, 14, 0.76);
-  --color-focus: var(--brand-sky);
-  --color-selection: rgba(105, 232, 255, 0.22);
+  --color-canvas: #12172d;
+  --color-canvas-raised: #151c35;
+  --color-surface-1: #1a2440;
+  --color-surface-2: #223250;
+  --color-surface-3: #283d61;
+  --color-surface-sunken: #0d1226;
+  --color-surface: var(--color-surface-1);
+  --color-text-primary: #f4f0e7;
+  --color-text-secondary: #bac2d3;
+  --color-text-tertiary: #9eaabe;
+  --color-text-inverse: #12172d;
+  --color-text-on-accent: var(--brand-ink);
+  --color-border-subtle: rgba(190, 204, 230, 0.1);
+  --color-border: rgba(190, 204, 230, 0.18);
+  --color-border-strong: rgba(190, 204, 230, 0.3);
+  --color-scrim: rgba(7, 10, 22, 0.76);
+  --color-focus: #79bde6;
+  --color-selection: rgba(240, 198, 90, 0.28);
+
+  /* Workspace identity is derived from real Pokemon type families, then softened for UI. */
+  --workspace-today: #f0c65a;
+  --workspace-acquire: #e96a74;
+  --workspace-inventory: #aebbd2;
+  --workspace-listings: #79bde6;
+  --workspace-profit: #75c7a1;
+  --workspace-settings: #e69acd;
 
   /* Operational state. Colour is always paired with a label and glyph. */
-  --color-success: #34d399;
-  --color-success-surface: rgba(52, 211, 153, 0.13);
-  --color-success-border: rgba(52, 211, 153, 0.38);
-  --color-warning: #ffd166;
-  --color-warning-surface: rgba(255, 209, 102, 0.13);
-  --color-warning-border: rgba(255, 209, 102, 0.4);
-  --color-danger: #fb7185;
-  --color-danger-surface: rgba(251, 113, 133, 0.13);
-  --color-danger-border: rgba(251, 113, 133, 0.4);
-  --color-info: var(--brand-sky);
-  --color-info-surface: rgba(105, 232, 255, 0.12);
-  --color-info-border: rgba(105, 232, 255, 0.36);
+  --color-success: #75c7a1;
+  --color-success-surface: rgba(117, 199, 161, 0.13);
+  --color-success-border: rgba(117, 199, 161, 0.38);
+  --color-warning: #f0c65a;
+  --color-warning-surface: rgba(240, 198, 90, 0.14);
+  --color-warning-border: rgba(240, 198, 90, 0.38);
+  --color-danger: #f0838a;
+  --color-danger-surface: rgba(240, 131, 138, 0.13);
+  --color-danger-border: rgba(240, 131, 138, 0.38);
+  --color-info: #79bde6;
+  --color-info-surface: rgba(121, 189, 230, 0.13);
+  --color-info-border: rgba(121, 189, 230, 0.38);
 
   /* Confidence: three bars / two bars / one bar; never colour alone. */
-  --confidence-high-color: #69e8ff;
-  --confidence-high-surface: rgba(105, 232, 255, 0.13);
-  --confidence-high-border: rgba(105, 232, 255, 0.42);
+  --confidence-high-color: #79bde6;
+  --confidence-high-surface: rgba(121, 189, 230, 0.14);
+  --confidence-high-border: rgba(121, 189, 230, 0.44);
   --confidence-high-pattern: linear-gradient(90deg, transparent, transparent);
-  --confidence-medium-color: #ffd166;
-  --confidence-medium-surface: rgba(255, 209, 102, 0.13);
-  --confidence-medium-border: rgba(255, 209, 102, 0.42);
-  --confidence-medium-pattern: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 209, 102, 0.14) 6px 8px);
-  --confidence-low-color: #ff8bc2;
-  --confidence-low-surface: rgba(255, 139, 194, 0.13);
-  --confidence-low-border: rgba(255, 139, 194, 0.42);
-  --confidence-low-pattern: radial-gradient(circle, rgba(255, 139, 194, 0.24) 1px, transparent 1.5px) 0 0 / 7px 7px;
+  --confidence-medium-color: #f0c65a;
+  --confidence-medium-surface: rgba(240, 198, 90, 0.14);
+  --confidence-medium-border: rgba(240, 198, 90, 0.44);
+  --confidence-medium-pattern: repeating-linear-gradient(135deg, transparent 0 6px, rgba(240, 198, 90, 0.14) 6px 8px);
+  --confidence-low-color: #e69acd;
+  --confidence-low-surface: rgba(230, 154, 205, 0.14);
+  --confidence-low-border: rgba(230, 154, 205, 0.44);
+  --confidence-low-pattern: radial-gradient(circle, rgba(230, 154, 205, 0.24) 1px, transparent 1.5px) 0 0 / 7px 7px;
 
   /* Deal Judge: tick / eye / minus-circle; always show the word too. */
-  --verdict-buy-color: #34d399;
-  --verdict-buy-surface: rgba(52, 211, 153, 0.14);
-  --verdict-buy-border: rgba(52, 211, 153, 0.44);
-  --verdict-watch-color: #ffd166;
-  --verdict-watch-surface: rgba(255, 209, 102, 0.14);
-  --verdict-watch-border: rgba(255, 209, 102, 0.44);
-  --verdict-pass-color: #fb7185;
-  --verdict-pass-surface: rgba(251, 113, 133, 0.14);
-  --verdict-pass-border: rgba(251, 113, 133, 0.44);
+  --verdict-buy-color: #75c7a1;
+  --verdict-buy-surface: rgba(117, 199, 161, 0.14);
+  --verdict-buy-border: rgba(117, 199, 161, 0.44);
+  --verdict-watch-color: #f0c65a;
+  --verdict-watch-surface: rgba(240, 198, 90, 0.14);
+  --verdict-watch-border: rgba(240, 198, 90, 0.44);
+  --verdict-pass-color: #f0838a;
+  --verdict-pass-surface: rgba(240, 131, 138, 0.14);
+  --verdict-pass-border: rgba(240, 131, 138, 0.44);
 
   /* Freshness: timestamp + clock state + descending opacity. */
-  --freshness-live-color: #34d399;
-  --freshness-recent-color: #69e8ff;
-  --freshness-aging-color: #ffd166;
-  --freshness-stale-color: #aeb9cf;
-  --freshness-expired-color: #77849b;
+  --freshness-live-color: #75c7a1;
+  --freshness-recent-color: #79bde6;
+  --freshness-aging-color: #f0c65a;
+  --freshness-stale-color: #bac2d3;
+  --freshness-expired-color: #9eaabe;
   --freshness-live-opacity: 1;
   --freshness-recent-opacity: 0.9;
   --freshness-aging-opacity: 0.76;
@@ -153,24 +163,44 @@
   --freshness-expired-opacity: 0.48;
 
   /* Source-mix segments: owned diamond, checked square, sold bar, market ring, cached dash. */
-  --source-owned-color: #34d399;
-  --source-checked-color: #69e8ff;
-  --source-sold-color: #b69cff;
-  --source-market-color: #ffd166;
-  --source-cached-color: #aeb9cf;
+  --source-owned-color: #75c7a1;
+  --source-checked-color: #79bde6;
+  --source-sold-color: #a99bef;
+  --source-market-color: #f0c65a;
+  --source-cached-color: #bac2d3;
 
-  /* Gradients keep the app unmistakably Pokémon without carrying meaning. */
-  --brand-hero-gradient: linear-gradient(135deg, rgba(42, 117, 187, 0.24), transparent 38%), linear-gradient(225deg, rgba(239, 51, 64, 0.2), transparent 46%);
-  --brand-holo-gradient: linear-gradient(115deg, #69e8ff 0%, #8b5cf6 42%, #ff72d2 72%, #ffcb05 100%);
-  --brand-holo-subtle: linear-gradient(115deg, rgba(105, 232, 255, 0.16), rgba(139, 92, 246, 0.14) 42%, rgba(255, 114, 210, 0.12) 72%, rgba(255, 203, 5, 0.14));
-  --brand-grid: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  /* Established type colours are workflow accents only; cards do not expose type data. */
+  --type-normal: #a8a77a;
+  --type-fire: #ee8130;
+  --type-water: #6390f0;
+  --type-electric: #f7d02c;
+  --type-grass: #7ac74c;
+  --type-ice: #96d9d6;
+  --type-fighting: #c22e28;
+  --type-poison: #a33ea1;
+  --type-ground: #e2bf65;
+  --type-flying: #a98ff3;
+  --type-psychic: #f66d9b;
+  --type-bug: #a6b91a;
+  --type-rock: #b6a136;
+  --type-ghost: #735797;
+  --type-dragon: #6f35fc;
+  --type-dark: #705746;
+  --type-steel: #aeb9cb;
+  --type-fairy: #d685ad;
 
-  --shadow-1: 0 10px 24px rgba(0, 0, 0, 0.26);
-  --shadow-2: 0 18px 48px rgba(0, 0, 0, 0.34);
-  --shadow-focus: 0 0 0 3px rgba(105, 232, 255, 0.18);
-  --elevation-base: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-  --elevation-raised: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 16px 34px rgba(0, 0, 0, 0.24);
-  --elevation-floating: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 22px 62px rgba(0, 0, 0, 0.42);
+  /* Holo is reserved for card/evidence moments; the page shell stays quiet. */
+  --brand-hero-gradient: linear-gradient(125deg, rgba(121, 189, 230, 0.13), transparent 48%), linear-gradient(220deg, rgba(233, 106, 116, 0.11), transparent 52%);
+  --brand-holo-gradient: linear-gradient(115deg, #7ad4e8 0%, #a99bef 42%, #e69acd 72%, #f0c65a 100%);
+  --brand-holo-subtle: linear-gradient(115deg, rgba(122, 212, 232, 0.18), rgba(169, 155, 239, 0.16) 42%, rgba(230, 154, 205, 0.14) 72%, rgba(240, 198, 90, 0.16));
+  --brand-grid: linear-gradient(180deg, #1a2440 0%, #12172d 100%);
+
+  --shadow-1: 0 8px 22px rgba(6, 8, 18, 0.25);
+  --shadow-2: 0 22px 56px rgba(6, 8, 18, 0.38);
+  --shadow-focus: 0 0 0 3px rgba(121, 189, 230, 0.22);
+  --elevation-base: 0 1px 0 rgba(255, 255, 255, 0.045) inset;
+  --elevation-raised: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 16px 34px rgba(6, 8, 18, 0.3);
+  --elevation-floating: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 28px 72px rgba(6, 8, 18, 0.5);
 
   --duration-instant: 90ms;
   --duration-fast: 150ms;

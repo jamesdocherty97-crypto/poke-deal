@@ -16,6 +16,7 @@ coverage/
 APP_LOGIN_PASSWORD.txt
 output/backups/
 output/playwright/
+output/lighthouse/
 .playwright-cli/
 test-results/
 playwright-report/

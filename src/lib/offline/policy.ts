@@ -1,5 +1,6 @@
 export const OFFLINE_COMP_FRESH_MS = 6 * 60 * 60 * 1_000;
 export const OFFLINE_COMP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
+export const OFFLINE_BOOTSTRAP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 export const OFFLINE_RETRY_MAX_MS = 15 * 60 * 1_000;
 
 export type OfflineCacheFreshness = "fresh" | "stale" | "expired";
@@ -11,14 +12,30 @@ export type CompCacheIdentity = {
   grade: string;
   tcgApiId?: string;
   tcgDexId?: string;
+  cardmarketId?: string;
+  language?: string;
+  edition?: string;
+  finish?: string;
   scanFingerprint?: string;
 };
 
 export function canonicalCompCacheKey(identity: CompCacheIdentity): string {
-  const lockedId = normalize(identity.tcgApiId) || normalize(identity.tcgDexId);
+  const lockedId = normalize(identity.tcgApiId) || normalize(identity.tcgDexId) || normalize(identity.cardmarketId);
   const card = lockedId || [normalize(identity.name), normalize(identity.setName), normalize(identity.number)].join(":");
+  const print = [normalize(identity.language) || "en", normalize(identity.edition), normalize(identity.finish)].join(":");
   const fingerprint = normalize(identity.scanFingerprint);
-  return [card, normalize(identity.grade) || "raw", fingerprint].filter(Boolean).join("|");
+  return [card, print, normalize(identity.grade) || "raw", fingerprint].filter(Boolean).join("|");
+}
+
+export function offlineBootstrapFreshness(
+  cachedAt: string | number | Date,
+  now: string | number | Date = Date.now(),
+): { expired: boolean; ageMs: number; ageHours: number } {
+  const freshness = compCacheFreshness(cachedAt, now, {
+    freshMs: OFFLINE_BOOTSTRAP_MAX_AGE_MS,
+    maxAgeMs: OFFLINE_BOOTSTRAP_MAX_AGE_MS,
+  });
+  return { expired: freshness.state === "expired", ageMs: freshness.ageMs, ageHours: freshness.ageHours };
 }
 
 export function compCacheFreshness(

@@ -1,8 +1,9 @@
 // The currency boundary. Every source converts to GBP pence here, at ingestion,
 // so nothing downstream ever sees EUR/USD/JPY. Live rates are cached daily when
-// FX_API_KEY is configured; fixture/dev mode falls back honestly to static rates.
+// FX_API_KEY is configured; development mode falls back honestly to static rates.
 
 import type { Currency } from "../domain/types.js";
+import { fetchReadWithRetry } from "../http/fetchReadWithRetry.js";
 export { formatGbp } from "../format/money.js";
 
 const REQUIRED_QUOTES = ["GBP", "EUR", "USD", "JPY"] as const satisfies readonly Currency[];
@@ -252,27 +253,34 @@ async function fetchLiveRates({
   fetchImpl: typeof fetch;
   now: Date;
 }): Promise<FxRates> {
-  const url = buildFxUrl(endpoint, apiKey);
-  const res = await fetchImpl(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(4500) });
+  const request = buildFxRequest(endpoint, apiKey);
+  const res = await fetchReadWithRetry(fetchImpl, request.url, {
+    headers: request.headers,
+    signal: AbortSignal.timeout(4500),
+  }, { totalDeadlineMs: 4500 });
   if (!res.ok) throw new Error(`provider returned HTTP ${res.status}`);
   const payload = (await res.json()) as unknown;
-  return parseFxPayload(payload, providerName(url), now);
+  return parseFxPayload(payload, providerName(request.url), now);
 }
 
-function buildFxUrl(endpoint: string, apiKey: string): string {
+function buildFxRequest(endpoint: string, apiKey: string): { url: string; headers: Record<string, string> } {
   const url = new URL(endpoint);
   const host = url.hostname.toLowerCase();
+  const headers: Record<string, string> = { Accept: "application/json" };
   if (host.includes("freecurrencyapi")) {
-    if (!url.searchParams.has("apikey")) url.searchParams.set("apikey", apiKey);
+    // freecurrencyapi documents header auth and recommends it over the query
+    // parameter because URLs are commonly retained in access logs and traces.
+    url.searchParams.delete("apikey");
+    headers.apikey = apiKey;
     if (!url.searchParams.has("base_currency")) url.searchParams.set("base_currency", "GBP");
     if (!url.searchParams.has("currencies")) url.searchParams.set("currencies", FOREIGN_QUOTES.join(","));
-    return url.toString();
+    return { url: url.toString(), headers };
   }
 
   if (!url.searchParams.has("access_key")) url.searchParams.set("access_key", apiKey);
   if (!url.searchParams.has("base")) url.searchParams.set("base", "GBP");
   if (!url.searchParams.has("symbols")) url.searchParams.set("symbols", FOREIGN_QUOTES.join(","));
-  return url.toString();
+  return { url: url.toString(), headers };
 }
 
 export function parseFxPayload(payload: unknown, provider = DEFAULT_PROVIDER, now = new Date()): FxRates {

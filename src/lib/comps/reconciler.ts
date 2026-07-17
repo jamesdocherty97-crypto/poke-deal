@@ -60,6 +60,17 @@ export interface ReconResult {
   reasons: string[];
   chosenSource?: ReconSource;
   trendPct: number | null;
+  selection?: {
+    sourceTier: number;
+    region: ReconRegion;
+    sampleSize: number;
+    ageDays: number;
+    corroboratingCount: number;
+    appliedPenalties: string[];
+    spreadPence: number;
+    spreadPct: number;
+    chosenBecause: string;
+  };
 }
 
 interface CandidateState {
@@ -206,7 +217,53 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     reasons: finalReasons.length > 0 ? finalReasons : ["reconciled-cleanly"],
     chosenSource: chosen.candidate.source,
     trendPct: chosen.trendPct,
+    selection: buildSelectionDiagnostics(chosen, eligible),
   };
+}
+
+function buildSelectionDiagnostics(chosen: CandidateState, eligible: CandidateState[]): NonNullable<ReconResult["selection"]> {
+  const values = eligible.map((state) => state.valuePence).filter((value) => value > 0);
+  const low = values.length ? Math.min(...values) : chosen.valuePence;
+  const high = values.length ? Math.max(...values) : chosen.valuePence;
+  const spreadPence = Math.max(0, high - low);
+  const spreadPct = low > 0 ? (spreadPence / low) * 100 : 0;
+  const corroboratingCount = eligible.filter((state) =>
+    state !== chosen && Math.abs(state.valuePence - chosen.valuePence) / chosen.valuePence <= 0.15,
+  ).length;
+  const freshness = Number.isFinite(chosen.ageDays)
+    ? chosen.ageDays < 1 ? "today" : `${Math.round(chosen.ageDays)}d old`
+    : "undated";
+  const region = chosen.candidate.region;
+  const chosenBecause = [
+    `${region} ${humanReconSource(chosen.candidate.source)}`,
+    `${chosen.n} sample${chosen.n === 1 ? "" : "s"}`,
+    freshness,
+    corroboratingCount > 0 ? `${corroboratingCount} corroborating source${corroboratingCount === 1 ? "" : "s"}` : "best eligible evidence",
+  ].join(" · ");
+  return {
+    sourceTier: TIER_WEIGHT[chosen.candidate.source],
+    region,
+    sampleSize: chosen.n,
+    ageDays: chosen.ageDays,
+    corroboratingCount,
+    appliedPenalties: [...new Set(chosen.reasons.filter((reason) => reason.includes("penalty") || reason.includes("stale") || reason.includes("suppressed")))],
+    spreadPence,
+    spreadPct,
+    chosenBecause,
+  };
+}
+
+function humanReconSource(source: ReconSource): string {
+  const labels: Record<ReconSource, string> = {
+    "owned-sales": "owned sales",
+    "ebay-insights": "eBay sold evidence",
+    "checked-comps": "checked comps",
+    "pt-smart": "Price Tracker smart price",
+    "pt-median": "Price Tracker median",
+    "tcg-market": "catalog market",
+    poketrace: "PokeTrace",
+  };
+  return labels[source];
 }
 
 function initialState(candidate: ReconCandidate): CandidateState {

@@ -29,6 +29,10 @@ const checkedCompPostSchema = z.object({
     number: z.string().min(1).optional(),
     tcgApiId: z.string().min(1).optional(),
     tcgDexId: z.string().min(1).optional(),
+    cardmarketId: z.string().min(1).optional(),
+    language: z.enum(["EN", "JP"]).default("EN"),
+    edition: z.enum(["UNLIMITED", "FIRST_EDITION", "SHADOWLESS", "STAFF", "PRERELEASE"]).optional(),
+    finish: z.enum(["NORMAL", "HOLO", "REVERSE_HOLO"]).optional(),
   }),
   grade: gradeSchema.default("RAW"),
   pricePence: z.coerce.number().int().positive(),
@@ -59,8 +63,11 @@ export async function GET(request: Request) {
     number: searchParams.get("number")?.trim() || undefined,
     tcgApiId: searchParams.get("tcgApiId")?.trim() || undefined,
     tcgDexId: searchParams.get("tcgDexId")?.trim() || undefined,
+    cardmarketId: searchParams.get("cardmarketId")?.trim() || undefined,
+    edition: readEdition(searchParams.get("edition")),
+    finish: readFinish(searchParams.get("finish")),
     game: "POKEMON",
-    language: "EN",
+    language: searchParams.get("language") === "JP" ? "JP" : "EN",
   };
 
   try {
@@ -100,7 +107,7 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
-  const card: CardRef = { ...data.card, game: "POKEMON", language: "EN" };
+  const card: CardRef = { ...data.card, game: "POKEMON" };
 
   try {
     const catalogSource = new PokemonTcgApiCatalogSource();
@@ -133,4 +140,16 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function readEdition(value: string | null): CardRef["edition"] {
+  return ["UNLIMITED", "FIRST_EDITION", "SHADOWLESS", "STAFF", "PRERELEASE"].includes(value ?? "")
+    ? value as CardRef["edition"]
+    : undefined;
+}
+
+function readFinish(value: string | null): CardRef["finish"] {
+  return ["NORMAL", "HOLO", "REVERSE_HOLO"].includes(value ?? "")
+    ? value as CardRef["finish"]
+    : undefined;
 }

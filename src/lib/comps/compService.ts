@@ -14,7 +14,10 @@ import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from 
 import { reconcileComps, type ReconCandidate, type ReconQuery, type ReconResult, type ReconSource } from "./reconciler.js";
 import { recordSourceSuccess } from "../system/sourceFreshness.js";
 
-const DEFAULT_SOURCE_TIMEOUT_MS = 4000;
+// Provider adapters have their own 6.5s network boundaries. Keep the
+// orchestrator above those boundaries so it does not cancel healthy live calls
+// first (production Price Tracker was observed at ~5s during this audit).
+const DEFAULT_SOURCE_TIMEOUT_MS = 7500;
 const DEFAULT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface SourceUnavailable {

@@ -96,6 +96,7 @@ test("readCompLookupRequest preserves 1st Edition variant text for pricing", () 
       number: undefined,
       game: "POKEMON",
       language: "EN",
+      edition: "FIRST_EDITION",
     },
     grade: "RAW",
   });
@@ -113,6 +114,7 @@ test("readCompLookupRequest preserves reverse holo text for pricing", () => {
       number: undefined,
       game: "POKEMON",
       language: "EN",
+      finish: "REVERSE_HOLO",
     },
     grade: "RAW",
   });
@@ -130,9 +132,50 @@ test("readCompLookupRequest preserves normal text for pricing", () => {
       number: undefined,
       game: "POKEMON",
       language: "EN",
+      finish: "NORMAL",
     },
     grade: "RAW",
   });
+});
+
+test("readCompLookupRequest preserves Japanese and exact print identity", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    name: "リザードン",
+    setName: "ポケモンカード151",
+    number: "006/165",
+    language: "JP",
+    finish: "HOLO",
+    tcgDexId: "sv2a-006",
+    cardmarketId: "123456",
+  }));
+
+  assert.deepEqual(parsed, {
+    card: {
+      name: "リザードン Holofoil",
+      setName: "ポケモンカード151",
+      number: "006/165",
+      tcgDexId: "sv2a-006",
+      cardmarketId: "123456",
+      game: "POKEMON",
+      language: "JP",
+      finish: "HOLO",
+    },
+    grade: "RAW",
+  });
+});
+
+test("readCompLookupRequest keeps shadowless distinct from unlimited", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    name: "Charizard",
+    setName: "Base",
+    number: "4/102",
+    edition: "SHADOWLESS",
+    finish: "HOLO",
+  }));
+
+  assert.equal("error" in parsed ? null : parsed.card.edition, "SHADOWLESS");
+  assert.equal("error" in parsed ? null : parsed.card.finish, "HOLO");
+  assert.match("error" in parsed ? "" : parsed.card.name, /Shadowless/);
 });
 
 test("readCompLookupRequest cleans direct cardName condition noise but keeps first edition", () => {
@@ -150,6 +193,7 @@ test("readCompLookupRequest cleans direct cardName condition noise but keeps fir
       number: "3/111",
       game: "POKEMON",
       language: "EN",
+      edition: "FIRST_EDITION",
     },
     grade: "RAW",
   });

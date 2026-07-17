@@ -263,7 +263,6 @@ const CHASE_CARDS: CatalogCard[] = [
     setCode: "svp",
     number: "SVP208",
     rarity: "Promo",
-    imageUrl: "https://images.scrydex.com/pokemon/svp-208/large",
     tcgApiId: "svp-208",
   },
   {
@@ -274,7 +273,6 @@ const CHASE_CARDS: CatalogCard[] = [
     setCode: "mep",
     number: "MEP049",
     rarity: "Promo",
-    imageUrl: "https://images.scrydex.com/pokemon/mep-49/large",
     tcgApiId: "mep-49",
   },
   {
@@ -285,7 +283,6 @@ const CHASE_CARDS: CatalogCard[] = [
     setCode: "mep",
     number: "MEP0079",
     rarity: "Promo",
-    imageUrl: "https://images.scrydex.com/pokemon/mep-79/large",
     tcgApiId: "mep-79",
   },
 ];

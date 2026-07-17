@@ -17,6 +17,8 @@ test("parseScanIdentity maps a clean raw-card read", () => {
       setCode: null,
       number: "215/203",
       language: "English",
+      edition: null,
+      finish: "Reverse Holo",
       isSlab: false,
       stamps: ["Single Strike"],
       readable: true,
@@ -27,7 +29,54 @@ test("parseScanIdentity maps a clean raw-card read", () => {
   assert.equal(identity.number, "215/203");
   assert.equal(identity.isSlab, false);
   assert.equal(identity.readable, true);
+  assert.equal(identity.edition, null);
+  assert.equal(identity.finish, "REVERSE_HOLO");
   assert.deepEqual(identity.stamps, ["Single Strike"]);
+});
+
+test("parseScanIdentity canonicalizes print identity but discards provider ids emitted by OCR", () => {
+  const identity = parseScanIdentity(JSON.stringify({
+    name: "Hitmontop",
+    setName: "Neo Genesis",
+    number: "3/111",
+    language: "EN",
+    edition: "1st Edition",
+    finish: "holofoil",
+    tcgApiId: "neo1-3",
+    providerIds: { tcgDexId: "neo1-3", cardmarketId: "12345" },
+    stamps: [" 1st Edition ", "1st Edition", ""],
+    readable: true,
+  }));
+
+  assert.equal(identity.language, "English");
+  assert.equal(identity.edition, "FIRST_EDITION");
+  assert.equal(identity.finish, "HOLO");
+  assert.equal(identity.tcgApiId, null);
+  assert.equal(identity.tcgDexId, null);
+  assert.equal(identity.cardmarketId, null);
+  assert.deepEqual(identity.stamps, ["1st Edition"]);
+  assert.deepEqual(identity.unresolvedIdentityHints, []);
+});
+
+test("parseScanIdentity infers Japanese from printed script but never defaults missing Latin text to English", () => {
+  const japanese = parseScanIdentity(JSON.stringify({ name: "リザードン", number: "006/165", language: null }));
+  const unknown = parseScanIdentity(JSON.stringify({ name: "Charizard", number: "4/102", language: null }));
+  assert.equal(japanese.language, "Japanese");
+  assert.equal(unknown.language, "Unknown");
+});
+
+test("parseScanIdentity preserves unsupported print text for mandatory downstream review", () => {
+  const identity = parseScanIdentity(JSON.stringify({
+    name: "Pikachu",
+    number: "25/102",
+    language: "English",
+    edition: "Winner stamp",
+    finish: "Cosmos Holo",
+    readable: true,
+  }));
+  assert.equal(identity.edition, null);
+  assert.equal(identity.finish, null);
+  assert.deepEqual(identity.unresolvedIdentityHints, ["Winner stamp", "Cosmos Holo"]);
 });
 
 test("parseScanIdentity maps a slab read with cert", () => {
@@ -47,11 +96,13 @@ test("parseScanIdentity maps a slab read with cert", () => {
   assert.equal(identity.certNumber, "81234567");
 });
 
-test("parseScanIdentity treats blank strings as null and defaults language", () => {
+test("parseScanIdentity treats blank strings as null and leaves unproved language unknown", () => {
   const identity = parseScanIdentity(JSON.stringify({ name: "  ", number: null, setCode: "D" }));
   assert.equal(identity.name, null);
   assert.equal(identity.setCode, null);
-  assert.equal(identity.language, "English");
+  assert.equal(identity.language, "Unknown");
+  assert.equal(identity.edition, null);
+  assert.equal(identity.finish, null);
   assert.equal(identity.readable, true);
 });
 
@@ -64,9 +115,13 @@ test("parseScanIdentity throws upstream ScanError on malformed JSON", () => {
 
 test("readCardImage sends the OCR-only prompt and parses the reply", async () => {
   let capturedBody = "";
+  let capturedUrl = "";
+  let capturedHeaders: Record<string, string> = {};
   const result = await readCardImage("aGVsbG8=", "image/jpeg", {
     apiKey: "test-key",
-    fetchImpl: async (_url, init) => {
+    fetchImpl: async (url, init) => {
+      capturedUrl = String(url);
+      capturedHeaders = init?.headers as Record<string, string>;
       capturedBody = String(init?.body);
       return geminiReply(
         { name: "Snivy", number: "MEP049", readable: true },
@@ -75,16 +130,23 @@ test("readCardImage sends the OCR-only prompt and parses the reply", async () =>
     },
   });
   assert.equal(result.identity.name, "Snivy");
+  assert.equal(new URL(capturedUrl).searchParams.has("key"), false);
+  assert.equal(capturedHeaders["x-goog-api-key"], "test-key");
   assert.deepEqual(result.usage, { promptTokens: 121, outputTokens: 34, totalTokens: 155, cachedTokens: 8 });
   assert.ok(capturedBody.includes("never infer identity from artwork"));
   assert.ok(capturedBody.includes(SCAN_PROMPT.slice(0, 40)));
   const request = JSON.parse(capturedBody) as {
+    contents?: Array<{ parts?: Array<{ text?: string }> }>;
     generationConfig?: {
       maxOutputTokens?: number;
       thinkingConfig?: { thinkingLevel?: string };
       mediaResolution?: string;
     };
   };
+  const prompt = request.contents?.[0]?.parts?.[0]?.text ?? "";
+  assert.ok(prompt.includes("null never implies Unlimited"));
+  assert.ok(prompt.includes('"finish":"NORMAL"|"HOLO"|"REVERSE_HOLO"|null'));
+  assert.ok(prompt.includes("Never invent Pokemon TCG API"));
   assert.equal(request.generationConfig?.maxOutputTokens, 512);
   assert.equal(request.generationConfig?.thinkingConfig?.thinkingLevel, "minimal");
   assert.equal(request.generationConfig?.mediaResolution, "MEDIA_RESOLUTION_LOW");

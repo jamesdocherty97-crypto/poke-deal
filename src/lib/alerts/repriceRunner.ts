@@ -1,6 +1,5 @@
 import { getPrisma } from "../db/prisma.js";
-import { CompService, defaultCompSources } from "../comps/compService.js";
-import { PrismaLastKnownCompCache } from "../comps/prismaCompResultRepo.js";
+import { createAppCompService } from "../comps/appCompLookup.js";
 import type { CardRef } from "../domain/types.js";
 import { formatRepriceDigest, recommendReprice, type RepriceRecommendation } from "./repricing.js";
 import { createInboxAlert } from "./inbox.js";
@@ -43,11 +42,8 @@ export async function runRepriceCheck({
   });
 
   const recommendations: RepriceRecommendation[] = [];
-  const compService = new CompService(
-    defaultCompSources(),
-    undefined,
-    process.env.DATABASE_URL ? new PrismaLastKnownCompCache() : null,
-  );
+  // Keep automated repricing on the same evidence stack used by Buy.
+  const compService = createAppCompService();
 
   for (const item of items) {
     const listing = item.listings[0];

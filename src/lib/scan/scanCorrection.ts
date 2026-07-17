@@ -1,4 +1,4 @@
-import type { Grade, Language } from "../domain/types.js";
+import type { CardFinish, Grade, Language, PrintEdition } from "../domain/types.js";
 
 export type ScanCorrectionInput = {
   scanEventId: string;
@@ -8,6 +8,11 @@ export type ScanCorrectionInput = {
   setCode?: string;
   number?: string;
   language?: Language;
+  edition?: PrintEdition;
+  finish?: CardFinish;
+  tcgApiId?: string;
+  tcgDexId?: string;
+  cardmarketId?: string;
   grade?: Grade;
   condition?: string;
   note?: string;
@@ -24,6 +29,11 @@ type CorrectionRow = {
   setCode: string | null;
   number: string | null;
   language: Language | null;
+  edition: string | null;
+  finish: string | null;
+  tcgApiId: string | null;
+  tcgDexId: string | null;
+  cardmarketId: string | null;
   grade: Grade | null;
   condition: string | null;
   createdAt: Date;
@@ -57,6 +67,11 @@ export async function appendScanCorrection(
         setCode: clean(input.setCode),
         number: clean(input.number),
         language: input.language,
+        edition: input.edition,
+        finish: input.finish,
+        tcgApiId: clean(input.tcgApiId),
+        tcgDexId: clean(input.tcgDexId),
+        cardmarketId: clean(input.cardmarketId),
         grade: input.grade,
         condition: clean(input.condition),
         inputKind: "correction",
@@ -85,6 +100,11 @@ function serializeCorrection(row: CorrectionRow) {
       setCode: row.setCode,
       number: row.number,
       language: row.language,
+      edition: row.edition,
+      finish: row.finish,
+      tcgApiId: row.tcgApiId,
+      tcgDexId: row.tcgDexId,
+      cardmarketId: row.cardmarketId,
       grade: row.grade,
       condition: row.condition,
     },

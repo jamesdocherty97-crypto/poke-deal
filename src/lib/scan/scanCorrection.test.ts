@@ -14,6 +14,11 @@ test("scan corrections append linked evidence and replay idempotently", async ()
     setCode: null,
     number: "1/1",
     language: "EN" as const,
+    edition: null,
+    finish: null,
+    tcgApiId: null,
+    tcgDexId: null,
+    cardmarketId: null,
     grade: "RAW" as const,
     condition: null,
     createdAt: new Date("2026-07-11T09:00:00.000Z"),
@@ -36,6 +41,11 @@ test("scan corrections append linked evidence and replay idempotently", async ()
           setCode: args.data.setCode ?? null,
           number: args.data.number ?? null,
           language: args.data.language ?? null,
+          edition: args.data.edition ?? null,
+          finish: args.data.finish ?? null,
+          tcgApiId: args.data.tcgApiId ?? null,
+          tcgDexId: args.data.tcgDexId ?? null,
+          cardmarketId: args.data.cardmarketId ?? null,
           grade: args.data.grade ?? null,
           condition: args.data.condition ?? null,
           createdAt: new Date("2026-07-11T10:00:00.000Z"),
@@ -51,10 +61,18 @@ test("scan corrections append linked evidence and replay idempotently", async ()
     name: "Gengar",
     number: "TG06/TG30",
     grade: "RAW" as const,
+    edition: "FIRST_EDITION" as const,
+    finish: "HOLO" as const,
+    tcgApiId: "neo1-5",
   };
   const created = await appendScanCorrection(db, input);
   assert.equal(created.kind, "created");
-  if (created.kind === "created") assert.equal(created.correction.identity.name, "Gengar");
+  if (created.kind === "created") {
+    assert.equal(created.correction.identity.name, "Gengar");
+    assert.equal(created.correction.identity.edition, "FIRST_EDITION");
+    assert.equal(created.correction.identity.finish, "HOLO");
+    assert.equal(created.correction.identity.tcgApiId, "neo1-5");
+  }
   assert.equal(original.name, "Wrong name", "original observation must remain immutable");
   assert.equal((await appendScanCorrection(db, input)).kind, "idempotent");
 });

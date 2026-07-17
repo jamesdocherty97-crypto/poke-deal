@@ -280,7 +280,7 @@ test("mapPokemonTcgCard formats Scarlet & Violet promo numbers as dealer-entered
   assert.equal(card?.setCode, "svp");
 });
 
-test("mapPokemonTcgCard uses ScryDex artwork for source-backed promos when API images are missing", () => {
+test("mapPokemonTcgCard does not construct third-party artwork when API images are missing", () => {
   const card = mapPokemonTcgCard({
     id: "svp-208",
     name: "Victini",
@@ -294,7 +294,7 @@ test("mapPokemonTcgCard uses ScryDex artwork for source-backed promos when API i
 
   assert.equal(card?.tcgApiId, "svp-208");
   assert.equal(card?.number, "SVP208");
-  assert.equal(card?.imageUrl, "https://images.scrydex.com/pokemon/svp-208/large");
+  assert.equal(card?.imageUrl, undefined);
 });
 
 test("mapPokemonTcgCard formats Mega Evolution promo numbers as dealer-entered MEP codes", () => {

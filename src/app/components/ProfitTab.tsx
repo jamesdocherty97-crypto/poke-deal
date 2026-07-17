@@ -161,8 +161,54 @@ export function ProfitTab({
 
   return (
     <section className="workspace pnl-workspace">
-      <section className={`pnl-summary ${noBookedSales ? "empty" : ""}`}>
-        <div className="detail-grid">
+      <header className="workspace-masthead profit-masthead">
+        <div className="workspace-masthead-copy">
+          <span className="workspace-kicker">Dealer ledger</span>
+          <h2>Know what the collection is earning.</h2>
+          <p>Sales, costs, cash recovery and stock value in one accountable view.</p>
+        </div>
+        <div className="export-actions" aria-label="Books export">
+          <a className="export-link" href="/api/export/books" download>
+            Sales CSV
+          </a>
+          <a className="export-link" href="/api/export/expenses" download>
+            Costs CSV
+          </a>
+        </div>
+      </header>
+
+      <section className={`pnl-summary profit-overview ${noBookedSales ? "empty" : ""}`}>
+        <div className="profit-overview-lead">
+          <span className="profit-overview-label">Net P&amp;L</span>
+          <strong className={netProfitTone}>{gbp(netProfitPence)}</strong>
+          <div className="profit-equation" aria-label="Net profit calculation">
+            <span>
+              <small>Gross profit</small>
+              {gbp(dashboard?.metrics.realizedProfitPence ?? 0)}
+            </span>
+            <i aria-hidden="true">−</i>
+            <span>
+              <small>Operating costs</small>
+              {gbp(dashboard?.metrics.operatingExpensePence ?? 0)}
+            </span>
+            <i aria-hidden="true">=</i>
+            <span className={netProfitTone}>
+              <small>Net</small>
+              {gbp(netProfitPence)}
+            </span>
+          </div>
+        </div>
+        <div className="profit-overview-trend">
+          {noBookedSales ? (
+            <div className="pnl-empty-note">
+              <strong>Nothing booked yet</strong>
+              <span>Mark a stocked card sold from Stock, then add any setup costs here so net profit stays honest.</span>
+            </div>
+          ) : profitTrend.length > 0 ? (
+            <ProfitSparkline points={profitTrend} />
+          ) : null}
+        </div>
+        <div className="detail-grid profit-metric-strip">
           <Metric label="Revenue" value={gbp(dashboard?.metrics.realizedRevenuePence ?? 0)} loading={dashboardLoading} />
           <Metric label="Profit" value={gbp(dashboard?.metrics.realizedProfitPence ?? 0)} tone="good" loading={dashboardLoading} />
           <Metric label="Costs" value={gbp(dashboard?.metrics.operatingExpensePence ?? 0)} tone="warn" loading={dashboardLoading} />
@@ -174,358 +220,371 @@ export function ProfitTab({
           />
           <Metric label="Sell-through" value={`${dashboard?.metrics.sellThroughPct ?? 0}%`} loading={dashboardLoading} />
         </div>
-        {noBookedSales ? (
-          <div className="pnl-empty-note">
-            <strong>Nothing booked yet</strong>
-            <span>Mark a stocked card sold from Stock, then add any setup costs here so net profit stays honest.</span>
-          </div>
-        ) : profitTrend.length > 0 ? (
-          <ProfitSparkline points={profitTrend} />
-        ) : null}
       </section>
 
-      <section className="panel cash-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Cash position</h2>
-            <span className="muted">stock + sales + costs</span>
-          </div>
-          <span className={`pill ${cashNetTone}`}>{gbp(cashNetPence)}</span>
-        </div>
-        <div className="detail-grid">
-          <Metric label="Cash in" value={gbp(dashboard?.metrics.cashInPence ?? 0)} loading={dashboardLoading} />
-          <Metric label="Cash out" value={gbp(dashboard?.metrics.cashOutPence ?? 0)} tone="warn" loading={dashboardLoading} />
-          <Metric label="In stock" value={gbp(dashboard?.metrics.activeCostPence ?? 0)} loading={dashboardLoading} />
-          <Metric
-            label="Recovered"
-            value={`${dashboard?.metrics.cashRecoveryPct ?? 0}%`}
-            tone={(dashboard?.metrics.cashRecoveryPct ?? 0) >= 100 ? "good" : "warn"}
-            loading={dashboardLoading}
-          />
-        </div>
-        <div className="cash-breakdown">
-          <span>sold stock {gbp(dashboard?.metrics.soldCostPence ?? 0)}</span>
-          <span>fees {gbp(dashboard?.metrics.realizedFeesPence ?? 0)}</span>
-          <span>postage {gbp(dashboard?.metrics.realizedPostagePence ?? 0)}</span>
-          <span>costs {gbp(dashboard?.metrics.operatingExpensePence ?? 0)}</span>
-        </div>
-      </section>
+      <div className="profit-ledger-layout">
+        <div className="profit-ledger-main">
+          {dashboard?.monthlyPnl?.length ? (
+            <section className="panel monthly-pnl-panel profit-ledger-section">
+              <div className="panel-heading">
+                <div>
+                  <h2>Monthly P&amp;L</h2>
+                  <span className="muted">A period-by-period record after cost basis, fees and operating costs</span>
+                </div>
+              </div>
+              <div className="channel-list">
+                {dashboard.monthlyPnl.map((row: any) => (
+                  <article className={`channel-row ${row.netProfitPence >= 0 ? "good" : "warn"}`} key={row.month}>
+                    <div>
+                      <strong>{formatMonth(row.month)}</strong>
+                      <span>
+                        {row.saleCount} sale{row.saleCount === 1 ? "" : "s"} · revenue {gbp(row.revenuePence)}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>{gbp(row.netProfitPence)}</strong>
+                      <span>gross {gbp(row.profitPence)}</span>
+                    </div>
+                    <small>
+                      cost {gbp(row.costBasisPence)} · fees {gbp(row.feesPence)} · postage {gbp(row.postagePence)} · costs{" "}
+                      {gbp(row.operatingExpensePence)}
+                    </small>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
-      {dashboard?.monthlyPnl?.length ? (
-        <section className="panel monthly-pnl-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Monthly P&amp;L</h2>
-              <span className="muted">cost basis + fees + costs</span>
+          <section className="panel channel-panel profit-ledger-section">
+            <div className="panel-heading">
+              <div>
+                <h2>Channel performance</h2>
+                <span className="muted">See where sales work after fees and postage</span>
+              </div>
+              <span className="pill">{dashboard?.metrics.channelBreakdown.length ?? 0} active</span>
             </div>
-          </div>
-          <div className="channel-list">
-            {dashboard.monthlyPnl.map((row: any) => (
-              <article className={`channel-row ${row.netProfitPence >= 0 ? "good" : "warn"}`} key={row.month}>
-                <div>
-                  <strong>{formatMonth(row.month)}</strong>
-                  <span>
-                    {row.saleCount} sale{row.saleCount === 1 ? "" : "s"} · revenue {gbp(row.revenuePence)}
-                  </span>
-                </div>
-                <div>
-                  <strong>{gbp(row.netProfitPence)}</strong>
-                  <span>gross {gbp(row.profitPence)}</span>
-                </div>
-                <small>
-                  cost {gbp(row.costBasisPence)} · fees {gbp(row.feesPence)} · postage {gbp(row.postagePence)} · costs{" "}
-                  {gbp(row.operatingExpensePence)}
-                </small>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
+            {dashboard?.metrics.channelBreakdown.length ? (
+              <div className="channel-list">
+                {dashboard.metrics.channelBreakdown.map((row: any) => (
+                  <article className={`channel-row ${row.profitPence >= 0 ? "good" : "warn"}`} key={row.channel}>
+                    <div>
+                      <strong>{channelLabel(row.channel)}</strong>
+                      <span>
+                        {row.saleCount} sale{row.saleCount === 1 ? "" : "s"} · avg {gbp(row.averageSalePence)}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>{gbp(row.profitPence)}</strong>
+                      <span>{row.marginPct == null ? "n/a" : `${row.marginPct}%`} margin</span>
+                    </div>
+                    <small>
+                      revenue {gbp(row.revenuePence)} · fees {gbp(row.feesPence)} · postage {gbp(row.postagePence)}
+                    </small>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState art="sales" text="No channel data yet. Mark a sale from Stock and this will show which channel is working." />
+            )}
+          </section>
 
-      <section className="panel channel-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Channel P&amp;L</h2>
-            <span className="muted">where sales work</span>
-          </div>
-          <span className="pill">{dashboard?.metrics.channelBreakdown.length ?? 0} active</span>
+          <section className="panel profit-ledger-section recent-sales-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Recent sales</h2>
+                <span className="muted">The latest booked profit entries</span>
+              </div>
+            </div>
+            {dashboard?.recentSales.length ? (
+              dashboard.recentSales.map((sale: SaleSummary) => (
+                <article className="mini-row sale-mini-row" key={sale.id}>
+                  <div>
+                    <strong>
+                      {sale.name} {sale.grade.replace(/_/g, " ")}
+                    </strong>
+                    <span>
+                      {shortDate(sale.soldAt)} · {channelLabel(sale.channel)} · sale {gbp(sale.salePricePence)}
+                    </span>
+                    <small>
+                      fees {gbp(sale.feesPence)} · postage {gbp(sale.postagePence)} · cost {gbp(sale.costBasisPence)}
+                    </small>
+                  </div>
+                  <div className="sale-result">
+                    <strong>{gbp(sale.profitPence)}</strong>
+                    <span>{sale.marginPct == null ? "n/a" : `${sale.marginPct}%`}</span>
+                    <button
+                      className="ghost-button sale-undo-button"
+                      type="button"
+                      onClick={() => requestUndoSale(sale)}
+                      disabled={busy === `sale-${sale.id}`}
+                    >
+                      {busy === `sale-${sale.id}` ? "Undoing…" : "Undo"}
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState art="sales" text="No sales booked yet. Mark an item sold from Stock." />
+            )}
+          </section>
         </div>
-        {dashboard?.metrics.channelBreakdown.length ? (
-          <div className="channel-list">
-            {dashboard.metrics.channelBreakdown.map((row: any) => (
-              <article className={`channel-row ${row.profitPence >= 0 ? "good" : "warn"}`} key={row.channel}>
-                <div>
-                  <strong>{channelLabel(row.channel)}</strong>
-                  <span>
-                    {row.saleCount} sale{row.saleCount === 1 ? "" : "s"} · avg {gbp(row.averageSalePence)}
-                  </span>
-                </div>
-                <div>
-                  <strong>{gbp(row.profitPence)}</strong>
-                  <span>{row.marginPct == null ? "n/a" : `${row.marginPct}%`} margin</span>
-                </div>
-                <small>
-                  revenue {gbp(row.revenuePence)} · fees {gbp(row.feesPence)} · postage {gbp(row.postagePence)}
-                </small>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <EmptyState text="No channel data yet. Mark a sale from Stock and this will show which channel is working." />
-        )}
-      </section>
 
-      <div className="export-actions" aria-label="Books export">
-        <a className="export-link" href="/api/export/books" download>
-          Sales CSV
-        </a>
-        <a className="export-link" href="/api/export/expenses" download>
-          Costs CSV
-        </a>
+        <aside className="profit-ledger-sidebar" aria-label="Cash and stock position">
+          <section className="panel cash-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="panel-kicker">Cash position</span>
+                <h2>Money recovered</h2>
+              </div>
+              <span className={`pill ${cashNetTone}`}>{gbp(cashNetPence)}</span>
+            </div>
+            <div className="detail-grid">
+              <Metric label="Cash in" value={gbp(dashboard?.metrics.cashInPence ?? 0)} loading={dashboardLoading} />
+              <Metric label="Cash out" value={gbp(dashboard?.metrics.cashOutPence ?? 0)} tone="warn" loading={dashboardLoading} />
+              <Metric label="In stock" value={gbp(dashboard?.metrics.activeCostPence ?? 0)} loading={dashboardLoading} />
+              <Metric
+                label="Recovered"
+                value={`${dashboard?.metrics.cashRecoveryPct ?? 0}%`}
+                tone={(dashboard?.metrics.cashRecoveryPct ?? 0) >= 100 ? "good" : "warn"}
+                loading={dashboardLoading}
+              />
+            </div>
+            <div className="cash-breakdown">
+              <span>sold stock {gbp(dashboard?.metrics.soldCostPence ?? 0)}</span>
+              <span>fees {gbp(dashboard?.metrics.realizedFeesPence ?? 0)}</span>
+              <span>postage {gbp(dashboard?.metrics.realizedPostagePence ?? 0)}</span>
+              <span>costs {gbp(dashboard?.metrics.operatingExpensePence ?? 0)}</span>
+            </div>
+          </section>
+
+          <section className="panel portfolio-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="panel-kicker">Collection capital</span>
+                <h2>Stock value</h2>
+              </div>
+              <span className="muted">{portfolio?.latest ? `${portfolio.latest.snapshotCount} priced` : "No snapshot"}</span>
+            </div>
+            <div className="portfolio-value">
+              <strong>{gbp(portfolio?.latest?.marketValuePence ?? 0)}</strong>
+              <span className={portfolio?.changePence == null ? "" : portfolio.changePence >= 0 ? "good" : "warn"}>
+                {portfolio?.changePence == null
+                  ? "Take a snapshot to start the trend."
+                  : `${portfolio.changePence >= 0 ? "+" : ""}${gbp(portfolio.changePence)} (${portfolio.changePct}%)`}
+              </span>
+            </div>
+            {portfolio?.points.length ? (
+              <div className="portfolio-trend" aria-label="Portfolio value history">
+                {portfolio.points.slice(-7).map((point) => (
+                  <div className="trend-row" key={point.date}>
+                    <span>{shortDate(point.date)}</span>
+                    <div>
+                      <i style={{ width: `${trendBarWidth(point, portfolio.points)}%` }} />
+                    </div>
+                    <strong>{gbp(point.marketValuePence)}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <button className="secondary-action" type="button" onClick={takePortfolioSnapshot} disabled={busy === "snapshot"}>
+              {busy === "snapshot" ? "Valuing stock…" : "Snapshot stock value"}
+            </button>
+            {portfolio?.checkedAt && <p className="hint">Last valued {ageLabel(portfolio.checkedAt)}.</p>}
+          </section>
+        </aside>
       </div>
 
-      <section className="panel expense-panel" ref={expensePanelRef}>
-        <div className="panel-heading">
+      <section className="profit-operations" aria-labelledby="profit-operations-title">
+        <header className="profit-operations-heading">
           <div>
-            <h2>Costs</h2>
-            <span className="muted">{expenses.length} saved</span>
+            <span className="workspace-kicker">Ledger controls</span>
+            <h2 id="profit-operations-title">Keep the numbers honest</h2>
           </div>
-          <strong>{gbp(dashboard?.metrics.operatingExpensePence ?? 0)}</strong>
-        </div>
-        <form className="expense-form" onSubmit={addExpense}>
-          <div className="preset-row expense-presets" aria-label="Cost presets">
-            {expensePresets.map((preset) => (
-              <button key={`${preset.category}-${preset.description}`} type="button" onClick={() => applyExpensePreset(preset)}>
-                {expenseCategoryLabel(preset.category)}
-              </button>
-            ))}
-          </div>
-          <label>
-            Description
-            <input
-              ref={expenseDescriptionRef}
-              value={expenseDescription}
-              onChange={(event) => setExpenseDescription(event.target.value)}
-              placeholder="Toploaders, table fee, grading..."
-            />
-          </label>
-          <div className="form-grid">
-            <label>
-              Amount
-              <MoneyInput value={expenseAmount} onChange={setExpenseAmount} />
-            </label>
-            <label>
-              Date
-              <input type="date" value={expenseSpentAt} onChange={(event) => setExpenseSpentAt(event.target.value)} />
-            </label>
-          </div>
-          <div className="form-grid">
-            <label>
-              Category
-              <select value={expenseCategory} onChange={(event) => setExpenseCategory(event.target.value as ExpenseCategory)}>
-                {expenseCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {expenseCategoryLabel(category)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Channel
-              <select value={expenseChannel} onChange={(event) => setExpenseChannel(event.target.value as Channel | "")}>
-                <option value="">general</option>
-                {channels.map((channel) => (
-                  <option key={channel} value={channel}>
-                    {channelLabel(channel)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <button className="primary-action" type="submit" disabled={busy === "expense-create"}>
-            {busy === "expense-create" ? "Saving..." : "Add cost"}
-          </button>
-        </form>
-        <div className="expense-list">
-          {expenses.slice(0, 6).map((expense) => (
-            <article className="expense-row" key={expense.id}>
+          <p>Book costs, monitor buying targets and move ageing stock from one operational desk.</p>
+        </header>
+
+        <div className="profit-operations-grid">
+          <section className="panel expense-panel" ref={expensePanelRef}>
+            <div className="panel-heading">
               <div>
-                <strong>{expense.description}</strong>
-                <span>
-                  {expenseCategoryLabel(expense.category)}
-                  {expense.channel ? ` · ${channelLabel(expense.channel)}` : ""}
-                  {" · "}
-                  {shortDate(expense.spentAt)}
-                </span>
+                <h2>Operating costs</h2>
+                <span className="muted">{expenses.length} saved</span>
               </div>
-              <div>
-                <strong>{gbp(expense.amount)}</strong>
-                <button
-                  className="danger-button"
-                  type="button"
-                  onClick={() => void deleteExpense(expense)}
-                  disabled={busy === `expense-${expense.id}`}
-                >
-                  Delete
-                </button>
+              <strong>{gbp(dashboard?.metrics.operatingExpensePence ?? 0)}</strong>
+            </div>
+            <form className="expense-form" onSubmit={addExpense}>
+              <div className="preset-row expense-presets" aria-label="Cost presets">
+                {expensePresets.map((preset) => (
+                  <button key={`${preset.category}-${preset.description}`} type="button" onClick={() => applyExpensePreset(preset)}>
+                    {expenseCategoryLabel(preset.category)}
+                  </button>
+                ))}
               </div>
-            </article>
-          ))}
-          {expenses.length === 0 && <EmptyState text="No costs saved yet. Add setup costs, supplies, grading and fair fees here." />}
-        </div>
-      </section>
-
-      <section className="panel portfolio-panel">
-        <div className="panel-heading">
-          <h2>Stock value</h2>
-          <span className="muted">{portfolio?.latest ? `${portfolio.latest.snapshotCount} priced` : "No snapshot"}</span>
-        </div>
-        <div className="portfolio-value">
-          <strong>{gbp(portfolio?.latest?.marketValuePence ?? 0)}</strong>
-          <span className={portfolio?.changePence == null ? "" : portfolio.changePence >= 0 ? "good" : "warn"}>
-            {portfolio?.changePence == null
-              ? "Take a snapshot to start the trend."
-              : `${portfolio.changePence >= 0 ? "+" : ""}${gbp(portfolio.changePence)} (${portfolio.changePct}%)`}
-          </span>
-        </div>
-        {portfolio?.points.length ? (
-          <div className="portfolio-trend" aria-label="Portfolio value history">
-            {portfolio.points.slice(-7).map((point) => (
-              <div className="trend-row" key={point.date}>
-                <span>{shortDate(point.date)}</span>
-                <div>
-                  <i style={{ width: `${trendBarWidth(point, portfolio.points)}%` }} />
-                </div>
-                <strong>{gbp(point.marketValuePence)}</strong>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <button className="secondary-action" type="button" onClick={takePortfolioSnapshot} disabled={busy === "snapshot"}>
-          {busy === "snapshot" ? "Valuing stock..." : "Snapshot stock value"}
-        </button>
-        {portfolio?.checkedAt && <p className="hint">Last valued {ageLabel(portfolio.checkedAt)}.</p>}
-      </section>
-
-      <section className="panel watch-panel" ref={pnlWatchPanelRef}>
-        <div className="panel-heading">
-          <h2>Buy watches</h2>
-          <span className="muted">{watches.filter((watch) => watch.active).length} active</span>
-        </div>
-        <button className="primary-action" type="button" onClick={checkWatches} disabled={busy === "watch-check"}>
-          {busy === "watch-check" ? "Checking..." : "Check buy targets"}
-        </button>
-        {watchMessage && <p className="hint">{watchMessage}</p>}
-        {(watchCheckedAt || watchDiscordReady !== null) && (
-          <div className="alert-status">
-            <span>{watchCheckedAt ? `Checked ${ageLabel(watchCheckedAt)}` : "Not checked"}</span>
-            <strong>{watchDiscordReady ? "Push ready" : "In-app only"}</strong>
-          </div>
-        )}
-        {watchHits.length > 0 ? (
-          <div className="watch-hit-list">
-            {watchHits.map((hit) => (
-              <WatchHitRow key={hit.watchId} hit={hit} />
-            ))}
-          </div>
-        ) : (
-          <div className="watch-list">
-            {watches.slice(0, 6).map((watch) => (
-              <WatchRow
-                key={watch.id}
-                watch={watch}
-                editValue={watchEdits[watch.id] ?? penceToPounds(watch.targetPence)}
-                busy={busy === `watch-${watch.id}`}
-                onEditValue={(value) => setWatchEdits((current) => ({ ...current, [watch.id]: value }))}
-                onSave={() => saveWatchTarget(watch)}
-                onToggle={() =>
-                  patchWatch(
-                    watch,
-                    { active: !watch.active },
-                    watch.active ? `${watch.card.name} watch paused.` : `${watch.card.name} watch resumed.`,
-                  )
-                }
-                onDelete={() => requestDeleteWatch(watch)}
-              />
-            ))}
-            {watches.length === 0 && <EmptyState art="watches" text="No buy watches yet." />}
-          </div>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>Stock health</h2>
-          <span className="muted">{dashboard?.metrics.averageAgeDays ?? 0}d avg age</span>
-        </div>
-        <div className="detail-grid">
-          <Metric label="Active cost" value={gbp(dashboard?.metrics.activeCostPence ?? 0)} />
-          <Metric label="45d+ stock" value={String(dashboard?.metrics.agedStockCount ?? 0)} />
-        </div>
-        <button className="primary-action" type="button" onClick={checkReprices} disabled={busy === "reprice"}>
-          {busy === "reprice" ? "Checking..." : "Check reprices"}
-        </button>
-        {repriceMessage && <p className="hint">{repriceMessage}</p>}
-        {(repriceCheckedAt || discordReady !== null) && (
-          <div className="alert-status">
-            <span>{repriceCheckedAt ? `Checked ${ageLabel(repriceCheckedAt)}` : "Not checked"}</span>
-            <strong>{discordReady ? "Push ready" : "In-app only"}</strong>
-          </div>
-        )}
-        {repriceRecommendations.length > 0 && (
-          <div className="reprice-list">
-            {repriceRecommendations.map((recommendation) => {
-              const listing = inventory.find((row) => row.id === recommendation.itemId)?.listings[0];
-              return (
-                <RepriceActionRow
-                  key={recommendation.itemId}
-                  recommendation={recommendation}
-                  busy={busy === `listing-${listing?.id}`}
-                  canApply={Boolean(listing)}
-                  onApply={applyReprice}
+              <label>
+                Description
+                <input
+                  ref={expenseDescriptionRef}
+                  value={expenseDescription}
+                  onChange={(event) => setExpenseDescription(event.target.value)}
+                  name="expense-description"
+                  placeholder="Toploaders, table fee, grading…"
                 />
-              );
-            })}
-          </div>
-        )}
-      </section>
+              </label>
+              <div className="form-grid">
+                <label>
+                  Amount
+                  <MoneyInput value={expenseAmount} onChange={setExpenseAmount} />
+                </label>
+                <label>
+                  Date
+                  <input type="date" value={expenseSpentAt} onChange={(event) => setExpenseSpentAt(event.target.value)} />
+                </label>
+              </div>
+              <div className="form-grid">
+                <label>
+                  Category
+                  <select value={expenseCategory} onChange={(event) => setExpenseCategory(event.target.value as ExpenseCategory)}>
+                    {expenseCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {expenseCategoryLabel(category)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Channel
+                  <select value={expenseChannel} onChange={(event) => setExpenseChannel(event.target.value as Channel | "")}>
+                    <option value="">general</option>
+                    {channels.map((channel) => (
+                      <option key={channel} value={channel}>
+                        {channelLabel(channel)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <button className="primary-action" type="submit" disabled={busy === "expense-create"}>
+                {busy === "expense-create" ? "Saving…" : "Add cost"}
+              </button>
+            </form>
+            <div className="expense-list">
+              {expenses.slice(0, 6).map((expense) => (
+                <article className="expense-row" key={expense.id}>
+                  <div>
+                    <strong>{expense.description}</strong>
+                    <span>
+                      {expenseCategoryLabel(expense.category)}
+                      {expense.channel ? ` · ${channelLabel(expense.channel)}` : ""}
+                      {" · "}
+                      {shortDate(expense.spentAt)}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>{gbp(expense.amount)}</strong>
+                    <button
+                      className="danger-button"
+                      type="button"
+                      onClick={() => void deleteExpense(expense)}
+                      disabled={busy === `expense-${expense.id}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {expenses.length === 0 && <EmptyState text="No costs saved yet. Add setup costs, supplies, grading and fair fees here." />}
+            </div>
+          </section>
 
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>Recent sales</h2>
-          <span className="muted">Booked profit</span>
-        </div>
-        {dashboard?.recentSales.length ? (
-          dashboard.recentSales.map((sale: SaleSummary) => (
-            <article className="mini-row sale-mini-row" key={sale.id}>
+          <section className="panel watch-panel" ref={pnlWatchPanelRef}>
+            <div className="panel-heading">
               <div>
-                <strong>
-                  {sale.name} {sale.grade.replace(/_/g, " ")}
-                </strong>
-                <span>
-                  {shortDate(sale.soldAt)} · {channelLabel(sale.channel)} · sale {gbp(sale.salePricePence)}
-                </span>
-                <small>
-                  fees {gbp(sale.feesPence)} · postage {gbp(sale.postagePence)} · cost {gbp(sale.costBasisPence)}
-                </small>
+                <h2>Buy watches</h2>
+                <span className="muted">Targets ready for the next deal</span>
               </div>
-              <div className="sale-result">
-                <strong>{gbp(sale.profitPence)}</strong>
-                <span>{sale.marginPct == null ? "n/a" : `${sale.marginPct}%`}</span>
-                <button
-                  className="ghost-button sale-undo-button"
-                  type="button"
-                  onClick={() => requestUndoSale(sale)}
-                  disabled={busy === `sale-${sale.id}`}
-                >
-                  {busy === `sale-${sale.id}` ? "Undoing..." : "Undo"}
-                </button>
+              <span className="pill">{watches.filter((watch) => watch.active).length} active</span>
+            </div>
+            <button className="primary-action" type="button" onClick={checkWatches} disabled={busy === "watch-check"}>
+              {busy === "watch-check" ? "Checking…" : "Check buy targets"}
+            </button>
+            {watchMessage && <p className="hint">{watchMessage}</p>}
+            {(watchCheckedAt || watchDiscordReady !== null) && (
+              <div className="alert-status">
+                <span>{watchCheckedAt ? `Checked ${ageLabel(watchCheckedAt)}` : "Not checked"}</span>
+                <strong>{watchDiscordReady ? "Push ready" : "In-app only"}</strong>
               </div>
-            </article>
-          ))
-        ) : (
-          <EmptyState text="No sales booked yet. Mark an item sold from Stock." />
-        )}
+            )}
+            {watchHits.length > 0 ? (
+              <div className="watch-hit-list">
+                {watchHits.map((hit) => (
+                  <WatchHitRow key={hit.watchId} hit={hit} />
+                ))}
+              </div>
+            ) : (
+              <div className="watch-list">
+                {watches.slice(0, 6).map((watch) => (
+                  <WatchRow
+                    key={watch.id}
+                    watch={watch}
+                    editValue={watchEdits[watch.id] ?? penceToPounds(watch.targetPence)}
+                    busy={busy === `watch-${watch.id}`}
+                    onEditValue={(value) => setWatchEdits((current) => ({ ...current, [watch.id]: value }))}
+                    onSave={() => saveWatchTarget(watch)}
+                    onToggle={() =>
+                      patchWatch(
+                        watch,
+                        { active: !watch.active },
+                        watch.active ? `${watch.card.name} watch paused.` : `${watch.card.name} watch resumed.`,
+                      )
+                    }
+                    onDelete={() => requestDeleteWatch(watch)}
+                  />
+                ))}
+                {watches.length === 0 && <EmptyState art="watches" text="No buy watches yet." />}
+              </div>
+            )}
+          </section>
+
+          <section className="panel stock-health-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Stock health</h2>
+                <span className="muted">Repricing signals for ageing cards</span>
+              </div>
+              <span className="pill">{dashboard?.metrics.averageAgeDays ?? 0}d avg age</span>
+            </div>
+            <div className="detail-grid">
+              <Metric label="Active cost" value={gbp(dashboard?.metrics.activeCostPence ?? 0)} />
+              <Metric label="45d+ stock" value={String(dashboard?.metrics.agedStockCount ?? 0)} />
+            </div>
+            <button className="primary-action" type="button" onClick={checkReprices} disabled={busy === "reprice"}>
+              {busy === "reprice" ? "Checking…" : "Check reprices"}
+            </button>
+            {repriceMessage && <p className="hint">{repriceMessage}</p>}
+            {(repriceCheckedAt || discordReady !== null) && (
+              <div className="alert-status">
+                <span>{repriceCheckedAt ? `Checked ${ageLabel(repriceCheckedAt)}` : "Not checked"}</span>
+                <strong>{discordReady ? "Push ready" : "In-app only"}</strong>
+              </div>
+            )}
+            {repriceRecommendations.length > 0 && (
+              <div className="reprice-list">
+                {repriceRecommendations.map((recommendation) => {
+                  const listing = inventory.find((row) => row.id === recommendation.itemId)?.listings[0];
+                  return (
+                    <RepriceActionRow
+                      key={recommendation.itemId}
+                      recommendation={recommendation}
+                      busy={busy === `listing-${listing?.id}`}
+                      canApply={Boolean(listing)}
+                      onApply={applyReprice}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
       </section>
     </section>
   );
@@ -556,7 +615,7 @@ function RepriceActionRow({
           {gbp(recommendation.currentPricePence)} -&gt; {gbp(recommendation.suggestedPricePence)}
         </span>
         <button type="button" onClick={() => onApply(recommendation)} disabled={busy || !canApply}>
-          {busy ? "Saving..." : "Apply"}
+          {busy ? "Saving…" : "Apply"}
         </button>
       </div>
     </article>

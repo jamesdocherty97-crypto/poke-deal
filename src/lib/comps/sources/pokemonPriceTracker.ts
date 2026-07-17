@@ -1,8 +1,8 @@
 // Reference adapter: Pokemon Price Tracker (primary comp source), API v2.
 //
-// Runs in two modes:
-//   • FIXTURE (no API key) → bundled sample sales cleaned by cleanToComp. App works offline.
-//   • LIVE   (key present) → GET /api/v2/cards?includeEbay=true. The provider returns
+// Missing credentials return explicit unavailable evidence. Captured fixtures are
+// used only by tests and must never become dealer-facing prices.
+// With a key, GET /api/v2/cards?includeEbay=true. The provider returns
 //     PRE-AGGREGATED stats per grade (count, median/avg/min/max, trend, a filtered
 //     "smartMarketPrice"), NOT individual sales — so we map the aggregate straight to a
 //     CompResult instead of fabricating raw sales. Prices are USD → converted to GBP.
@@ -22,10 +22,10 @@ import {
 } from "../../cards/identity.js";
 import type { CompSource, CompSourceContext } from "../CompSource.js";
 import { createAbortScope } from "../../http/abortScope.js";
-import { cleanToComp, DEFAULT_WINDOW_DAYS } from "../cleaning.js";
+import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
-import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
-import { sampleRawSales } from "./fixtures.js";
+import { detectCardPrintIdentity, requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
+import { fetchReadWithRetry } from "../../http/fetchReadWithRetry.js";
 
 const BASE_URL = "https://www.pokemonpricetracker.com/api/v2";
 const DEFAULT_FETCH_TIMEOUT_MS = 6500;
@@ -33,10 +33,17 @@ const LOOKUP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 type CachedPptLookup = {
   value: unknown;
+  cachedAt: number;
   expiresAt: number;
 };
 
+type PptRead = { value: unknown; cache: { state: "live" | "cached"; retrievedAt: string; cachedAt?: string; expiresAt: string; ageMinutes: number } };
+
 const lookupCache = new Map<string, CachedPptLookup>();
+
+export function resetPokemonPriceTrackerCacheForTests(): void {
+  lookupCache.clear();
+}
 
 export class PokemonPriceTrackerSource implements CompSource {
   readonly name = "pokemon-price-tracker";
@@ -55,36 +62,37 @@ export class PokemonPriceTrackerSource implements CompSource {
     const windowDays = query.windowDays ?? DEFAULT_WINDOW_DAYS;
 
     if (!this.live) {
-      // Offline: clean bundled individual sales. Exercises the cleaning engine.
-      const rates = await getRates();
-      return cleanToComp({
-        source: this.name,
-        card,
-        grade,
-        sales: sampleRawSales(),
-        windowDays,
-        rates,
-      });
+      return emptyComp({ source: this.name, card, grade, windowDays }, "Price Tracker key missing");
     }
 
-    const matchedCard = await this.fetchCard(card, windowDays, grade, context.signal);
-    if (matchedCard == null) {
+    const read = await this.fetchCard(card, windowDays, grade, context.signal);
+    if (read == null) {
       return emptyComp({ source: this.name, card, grade, windowDays }, "Price Tracker lookup failed or returned no response");
     }
     const rates = await getRates();
-    return mapCardAggregateToComp(matchedCard, { source: this.name, card, grade, windowDays }, rates);
+    const mapped = mapCardAggregateToComp(read.value, { source: this.name, card, grade, windowDays }, rates);
+    return { ...mapped, raw: { ...(mapped.raw as Record<string, unknown>), cache: read.cache } };
   }
 
   /** Fetch one card with eBay graded-sales aggregates. Returns null on any failure. */
-  private async fetchCard(card: CardRef, windowDays: number, grade: Grade, parentSignal?: AbortSignal): Promise<unknown | null> {
+  private async fetchCard(card: CardRef, windowDays: number, grade: Grade, parentSignal?: AbortSignal): Promise<PptRead | null> {
     // BILLING: credits are charged on the requested `limit` (default 50!) — pass limit=1.
     const days = Math.min(Math.max(windowDays, 1), 180); // Pro plan caps history at 180d
     const search = buildPokemonPriceTrackerSearch(card);
     const attempts = buildFetchAttempts(card, search, days);
     const cacheKey = buildLookupCacheKey(card, days);
     const cached = readLookupCache(cacheKey);
-    if (cached !== null) {
-      return providerHasGradeAggregate(cached, grade) ? cached : null;
+    if (cached) {
+      return providerHasGradeAggregate(cached.value, grade) ? {
+        value: cached.value,
+        cache: {
+          state: "cached",
+          retrievedAt: new Date(cached.cachedAt).toISOString(),
+          cachedAt: new Date(cached.cachedAt).toISOString(),
+          expiresAt: new Date(cached.expiresAt).toISOString(),
+          ageMinutes: Math.max(0, Math.floor((Date.now() - cached.cachedAt) / 60_000)),
+        },
+      } : null;
     }
 
     let matchedWithoutGrade: unknown | null = null;
@@ -93,10 +101,10 @@ export class PokemonPriceTrackerSource implements CompSource {
       for (const params of attempts) {
         const abort = createAbortScope(parentSignal, this.fetchTimeoutMs);
         try {
-          const res = await this.fetchImpl(`${BASE_URL}/cards?${params.toString()}`, {
+          const res = await fetchReadWithRetry(this.fetchImpl, `${BASE_URL}/cards?${params.toString()}`, {
             headers: { Authorization: `Bearer ${this.apiKey}`, Accept: "application/json" },
             signal: abort.signal,
-          });
+          }, { totalDeadlineMs: this.fetchTimeoutMs });
           if (!res.ok) {
             console.warn(`[${this.name}] HTTP ${res.status} — no comp returned`);
             continue;
@@ -105,8 +113,11 @@ export class PokemonPriceTrackerSource implements CompSource {
           const match = selectMatchingPptCard(json, card);
           if (match) {
             if (providerHasGradeAggregate(match, grade)) {
-              writeLookupCache(cacheKey, match);
-              return match;
+              const entry = writeLookupCache(cacheKey, match);
+              return {
+                value: match,
+                cache: { state: "live", retrievedAt: new Date(entry.cachedAt).toISOString(), expiresAt: new Date(entry.expiresAt).toISOString(), ageMinutes: 0 },
+              };
             }
             matchedWithoutGrade = match;
             continue;
@@ -123,7 +134,10 @@ export class PokemonPriceTrackerSource implements CompSource {
       if (round < rounds - 1 && !parentSignal?.aborted) await sleep(350);
     }
 
-    return matchedWithoutGrade;
+    return matchedWithoutGrade ? {
+      value: matchedWithoutGrade,
+      cache: { state: "live", retrievedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + LOOKUP_CACHE_TTL_MS).toISOString(), ageMinutes: 0 },
+    } : null;
   }
 }
 
@@ -133,18 +147,21 @@ function buildLookupCacheKey(card: CardRef, days: number): string {
   return `${normalizeSearchText(card.name)}|${setName}|${number}|${days}`;
 }
 
-function readLookupCache(key: string): unknown | null {
+function readLookupCache(key: string): CachedPptLookup | null {
   const cached = lookupCache.get(key);
   if (!cached) return null;
   if (cached.expiresAt <= Date.now()) {
     lookupCache.delete(key);
     return null;
   }
-  return cached.value;
+  return cached;
 }
 
-function writeLookupCache(key: string, value: unknown): void {
-  lookupCache.set(key, { value, expiresAt: Date.now() + LOOKUP_CACHE_TTL_MS });
+function writeLookupCache(key: string, value: unknown): CachedPptLookup {
+  const cachedAt = Date.now();
+  const entry = { value, cachedAt, expiresAt: cachedAt + LOOKUP_CACHE_TTL_MS };
+  lookupCache.set(key, entry);
+  return entry;
 }
 
 function providerHasGradeAggregate(json: unknown, grade: Grade): boolean {
@@ -568,6 +585,13 @@ function listProviderCards(json: unknown): PptProviderCard[] {
 
 function providerPayloadMatchesRequestProfile(providerCard: Record<string, unknown>, request: CardRef): boolean {
   if (requestsFirstEdition(request) && !providerPayloadMentionsFirstEdition(providerCard)) return false;
+  const requestedPrint = { ...detectCardPrintIdentity(request), edition: request.edition ?? detectCardPrintIdentity(request).edition, finish: request.finish ?? detectCardPrintIdentity(request).finish };
+  const providerPrint = detectCardPrintIdentity({
+    name: ["name", "variant", "printing", "edition", "finish"].map((key) => readProviderString(providerCard, key)).filter(Boolean).join(" "),
+    setName: readProviderSetName(providerCard),
+  });
+  if (requestedPrint.edition && requestedPrint.edition !== providerPrint.edition) return false;
+  if (requestedPrint.finish && requestedPrint.finish !== providerPrint.finish) return false;
 
   const providerName = normalizeSearchText(readProviderString(providerCard, "name") ?? "");
   const requestedName = normalizeSearchText(request.name);
@@ -580,7 +604,20 @@ function providerPayloadMatchesRequestProfile(providerCard: Record<string, unkno
   const requestedNumber = normalizeProviderCollectorNumber(request.number, request.setName);
   if (providerNumber && requestedNumber && !collectorNumbersEquivalent(providerNumber, requestedNumber)) return false;
 
-  const providerSet = normalizeSearchText(stripProviderSetCodePrefix(readProviderSetName(providerCard)));
+  // Collector numbers repeat across many sets (Base 4/102 vs Base Set 2
+  // 4/130). Prefer canonical set ids when both identities can be resolved;
+  // fuzzy token matching alone is too permissive for numbered sequel sets.
+  const providerSetName = readProviderSetName(providerCard) ?? undefined;
+  const requestedSetId = resolveSetIdForCard(request.setName, request.number);
+  const providerSetId = resolveSetIdForCard(providerSetName, providerNumber);
+  if (
+    requestedSetId &&
+    providerSetId &&
+    requestedSetId !== providerSetId &&
+    !providerCollectorPrefixPinsSet(providerNumber, requestedSetId)
+  ) return false;
+
+  const providerSet = normalizeSearchText(stripProviderSetCodePrefix(providerSetName));
   if (request.setName && providerSet) {
     if (!providerSetMatchesRequest(request.setName, providerSet)) {
       return false;
@@ -588,6 +625,11 @@ function providerPayloadMatchesRequestProfile(providerCard: Record<string, unkno
   }
 
   return true;
+}
+
+function providerCollectorPrefixPinsSet(number: string | undefined, setId: string): boolean {
+  const prefix = number?.trim().match(/^([A-Za-z]{2,5})/)?.[1]?.toUpperCase();
+  return ({ SVP: "svp", MEP: "mep", SWSH: "swshp", SMP: "smp", XYP: "xyp" } as Record<string, string>)[prefix ?? ""] === setId;
 }
 
 const ignoredSetTokens = new Set(["set", "promo", "pokemon", "card"]);

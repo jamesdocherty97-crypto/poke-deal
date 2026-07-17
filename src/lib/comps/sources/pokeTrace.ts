@@ -11,7 +11,7 @@ import type { CompSource, CompSourceContext } from "../CompSource.js";
 import { createAbortScope } from "../../http/abortScope.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
-import { requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
+import { detectCardPrintIdentity, requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
 
 const BASE_URL = "https://api.poketrace.com/v1";
 const DEFAULT_FETCH_TIMEOUT_MS = 2200;
@@ -74,6 +74,7 @@ type PokeTraceCard = {
   prices?: Record<string, Record<string, PokeTracePriceTier | undefined> | undefined>;
   lastUpdated?: unknown;
   totalSaleCount?: unknown;
+  refs?: { tcgplayerId?: unknown; cardmarketId?: unknown };
 };
 
 type PokeTracePayload = {
@@ -113,7 +114,7 @@ export class PokeTraceSource implements CompSource {
   readonly live: boolean;
 
   constructor(
-    private readonly apiKey: string | undefined = process.env.POKETRACE_API_KEY,
+    private readonly apiKey: string | undefined = readPokeTraceRuntimeApiKey(),
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
     private readonly interMarketDelayMs = DEFAULT_INTER_MARKET_DELAY_MS,
@@ -129,6 +130,7 @@ export class PokeTraceSource implements CompSource {
     const grade = query.grade ?? "RAW";
     const windowDays = query.windowDays ?? DEFAULT_WINDOW_DAYS;
     const ctx = { source: this.name, card, grade, windowDays };
+    if (card.language === "JP") return emptyComp(ctx, "PokeTrace English-market evidence is not eligible for Japanese identity");
     if (!this.live) return emptyComp(ctx, "PokeTrace key missing");
     const cooldown = readPokeTraceCooldown();
     if (cooldown) return emptyComp(ctx, `PokeTrace source unavailable: ${cooldown}`);
@@ -262,11 +264,17 @@ export function getPokeTraceHealth(now = Date.now()): PokeTraceHealth {
 }
 
 export function readPokeTraceMarkets(raw = process.env.POKETRACE_MARKETS): PokeTraceMarket[] {
-  const markets = (raw?.trim() ? raw : "US,EU")
+  const markets = (raw?.trim() ? raw : "US")
     .split(",")
     .map((part) => part.trim().toUpperCase())
     .filter(isPokeTraceMarket);
-  return [...new Set(markets)].length > 0 ? [...new Set(markets)] : ["US", "EU"];
+  return [...new Set(markets)].length > 0 ? [...new Set(markets)] : ["US"];
+}
+
+export function readPokeTraceRuntimeApiKey(
+  env: Record<string, string | undefined> = process.env,
+): string | undefined {
+  return env.POKETRACE_API_KEY?.trim() || undefined;
 }
 
 export function gradeToPokeTraceTier(grade: Grade): string {
@@ -480,6 +488,7 @@ function canonicalCardRef(input: CardRef, card: PokeTraceCard): CardRef {
     name: readString(card.name) ?? input.name,
     setName: readString(card.set?.name) ?? input.setName,
     number: readString(card.cardNumber) ?? input.number,
+    ...((readString(card.refs?.cardmarketId) ?? input.cardmarketId) ? { cardmarketId: (readString(card.refs?.cardmarketId) ?? input.cardmarketId)! } : {}),
     game: "POKEMON",
     language: input.language ?? "EN",
   };
@@ -491,6 +500,7 @@ function providerCardRef(card: PokeTraceCard): CardRef & { imageUrl?: string } {
     name: readString(card.name) ?? "Unknown card",
     setName: readString(card.set?.name) ?? undefined,
     number: readString(card.cardNumber) ?? undefined,
+    ...(readString(card.refs?.cardmarketId) ? { cardmarketId: readString(card.refs?.cardmarketId)! } : {}),
     ...(imageUrl ? { imageUrl } : {}),
     game: "POKEMON",
     language: "EN",
@@ -548,6 +558,10 @@ function pokeTraceCardMatchesRequest(card: PokeTraceCard, request: CardRef): boo
   if (!tokensMatch(request.name, providerName)) return false;
 
   if (requestsFirstEdition(request) && !pokeTraceProviderMentionsFirstEdition(card)) return false;
+  const requestedPrint = detectCardPrintIdentity(request);
+  const providerPrint = detectCardPrintIdentity({ name: readString(card.name), setName: readString(card.set?.name) });
+  if (requestedPrint.edition && requestedPrint.edition !== providerPrint.edition) return false;
+  if (requestedPrint.finish && requestedPrint.finish !== providerPrint.finish) return false;
 
   const requestedNumber = request.number?.trim();
   const providerNumber = readString(card.cardNumber) ?? undefined;

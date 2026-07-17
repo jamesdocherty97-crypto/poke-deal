@@ -36,6 +36,8 @@ model Card {
   tcgApiId     String? @unique // pokemontcg.io id
   tcgDexId     String? @unique // tcgdex.net id
   cardmarketId String?
+  edition      String? // UNLIMITED, FIRST_EDITION, SHADOWLESS, STAFF, PRERELEASE
+  finish       String? // NORMAL, HOLO, REVERSE_HOLO
 
   inventory        InventoryItem[]
   comps            CompResult[]
@@ -52,6 +54,8 @@ model Card {
   @@index([name])
   @@index([setName])
   @@index([setCode])
+  @@index([cardmarketId])
+  @@index([game, language, setName, number, edition, finish], map: "Card_print_identity_idx")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -265,6 +269,10 @@ model DealSessionLine {
   number   String?
   tcgApiId String?
   tcgDexId String?
+  cardmarketId String?
+  language Language @default(EN)
+  edition String?
+  finish String?
   imageUrl String?
   grade    Grade   @default(RAW)
 
@@ -378,6 +386,11 @@ model ScanEvent {
   setCode     String?
   number      String?
   language    Language?
+  edition     String?
+  finish      String?
+  tcgApiId    String?
+  tcgDexId    String?
+  cardmarketId String?
   grade       Grade?
   condition   String?
   marketplace Channel?

@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { buildPromoCatalogFallback } from "./promoFallback.js";
 
-test("buildPromoCatalogFallback attaches exact ScryDex artwork for modern promos", () => {
+test("buildPromoCatalogFallback preserves identity without constructing an unverified image URL", () => {
   const card = buildPromoCatalogFallback({
     name: "Alakazam",
     setName: "Mega Evolution Promos",
@@ -15,5 +15,5 @@ test("buildPromoCatalogFallback attaches exact ScryDex artwork for modern promos
   assert.equal(card?.name, "Alakazam");
   assert.equal(card?.number, "MEP079");
   assert.equal(card?.tcgApiId, "mep-79");
-  assert.equal(card?.imageUrl, "https://images.scrydex.com/pokemon/mep-79/large");
+  assert.equal(card?.imageUrl, undefined);
 });

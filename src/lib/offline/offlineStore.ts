@@ -2,6 +2,7 @@ import {
   canonicalCompCacheKey,
   compCacheFreshness,
   isDueOfflineMutation,
+  offlineBootstrapFreshness,
   offlineRetryDelayMs,
   shouldRetryOfflineResponse,
   type CompCacheIdentity,
@@ -169,8 +170,12 @@ export async function putOfflineBootstrap<T>(payload: T, cachedAt = new Date().t
 export async function getOfflineBootstrap<T>(): Promise<{ payload: T; cachedAt: string; ageHours: number } | null> {
   const entry = await getRecord<OfflineBootstrapEntry<T>>(BOOTSTRAP_STORE, "latest");
   if (!entry) return null;
-  const ageMs = Math.max(0, Date.now() - new Date(entry.cachedAt).getTime());
-  return { payload: entry.payload, cachedAt: entry.cachedAt, ageHours: Math.round(ageMs / (60 * 60 * 1_000)) };
+  const freshness = offlineBootstrapFreshness(entry.cachedAt);
+  if (freshness.expired) {
+    await deleteRecord(BOOTSTRAP_STORE, "latest");
+    return null;
+  }
+  return { payload: entry.payload, cachedAt: entry.cachedAt, ageHours: freshness.ageHours };
 }
 
 export async function getOfflineSyncState(): Promise<OfflineSyncState> {

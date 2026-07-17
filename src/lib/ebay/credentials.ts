@@ -150,14 +150,24 @@ export async function resolveEbayRefreshToken(
   if (db) {
     const row = await db.ebayCredential.findUnique({ where: { key: DEFAULT_CREDENTIAL_KEY } });
     if (row) {
-      return {
-        token: decryptSecret({
-          ciphertext: row.refreshTokenCiphertext,
-          iv: row.refreshTokenIv,
-          tag: row.refreshTokenTag,
-        }, readTokenEncryptionKey(env)),
-        source: "db",
-      };
+      try {
+        return {
+          token: decryptSecret({
+            ciphertext: row.refreshTokenCiphertext,
+            iv: row.refreshTokenIv,
+            tag: row.refreshTokenTag,
+          }, readTokenEncryptionKey(env)),
+          source: "db",
+        };
+      } catch (error) {
+        // A legacy environment token is a deliberate recovery path when a
+        // deployment has a DB credential written with a missing/rotated key.
+        // Never expose either token; status will validate the fallback with
+        // eBay and prompt reconnect if it is stale.
+        const envToken = env.EBAY_REFRESH_TOKEN?.trim();
+        if (envToken) return { token: envToken, source: "env" };
+        throw error;
+      }
     }
   }
 

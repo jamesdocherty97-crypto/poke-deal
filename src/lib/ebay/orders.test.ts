@@ -31,7 +31,59 @@ test("buildFulfillmentOrdersPath requests recent fulfillment orders with a bound
 
   assert.equal(url.pathname, "/sell/fulfillment/v1/order");
   assert.equal(url.searchParams.get("limit"), "100");
+  assert.equal(url.searchParams.get("offset"), "0");
   assert.equal(url.searchParams.get("filter"), "creationdate:[2026-07-01T00:00:00.000Z..2026-07-03T00:00:00.000Z]");
+});
+
+test("syncOwnEbaySales follows Fulfillment pagination before importing", async () => {
+  const savedEnv = {
+    clientId: process.env.EBAY_CLIENT_ID,
+    clientSecret: process.env.EBAY_CLIENT_SECRET,
+    ruName: process.env.EBAY_RU_NAME,
+    refreshToken: process.env.EBAY_REFRESH_TOKEN,
+  };
+  process.env.EBAY_CLIENT_ID = TEST_CONFIG.clientId;
+  process.env.EBAY_CLIENT_SECRET = TEST_CONFIG.clientSecret;
+  process.env.EBAY_RU_NAME = TEST_CONFIG.ruName;
+  process.env.EBAY_REFRESH_TOKEN = "refresh-token";
+  const offsets: string[] = [];
+  const fetchImpl: typeof globalThis.fetch = (url) => {
+    const href = String(url);
+    if (href.includes("/identity/v1/oauth2/token")) {
+      return Promise.resolve(Response.json({ access_token: "user-token", expires_in: 7200 }));
+    }
+    const offset = new URL(href).searchParams.get("offset") ?? "";
+    offsets.push(offset);
+    const index = Number(offset);
+    return Promise.resolve(Response.json({
+      total: 2,
+      limit: 1,
+      offset: index,
+      orders: [{
+        orderId: `order-${index + 1}`,
+        creationDate: "2026-07-03T10:00:00.000Z",
+        orderPaymentStatus: "PAID",
+        lineItems: [{ lineItemId: "line-1", title: "Unmatched card", quantity: 1, lineItemCost: { value: "10.00", currency: "GBP" } }],
+      }],
+    }));
+  };
+
+  try {
+    const result = await syncOwnEbaySales({
+      db: fakeEbaySyncDb({ includeListing: false, includeItem: false }).client,
+      config: TEST_CONFIG,
+      fetchImpl,
+      limit: 1,
+    });
+    assert.equal(result.fetchedOrders, 2);
+    assert.equal(result.unmatchedCount, 2);
+    assert.deepEqual(offsets, ["0", "1"]);
+  } finally {
+    restoreEnv("EBAY_CLIENT_ID", savedEnv.clientId);
+    restoreEnv("EBAY_CLIENT_SECRET", savedEnv.clientSecret);
+    restoreEnv("EBAY_RU_NAME", savedEnv.ruName);
+    restoreEnv("EBAY_REFRESH_TOKEN", savedEnv.refreshToken);
+  }
 });
 
 test("normalizePaidEbayOrder maps paid order lines to GBP pence and import keys", () => {
@@ -62,6 +114,7 @@ test("normalizePaidEbayOrder maps paid order lines to GBP pence and import keys"
   assert.equal(lines[0]?.buyerPaidPence, 10499);
   assert.equal(lines[0]?.postageChargedPence, 499);
   assert.equal(lines[0]?.paidAt?.toISOString(), "2026-07-03T10:01:00.000Z");
+  assert.doesNotMatch(JSON.stringify(lines[0]?.raw), /buyer|address/i);
 });
 
 test("normalizePaidEbayOrder ignores unpaid orders", () => {

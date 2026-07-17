@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   OFFLINE_COMP_MAX_AGE_MS,
+  OFFLINE_BOOTSTRAP_MAX_AGE_MS,
   canonicalCompCacheKey,
   compCacheFreshness,
   isDueOfflineMutation,
   offlineRetryDelayMs,
+  offlineBootstrapFreshness,
   shouldRetryOfflineResponse,
 } from "./policy.js";
 
@@ -32,6 +34,13 @@ test("catalog ids take precedence while optional scan fingerprints partition col
   );
 });
 
+test("offline comp keys partition language, edition and finish even when a provider id is shared", () => {
+  const base = { name: "Charizard", setName: "Base", number: "4/102", grade: "RAW", tcgApiId: "base1-4", language: "EN" };
+  assert.notEqual(canonicalCompCacheKey({ ...base, edition: "UNLIMITED" }), canonicalCompCacheKey({ ...base, edition: "FIRST_EDITION" }));
+  assert.notEqual(canonicalCompCacheKey({ ...base, finish: "HOLO" }), canonicalCompCacheKey({ ...base, finish: "REVERSE_HOLO" }));
+  assert.notEqual(canonicalCompCacheKey(base), canonicalCompCacheKey({ ...base, language: "JP" }));
+});
+
 test("cache policy distinguishes usable fresh, stale and expired receipts", () => {
   const now = Date.UTC(2026, 6, 11, 12);
   assert.equal(compCacheFreshness(now - 60_000, now).state, "fresh");
@@ -39,6 +48,13 @@ test("cache policy distinguishes usable fresh, stale and expired receipts", () =
   const expired = compCacheFreshness(now - OFFLINE_COMP_MAX_AGE_MS - 1, now);
   assert.equal(expired.state, "expired");
   assert.ok(expired.ageHours >= 168);
+});
+
+test("workspace bootstrap expires after seven days instead of displaying indefinite cached truth", () => {
+  const now = Date.UTC(2026, 6, 16, 12);
+  assert.equal(offlineBootstrapFreshness(now - OFFLINE_BOOTSTRAP_MAX_AGE_MS, now).expired, false);
+  assert.equal(offlineBootstrapFreshness(now - OFFLINE_BOOTSTRAP_MAX_AGE_MS - 1, now).expired, true);
+  assert.equal(offlineBootstrapFreshness("not-a-date", now).expired, true);
 });
 
 test("retry policy backs off, caps and only retries transient HTTP failures", () => {

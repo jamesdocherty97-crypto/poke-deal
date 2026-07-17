@@ -4,6 +4,8 @@
 
 export type Game = "POKEMON" | "SOCCER";
 export type Language = "EN" | "JP";
+export type PrintEdition = "UNLIMITED" | "FIRST_EDITION" | "SHADOWLESS" | "STAFF" | "PRERELEASE";
+export type CardFinish = "NORMAL" | "HOLO" | "REVERSE_HOLO";
 
 export const GRADE_VALUES = [
   "RAW",
@@ -30,6 +32,9 @@ export interface CardRef {
   number?: string;
   tcgApiId?: string;
   tcgDexId?: string;
+  cardmarketId?: string;
+  edition?: PrintEdition;
+  finish?: CardFinish;
   game?: Game;
   language?: Language;
 }

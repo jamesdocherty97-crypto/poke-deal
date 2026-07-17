@@ -52,6 +52,8 @@ type EbayFulfillmentOrdersResponse = {
   offset?: number;
 };
 
+const MAX_FULFILLMENT_ORDER_PAGES = 20;
+
 export type NormalizedEbayOrderLine = {
   importKey: string;
   orderId: string;
@@ -161,25 +163,20 @@ export async function syncOwnEbaySales({
   if (!refreshToken) return emptySyncResult(now, "eBay is not connected.");
 
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
-  let response: EbayFulfillmentOrdersResponse;
+  let orders: EbayFulfillmentOrder[];
   try {
     const { accessToken } = await getAccessTokenWithSource(config, fetchImpl, { refreshToken });
-    const path = buildFulfillmentOrdersPath({
+    orders = await fetchFulfillmentOrdersPages({
+      config,
+      accessToken,
       since: since ?? new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
       until: now,
       limit: safeLimit,
-    });
-    response = await ebayJson<EbayFulfillmentOrdersResponse>(
-      config,
-      path,
-      accessToken,
-      { marketplaceId: config.marketplaceId },
       fetchImpl,
-    );
+    });
   } catch (err) {
     throw new Error(ebayErrorMessage(err, "eBay sales sync failed"));
   }
-  const orders = response.orders ?? [];
   const lines = orders.flatMap(normalizePaidEbayOrder);
   const imports: EbayOrderImportSummary[] = [];
 
@@ -203,17 +200,63 @@ export function buildFulfillmentOrdersPath({
   since,
   until,
   limit = 25,
+  offset = 0,
 }: {
   since: Date;
   until: Date;
   limit?: number;
+  offset?: number;
 }): string {
   const filter = `creationdate:[${since.toISOString()}..${until.toISOString()}]`;
   const params = new URLSearchParams({
     filter,
     limit: String(Math.max(1, Math.min(100, Math.floor(limit)))),
+    offset: String(Math.max(0, Math.floor(offset))),
   });
   return `/sell/fulfillment/v1/order?${params.toString()}`;
+}
+
+async function fetchFulfillmentOrdersPages({
+  config,
+  accessToken,
+  since,
+  until,
+  limit,
+  fetchImpl,
+}: {
+  config: EbayConfig;
+  accessToken: string;
+  since: Date;
+  until: Date;
+  limit: number;
+  fetchImpl: typeof fetch;
+}): Promise<EbayFulfillmentOrder[]> {
+  const orders: EbayFulfillmentOrder[] = [];
+  let offset = 0;
+
+  for (let page = 0; page < MAX_FULFILLMENT_ORDER_PAGES; page += 1) {
+    const path = buildFulfillmentOrdersPath({ since, until, limit, offset });
+    const response = await ebayJson<EbayFulfillmentOrdersResponse>(
+      config,
+      path,
+      accessToken,
+      { marketplaceId: config.marketplaceId },
+      fetchImpl,
+    );
+    const pageOrders = response.orders ?? [];
+    orders.push(...pageOrders);
+
+    const total = readNonNegativeInt(response.total);
+    const responseOffset = readNonNegativeInt(response.offset) ?? offset;
+    const responseLimit = readPositiveInt(response.limit) ?? limit;
+    const nextOffset = responseOffset + pageOrders.length;
+    if (pageOrders.length === 0 || (total != null && nextOffset >= total) || pageOrders.length < responseLimit) {
+      return orders;
+    }
+    offset = nextOffset;
+  }
+
+  throw new Error(`eBay Fulfillment pagination exceeded ${MAX_FULFILLMENT_ORDER_PAGES} pages; no partial import was applied`);
 }
 
 export function normalizePaidEbayOrder(order: EbayFulfillmentOrder): NormalizedEbayOrderLine[] {
@@ -245,7 +288,26 @@ export function normalizePaidEbayOrder(order: EbayFulfillmentOrder): NormalizedE
       itemSubtotalPence,
       postageChargedPence,
       buyerPaidPence,
-      raw: { order, line },
+      // Persist only fulfillment fields used for audit/replay. The provider's
+      // full order object may contain buyer account or address data and must
+      // not be retained in this operational ledger.
+      raw: {
+        schemaVersion: 1,
+        order: {
+          orderId: order.orderId,
+          creationDate: order.creationDate,
+          lastModifiedDate: order.lastModifiedDate,
+          orderPaymentStatus: order.orderPaymentStatus,
+          orderFulfillmentStatus: order.orderFulfillmentStatus,
+        },
+        line: {
+          lineItemId: line.lineItemId,
+          legacyItemId: line.legacyItemId,
+          sku: line.sku,
+          title: line.title,
+          quantity: line.quantity,
+        },
+      },
     };
   });
 }
@@ -553,4 +615,14 @@ function parseDate(value: string | undefined): Date | null {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function readNonNegativeInt(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function readPositiveInt(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }

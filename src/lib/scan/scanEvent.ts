@@ -23,6 +23,11 @@ export interface ScanEventData {
   setCode?: string;
   number?: string;
   language?: Language;
+  edition?: ScanIdentity["edition"];
+  finish?: ScanIdentity["finish"];
+  tcgApiId?: string;
+  tcgDexId?: string;
+  cardmarketId?: string;
   grade?: Grade;
   model?: string;
   raw?: Prisma.InputJsonValue;
@@ -48,10 +53,13 @@ export function scanEventDataFromResult(
     setCode: identity.setCode ?? undefined,
     number: identity.number ?? undefined,
     language: scanLanguage(identity.language),
+    edition: identity.edition ?? undefined,
+    finish: identity.finish ?? undefined,
     grade: scanGrade(identity),
     model: result.model,
     raw: {
       identity,
+      promptVersion: result.promptVersion ?? "legacy-unversioned",
       ...(result.usage ? { usage: result.usage } : {}),
     } as unknown as Prisma.InputJsonValue,
     ...telemetry,

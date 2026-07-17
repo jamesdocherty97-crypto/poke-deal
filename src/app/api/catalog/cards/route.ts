@@ -15,6 +15,7 @@ import { settleTypeaheadSource } from "@/lib/catalog/typeahead";
 import type { CatalogCard } from "@/lib/catalog/types";
 import { getPrisma } from "@/lib/db/prisma";
 import type { Game, Language } from "@/lib/domain/types";
+import { evaluateCatalogIdentity } from "@/lib/catalog/identityConfidence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,18 +36,25 @@ type DbCard = {
   displayImageUrl: string | null;
   tcgApiId: string | null;
   tcgDexId: string | null;
+  cardmarketId: string | null;
+  edition: string | null;
+  finish: string | null;
+  updatedAt: Date;
 };
 
 type CatalogCardSuggestion = CatalogCard & {
   sourceLabel: string;
   matchLabel: string;
   variantLabel: string;
+  identityConfidence: "high" | "medium" | "low";
+  identityReasons: string[];
 };
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") ?? "";
   const setName = searchParams.get("set") ?? undefined;
+  const language: Language = searchParams.get("language")?.toUpperCase() === "JP" || /\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u.test(q) ? "JP" : "EN";
   const limitParam = Number(searchParams.get("limit"));
   const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 24) : 12;
 
@@ -56,12 +64,16 @@ export async function GET(request: Request) {
   const sourceSetName = isGenericPromoSetContext(lookup.setName) ? undefined : lookup.setName;
   const parsedQuery = parseCardSearchQuery(lookup.query);
   const rankingPoolLimit = Math.max(limit * 3, 20);
-  const localCards = await findLocalCards(lookup.query, lookup.setName, parsedQuery).catch(() => []);
+  const localCards = await findLocalCards(lookup.query, lookup.setName, parsedQuery, language).catch(() => []);
   const localRanked = rankCatalogCards(lookup.query, localCards, { setName: lookup.setName, limit: rankingPoolLimit });
 
   let liveCards: CatalogCard[] = [];
   let tcgDexCards: CatalogCard[] = [];
-  if (localRanked.length < limit) {
+  const hasExactLocal = localRanked.some((card) =>
+    (!lookup.number || normalizePreviewNumber(card.number ?? "") === normalizePreviewNumber(lookup.number)) &&
+    (!lookup.setName || catalogCardMatchesSetContext(card, lookup.setName)),
+  );
+  if (localRanked.length < limit || !hasExactLocal || Boolean(lookup.number)) {
     const liveName = lookup.name || parsedQuery.name || q;
     const pokemonTcgSource = new PokemonTcgApiCatalogSource(
       undefined,
@@ -72,19 +84,22 @@ export async function GET(request: Request) {
     const tcgDexSource = new TcgDexCatalogSource(fetch, undefined, TYPEAHEAD_TCGDEX_TIMEOUT_MS);
     const [pokemonTcgCards, allTcgDexCards] = await Promise.all([
       settleTypeaheadSource(
-        pokemonTcgSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, Math.max(limit, 12)),
+        language === "EN"
+          ? pokemonTcgSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language }, Math.max(limit, 12), { signal: request.signal })
+          : Promise.resolve([]),
         [],
         TYPEAHEAD_POKEMON_TCG_TIMEOUT_MS,
       ),
       settleTypeaheadSource(
-        tcgDexSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language: "EN" }, Math.max(limit, 12)),
+        tcgDexSource.search({ name: liveName, number: lookup.number ?? parsedQuery.number, setName: sourceSetName, game: "POKEMON", language }, Math.max(limit, 12), { signal: request.signal }),
         [],
         TYPEAHEAD_TCGDEX_TIMEOUT_MS,
       ),
     ]);
 
-    liveCards = pokemonTcgCards;
-    tcgDexCards = localRanked.length + liveCards.length < limit ? allTcgDexCards : [];
+    const retrievedAt = new Date().toISOString();
+    liveCards = pokemonTcgCards.map((card) => ({ ...card, provenance: { origin: "live", providers: ["pokemon-tcg-api"], retrievedAt } }));
+    tcgDexCards = allTcgDexCards.map((card) => ({ ...card, provenance: { origin: "live", providers: ["tcgdex"], retrievedAt } }));
     cacheCatalogCardsInBackground(liveCards, "live");
     cacheCatalogCardsInBackground(allTcgDexCards, "tcgdex");
   }
@@ -95,7 +110,7 @@ export async function GET(request: Request) {
     setName: lookup.setName,
     number: lookup.number ?? parsedQuery.number,
     game: "POKEMON",
-    language: "EN",
+    language,
   });
   const rankedCards = rankCatalogCards(
     lookup.query,
@@ -119,23 +134,22 @@ async function findLocalCards(
   q: string,
   setName: string | undefined,
   parsedQuery: ParsedCardSearchQuery,
+  language: Language,
 ): Promise<CatalogCard[]> {
   const db = getPrisma();
   const nameQuery = parsedQuery.name || q;
-  const nameMatches = await db.card.findMany({
+  const [nameMatches, containsMatches, recentMatches] = await Promise.all([db.card.findMany({
     where: {
       game: "POKEMON",
-      language: "EN",
+      language,
       name: { contains: nameQuery, mode: "insensitive" },
     },
     orderBy: { updatedAt: "desc" },
     take: 80,
-  });
-
-  const containsMatches = await db.card.findMany({
+  }), db.card.findMany({
     where: {
       game: "POKEMON",
-      language: "EN",
+      language,
       OR: [
         { name: { contains: q, mode: "insensitive" } },
         ...(nameQuery !== q ? [{ name: { contains: nameQuery, mode: "insensitive" as const } }] : []),
@@ -146,17 +160,15 @@ async function findLocalCards(
     },
     orderBy: { updatedAt: "desc" },
     take: 120,
-  });
-
-  const recentMatches = await db.card.findMany({
+  }), db.card.findMany({
     where: {
       game: "POKEMON",
-      language: "EN",
+      language,
       ...(setName ? { setName: { contains: setName, mode: "insensitive" as const } } : {}),
     },
     orderBy: { updatedAt: "desc" },
     take: 120,
-  });
+  })]);
 
   return [...nameMatches, ...containsMatches, ...recentMatches].map(dbCardToCatalogCard);
 }
@@ -202,6 +214,15 @@ function dbCardToCatalogCard(card: DbCard): CatalogCard {
     displayImageUrl: card.displayImageUrl ?? undefined,
     tcgApiId: card.tcgApiId ?? undefined,
     tcgDexId: card.tcgDexId ?? undefined,
+    cardmarketId: card.cardmarketId ?? undefined,
+    edition: card.edition as CatalogCard["edition"],
+    finish: card.finish as CatalogCard["finish"],
+    provenance: {
+      origin: "cache",
+      providers: [card.tcgApiId ? "pokemon-tcg-api" : null, card.tcgDexId ? "tcgdex" : null, card.cardmarketId ? "cardmarket" : null]
+        .filter((value): value is string => Boolean(value)),
+      cachedAt: card.updatedAt.toISOString(),
+    },
   };
 }
 
@@ -214,13 +235,16 @@ function toCatalogCardSuggestion(
     sourceLabel: catalogSourceLabel(card),
     matchLabel: catalogMatchLabel(card, lookup),
     variantLabel: catalogVariantLabel(card),
+    ...catalogIdentityConfidence(card, lookup),
   };
 }
 
 function catalogSourceLabel(card: CatalogCard): string {
-  if (card.tcgApiId && card.tcgDexId) return "Pokemon TCG + TCGdex";
-  if (card.tcgApiId) return "Pokemon TCG API";
-  if (card.tcgDexId) return "TCGdex";
+  const age = card.provenance?.cachedAt ? ` · cached ${formatCompactAge(card.provenance.cachedAt)}` : "";
+  const live = card.provenance?.origin === "live" ? " · live" : age;
+  if (card.tcgApiId && card.tcgDexId) return `Pokemon TCG + TCGdex${live}`;
+  if (card.tcgApiId) return `Pokemon TCG API${live}`;
+  if (card.tcgDexId) return `TCGdex${live}`;
   return "Curated/manual";
 }
 
@@ -231,12 +255,27 @@ function catalogMatchLabel(card: CatalogCard, lookup: { name: string; setName?: 
   if (lookup.setName && catalogCardMatchesSetContext(card, lookup.setName)) {
     return "Set match";
   }
-  if (card.imageUrl || card.displayImageUrl) return "Image match";
-  return "Manual candidate";
+  if (lookup.name && card.name) return "Name match";
+  return "Catalog candidate";
 }
 
 function catalogVariantLabel(card: CatalogCard): string {
-  return [card.rarity, card.number ? `#${card.number}` : null].filter(Boolean).join(" · ") || "variant";
+  return [card.edition?.replace(/_/g, " "), card.finish?.replace(/_/g, " "), card.language, card.rarity, card.number ? `#${card.number}` : null].filter(Boolean).join(" · ") || "variant";
+}
+
+function catalogIdentityConfidence(card: CatalogCard, lookup: { name: string; setName?: string; number?: string }) {
+  const verdict = evaluateCatalogIdentity({ name: lookup.name, setName: lookup.setName, number: lookup.number, game: "POKEMON", language: card.language }, card);
+  return {
+    identityConfidence: verdict.level,
+    identityReasons: [...verdict.reasons, ...verdict.conflicts],
+  };
+}
+
+function formatCompactAge(value: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`;
 }
 
 function normalizePreviewNumber(value: string): string {

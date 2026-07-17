@@ -4,29 +4,33 @@ export interface VariantRequestText {
   number?: string | null;
 }
 
-export type CardVariantHint = "FIRST_EDITION" | "REVERSE_HOLO" | "HOLO" | "NORMAL";
+import type { CardFinish, PrintEdition } from "../domain/types.js";
+
+export type CardVariantHint = PrintEdition | CardFinish;
+
+export type CardPrintIdentity = {
+  edition?: PrintEdition;
+  finish?: CardFinish;
+};
+
+export function detectCardPrintIdentity(card: VariantRequestText): CardPrintIdentity {
+  const text = [card.name, card.setName, card.number].map((value) => value?.toLowerCase() ?? "").join(" ");
+  const edition: PrintEdition | undefined =
+    /\b(?:1st|first)\s*(?:edition|ed)\b/.test(text) ? "FIRST_EDITION" :
+      /\bshadowless\b/.test(text) ? "SHADOWLESS" :
+        /\bstaff\b/.test(text) ? "STAFF" :
+          /\bpre[\s-]?release\b/.test(text) ? "PRERELEASE" :
+            /\bunlimited\b/.test(text) ? "UNLIMITED" : undefined;
+  const finish: CardFinish | undefined =
+    /\breverse[\s-]?holo(?:foil)?\b/.test(text) ? "REVERSE_HOLO" :
+      /\bholo(?:foil)?\b/.test(text) && !/\bnormal\b/.test(text) ? "HOLO" :
+        /\bnormal\b/.test(text) ? "NORMAL" : undefined;
+  return { edition, finish };
+}
 
 export function detectCardVariantHint(card: VariantRequestText): CardVariantHint | null {
-  const tokens = [card.name, card.setName, card.number].map((value) => value?.toLowerCase() ?? "");
-
-  if (tokens.some((text) => text.includes("1st") && text.includes("edition"))) {
-    return "FIRST_EDITION";
-  }
-
-  const anyText = tokens.join(" ");
-  if (/\breverse\s+holo(?:foil)?\b|\breverse-holofoil\b/.test(anyText)) {
-    return "REVERSE_HOLO";
-  }
-
-  if (/\bholo(?:foil)?\b/.test(anyText) && !/\bnormal\b/.test(anyText)) {
-    return "HOLO";
-  }
-
-  if (/\bnormal\b/.test(anyText)) {
-    return "NORMAL";
-  }
-
-  return null;
+  const identity = detectCardPrintIdentity(card);
+  return identity.edition ?? identity.finish ?? null;
 }
 
 export function addRequestedVariantHint(baseName: string, fallbackName: string): string {
@@ -52,6 +56,24 @@ export function addRequestedVariantHint(baseName: string, fallbackName: string):
   const separator = textMatchesVariant(baseName, "Reverse") && hint === "REVERSE_HOLO" ? " " : " ";
   if (!target) return baseName;
   return `${baseName}${separator}${target}`;
+}
+
+/** Reattaches both independent print dimensions after lookup-noise normalization. */
+export function addRequestedPrintHints(baseName: string, fallback: VariantRequestText): string {
+  const identity = detectCardPrintIdentity(fallback);
+  let value = baseName;
+  for (const hint of [identity.edition, identity.finish]) {
+    if (hint) value = addSingleHint(value, hint);
+  }
+  return value;
+}
+
+function addSingleHint(value: string, hint: CardVariantHint): string {
+  const target = hintToLabel(hint);
+  if (!target || !value.trim()) return value;
+  const normalized = normalizeExistingVariantHint(value, hint);
+  if (normalized !== value || textMatchesVariant(value, target)) return normalized;
+  return `${value} ${target}`;
 }
 
 function normalizeExistingVariantHint(value: string, hint: CardVariantHint): string {
@@ -88,6 +110,15 @@ function normalizeExistingVariantHint(value: string, hint: CardVariantHint): str
         .replace(/\b1st\s*(?:edition|ed)\b/gi, target)
         .replace(/\bfirst\s*(?:edition|ed)\b/gi, target)
         .replace(new RegExp(`\\b${escapeRegExp(target)}\\s+${escapeRegExp(target)}\\b`, "gi"), target)
+        .trim()
+        .replace(/\s+/g, " ");
+
+    case "SHADOWLESS":
+    case "STAFF":
+    case "PRERELEASE":
+    case "UNLIMITED":
+      return normalized
+        .replace(new RegExp(`\\b${escapeRegExp(target)}\\b`, "gi"), target)
         .trim()
         .replace(/\s+/g, " ");
 
@@ -128,6 +159,14 @@ function hintToLabel(hint: CardVariantHint): string | null {
   switch (hint) {
     case "FIRST_EDITION":
       return "1st Edition";
+    case "SHADOWLESS":
+      return "Shadowless";
+    case "STAFF":
+      return "Staff";
+    case "PRERELEASE":
+      return "Prerelease";
+    case "UNLIMITED":
+      return "Unlimited";
     case "REVERSE_HOLO":
       return "Reverse Holo";
     case "HOLO":

@@ -14,6 +14,7 @@
 // selling account).
 
 import type { EbayConfig } from "./config.js";
+import { boundedEbayFetch } from "./client.js";
 
 const SITE_IDS: Record<string, number> = {
   EBAY_GB: 3,
@@ -42,7 +43,7 @@ export async function fetchEbayTradingApiUser(
 <GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents">
 </GetUserRequest>`;
 
-  const response = await fetchImpl(tradingApiBaseUrl, {
+  const response = await boundedEbayFetch(fetchImpl, tradingApiBaseUrl, {
     method: "POST",
     headers: {
       "Content-Type": "text/xml",

@@ -1,4 +1,4 @@
-import { CompService } from "../comps/compService.js";
+import { createAppCompService } from "../comps/appCompLookup.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef, Grade } from "../domain/types.js";
 import {
@@ -35,7 +35,7 @@ export async function runPortfolioSnapshot({ limit = 25 }: { limit?: number } = 
   const prisma = getPrisma();
   const groups = (await readActiveGroups()).slice(0, limit);
   const takenAt = snapshotDate();
-  const compService = CompService.default();
+  const compService = createAppCompService();
   let written = 0;
   let skipped = 0;
 

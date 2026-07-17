@@ -26,6 +26,8 @@ type PsaCertView = {
   populationHigher?: number;
   isDualCert?: boolean;
   live: boolean;
+  cached?: boolean;
+  cacheAgeMinutes?: number;
   reason?: string;
 };
 
@@ -90,7 +92,7 @@ export function PsaCertCard({
         ["PSA grade", result.gradeLabel ?? null],
         ["App grade", result.grade?.replace(/_/g, " ") ?? null],
         ["Dual cert", result.isDualCert ? "Yes" : null],
-        ["Lookup", result.live ? "Live PSA API" : "Demo fixture"],
+        ["Lookup", result.live ? "Live PSA API" : "Non-live evidence"],
       ].filter((row): row is [string, string] => Boolean(row[1]))
     : [];
 
@@ -100,7 +102,7 @@ export function PsaCertCard({
         <>
           <div className="psa-cert-heading">
             <div>
-              <span>PSA cert {result.certNumber}{result.live ? "" : " · demo"}</span>
+              <span>PSA registry {result.certNumber}{result.cached ? ` · cached ${result.cacheAgeMinutes ?? 0}m` : result.live ? " · checked now" : " · unavailable"}</span>
               <strong>{toTitleCase(result.subject ?? "Unknown card")}</strong>
               <small>
                 {[result.year, result.brand ? toTitleCase(result.brand) : null, result.cardNumber ? `#${result.cardNumber}` : null]
@@ -128,12 +130,12 @@ export function PsaCertCard({
           <div className="psa-cert-actions">
             <p className="hint">
               {canFeedPokemonComps
-                ? "Verified slab details can feed the comp lookup and listing cert."
-                : "Verified cert, but this app only comps Pokémon TCG cards."}
+                ? "PSA registry details can feed identity and grade. This is not proof the physical slab is authentic."
+                : "Registry record found, but this app only comps Pokémon TCG cards."}
             </p>
             {onComp && (
               <button type="button" onClick={onComp} disabled={busy}>
-                {busy ? "Comping..." : "Comp from cert"}
+                {busy ? "Comping…" : "Comp from cert"}
               </button>
             )}
           </div>
@@ -182,7 +184,7 @@ export function IntakeSessionCard({
           </strong>
         </div>
         <small>
-          {channelLabel(channel)} · {listingState.toLowerCase()} · {keepBuying ? "next card" : "finish after stock"}
+          {channelLabel(channel)} · {channel === "EBAY" ? "draft → review" : listingState.toLowerCase()} · {keepBuying ? "next card" : "finish after stock"}
         </small>
       </summary>
       <div className="intake-session-body">
@@ -214,8 +216,14 @@ export function IntakeSessionCard({
         <button type="button" className={listingState === "DRAFT" ? "selected" : ""} onClick={() => onListingStateChange("DRAFT")}>
           Draft
         </button>
-        <button type="button" className={listingState === "ACTIVE" ? "selected" : ""} onClick={() => onListingStateChange("ACTIVE")}>
-          Active
+        <button
+          type="button"
+          className={listingState === "ACTIVE" ? "selected" : ""}
+          onClick={() => onListingStateChange("ACTIVE")}
+          disabled={channel === "EBAY"}
+          title={channel === "EBAY" ? "eBay goes active only after Review & publish" : undefined}
+        >
+          {channel === "EBAY" ? "Publish after review" : "Active"}
         </button>
       </div>
       <div className="intake-session-presets" aria-label="Source presets">
@@ -281,8 +289,8 @@ export function LastStockedPanel({
         </small>
       </div>
       <div className="last-stocked-actions">
-        <button type="button" onClick={onPack} disabled={card.queued || !card.listingId}>
-          Pack
+        <button type="button" onClick={onPack} disabled={card.queued}>
+          {!card.listingId ? "Create draft" : card.channel === "EBAY" && card.listingState === "DRAFT" ? "Review draft" : "Pack"}
         </button>
         <button type="button" onClick={onSell} disabled={card.queued}>
           Sell

@@ -1,4 +1,6 @@
 import type { CatalogCard } from "../catalog/types.js";
+import { evaluateCatalogIdentity } from "../catalog/identityConfidence.js";
+import { mergeCatalogCards } from "../catalog/catalogIdentity.js";
 import { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
 import type { CardRef, Grade } from "../domain/types.js";
 import { attachAskEvidence, fetchEbayAskEvidence } from "../ebay/browseAsks.js";
@@ -22,7 +24,7 @@ import { PrismaCompResultRepo } from "./prismaCompResultRepo.js";
 import { readCompLookupRequest } from "./request.js";
 
 const RECOVERY_ALTERNATIVES_TIMEOUT_MS = 5_000;
-const CATALOG_RESOLVE_TIMEOUT_MS = 3_600;
+const CATALOG_RESOLVE_TIMEOUT_MS = 7_500;
 const EBAY_ASK_TIMEOUT_MS = 3_500;
 const MIN_AMBIGUOUS_ALTERNATIVES = 5;
 
@@ -33,6 +35,7 @@ export type AppCompCatalogProgress = {
   catalog: CatalogCard | null;
   ambiguity: "pending" | boolean;
   sources: Array<{ name: string; live: boolean }>;
+  identityConfidence: ReturnType<typeof evaluateCatalogIdentity>;
 };
 
 export interface AppCompLookupFlowOptions {
@@ -79,30 +82,33 @@ export async function runAppCompLookup(
   const { card, grade } = lookup;
 
   const catalogSource = new PokemonTcgApiCatalogSource();
-  const catalog = await resolveCatalogCard(card, catalogSource, { timeoutMs: CATALOG_RESOLVE_TIMEOUT_MS });
+  const catalog = await resolveCatalogCard(card, catalogSource, { timeoutMs: CATALOG_RESOLVE_TIMEOUT_MS, signal: options.signal });
   const compCard = catalog ? catalogToCardRef(catalog, card) : card;
   const compService = createAppCompService(catalogSource, catalog);
   const explicitIdentity = requestHasExplicitCardNumber(card) || Boolean(card.tcgApiId);
+  const identityConfidence = evaluateCatalogIdentity(card, catalog);
+  const identityNeedsConfirmation = !identityConfidence.autoSelectable;
 
   await options.onCatalog?.({
     requested: card,
     identity: compCard,
     grade,
     catalog,
-    ambiguity: explicitIdentity ? false : "pending",
+    ambiguity: identityNeedsConfirmation ? true : explicitIdentity ? false : "pending",
     sources: compService.sourceSummaries,
+    identityConfidence,
   });
 
   // Start all independent work before awaiting ambiguity. A provisional bare
   // query is reconciled conservatively until sibling discovery completes.
-  const ambiguityPromise = resolveAmbiguity(card, catalog, catalogSource, explicitIdentity);
+  const ambiguityPromise = resolveAmbiguity(card, catalog, catalogSource, explicitIdentity, options.signal);
   const askEvidencePromise = fetchEbayAskEvidence(compCard, {
     grade,
     signal: options.signal,
     timeoutMs: EBAY_ASK_TIMEOUT_MS,
   });
   const compPromise = compService.lookup(compCard, { grade }, {
-    ambiguous: !explicitIdentity,
+    ambiguous: !explicitIdentity || identityNeedsConfirmation,
     signal: options.signal,
     onProgress: options.onSource,
   });
@@ -111,7 +117,7 @@ export async function runAppCompLookup(
     compPromise,
     askEvidencePromise,
   ]);
-  const result = reconcileCompReceipt(provisionalResult, compCard, { grade }, { ambiguous });
+  const result = reconcileCompReceipt(provisionalResult, compCard, { grade }, { ambiguous: ambiguous || identityNeedsConfirmation });
 
   let alternatives: CatalogCard[] = [];
   const cardImage = resolveCompCardImage({ catalog, headline: result.headline, all: result.all });
@@ -120,6 +126,7 @@ export async function runAppCompLookup(
   if (needsRecovery) {
     const recovery = await findCatalogAlternatives(card, catalogSource, 4, {
       timeoutMs: RECOVERY_ALTERNATIVES_TIMEOUT_MS,
+      signal: options.signal,
     });
     alternatives = dedupeCatalogCards([...ambiguityAlternatives, ...recovery]).slice(0, 8);
   } else if (ambiguous) {
@@ -130,9 +137,10 @@ export async function runAppCompLookup(
     ...attachAskEvidence(result, askEvidence),
     catalog: responseCatalog,
     alternatives,
-    ambiguous,
+    ambiguous: ambiguous || identityNeedsConfirmation,
     psaCert: psaResult,
     cardImage,
+    identityConfidence,
   };
 
   const persistEvidence = async () => {
@@ -155,7 +163,7 @@ export async function runAppCompLookup(
           unavailableSources: result.unavailableSources,
           sourcesDisagree: result.sourcesDisagree,
           cached: result.cached,
-          ambiguous,
+          ambiguous: ambiguous || identityNeedsConfirmation,
         },
       }).catch((err) => {
         console.warn("[comps] comp persistence skipped:", safeError(err));
@@ -173,7 +181,7 @@ export async function runAppCompLookup(
     pricedSourceCount: new Set(result.all.filter((row) => row.sampleSize > 0 && row.medianPence > 0).map((row) => row.source)).size,
     confidence: result.reconciliation?.confidence ?? "none",
     manualCheck: result.reconciliation?.manualCheck ?? true,
-    ambiguous,
+    ambiguous: ambiguous || identityNeedsConfirmation,
     cached: Boolean(result.cached),
   }));
   return receipt;
@@ -184,14 +192,16 @@ async function resolveAmbiguity(
   catalog: CatalogCard | null,
   catalogSource: PokemonTcgApiCatalogSource,
   explicitIdentity: boolean,
+  signal?: AbortSignal,
 ): Promise<{ ambiguous: boolean; alternatives: CatalogCard[] }> {
   if (explicitIdentity) return { ambiguous: false, alternatives: [] };
   const candidates = await findAmbiguousCatalogCandidates(card, catalogSource, 8, {
     timeoutMs: RECOVERY_ALTERNATIVES_TIMEOUT_MS,
+    signal,
   });
   let state = resolveBareSetAmbiguity(card, catalog, candidates);
   if (state.ambiguous && state.alternatives.length < MIN_AMBIGUOUS_ALTERNATIVES) {
-    const expanded = await findAmbiguousCatalogCandidates(card, catalogSource, 12, { timeoutMs: 10_000 });
+    const expanded = await findAmbiguousCatalogCandidates(card, catalogSource, 12, { timeoutMs: 10_000, signal });
     state = resolveBareSetAmbiguity(card, catalog, expanded);
   }
   return state;
@@ -212,22 +222,8 @@ function hasCardIdentity(searchParams: URLSearchParams): boolean {
   return Boolean(readFirst(searchParams, "q", "query", "search", "name", "cardName", "card"));
 }
 
-function catalogIdentityKey(card: CatalogCard): string {
-  return card.tcgApiId ?? card.tcgDexId ?? [
-    card.name.trim().toLowerCase(),
-    card.setName.trim().toLowerCase(),
-    (card.number ?? "").trim().toLowerCase(),
-  ].join("|");
-}
-
 function dedupeCatalogCards(cards: CatalogCard[]): CatalogCard[] {
-  const seen = new Set<string>();
-  return cards.filter((card) => {
-    const key = catalogIdentityKey(card);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return mergeCatalogCards(cards);
 }
 
 function safeError(error: unknown): string {

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
 import { orderListingPhotos } from "@/lib/photos/listingPhotoPolicy";
+import { isManagedInventoryPhotoBlobUrl } from "@/lib/photos/uploadPolicy";
+import { del } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -180,12 +182,13 @@ export async function DELETE(
     const prisma = getPrisma();
     const photo = await prisma.cardPhoto.findUnique({
       where: { id: photoId },
-      select: { id: true, inventoryItemId: true },
+      select: { id: true, inventoryItemId: true, url: true },
     });
     if (!photo || photo.inventoryItemId !== params.id) {
       return NextResponse.json({ error: "Photo not found." }, { status: 404 });
     }
 
+    if (isManagedInventoryPhotoBlobUrl(photo.url)) await del(photo.url);
     await prisma.cardPhoto.delete({ where: { id: photoId } });
     const photos = await normalizePhotoOrder(params.id);
 

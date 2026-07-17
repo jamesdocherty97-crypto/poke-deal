@@ -1,5 +1,4 @@
-import { CompService, defaultCompSources } from "../comps/compService.js";
-import { PrismaLastKnownCompCache } from "../comps/prismaCompResultRepo.js";
+import { createAppCompService } from "../comps/appCompLookup.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
 import { createInboxAlert } from "./inbox.js";
@@ -27,11 +26,9 @@ export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: b
     orderBy: { createdAt: "desc" },
     take: limit,
   });
-  const compService = new CompService(
-    defaultCompSources(),
-    undefined,
-    process.env.DATABASE_URL ? new PrismaLastKnownCompCache() : null,
-  );
+  // Use the same catalog, provider, checked-comp and owned-sale evidence as an
+  // interactive dealer lookup so background alerts remain comparable.
+  const compService = createAppCompService();
   const hits: WatchHit[] = [];
   const alertHits: WatchHit[] = [];
   const alertIds: string[] = [];

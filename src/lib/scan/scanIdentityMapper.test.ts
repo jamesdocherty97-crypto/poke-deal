@@ -15,6 +15,12 @@ function identity(overrides: Partial<ScanIdentity>): ScanIdentity {
     setCode: null,
     number: "215/203",
     language: "English",
+    edition: null,
+    finish: null,
+    tcgApiId: null,
+    tcgDexId: null,
+    cardmarketId: null,
+    unresolvedIdentityHints: [],
     isSlab: false,
     grader: null,
     grade: null,
@@ -44,6 +50,7 @@ test("scanIdentityToQuery maps a standard set-code scan to an existing comp quer
   assert.equal(mapped.query.setName, "Evolving Skies");
   assert.equal(mapped.query.number, "215/203");
   assert.equal(mapped.query.grade, "RAW");
+  assert.equal(mapped.query.language, "EN");
 });
 
 test("scanIdentityToQuery canonicalizes ME-era zero-padded numeric numbers", () => {
@@ -109,11 +116,40 @@ test("scanIdentityToQuery never comps an unreadable/null number from a guessed i
   assert.match(mapped.quickFill, /Umbreon VMAX/);
 });
 
-test("scanIdentityToQuery sends non-English cards to manual comp for now", () => {
-  const mapped = scanIdentityToQuery(identity({ language: "Japanese" }));
+test("scanIdentityToQuery allows a sufficiently identified Japanese card and keeps JP in the comp query", () => {
+  const mapped = scanIdentityToQuery(identity({
+    name: "リザードン",
+    setName: "ポケモンカード151",
+    setCode: "SV2a",
+    number: "006/165",
+    language: "Japanese",
+  }));
+  assert.equal(mapped.status, "ready");
+  if (mapped.status !== "ready") throw new Error("expected ready");
+  assert.equal(mapped.query.language, "JP");
+  assert.equal(mapped.query.name, "リザードン");
+  assert.match(mapped.quickFill, /JP/);
+  assert.match(mapped.warnings.join(" "), /Japanese identity/i);
+});
+
+test("scanIdentityToQuery rejects unsupported languages without relabelling them English", () => {
+  const mapped = scanIdentityToQuery(identity({ language: "French" }));
   assert.equal(mapped.status, "manual");
   if (mapped.status !== "manual") throw new Error("expected manual");
-  assert.match(mapped.reason, /Non-English/i);
+  assert.match(mapped.reason, /French scan is not supported/i);
+});
+
+test("scanIdentityToQuery requires a set or exact provider identity for Japanese ambiguity", () => {
+  const mapped = scanIdentityToQuery(identity({
+    name: "リザードン",
+    setName: null,
+    setCode: null,
+    number: "006/165",
+    language: "Japanese",
+  }));
+  assert.equal(mapped.status, "manual");
+  if (mapped.status !== "manual") throw new Error("expected manual");
+  assert.match(mapped.reason, /Japanese scan needs a readable set/i);
 });
 
 test("scanIdentityToQuery politely refuses non-card photos", () => {
@@ -129,16 +165,119 @@ test("scanIdentityToQuery politely refuses non-card photos", () => {
   assert.match(mapped.reason, /does not look/i);
 });
 
-test("scanIdentityToQuery warns but allows 1st Edition and Shadowless comps", () => {
+test("scanIdentityToQuery preserves first edition as structured and provider-compatible query identity", () => {
   const mapped = scanIdentityToQuery(identity({
     name: "Hitmontop",
     setName: "Neo Genesis",
     number: "3/111",
-    stamps: ["1st Edition", "Shadowless"],
+    edition: "FIRST_EDITION",
+    stamps: ["1st Edition"],
   }));
   assert.equal(mapped.status, "ready");
+  if (mapped.status !== "ready") throw new Error("expected ready");
+  assert.equal(mapped.query.edition, "FIRST_EDITION");
+  assert.match(mapped.query.name, /1st Edition/);
   assert.match(mapped.warnings.join(" "), /1st Edition/);
-  assert.match(mapped.warnings.join(" "), /Shadowless/);
+  assert.doesNotMatch(mapped.warnings.join(" "), /unlimited printing/i);
+});
+
+test("scanIdentityToQuery preserves Shadowless rather than silently treating it as Unlimited", () => {
+  const mapped = scanIdentityToQuery(identity({
+    name: "Charizard",
+    setName: "Base",
+    number: "4/102",
+    stamps: ["Shadowless"],
+  }));
+  assert.equal(mapped.status, "ready");
+  if (mapped.status !== "ready") throw new Error("expected ready");
+  assert.equal(mapped.query.edition, "SHADOWLESS");
+  assert.match(mapped.query.name, /Shadowless/);
+});
+
+test("scanIdentityToQuery keeps Staff and Reverse Holo as independent print dimensions", () => {
+  const mapped = scanIdentityToQuery(identity({
+    name: "Mew ex",
+    setName: "Scarlet & Violet Black Star Promos",
+    number: "SVP 053",
+    stamps: ["STAFF", "Reverse Holo"],
+  }));
+  assert.equal(mapped.status, "ready");
+  if (mapped.status !== "ready") throw new Error("expected ready");
+  assert.equal(mapped.query.edition, "STAFF");
+  assert.equal(mapped.query.finish, "REVERSE_HOLO");
+  assert.match(mapped.query.name, /Staff/);
+  assert.match(mapped.query.name, /Reverse Holo/);
+});
+
+test("scanIdentityToQuery keeps Prerelease and Holo explicit", () => {
+  const mapped = scanIdentityToQuery(identity({
+    name: "Charizard",
+    setName: "Vivid Voltage",
+    number: "025/185",
+    edition: "PRERELEASE",
+    finish: "HOLO",
+  }));
+  assert.equal(mapped.status, "ready");
+  if (mapped.status !== "ready") throw new Error("expected ready");
+  assert.equal(mapped.query.edition, "PRERELEASE");
+  assert.equal(mapped.query.finish, "HOLO");
+});
+
+test("scanIdentityToQuery blocks compound edition marks the structured domain cannot represent", () => {
+  const mapped = scanIdentityToQuery(identity({
+    name: "Charizard",
+    setName: "Base",
+    number: "4/102",
+    stamps: ["1st Edition", "Shadowless"],
+  }));
+  assert.equal(mapped.status, "manual");
+  if (mapped.status !== "manual") throw new Error("expected manual");
+  assert.match(mapped.reason, /Conflicting edition marks/i);
+  assert.match(mapped.quickFill, /1st Edition/);
+  assert.match(mapped.quickFill, /Shadowless/);
+});
+
+test("scanIdentityToQuery blocks unsupported special print and foil treatments", () => {
+  const winner = scanIdentityToQuery(identity({ stamps: ["Winner stamp"] }));
+  const cosmos = scanIdentityToQuery(identity({ stamps: ["Cosmos Holo"] }));
+  assert.equal(winner.status, "manual");
+  assert.equal(cosmos.status, "manual");
+  if (winner.status !== "manual" || cosmos.status !== "manual") throw new Error("expected manual");
+  assert.match(winner.reason, /Unsupported print identity/i);
+  assert.match(cosmos.reason, /Unsupported print identity/i);
+});
+
+test("scanIdentityToQuery does not silently assume Unlimited for edition-sensitive vintage sets", () => {
+  const unknown = scanIdentityToQuery(identity({
+    name: "Hitmontop",
+    setName: "Neo Genesis",
+    number: "3/111",
+  }));
+  const unlimited = scanIdentityToQuery(identity({
+    name: "Hitmontop",
+    setName: "Neo Genesis",
+    number: "3/111",
+    edition: "UNLIMITED",
+  }));
+  assert.equal(unknown.status, "manual");
+  if (unknown.status !== "manual") throw new Error("expected manual");
+  assert.match(unknown.reason, /Edition is not confirmed/i);
+  assert.equal(unlimited.status, "ready");
+  if (unlimited.status !== "ready") throw new Error("expected ready");
+  assert.equal(unlimited.query.edition, "UNLIMITED");
+});
+
+test("scanIdentityToQuery preserves exact provider identity hints", () => {
+  const mapped = scanIdentityToQuery(identity({
+    tcgApiId: "swsh7-215",
+    tcgDexId: "swsh7-215",
+    cardmarketId: "567890",
+  }));
+  assert.equal(mapped.status, "ready");
+  if (mapped.status !== "ready") throw new Error("expected ready");
+  assert.equal(mapped.query.tcgApiId, "swsh7-215");
+  assert.equal(mapped.query.tcgDexId, "swsh7-215");
+  assert.equal(mapped.query.cardmarketId, "567890");
 });
 
 test("scanIdentityToQuery routes PSA slab certs through cert verification", () => {
