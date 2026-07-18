@@ -119,6 +119,8 @@
   --color-warning-surface: rgba(240, 198, 90, 0.14);
   --color-warning-border: rgba(240, 198, 90, 0.38);
   --color-danger: #f0838a;
+  /* Text-size danger/negative copy on dark surfaces; #f0838a lands ~4.1:1 on tinted panels. */
+  --color-danger-text: #f5a7ac;
   --color-danger-surface: rgba(240, 131, 138, 0.13);
   --color-danger-border: rgba(240, 131, 138, 0.38);
   --color-info: #79bde6;
@@ -275,6 +277,7 @@
   --color-warning-surface: rgba(131, 91, 0, 0.1);
   --color-warning-border: rgba(131, 91, 0, 0.34);
   --color-danger: #a72d49;
+  --color-danger-text: #a72d49;
   --color-danger-surface: rgba(167, 45, 73, 0.1);
   --color-danger-border: rgba(167, 45, 73, 0.34);
   --color-info: #006f8d;
