@@ -702,6 +702,18 @@ function ProfitSparkline({ points }: { points: ProfitTrendPoint[] }) {
   const first = points[0];
   const zeroY = sparklineY(0, points, height, padding);
 
+  if (points.length < 2) {
+    return (
+      <div className="profit-sparkline">
+        <div>
+          <span>Profit trend</span>
+          <strong>{latest ? gbp(latest.cumulativeProfitPence) : "n/a"}</strong>
+          <small>{latest ? "Trend starts with your next booked sale." : "Book a sale to start the trend."}</small>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="profit-sparkline">
       <div>

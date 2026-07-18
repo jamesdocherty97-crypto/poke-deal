@@ -7784,7 +7784,6 @@ export default function Home() {
                   className={`buy-stage-card ${spotlightImage ? "" : "brand-art"}`}
                   fallbackClassName="buy-stage-card blank"
                   alt=""
-                  eager
                 />
                 <span className="dealer-ticket"><b>LIVE GBP</b><small>identity · evidence · decision</small></span>
               </div>
@@ -7857,7 +7856,7 @@ export default function Home() {
                     );
                   }}
                   name="smart-card-search"
-                  placeholder="Umbreon prismatic, Victini promo…"
+                  placeholder="Name, set, number…"
                   autoComplete="off"
                   aria-busy={cardSuggestionsLoading}
                 />
@@ -11507,11 +11506,10 @@ function InventoryRow({
               <span>History</span>
             </button>
           </div>
-          {(needsListing || needsPhotos || photoCount > 0 || needsReprice) && (
-            <div className="inventory-row-flags" aria-label="Stock tasks">
+          {(needsListing || (needsPhotos && !needsEbayPhotos) || photoCount > 0 || needsReprice) && (
+            <div className="inventory-row-flags" role="group" aria-label="Stock tasks">
               {needsListing && <span>Needs listing</span>}
-              {needsPhotos && <span>Needs photos</span>}
-              {!needsPhotos && needsEbayPhotos && <span>Needs real photo</span>}
+              {needsPhotos && !needsEbayPhotos && <span>Needs photos</span>}
               {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
               {needsReprice && <span className="reprice-nudge">Reprice · {ageDays}d held</span>}
             </div>

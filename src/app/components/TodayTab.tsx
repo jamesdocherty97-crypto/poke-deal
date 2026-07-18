@@ -269,9 +269,7 @@ export function TodayTab({
               </li>
             ))}
           </ol>
-        </section>
 
-        <aside className="status-rail" aria-label="Dealer status">
           {firstSaleListingTarget && saleCard && (
             <article className="deal-sleeve sale-ready-sleeve">
               <div className="deal-sleeve-art">
@@ -295,7 +293,9 @@ export function TodayTab({
               </div>
             </article>
           )}
+        </section>
 
+        <aside className="status-rail" aria-label="Dealer status">
           <section className="dealer-pulse" aria-labelledby="dealer-pulse-title">
             <div className="dealer-pulse-heading">
               <div>
