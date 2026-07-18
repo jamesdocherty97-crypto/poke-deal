@@ -108,7 +108,7 @@
   border-radius: 999px;
   color: var(--color-text-secondary);
   background: var(--color-surface-1);
-  font-size: .72rem;
+  font-size: var(--font-size-micro);
 }
 
 .source-progress-chip.priced,
@@ -237,7 +237,7 @@
 .stock-sparkline { width: 92px; height: 28px; display: inline-flex; align-items: center; }
 .stock-sparkline svg { width: 100%; height: 100%; }
 .stock-sparkline polyline { stroke: var(--source-checked-color); stroke-width: 2.5; }
-.stock-sparkline.empty { width: auto; color: var(--color-text-secondary); font-size: .72rem; }
+.stock-sparkline.empty { width: auto; color: var(--color-text-secondary); font-size: var(--font-size-micro); }
 
 .price-history-sheet { z-index: 125; max-width: 760px; }
 .history-card-heading { display: flex; align-items: center; gap: 12px; margin: 8px 0 14px; }
@@ -291,7 +291,7 @@
 @media (max-width: 640px) {
   .topbar-actions .quick-command-trigger { display: none; }
   .sync-status { padding-inline: 9px; }
-  .sync-status strong { font-size: .68rem; }
+  .sync-status strong { font-size: var(--font-size-micro); }
   .command-palette { place-items: end center; padding: 12px 8px calc(82px + env(safe-area-inset-bottom)); }
   .command-palette-sheet { border-radius: 24px 24px 18px 18px; }
   .manual-review-heading { grid-template-columns: auto minmax(0, 1fr); }
@@ -316,7 +316,7 @@
 
 .metric span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -436,8 +436,8 @@
   place-items: center;
   border-radius: 999px;
   background: rgba(42, 117, 187, 0.24);
-  color: #cfe6ff;
-  font-size: 12px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -450,14 +450,14 @@
 .buy-flow-step strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   line-height: 1.05;
 }
 
 .buy-flow-step small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.1;
   text-overflow: ellipsis;
@@ -530,8 +530,9 @@
 
 .today-hero-panel span {
   color: var(--yellow);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -547,7 +548,7 @@
   max-width: 32ch;
   margin: 0;
   color: rgba(248, 251, 255, 0.82);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 850;
   line-height: 1.3;
 }
@@ -564,9 +565,9 @@
   min-height: 38px;
   border-color: rgba(255, 203, 5, 0.34);
   background: rgba(255, 203, 5, 0.14);
-  color: #fff4b0;
+  color: var(--brand-yellow);
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -709,7 +710,7 @@ label,
 
 .section-heading span {
   color: var(--yellow);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 900;
 }
 
@@ -723,7 +724,7 @@ label,
 .heading-actions .ghost-button {
   min-height: 44px;
   padding: 8px 11px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .section-heading.tight {
@@ -747,8 +748,9 @@ label,
 
 .dex-controls label {
   min-width: 0;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -756,7 +758,7 @@ label,
 .dex-controls select {
   min-height: 44px;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .inventory-filter-tabs {
@@ -782,7 +784,7 @@ label,
   background: rgba(255, 255, 255, 0.055);
   color: var(--muted);
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -800,7 +802,7 @@ label,
   border-radius: 999px;
   background: rgba(3, 8, 20, 0.46);
   color: var(--ink);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
 }
 
 .muted,
@@ -877,14 +879,15 @@ label,
 
 .buy-optional-drawer summary span {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .buy-optional-drawer summary small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -907,15 +910,16 @@ label,
 
 .recent-comp-heading span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .recent-comp-heading button {
   min-height: 30px;
   padding: 5px 9px;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
 }
 
 .recent-comp-row {
@@ -991,20 +995,20 @@ label,
 
 .recent-comp-copy strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   line-height: 1.1;
 }
 
 .recent-comp-copy small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.1;
 }
 
 .recent-comp-copy em {
-  color: #fff4b0;
-  font-size: 11px;
+  color: var(--brand-yellow);
+  font-size: var(--font-size-micro);
   font-style: normal;
   font-weight: 950;
   line-height: 1.1;
@@ -1016,8 +1020,8 @@ label,
 
 .recent-comp-recheck {
   color: rgba(220, 226, 240, 0.76);
-  font-size: 9px;
-  letter-spacing: 0;
+  font-size: var(--font-size-micro);
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -1027,7 +1031,7 @@ label,
   min-height: 72px;
   place-items: center;
   padding: 0;
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 1000;
 }
 
@@ -1055,8 +1059,8 @@ label,
   padding: 6px 8px;
   border-color: rgba(255, 203, 5, 0.26);
   background: rgba(255, 203, 5, 0.1);
-  color: #fff4b0;
-  font-size: 12px;
+  color: var(--brand-yellow);
+  font-size: var(--font-size-micro);
   font-weight: 900;
   text-align: left;
 }
@@ -1067,7 +1071,7 @@ label,
   min-height: 38px;
   place-items: center;
   padding: 0;
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 1000;
 }
 
@@ -1124,14 +1128,14 @@ label,
 .quick-hunt-copy strong {
   overflow-wrap: anywhere;
   color: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   line-height: 1.08;
 }
 
 .quick-hunt-copy small {
   overflow-wrap: anywhere;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.12;
 }
@@ -1160,14 +1164,14 @@ label,
 .selected-card-strip span,
 .selected-card-strip small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .selected-card-strip strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   line-height: 1.08;
 }
 
@@ -1211,7 +1215,7 @@ label,
   border-color: rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 1000;
 }
 
@@ -1254,8 +1258,8 @@ label,
   min-height: 44px;
   border-color: rgba(255, 203, 5, 0.42);
   background: rgba(255, 203, 5, 0.14);
-  color: #fff4b0;
-  font-size: 13px;
+  color: var(--brand-yellow);
+  font-size: var(--font-size-label);
   font-weight: 900;
 }
 
@@ -1374,14 +1378,14 @@ label,
 
 .suggestion-name strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
 .suggestion-set strong,
 .suggestion-number strong {
   color: #dce6f7;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -1389,7 +1393,7 @@ label,
 .suggestion-set small,
 .suggestion-number small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -1408,7 +1412,7 @@ label,
   min-width: 0;
   min-height: 34px;
   padding: 4px 6px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .smart-suggestion-actions button:first-child {
@@ -1430,7 +1434,7 @@ label,
   border-color: rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
   overflow-wrap: anywhere;
 }
@@ -1438,7 +1442,7 @@ label,
 .smart-grade-strip button.selected {
   border-color: rgba(255, 203, 5, 0.58);
   background: rgba(255, 203, 5, 0.16);
-  color: #fff4b0;
+  color: var(--brand-yellow);
 }
 
 .identity-details {
@@ -1469,13 +1473,13 @@ label,
 
 .identity-details > summary strong {
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .identity-details > summary small,
 .identity-details > summary em {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-style: normal;
   font-weight: 850;
 }
@@ -1496,7 +1500,7 @@ label,
   min-height: 44px;
   border-color: rgba(255, 203, 5, 0.42);
   background: rgba(255, 203, 5, 0.14);
-  color: #fff4b0;
+  color: var(--brand-yellow);
 }
 
 .optional-tool-panel {
@@ -1540,21 +1544,21 @@ label,
 
 .optional-tool-panel > summary span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
-  letter-spacing: 0;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .optional-tool-panel > summary strong {
   color: var(--ink);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
   line-height: 1.08;
 }
 
 .optional-tool-panel > summary small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -1604,15 +1608,16 @@ label,
 
 .quick-intake-preview-heading span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .quick-intake-preview-heading strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.12;
   text-align: right;
 }
@@ -1633,7 +1638,7 @@ label,
   background: rgba(3, 8, 20, 0.36);
   padding: 5px 7px;
   color: var(--ink);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   overflow-wrap: anywhere;
 }
@@ -1645,14 +1650,15 @@ label,
 
 .quick-intake-preview-chips b {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .quick-intake-preview p {
   margin: 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.3;
 }
@@ -1687,21 +1693,22 @@ label,
 
 .intake-session-summary span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .intake-session-summary strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .intake-session-summary small {
   max-width: 130px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   text-align: right;
 }
@@ -1728,15 +1735,16 @@ label,
 
 .intake-session-heading span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .intake-session-heading strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.12;
 }
 
@@ -1758,7 +1766,7 @@ label,
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
   overflow-wrap: anywhere;
 }
@@ -1767,7 +1775,7 @@ label,
 .intake-session-presets button.selected {
   border-color: rgba(255, 203, 5, 0.56);
   background: rgba(255, 203, 5, 0.16);
-  color: #fff4b0;
+  color: var(--brand-yellow);
 }
 
 .intake-session-presets {
@@ -1805,13 +1813,13 @@ label,
 
 .psa-lookup-heading strong {
   color: #d8e9ff;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
 .psa-lookup-hint {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
   line-height: 1.35;
   text-transform: none;
@@ -1849,7 +1857,7 @@ label,
   border-radius: 6px;
   background: transparent;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 700;
   text-align: left;
 }
@@ -1883,7 +1891,7 @@ label,
 .suggestion-item small {
   margin-left: auto;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -1919,8 +1927,9 @@ label,
 
 .set-chip-stack > span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -1935,8 +1944,8 @@ label,
   padding: 6px 10px;
   border-color: rgba(42, 117, 187, 0.4);
   background: rgba(42, 117, 187, 0.16);
-  color: #cfe6ff;
-  font-size: 12px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 800;
   white-space: nowrap;
 }
@@ -1944,7 +1953,7 @@ label,
 .set-chip-row.recent-set-row button {
   border-color: rgba(52, 211, 153, 0.34);
   background: rgba(52, 211, 153, 0.12);
-  color: #c7f7df;
+  color: var(--color-success);
 }
 
 .preset-row,
@@ -1967,7 +1976,7 @@ label,
 .sale-channel-presets button.selected {
   border-color: rgba(255, 203, 5, 0.62);
   background: rgba(255, 203, 5, 0.16);
-  color: #fff4b0;
+  color: var(--brand-yellow);
 }
 
 .toggle-control {
@@ -1977,7 +1986,7 @@ label,
   min-height: 42px;
   width: fit-content;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 900;
 }
 
@@ -2002,9 +2011,10 @@ label,
   padding: 12px;
   color: var(--muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
   list-style-position: inside;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -2042,7 +2052,7 @@ label,
 .bottom-nav button {
   min-height: 40px;
   padding: 8px 6px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -2071,7 +2081,7 @@ label,
 .bottom-nav .active,
 .primary-action {
   border-color: rgba(255, 203, 5, 0.86);
-  background: linear-gradient(180deg, var(--yellow), #f59e0b);
+  background: linear-gradient(180deg, var(--yellow), var(--color-warning));
   color: #1b2235;
 }
 
@@ -2093,7 +2103,7 @@ label,
 .secondary-action {
   border-color: rgba(42, 117, 187, 0.56);
   background: rgba(42, 117, 187, 0.22);
-  color: #cfe6ff;
+  color: var(--color-info);
 }
 
 .export-actions {
@@ -2113,8 +2123,8 @@ label,
   border: 1px solid rgba(42, 117, 187, 0.46);
   border-radius: var(--r-md);
   background: rgba(42, 117, 187, 0.18);
-  color: #cfe6ff;
-  font-size: 12px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 900;
   text-decoration: none;
 }
@@ -2160,8 +2170,9 @@ label,
 
 .next-move-kicker {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -2187,8 +2198,8 @@ label,
 }
 
 .next-move-card small {
-  color: #cfe6ff;
-  font-size: 12px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -2240,7 +2251,7 @@ label,
 .setup-step strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
   line-height: 1.12;
 }
 
@@ -2251,7 +2262,7 @@ label,
 .readiness-row small,
 .setup-step small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -2301,7 +2312,7 @@ label,
 .operating-snapshot-card span,
 .operating-snapshot-card small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.2;
 }
@@ -2334,7 +2345,7 @@ label,
 }
 
 .operating-snapshot-card.info strong {
-  color: #cfe6ff;
+  color: var(--color-info);
 }
 
 .automation-inbox-panel {
@@ -2364,7 +2375,7 @@ label,
   background: rgba(255, 255, 255, 0.08);
   padding: 5px 7px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
   text-align: center;
 }
@@ -2390,13 +2401,13 @@ label,
 .automation-alert-row strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.12;
 }
 
 .automation-alert-row small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -2443,8 +2454,8 @@ label,
   place-items: center;
   border: 1px solid rgba(42, 117, 187, 0.36);
   border-radius: 50%;
-  color: #88c8ff;
-  font-size: 14px;
+  color: var(--color-info);
+  font-size: var(--font-size-body-sm);
   font-weight: 1000;
 }
 
@@ -2470,8 +2481,8 @@ label,
   min-width: 48px;
   min-height: 40px;
   padding: 8px 10px;
-  color: #cfe6ff;
-  font-size: 11px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -2481,6 +2492,7 @@ label,
   border-radius: 999px;
   padding: 5px 8px;
   color: var(--yellow);
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -2490,12 +2502,13 @@ label,
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 5px 8px;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .source-health-row small {
   overflow-wrap: anywhere;
-  color: #cfe6ff;
+  color: var(--color-info);
 }
 
 .source-health-row.good > span,
@@ -2511,7 +2524,7 @@ label,
 
 .source-health-row.info > span {
   border-color: rgba(42, 117, 187, 0.46);
-  color: #88c8ff;
+  color: var(--color-info);
 }
 
 .source-health-row.danger > span {
@@ -2548,7 +2561,7 @@ label,
 .provider-health-row span,
 .provider-health-row small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
 }
 
 .provider-health-row.state-ok > div:last-child strong {
@@ -2573,7 +2586,7 @@ label,
   border: 1px solid rgba(255, 203, 5, 0.3);
   border-radius: 50%;
   color: var(--yellow);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 1000;
 }
 
@@ -2581,8 +2594,8 @@ label,
   min-width: 48px;
   min-height: 40px;
   padding: 8px 10px;
-  color: #cfe6ff;
-  font-size: 11px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -2594,8 +2607,8 @@ label,
 
 .command-grid button {
   min-height: 42px;
-  color: #cfe6ff;
-  font-size: 12px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -2621,14 +2634,14 @@ label,
 .pnl-empty-note strong,
 .profit-sparkline strong {
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--font-size-body);
 }
 
 .pnl-empty-note span,
 .profit-sparkline span,
 .profit-sparkline small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -2665,7 +2678,7 @@ label,
   background: rgba(3, 8, 20, 0.34);
   padding: 5px 8px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -2704,7 +2717,7 @@ label,
 
 .channel-row strong {
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
 }
 
 .channel-row.good > div:nth-child(2) strong {
@@ -2718,7 +2731,7 @@ label,
 .channel-row span,
 .channel-row small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -2786,7 +2799,7 @@ label,
 .expense-presets button {
   border-color: rgba(255, 203, 5, 0.28);
   background: rgba(255, 203, 5, 0.1);
-  color: #fff4b0;
+  color: var(--brand-yellow);
 }
 
 .expense-row {
@@ -2813,19 +2826,19 @@ label,
 .expense-row strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .expense-row span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .expense-row button {
   min-height: 30px;
   padding: 5px 8px;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
 }
 
 .watch-panel {
@@ -2857,8 +2870,8 @@ label,
 }
 
 .target-suggestion span {
-  color: #fff2a6;
-  font-size: 11px;
+  color: var(--brand-yellow);
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -2876,7 +2889,7 @@ label,
 .target-suggestion small {
   overflow-wrap: anywhere;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -2885,7 +2898,7 @@ label,
   min-height: 38px;
   border-color: rgba(255, 203, 5, 0.32);
   color: var(--yellow);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -2924,14 +2937,15 @@ label,
 
 .buy-target-presets span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .buy-target-presets strong {
   color: var(--yellow);
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
   line-height: 1;
 }
 
@@ -2986,13 +3000,13 @@ label,
 
 .stock-import-panel summary span {
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: 1000;
 }
 
 .stock-import-panel summary small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -3014,7 +3028,7 @@ label,
   border-color: rgba(139, 92, 246, 0.34);
   background: rgba(139, 92, 246, 0.12);
   color: #eadcff;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -3055,15 +3069,16 @@ label,
   background: rgba(52, 211, 153, 0.08);
   padding: 7px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .stock-import-summary strong {
   overflow-wrap: anywhere;
   color: var(--green);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
   line-height: 1.05;
 }
 
@@ -3071,13 +3086,13 @@ label,
 .stock-import-errors span {
   overflow-wrap: anywhere;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.28;
 }
 
 .stock-import-errors span {
-  color: #fff4b0;
+  color: var(--brand-yellow);
 }
 
 .recent-intake-panel {
@@ -3087,7 +3102,7 @@ label,
 }
 
 .recent-intake-panel .panel-heading > strong {
-  color: #88c8ff;
+  color: var(--color-info);
   font-size: 18px;
   line-height: 1;
 }
@@ -3117,18 +3132,18 @@ label,
 .recent-intake-row strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .recent-intake-total {
   justify-self: end;
-  color: #88c8ff;
+  color: var(--color-info);
   white-space: nowrap;
 }
 
 .recent-intake-row span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -3144,7 +3159,7 @@ label,
   padding: 6px 8px;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.06);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -3173,23 +3188,23 @@ label,
 
 .last-stocked-copy span {
   color: var(--green);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
-  letter-spacing: 0;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .last-stocked-copy strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.1;
 }
 
 .last-stocked-copy small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -3208,8 +3223,8 @@ label,
   padding: 6px 8px;
   border-radius: 7px;
   background: rgba(52, 211, 153, 0.1);
-  color: #c7f7df;
-  font-size: 11px;
+  color: var(--color-success);
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -3242,7 +3257,7 @@ label,
 
 .portfolio-value span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -3269,7 +3284,7 @@ label,
 .trend-row span,
 .trend-row strong {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -3289,7 +3304,7 @@ label,
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--green), #88c8ff);
+  background: linear-gradient(90deg, var(--green), var(--brand-blue));
 }
 
 .comp-hero {
@@ -3315,7 +3330,7 @@ label,
 .comp-skip-button {
   min-height: 28px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .rarity-chip {
@@ -3424,7 +3439,7 @@ label,
 .deal-session-line span,
 .deal-session-line small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .deal-session-line-actions {
@@ -3435,7 +3450,7 @@ label,
 
 .deal-session-line-actions label {
   width: 92px;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
 }
 
 .deal-session-line-actions input {
@@ -3446,7 +3461,7 @@ label,
 .deal-session-line-actions button {
   min-height: 32px;
   padding: 5px 9px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .comp-identity-strip div {
@@ -3459,14 +3474,14 @@ label,
 .comp-identity-strip small {
   overflow-wrap: anywhere;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .comp-identity-strip strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
   line-height: 1.08;
 }
 
@@ -3496,7 +3511,7 @@ label,
   border-radius: 999px;
   padding: 4px 8px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -3523,7 +3538,7 @@ label,
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
     0 6px 14px rgba(0, 0, 0, 0.18);
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
   letter-spacing: 0;
 }
@@ -3572,7 +3587,7 @@ label,
 }
 
 .pill.info {
-  color: #88c8ff;
+  color: var(--color-info);
 }
 
 .pill.danger,
@@ -3582,7 +3597,7 @@ label,
 }
 
 .ebay-reconnect-callout a {
-  color: #fff4b0;
+  color: var(--brand-yellow);
   font-weight: 950;
 }
 
@@ -3648,12 +3663,12 @@ label,
 }
 
 .cache-badge strong {
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .cache-badge span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -3666,18 +3681,19 @@ label,
 .stock-reprice-card span,
 .stock-reprice-card small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
 .stock-reprice-card span {
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .stock-reprice-card strong {
   overflow-wrap: anywhere;
   color: var(--green);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
 }
 
 .stock-reprice-card button {
@@ -3705,7 +3721,7 @@ label,
   background: rgba(251, 113, 133, 0.1);
   color: #ffc2ce;
   padding: 9px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -3729,14 +3745,14 @@ label,
 .listing-price-summary span,
 .listing-price-summary small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
 .pricing-context-grid strong,
 .listing-price-summary strong {
   color: var(--ink);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
 }
 
 .listing-price-summary {
@@ -3760,7 +3776,7 @@ label,
 
 .listing-paid-price {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -3813,13 +3829,13 @@ label,
 .stock-listing-plan span,
 .stock-listing-plan small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
 .stock-listing-plan strong {
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.2;
 }
 
@@ -3858,7 +3874,7 @@ label,
 .buy-result-summary small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
   line-height: 1.15;
   text-overflow: ellipsis;
@@ -3868,7 +3884,7 @@ label,
 .buy-result-summary strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
   font-weight: 1000;
   line-height: 1.08;
 }
@@ -3886,7 +3902,7 @@ label,
 .buy-result-chip-row button {
   min-height: 44px;
   padding-inline: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.05;
 }
 
@@ -3899,7 +3915,7 @@ label,
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.07);
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -3920,13 +3936,13 @@ label,
 
 .more-grade-details summary span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
 .more-grade-details summary strong {
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.1;
 }
 
@@ -3965,7 +3981,7 @@ label,
 .deal-tool-actions small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -3973,7 +3989,7 @@ label,
 
 .deal-tool-actions strong {
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.15;
 }
 
@@ -4009,12 +4025,12 @@ label,
 
 .stock-progress-card strong {
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .stock-progress-card small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   line-height: 1.25;
 }
 
@@ -4033,16 +4049,16 @@ label,
   min-height: 36px;
   border-color: rgba(255, 203, 5, 0.34);
   background: rgba(255, 203, 5, 0.12);
-  color: #fff4b0;
+  color: var(--brand-yellow);
   padding: 7px 9px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
   white-space: nowrap;
 }
 
 .quick-offer-presets button.selected {
   border-color: rgba(255, 203, 5, 0.86);
-  background: linear-gradient(180deg, var(--yellow), #f59e0b);
+  background: linear-gradient(180deg, var(--yellow), var(--color-warning));
   color: #1b2235;
   box-shadow: 0 0 0 2px rgba(255, 203, 5, 0.18);
 }
@@ -4050,7 +4066,7 @@ label,
 .checked-comp-price-presets button {
   border-color: rgba(52, 211, 153, 0.32);
   background: rgba(52, 211, 153, 0.1);
-  color: #c7f7df;
+  color: var(--color-success);
 }
 
 .manual-rescue-card {
@@ -4079,7 +4095,7 @@ label,
 .manual-rescue-card span,
 .manual-rescue-card li {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.28;
 }
@@ -4119,8 +4135,9 @@ label,
 
 .catalog-alternatives-heading span,
 .catalog-alternatives-heading strong {
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -4129,7 +4146,7 @@ label,
 }
 
 .catalog-alternatives-heading strong {
-  color: #88c8ff;
+  color: var(--color-info);
 }
 
 .catalog-alternative-row {
@@ -4169,13 +4186,13 @@ label,
 
 .catalog-alternative-card strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   line-height: 1.1;
 }
 
 .catalog-alternative-card small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.12;
 }
@@ -4220,7 +4237,7 @@ label,
 
 .quick-stock-heading span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -4259,7 +4276,7 @@ label,
   border-color: rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -4310,14 +4327,14 @@ label,
 .dealer-verdict span,
 .dealer-verdict small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
 .dealer-verdict strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--font-size-body);
 }
 
 .dealer-verdict.good strong {
@@ -4345,7 +4362,7 @@ label,
   border-color: rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -4363,12 +4380,12 @@ label,
 .market-signal span,
 .market-signal small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
 .market-signal strong {
-  color: #88c8ff;
+  color: var(--color-info);
   font-size: 18px;
 }
 
@@ -4407,18 +4424,18 @@ label,
 
 .psa-cert-heading span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
 .psa-cert-heading strong {
   display: block;
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
 }
 
 .psa-cert-heading small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .psa-cert-pop {
@@ -4445,8 +4462,9 @@ label,
 
 .psa-cert-data span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -4454,7 +4472,7 @@ label,
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .psa-mismatch-list {
@@ -4473,21 +4491,22 @@ label,
 
 .psa-mismatch-list span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .psa-mismatch-list strong {
   overflow-wrap: anywhere;
   color: var(--yellow);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .psa-mismatch-list small {
   overflow-wrap: anywhere;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -4508,7 +4527,7 @@ label,
   background: rgba(42, 117, 187, 0.16);
   color: #d8e9ff;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -4553,7 +4572,7 @@ label,
 .ask-undercut span,
 .ask-undercut small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -4586,21 +4605,21 @@ label,
 .ask-listings span {
   overflow: hidden;
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ask-listings strong {
-  color: #88c8ff;
-  font-size: 13px;
+  color: var(--color-info);
+  font-size: var(--font-size-label);
 }
 
 .ask-listings small {
   grid-column: 1 / -1;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -4641,15 +4660,16 @@ label,
 
 .psa-receipt-chip span {
   color: var(--green);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .psa-receipt-chip strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   text-align: right;
 }
 
@@ -4685,7 +4705,7 @@ label,
 .lookup-progress-card p,
 .lookup-cached-comp span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -4902,12 +4922,12 @@ label,
 .receipt-heading strong,
 .receipt-row span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .receipt-heading strong {
-  color: #cfe6ff;
+  color: var(--color-info);
 }
 
 .receipt-list {
@@ -4936,7 +4956,7 @@ label,
   background: rgba(136, 200, 255, 0.14);
   color: #bfe2ff;
   content: "i";
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
   line-height: 1;
 }
@@ -4964,7 +4984,7 @@ label,
 }
 
 .receipt-row.info {
-  border-left-color: #88c8ff;
+  border-left-color: var(--brand-blue);
 }
 
 .receipt-row.danger {
@@ -4992,7 +5012,7 @@ label,
 .receipt-row strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.15;
 }
 
@@ -5005,7 +5025,7 @@ label,
 }
 
 .receipt-row.info strong {
-  color: #88c8ff;
+  color: var(--color-info);
 }
 
 .receipt-row.danger strong {
@@ -5030,7 +5050,7 @@ label,
 
 .reconciliation-notes li {
   color: #f8e7a0;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.25;
 }
@@ -5066,13 +5086,13 @@ label,
 
 .poketrace-signal-row strong {
   overflow-wrap: anywhere;
-  color: #cfe6ff;
-  font-size: 13px;
+  color: var(--color-info);
+  font-size: var(--font-size-label);
 }
 
 .poketrace-signal-row span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -5111,20 +5131,20 @@ label,
 
 .grade-ladder-row .grade-ladder-grade {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .grade-ladder-row strong {
-  font-size: 15px;
+  font-size: var(--font-size-body);
   color: var(--ink);
 }
 
 .grade-ladder-row .grade-ladder-sample {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 700;
 }
 
@@ -5180,15 +5200,16 @@ label,
 .manual-comp-search span {
   grid-column: 1 / -1;
   min-width: 0;
-  color: #fff2a6;
-  font-size: 12px;
+  color: var(--brand-yellow);
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
 .manual-comp-heading strong {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -5224,7 +5245,7 @@ label,
   border: 1px solid rgba(255, 203, 5, 0.32);
   border-radius: var(--r-md);
   padding: 6px 9px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
   text-align: center;
   text-decoration: none;
@@ -5246,7 +5267,7 @@ label,
   background: rgba(3, 8, 20, 0.28);
   padding: 7px 9px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -5257,7 +5278,7 @@ label,
 .manual-comp-links a.primary-link {
   border-color: rgba(52, 211, 153, 0.48);
   background: rgba(52, 211, 153, 0.14);
-  color: #c7f7df;
+  color: var(--color-success);
 }
 
 .manual-comp-links a.terapeak-link {
@@ -5269,7 +5290,7 @@ label,
   border-style: solid;
   border-color: rgba(255, 203, 5, 0.52);
   background: rgba(255, 203, 5, 0.16);
-  color: #fff2a6;
+  color: var(--brand-yellow);
 }
 
 .checked-comp-card {
@@ -5329,14 +5350,14 @@ label,
 
 .checked-comp-heading span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .checked-comp-heading strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   line-height: 1.1;
 }
 
@@ -5347,7 +5368,7 @@ label,
 .checked-comp-heading button {
   min-width: 64px;
   min-height: 34px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -5366,14 +5387,14 @@ label,
 .checked-comp-quick-actions button {
   min-height: 38px;
   padding: 7px 8px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
 .checked-comp-quick-actions button:first-child {
   border-color: rgba(52, 211, 153, 0.36);
   background: rgba(52, 211, 153, 0.12);
-  color: #c7f7df;
+  color: var(--color-success);
 }
 
 .checked-comp-return {
@@ -5387,13 +5408,13 @@ label,
 
 .checked-comp-return strong {
   color: var(--yellow);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
 .checked-comp-return span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
   line-height: 1.25;
 }
@@ -5415,7 +5436,7 @@ label,
 .checked-comp-source-url summary {
   cursor: pointer;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -5459,14 +5480,14 @@ label,
 
 .checked-comp-entry-row strong {
   color: var(--green);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 1000;
 }
 
 .checked-comp-entry-row span,
 .checked-comp-entry-row small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
   line-height: 1.2;
 }
@@ -5481,13 +5502,13 @@ label,
   min-height: 38px;
   padding: 7px 6px;
   overflow-wrap: anywhere;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .checked-comp-presets .selected {
   border-color: rgba(255, 203, 5, 0.86);
-  background: linear-gradient(180deg, var(--yellow), #f59e0b);
+  background: linear-gradient(180deg, var(--yellow), var(--color-warning));
   color: #1b2235;
 }
 
@@ -5528,7 +5549,7 @@ label,
 .owned-sales-signal span,
 .owned-sales-signal small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -5560,7 +5581,7 @@ label,
 .grade-verdict span,
 .catalog-strip span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
 }
 
@@ -5568,7 +5589,7 @@ label,
 .grade-verdict strong,
 .catalog-strip strong {
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
 }
 
 .catalog-strip {
@@ -5597,7 +5618,7 @@ label,
 .catalog-strip small {
   overflow-wrap: anywhere;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .source-match-typed {
@@ -5618,7 +5639,7 @@ label,
   background: rgba(255, 203, 5, 0.1);
   color: var(--yellow);
   padding: 5px 8px;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -5729,7 +5750,7 @@ label,
   border-radius: 50%;
   background:
     radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.75), transparent 20%),
-    linear-gradient(145deg, #ffe08a, #f59e0b);
+    linear-gradient(145deg, #ffe08a, var(--color-warning));
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.34);
   transform-origin: center;
   animation: toast-coin-flip 0.74s ease-out 1;
@@ -5751,9 +5772,9 @@ label,
   border: 1px solid rgba(255, 203, 5, 0.44);
   border-radius: var(--r-sm);
   background: rgba(255, 203, 5, 0.14);
-  color: #fff4b0;
+  color: var(--brand-yellow);
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
   text-decoration: none;
 }
@@ -5819,9 +5840,9 @@ label,
   width: 42%;
   align-items: center;
   padding: 0 16px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
-  letter-spacing: 0;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -5868,20 +5889,20 @@ label,
 
 .item-row h3 {
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
   line-height: 1.14;
 }
 
 .listing-row-price {
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: 1000;
 }
 
 .listing-row-economics {
   border-left: 3px solid rgba(255, 203, 5, 0.44);
   padding-left: 8px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
   line-height: 1.25;
 }
@@ -5909,7 +5930,7 @@ label,
   gap: 5px 8px;
   min-width: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.25;
 }
@@ -5937,7 +5958,7 @@ label,
   background: rgba(255, 203, 5, 0.08);
   color: var(--yellow);
   padding: 4px 7px;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -5970,7 +5991,7 @@ label,
   min-width: 0;
   min-height: 42px;
   padding: 8px 9px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -5999,7 +6020,7 @@ label,
   background: rgba(255, 255, 255, 0.055);
   color: var(--muted);
   padding: 8px 11px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
   list-style: none;
   cursor: pointer;
@@ -6040,10 +6061,10 @@ label,
   place-items: center;
   border: 1px solid rgba(255, 203, 5, 0.52);
   border-radius: var(--r-md);
-  background: linear-gradient(180deg, var(--yellow), #f59e0b);
+  background: linear-gradient(180deg, var(--yellow), var(--color-warning));
   color: #1b2235;
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
   text-align: center;
   text-decoration: none;
@@ -6079,9 +6100,9 @@ label,
   background: rgba(42, 117, 187, 0.12);
   color: rgba(202, 224, 255, 0.92);
   padding: 4px 7px;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
-  letter-spacing: 0;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -6097,7 +6118,7 @@ label,
 .danger-button {
   min-height: 44px;
   padding: 8px 11px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -6130,13 +6151,13 @@ label,
 
 .row-action-sheet-list button span {
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 1000;
 }
 
 .row-action-sheet-list button small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
   line-height: 1.25;
 }
@@ -6210,10 +6231,11 @@ label,
 .inventory-photo-chip > span {
   overflow: hidden;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
   text-align: center;
   text-overflow: ellipsis;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -6228,7 +6250,7 @@ label,
   min-height: 44px;
   padding: 7px 8px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -6250,7 +6272,7 @@ label,
   background: rgba(42, 117, 187, 0.12);
   color: var(--text);
   padding: 8px 11px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -6262,7 +6284,7 @@ label,
 .photo-nudge {
   margin: 0;
   color: var(--yellow);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -6278,7 +6300,7 @@ label,
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
   list-style: none;
   cursor: pointer;
@@ -6299,13 +6321,13 @@ label,
   min-width: 0;
   min-height: 44px;
   border-radius: var(--r-md);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .manual-photo-url button {
   min-height: 44px;
   padding: 8px 11px;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -6349,24 +6371,24 @@ label,
 .sale-mini-row strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .sale-mini-row .sale-result strong {
   color: var(--green);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
 }
 
 .sale-undo-button {
   min-height: 28px;
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
 }
 
 .sale-mini-row span,
 .sale-mini-row small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -6385,12 +6407,12 @@ label,
 .alert-status strong,
 .reprice-row span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .alert-status strong {
-  color: #88c8ff;
+  color: var(--color-info);
 }
 
 .reprice-list {
@@ -6423,7 +6445,7 @@ label,
 .reprice-row strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .reprice-row.raise strong {
@@ -6439,7 +6461,7 @@ label,
   padding: 6px 10px;
   border-color: rgba(255, 203, 5, 0.46);
   color: var(--yellow);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -6513,7 +6535,7 @@ label,
 
 .watch-controls label {
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--font-size-micro);
 }
 
 .watch-controls input,
@@ -6527,7 +6549,7 @@ label,
 
 .watch-controls button {
   padding: 6px 9px;
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -6540,7 +6562,7 @@ label,
 .watch-hit-row strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .watch-hit-row strong {
@@ -6551,7 +6573,7 @@ label,
 .watch-row small,
 .watch-hit-row span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -6659,8 +6681,9 @@ label,
 .scan-sheet-heading span,
 .scan-confirm-card span {
   color: var(--yellow);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -6676,7 +6699,7 @@ label,
 .scan-confirm-card small,
 .scan-manual-card small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   line-height: 1.35;
 }
 
@@ -6752,7 +6775,7 @@ label,
   border-radius: var(--r-sm);
   background: rgba(255, 255, 255, 0.06);
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6764,8 +6787,8 @@ label,
   border: 1px solid rgba(255, 203, 5, 0.32);
   border-radius: var(--r-sm);
   background: rgba(255, 203, 5, 0.1);
-  color: #fff4b0;
-  font-size: 12px;
+  color: var(--brand-yellow);
+  font-size: var(--font-size-micro);
   line-height: 1.35;
 }
 
@@ -6797,8 +6820,9 @@ label,
 
 .scan-art-compare figcaption {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -6830,9 +6854,9 @@ label,
 
 .scan-comp-ready-heading > span {
   color: var(--green);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -6845,7 +6869,7 @@ label,
 .scan-comp-ready-heading > small,
 .scan-comp-ready > small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   line-height: 1.35;
 }
 
@@ -6864,15 +6888,16 @@ label,
   border-radius: 10px;
   background: rgba(3, 8, 20, 0.36);
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .scan-ready-checks strong {
   overflow: hidden;
   color: var(--green);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   text-overflow: ellipsis;
   text-transform: none;
   white-space: nowrap;
@@ -6921,12 +6946,12 @@ label,
 
 .scan-candidate-grid strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
 }
 
 .scan-candidate-grid small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
 }
 
 .scan-confirm-card,
@@ -6975,8 +7000,8 @@ label,
   border: 1px solid rgba(255, 203, 5, 0.36);
   border-radius: var(--r-sm);
   background: rgba(255, 203, 5, 0.12);
-  color: #fff4b0;
-  font-size: 13px;
+  color: var(--brand-yellow);
+  font-size: var(--font-size-label);
   font-weight: 950;
   text-align: center;
   cursor: pointer;
@@ -7105,7 +7130,7 @@ label,
 .ebay-publish-card small,
 .ebay-publish-card span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -7153,7 +7178,7 @@ label,
 .sales-desk-panel .listing-desk-card button {
   border-color: rgba(42, 117, 187, 0.46);
   background: rgba(42, 117, 187, 0.18);
-  color: #cfe6ff;
+  color: var(--color-info);
 }
 
 .listing-desk-card {
@@ -7178,7 +7203,7 @@ label,
 .listing-desk-card small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7188,7 +7213,7 @@ label,
   overflow-wrap: anywhere;
   hyphens: auto;
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   line-height: 1.08;
 }
 
@@ -7197,8 +7222,8 @@ label,
   padding: 7px 10px;
   border-color: rgba(52, 211, 153, 0.38);
   background: rgba(52, 211, 153, 0.14);
-  color: #c7f7df;
-  font-size: 12px;
+  color: var(--color-success);
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -7240,8 +7265,9 @@ label,
 
 .listing-price-editor > span:first-child {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -7258,8 +7284,8 @@ label,
 }
 
 .listing-price-editor small {
-  color: #cfe6ff;
-  font-size: 11px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -7276,8 +7302,9 @@ label,
 .listing-title-editor span,
 .listing-title-editor > div strong {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -7285,13 +7312,13 @@ label,
   width: 100%;
   min-height: 44px;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
   font-weight: 900;
 }
 
 .listing-title-editor small {
-  color: #cfe6ff;
-  font-size: 11px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -7314,15 +7341,16 @@ label,
 .listing-pack-summary span,
 .listing-pack-specifics strong {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .listing-pack-summary strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.12;
 }
 
@@ -7349,7 +7377,7 @@ label,
 
 .listing-economics span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -7362,7 +7390,7 @@ label,
 
 .listing-economics small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.2;
 }
@@ -7404,13 +7432,13 @@ label,
   overflow-wrap: anywhere;
   hyphens: auto;
   color: var(--ink);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
   line-height: 1.08;
 }
 
 .listing-next-action small {
-  color: #cfe6ff;
-  font-size: 11px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.2;
 }
@@ -7419,8 +7447,8 @@ label,
   min-height: 42px;
   border-color: rgba(52, 211, 153, 0.48);
   background: rgba(52, 211, 153, 0.14);
-  color: #dfffe7;
-  font-size: 12px;
+  color: var(--color-success);
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -7441,7 +7469,7 @@ label,
   padding: 11px 0 9px;
   color: #d9e9ff;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -7468,12 +7496,12 @@ label,
 
 .ebay-ready-summary strong {
   color: var(--green);
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
 }
 
 .ebay-ready-summary span {
-  color: #c7f7df;
-  font-size: 11px;
+  color: var(--color-success);
+  font-size: var(--font-size-micro);
   font-weight: 850;
 }
 
@@ -7505,7 +7533,7 @@ label,
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -7517,7 +7545,7 @@ label,
 
 .listing-flow-step strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   line-height: 1.12;
 }
 
@@ -7527,16 +7555,16 @@ label,
   border-radius: 999px;
   color: var(--muted);
   padding: 2px 6px;
-  font-size: 9px;
+  font-size: var(--font-size-micro);
   font-style: normal;
   font-weight: 1000;
-  letter-spacing: 0;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .listing-flow-step small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 800;
   line-height: 1.2;
 }
@@ -7597,14 +7625,14 @@ label,
   padding: 7px 8px;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.06);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .listing-field-actions button.selected {
   border-color: rgba(123, 214, 143, 0.52);
   background: rgba(123, 214, 143, 0.14);
-  color: #dfffe7;
+  color: var(--color-success);
 }
 
 .listing-pack-specifics {
@@ -7616,7 +7644,7 @@ label,
 .listing-pack-specifics span {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.22;
 }
@@ -7624,7 +7652,7 @@ label,
 .listing-pack-sheet textarea {
   min-height: 190px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   line-height: 1.35;
 }
 
@@ -7647,7 +7675,7 @@ label,
 .listing-pack-actions .listing-pack-sale-action {
   border-color: rgba(123, 214, 143, 0.45);
   background: rgba(123, 214, 143, 0.12);
-  color: #dfffe7;
+  color: var(--color-success);
 }
 
 .slide-confirm {
@@ -7702,7 +7730,7 @@ label,
   height: 52px;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(180deg, #fff1a8, #f59e0b);
+  background: linear-gradient(180deg, #fff1a8, var(--color-warning));
   color: #1b2235;
   font-size: 34px;
   font-weight: 1000;
@@ -7733,14 +7761,15 @@ label,
 }
 
 .slide-confirm-label strong {
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .slide-confirm-label small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -7792,21 +7821,22 @@ label,
 
 .sale-breakdown span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .sale-breakdown strong {
   overflow-wrap: anywhere;
   color: #eaf4ff;
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
   line-height: 1.08;
 }
 
 .sale-breakdown small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.2;
 }
@@ -7819,7 +7849,7 @@ label,
 
 .sale-preview span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -7831,7 +7861,7 @@ label,
 
 .sale-preview small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.2;
 }
@@ -7879,21 +7909,22 @@ label,
 
 .sale-prompt-card span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
 .sale-prompt-card strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
   line-height: 1.08;
 }
 
 .sale-prompt-card small {
-  color: #cfe6ff;
-  font-size: 11px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 850;
   line-height: 1.2;
 }
@@ -7902,8 +7933,8 @@ label,
   min-height: 42px;
   border-color: rgba(52, 211, 153, 0.48);
   background: rgba(52, 211, 153, 0.14);
-  color: #dfffe7;
-  font-size: 12px;
+  color: var(--color-success);
+  font-size: var(--font-size-micro);
   font-weight: 1000;
 }
 
@@ -7919,8 +7950,9 @@ label,
 
 .sale-shortcut-group > span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
   font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -7935,8 +7967,8 @@ label,
   padding: 6px 5px;
   border-color: rgba(42, 117, 187, 0.32);
   background: rgba(42, 117, 187, 0.12);
-  color: #cfe6ff;
-  font-size: 11px;
+  color: var(--color-info);
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -7970,7 +8002,7 @@ label,
 .price-preview span,
 .price-preview small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -7995,8 +8027,8 @@ label,
   min-height: 36px;
   border-color: rgba(255, 203, 5, 0.42);
   background: rgba(255, 203, 5, 0.14);
-  color: #fff4b0;
-  font-size: 12px;
+  color: var(--brand-yellow);
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -8020,14 +8052,14 @@ label,
 .split-cost-card span,
 .split-cost-card small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
 .split-cost-card strong {
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
   line-height: 1.1;
 }
 
@@ -8037,7 +8069,7 @@ label,
   border-color: rgba(42, 117, 187, 0.4);
   background: rgba(42, 117, 187, 0.18);
   color: #d9ecff;
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   font-weight: 950;
 }
 
@@ -8075,7 +8107,7 @@ label,
 .buy-plan span,
 .buy-plan small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
 }
 
@@ -8109,7 +8141,7 @@ label,
 }
 
 .buy-plan.compact strong {
-  font-size: 16px;
+  font-size: var(--font-size-body-lg);
 }
 
 .buy-plan.compact .buy-plan-heading strong {
@@ -8123,7 +8155,7 @@ label,
 
 .buy-plan .buy-plan-sale-side strong {
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
   font-weight: 900;
 }
 
@@ -8203,7 +8235,7 @@ label,
 .mobile-buy-action small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   font-weight: 900;
   line-height: 1.12;
   text-overflow: ellipsis;
@@ -8243,7 +8275,7 @@ label,
   min-width: 0;
   min-height: 48px;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--font-size-label);
   line-height: 1.05;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -8290,7 +8322,7 @@ label,
 
 .confirm-sheet span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 800;
 }
 
@@ -8611,7 +8643,7 @@ label,
   top: 50%;
   right: 10px;
   font-family: var(--font-data);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   letter-spacing: 2px;
   transform: translateY(-50%);
 }
@@ -8637,7 +8669,7 @@ label,
   flex: 0 0 20px;
   place-items: center;
   font-family: var(--font-data);
-  font-size: 12px;
+  font-size: var(--font-size-micro);
   line-height: 1;
 }
 
@@ -8661,7 +8693,7 @@ label,
 .verdict-ebay-action::before { content: "↗"; }
 
 .checked-comp-finish-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.12); }
-.checked-comp-finish-actions::before { content: "Step 3 · finish"; grid-column: 1 / -1; color: var(--muted); font-size: 11px; font-weight: 950; text-transform: uppercase; letter-spacing: .04em; }
+.checked-comp-finish-actions::before { content: "Step 3 · finish"; grid-column: 1 / -1; color: var(--muted); font-size: var(--font-size-micro); font-weight: 950; text-transform: uppercase; letter-spacing: var(--letter-spacing-label); }
 
 .ghost-button.verdict-pass-action {
   border-color: var(--verdict-pass-border);
@@ -8733,7 +8765,7 @@ label,
 
 .bottom-nav .active {
   border-color: color-mix(in srgb, var(--brand-yellow) 82%, white 18%);
-  background: linear-gradient(180deg, var(--brand-yellow), #f59e0b);
+  background: linear-gradient(180deg, var(--brand-yellow), var(--color-warning));
   color: var(--brand-ink);
 }
 
@@ -8882,7 +8914,7 @@ label,
   color: var(--color-text-secondary);
   font-size: var(--font-size-micro);
   font-weight: var(--font-weight-medium);
-  letter-spacing: 0.025em;
+  letter-spacing: var(--letter-spacing-label);
   text-transform: uppercase;
 }
 
@@ -8901,11 +8933,6 @@ label,
   box-shadow: inset 0 -3px 0 rgba(17, 24, 39, 0.18);
 }
 
-.secondary-action {
-  border-color: color-mix(in srgb, var(--type-water) 58%, var(--color-border));
-  background: color-mix(in srgb, var(--type-water) 14%, var(--color-surface-2));
-  color: #d9e7ff;
-}
 
 .next-action-button.good,
 .export-link.good {
@@ -9101,26 +9128,8 @@ button:disabled,
   color: var(--view-on-accent);
 }
 
-.inventory-filter-tabs {
-  padding-right: var(--space-7);
-  scroll-padding-inline: var(--space-2);
-  scroll-snap-type: x proximity;
-  mask-image: linear-gradient(90deg, #000 0 calc(100% - 28px), transparent 100%);
-}
 
-.inventory-filter-tabs button {
-  min-height: var(--touch-target-min);
-  scroll-snap-align: start;
-  background: var(--color-surface-2);
-  font-size: 0.75rem;
-}
 
-.inventory-filter-tabs button.selected {
-  border-color: var(--view-accent-border);
-  background: var(--view-accent-soft);
-  color: var(--view-accent);
-  box-shadow: inset 0 -2px 0 var(--view-accent);
-}
 
 .dex-controls {
   border-color: var(--view-accent-border);
@@ -9214,14 +9223,12 @@ button:disabled,
   .notice,
   .bottom-nav,
   .topbar,
-  .inventory-filter-tabs button,
   .provider-health-row {
     border: 1px solid CanvasText;
     box-shadow: none;
   }
 
-  .bottom-nav [aria-current="page"],
-  .inventory-filter-tabs button.selected {
+  .bottom-nav [aria-current="page"] {
     outline: 3px solid Highlight;
     outline-offset: -3px;
   }
