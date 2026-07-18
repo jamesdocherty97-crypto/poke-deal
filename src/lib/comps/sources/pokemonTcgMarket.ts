@@ -7,6 +7,7 @@ import type { CompSource, CompSourceContext } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import {
   addRequestedVariantHint,
+  detectCardPrintIdentity,
   requestsFirstEdition,
   requestsHolo,
   requestsNormal,
@@ -110,46 +111,32 @@ export function pickCatalogPriceSignalForRequest(
   card: CardRef,
 ): CatalogPriceSignal | null {
   if (!signals || signals.length === 0) return null;
+  const requested = { ...detectCardPrintIdentity(card), edition: card.edition ?? detectCardPrintIdentity(card).edition, finish: card.finish ?? detectCardPrintIdentity(card).finish };
+  let eligible = signals;
 
-  if (requestsReverseHolo(card)) {
-    const reverse = signals.filter((signal) => normalizeSignalVariant(signal.variant).startsWith("reverseholo"));
-    if (reverse.length > 0) return pickCatalogPriceSignal(reverse);
+  if (requested.edition === "FIRST_EDITION") {
+    eligible = eligible.filter((signal) => normalizeSignalVariant(signal.variant).startsWith("1stedition"));
+  } else if (requested.edition === "UNLIMITED") {
+    eligible = eligible.filter((signal) => normalizeSignalVariant(signal.variant).startsWith("unlimited"));
+  } else if (requested.edition) {
+    return null;
   }
+  if (eligible.length === 0) return null;
 
-  if (requestsHolo(card)) {
-    const holo = signals.filter((signal) => {
+  if (requestsReverseHolo(card) || requested.finish === "REVERSE_HOLO") {
+    eligible = eligible.filter((signal) => normalizeSignalVariant(signal.variant).startsWith("reverseholo"));
+  } else if (requestsHolo(card) || requested.finish === "HOLO") {
+    eligible = eligible.filter((signal) => {
       const variant = normalizeSignalVariant(signal.variant);
       return variant.includes("holo") && !variant.includes("reverse");
     });
-    if (holo.length > 0) return pickCatalogPriceSignal(holo);
-  }
-
-  if (requestsNormal(card)) {
-    const normal = signals.filter((signal) => normalizeSignalVariant(signal.variant) === "normal");
-    if (normal.length > 0) return pickCatalogPriceSignal(normal);
-  }
-
-  if (!requestsFirstEdition(card)) return pickCatalogPriceSignal(signals);
-
-  const firstEditionSignals = signals.filter((signal) =>
-    normalizeSignalVariant(signal.variant).startsWith("1stedition"),
-  );
-  if (firstEditionSignals.length === 0) return null;
-
-  if (requestsHolo(card)) {
-    const firstEditionHolo = firstEditionSignals.filter((signal) => {
+  } else if (requestsNormal(card) || requested.finish === "NORMAL") {
+    eligible = eligible.filter((signal) => {
       const variant = normalizeSignalVariant(signal.variant);
-      return variant.includes("holo") && !variant.includes("reverse");
+      return variant === "normal" || variant.endsWith("normal");
     });
-    if (firstEditionHolo.length > 0) return pickCatalogPriceSignal(firstEditionHolo);
   }
-
-  if (requestsNormal(card)) {
-    const firstEditionNormal = firstEditionSignals.filter((signal) => normalizeSignalVariant(signal.variant) === "1steditionnormal");
-    if (firstEditionNormal.length > 0) return pickCatalogPriceSignal(firstEditionNormal);
-  }
-
-  return pickCatalogPriceSignal(firstEditionSignals);
+  return eligible.length > 0 ? pickCatalogPriceSignal(eligible) : null;
 }
 
 function extractCatalogSignalTrendPct(signals: CatalogPriceSignal[] | undefined): number | null {

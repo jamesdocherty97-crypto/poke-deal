@@ -97,10 +97,10 @@ test("buy flow names what the dealer paid separately from suggested and chosen s
   await expect(stockCard.getByLabel(/^What I paid/)).toBeVisible();
   await expect(stockCard).toContainText("Your purchase cost—not the market comp or listing price.");
   await stockCard.getByRole("button", { name: "No tracked cost · £0.00" }).click();
-  await stockCard.getByText("Optional listing after stock", { exact: true }).click();
+  await stockCard.getByText("Change listing plan", { exact: true }).click();
   await expect(stockCard.getByLabel(/^Your list price/)).toBeVisible();
   await stockCard.getByLabel(/^Your list price/).fill("5.00");
-  await stockCard.getByRole("button", { name: "Draft", exact: true }).click();
+  await stockCard.getByRole("button", { name: "eBay draft", exact: true }).click();
   await page.getByRole("button", { name: "Add to stock", exact: true }).click();
 
   await expect.poll(() => ledger.acquireBody).not.toBeNull();

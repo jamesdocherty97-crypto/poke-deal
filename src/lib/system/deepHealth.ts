@@ -1,6 +1,7 @@
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
 import { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
+import { TcgDexCatalogSource } from "../catalog/tcgDex.js";
 import { getFxHealth } from "../comps/currency.js";
 import { EbayMarketplaceInsightsSource } from "../comps/sources/ebayMarketplaceInsights.js";
 import { getPokeTraceHealth, PokeTraceSource } from "../comps/sources/pokeTrace.js";
@@ -59,11 +60,23 @@ export async function runDeepHealthCheck(now = new Date()): Promise<DeepHealthRe
       required: true,
       run: async () => {
         const source = new PokemonPriceTrackerSource();
-        if (!source.live) return { status: "skipped", detail: "No key; fixture mode." };
+        if (!source.live) return { status: "skipped", detail: "No key; source unavailable." };
         const comp = await source.lookup(HEALTH_CARD, { grade: "PSA_10", windowDays: 30 });
         return comp.sampleSize > 0
           ? `PSA 10 sample ${comp.sampleSize}, median £${(comp.medianPence / 100).toFixed(2)}.`
           : { status: "fail", detail: comp.raw && typeof comp.raw === "object" && "reason" in comp.raw ? String(comp.raw.reason) : "No sample returned." };
+      },
+    },
+    {
+      id: "tcgdex",
+      label: "TCGdex",
+      role: "fallback catalog and art",
+      required: false,
+      run: async () => {
+        const card = await new TcgDexCatalogSource().resolve(HEALTH_CARD);
+        return card?.tcgDexId
+          ? `${card.name} ${card.number ?? ""} resolved as ${card.tcgDexId}.`
+          : { status: "fail", detail: "TCGdex did not resolve the health card." };
       },
     },
     {
@@ -99,7 +112,7 @@ export async function runDeepHealthCheck(now = new Date()): Promise<DeepHealthRe
         const card = await source.resolve(HEALTH_CARD);
         return card?.imageUrl
           ? `${card.name} ${card.number ?? ""} resolved with art.`
-          : { status: "fail", detail: source.live ? "Live API did not resolve the health card." : "Public/fixture lookup did not resolve the health card." };
+          : { status: "fail", detail: source.live ? "Live API did not resolve the health card." : "Unkeyed public lookup did not resolve the health card." };
       },
     },
     {
@@ -111,10 +124,31 @@ export async function runDeepHealthCheck(now = new Date()): Promise<DeepHealthRe
         const lookup = new PsaCertLookup();
         const cert = process.env.HEALTH_PSA_CERT?.trim() || "84213567";
         const result = await lookup.lookup(cert);
-        if (!lookup.live) return { status: "skipped", detail: "No PSA token; fixture lookup available." };
+        if (!lookup.live) return { status: "skipped", detail: "No PSA token; source unavailable." };
         return result.found
           ? `Cert ${result.certNumber} ${result.gradeLabel ?? ""} resolved.`
           : { status: "fail", detail: result.reason ?? "PSA returned no cert data." };
+      },
+    },
+    {
+      id: "gemini",
+      label: "Gemini",
+      role: "card image OCR",
+      required: false,
+      run: async () => {
+        const key = process.env.GEMINI_API_KEY?.trim();
+        const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
+        if (!key) return { status: "skipped", detail: "Gemini key missing; scan unavailable." };
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}`,
+          { headers: { Accept: "application/json", "x-goog-api-key": key }, signal: AbortSignal.timeout(6_000) },
+        );
+        if (!response.ok) return { status: "fail", detail: `Gemini model metadata returned HTTP ${response.status}.` };
+        const payload = await response.json() as { name?: unknown; supportedGenerationMethods?: unknown };
+        const methods = Array.isArray(payload.supportedGenerationMethods) ? payload.supportedGenerationMethods : [];
+        return methods.includes("generateContent")
+          ? `${String(payload.name ?? model)} exposes generateContent.`
+          : { status: "fail", detail: `${model} metadata did not advertise generateContent.` };
       },
     },
     {

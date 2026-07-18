@@ -1,6 +1,9 @@
 import type { CatalogCard } from "./types.js";
 import { collectorNumbersEquivalent } from "../cards/identity.js";
 import { normalizeSearchText, scoreSearchText } from "./fuzzy.js";
+import { mergeCatalogCards } from "./catalogIdentity.js";
+import { detectCardPrintIdentity } from "../comps/variants.js";
+import type { CardFinish, Language, PrintEdition } from "../domain/types.js";
 import {
   getSetById,
   isApiUnavailableSetId,
@@ -19,6 +22,8 @@ export interface CardSearchOptions {
 export interface ParsedCardSearchQuery {
   name: string;
   number?: string;
+  edition?: PrintEdition;
+  finish?: CardFinish;
 }
 
 export interface NormalizedCatalogCardSearchInput {
@@ -26,12 +31,20 @@ export interface NormalizedCatalogCardSearchInput {
   name: string;
   setName?: string;
   number?: string;
+  edition?: PrintEdition;
+  finish?: CardFinish;
 }
 
 export interface CatalogCardLookupContext {
   name?: string | null;
   setName?: string | null;
   number?: string | null;
+  language?: Language | null;
+  edition?: PrintEdition | null;
+  finish?: CardFinish | null;
+  tcgApiId?: string | null;
+  tcgDexId?: string | null;
+  cardmarketId?: string | null;
 }
 
 interface SetPhraseMatch {
@@ -116,6 +129,12 @@ export function catalogCardMatchesLookupContext(
   request: CatalogCardLookupContext,
 ): boolean {
   if (!card) return false;
+  if (request.language && card.language !== request.language) return false;
+  if (request.tcgApiId && card.tcgApiId && card.tcgApiId !== request.tcgApiId) return false;
+  if (request.tcgDexId && card.tcgDexId && card.tcgDexId !== request.tcgDexId) return false;
+  if (request.cardmarketId && card.cardmarketId && card.cardmarketId !== request.cardmarketId) return false;
+  if (request.edition && card.edition && card.edition !== request.edition) return false;
+  if (request.finish && card.finish && card.finish !== request.finish) return false;
   if (!catalogCardMatchesSetContext(card, request.setName, request.number)) return false;
 
   const requestedName = normalizeNameForSearch(stripLookupNoise(stripVariantLookupNoise(request.name ?? "")));
@@ -134,6 +153,8 @@ function stripVariantLookupNoise(input: string): string {
     .replace(/\bholo\b/gi, " ")
     .replace(/\bnormal\b/gi, " ")
     .replace(/\b1st\b\s*(?:edition|ed)\b/gi, " ")
+    .replace(/\bfirst\s*(?:edition|ed)\b/gi, " ")
+    .replace(/\b(?:shadowless|staff|pre[\s-]?release|unlimited)\b/gi, " ")
     .trim()
     .replace(/\s+/g, " ");
 }
@@ -180,6 +201,7 @@ export function normalizeCatalogCardSearchInput(
   query: string,
   explicitSetName?: string,
 ): NormalizedCatalogCardSearchInput {
+  const printIdentity = detectCardPrintIdentity({ name: query, setName: explicitSetName });
   const cleaned = normalizeCatalogLookupInput(query);
   const parsed = parseCardSearchQuery(cleaned);
   let name = parsed.name || cleaned.trim();
@@ -231,7 +253,14 @@ export function normalizeCatalogCardSearchInput(
   name = normalizeNameForSearch(name);
   const normalizedNumber = formatPromoDisplayNumber(number ?? trailingNumber?.number, setName);
   const normalizedQuery = [name, normalizedNumber].filter(Boolean).join(" ").trim() || cleaned.trim();
-  return { query: normalizedQuery, name, setName, number: normalizedNumber };
+  return {
+    query: normalizedQuery,
+    name,
+    setName,
+    number: normalizedNumber,
+    ...(printIdentity.edition ? { edition: printIdentity.edition } : {}),
+    ...(printIdentity.finish ? { finish: printIdentity.finish } : {}),
+  };
 }
 
 function normalizeParentheticalPromoNumbers(input: string): string {
@@ -422,19 +451,7 @@ function isPlainCollectorNumber(value: string): boolean {
 }
 
 function dedupeCards(cards: CatalogCard[]): CatalogCard[] {
-  const seen = new Set<string>();
-  const result: CatalogCard[] = [];
-  for (const card of cards) {
-    const key = card.tcgApiId ?? card.tcgDexId ?? [
-      normalizeSearchText(card.name),
-      normalizeSearchText(card.setName),
-      normalizeSearchText(card.number ?? ""),
-    ].join("|");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(card);
-  }
-  return result;
+  return mergeCatalogCards(cards);
 }
 
 function sameCollectorNumber(queryNumber: string, cardNumber: string): boolean {

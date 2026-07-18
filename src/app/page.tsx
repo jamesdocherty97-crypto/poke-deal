@@ -16,7 +16,7 @@ import {
   suggestListPrice,
   type PricingStrategy,
 } from "@/lib/comps/pricing";
-import { GRADE_VALUES, type CompResult as DomainCompResult, type Grade as DomainGrade } from "@/lib/domain/types";
+import { GRADE_VALUES, type CardFinish, type CompResult as DomainCompResult, type Grade as DomainGrade, type Language, type PrintEdition } from "@/lib/domain/types";
 import {
   buildInventoryView,
   buildListingView,
@@ -99,10 +99,13 @@ import { buildQuickIntakePreview } from "@/lib/dealer/intakePreview";
 import { buildOperatingSnapshot, type OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
 import { parseStockImportText } from "@/lib/dealer/stockImport";
 import {
+  buildCardIntakePayload,
   DEFAULT_INTAKE_PREFERENCES,
+  intakeDraftListPricePence,
   nextIntakeFormAfterStock,
   parseIntakePreferences,
   parseIntakeQuantity,
+  sameCardIntakeIdentity,
   serializeIntakePreferences,
 } from "@/lib/dealer/intakeSession";
 import { pullRefreshDistance, pullRefreshProgress, shouldTriggerPullRefresh } from "@/lib/dealer/pullRefresh";
@@ -132,7 +135,7 @@ import {
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayActionTarget } from "@/lib/dealer/today";
-import { textMentionsFirstEdition } from "@/lib/comps/variants";
+import { addRequestedPrintHints, detectCardPrintIdentity, textMentionsFirstEdition } from "@/lib/comps/variants";
 import { readCompProgress } from "@/lib/comps/clientProgress";
 import type { CompProgressEvent, CompSourceEvent } from "@/lib/comps/progressContract";
 import type { ManualCompReview, ManualReviewResolution } from "@/lib/comps/manualReview";
@@ -190,7 +193,12 @@ type PsaCertView = {
   populationHigher?: number;
   isDualCert?: boolean;
   live: boolean;
+  cached?: boolean;
+  cacheAgeMinutes?: number;
+  checkedAt?: string;
   reason?: string;
+  filteredCount?: number;
+  rejectionCounts?: Record<string, number>;
 };
 type PsaPendingDecision = {
   result: PsaCertView;
@@ -218,6 +226,10 @@ type LookupInput = {
   grade: Grade;
   tcgApiId?: string;
   tcgDexId?: string;
+  cardmarketId?: string;
+  edition?: PrintEdition;
+  finish?: CardFinish;
+  language?: Language;
   psaCert?: string;
 };
 
@@ -244,6 +256,7 @@ type ScanPhotoPayload = {
   blob: Blob;
   width: number;
   height: number;
+  identity?: { name: string; setName: string; number: string };
 };
 
 type LastStockedCard = {
@@ -305,6 +318,8 @@ type CatalogSuggestion = CatalogCard & {
   sourceLabel?: string;
   matchLabel?: string;
   variantLabel?: string;
+  identityConfidence?: "high" | "medium" | "low";
+  identityReasons?: string[];
 };
 
 type PokeTraceSignalView = {
@@ -327,6 +342,17 @@ type ReconciliationView = {
   reasons: string[];
   chosenSource?: string;
   trendPct: number | null;
+  selection?: {
+    sourceTier: number;
+    region: string;
+    sampleSize: number;
+    ageDays: number;
+    corroboratingCount: number;
+    appliedPenalties: string[];
+    spreadPence: number;
+    spreadPct: number;
+    chosenBecause: string;
+  };
 };
 
 type EbayAskListing = {
@@ -354,6 +380,8 @@ type EbayAskEvidence = {
   cached?: boolean;
   skipped?: boolean;
   reason?: string;
+  filteredCount?: number;
+  rejectionCounts?: Record<string, number>;
 };
 
 type EbaySalesSyncRow = {
@@ -413,6 +441,7 @@ type CompCardImage = {
   imageUrl: string | null;
   source: "catalog" | "cached-display" | "poketrace" | "pokemon-price-tracker" | "none";
   listingSafe: boolean;
+  candidates?: Array<{ imageUrl: string; source: CompCardImage["source"]; listingSafe: boolean }>;
 };
 
 type Reconciled = {
@@ -428,6 +457,13 @@ type Reconciled = {
   psaCert?: PsaCertView | null;
   askEvidence?: EbayAskEvidence | null;
   cardImage?: CompCardImage | null;
+  identityConfidence?: {
+    level: "high" | "medium" | "low";
+    score: number;
+    autoSelectable: boolean;
+    reasons: string[];
+    conflicts: string[];
+  };
 };
 
 type DealSessionLine = {
@@ -438,6 +474,10 @@ type DealSessionLine = {
   number: string | null;
   tcgApiId: string | null;
   tcgDexId: string | null;
+  cardmarketId: string | null;
+  language: "EN" | "JP";
+  edition: CatalogCard["edition"] | null;
+  finish: CatalogCard["finish"] | null;
   imageUrl: string | null;
   grade: Grade;
   headlinePence: number;
@@ -497,6 +537,12 @@ type InventoryItem = {
     number: string | null;
     imageUrl: string | null;
     displayImageUrl?: string | null;
+    language?: "EN" | "JP";
+    tcgApiId?: string | null;
+    tcgDexId?: string | null;
+    cardmarketId?: string | null;
+    edition?: CatalogCard["edition"] | null;
+    finish?: CatalogCard["finish"] | null;
   };
   grade: string;
   quantity: number;
@@ -918,7 +964,7 @@ export default function Home() {
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
   const [buyResultSection, setBuyResultSection] = useState<BuyResultSection>(null);
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
-  const [shouldCreateListing, setShouldCreateListing] = useState(false);
+  const [shouldCreateListing, setShouldCreateListing] = useState(true);
   const [keepBuying, setKeepBuying] = useState(DEFAULT_INTAKE_PREFERENCES.keepBuying);
   const [comp, setComp] = useState<Reconciled | null>(null);
   const [stockCompItemId, setStockCompItemId] = useState<string | null>(null);
@@ -1035,7 +1081,7 @@ export default function Home() {
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("needs-action");
   const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
   const [listingQuery, setListingQuery] = useState("");
-  const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("ALL");
+  const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("DRAFT");
   const [listingSort, setListingSort] = useState<ListingSort>("newest");
   const [quickHunts, setQuickHunts] = useState<QuickHuntCard[]>(DEFAULT_QUICK_HUNTS);
   const [recentSetIds, setRecentSetIds] = useState<string[]>([]);
@@ -1051,10 +1097,12 @@ export default function Home() {
   });
   const [offlineMutations, setOfflineMutations] = useState<OfflineMutation[]>([]);
   const [offlineBootstrapAgeHours, setOfflineBootstrapAgeHours] = useState<number | null>(null);
+  const [offlineBootstrapPartial, setOfflineBootstrapPartial] = useState(false);
   const [inventoryLoaded, setInventoryLoaded] = useState(false);
   const [listingsLoaded, setListingsLoaded] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [manualReviews, setManualReviews] = useState<ManualCompReview[]>([]);
   const [manualReviewBusyId, setManualReviewBusyId] = useState<string | null>(null);
   const [priceHistoryByKey, setPriceHistoryByKey] = useState<Record<string, CardPriceHistory | null>>({});
@@ -1076,9 +1124,16 @@ export default function Home() {
   const scanFileInputRef = useRef<HTMLInputElement | null>(null);
   const scanAttemptTimesRef = useRef<number[]>([]);
   const scanModeRef = useRef<ScanMode>("idle");
+  const scanRequestRef = useRef<AbortController | null>(null);
+  const scanAlternativesRef = useRef<AbortController | null>(null);
   const expensePanelRef = useRef<HTMLElement | null>(null);
   const expenseDescriptionRef = useRef<HTMLInputElement | null>(null);
   const pnlWatchPanelRef = useRef<HTMLElement | null>(null);
+  const offlineBootstrapCachedAtRef = useRef<string | null>(null);
+  const compLookupRef = useRef<{ id: number; controller: AbortController } | null>(null);
+  const compLookupSequenceRef = useRef(0);
+  const cardSuggestionCacheRef = useRef(new Map<string, { cards: CatalogSuggestion[]; cachedAt: number }>());
+  const refreshAllRef = useRef<Promise<void> | null>(null);
 
   function setNotice(message: string | null, action: NoticeAction | null = null) {
     setNoticeState(message);
@@ -1109,6 +1164,7 @@ export default function Home() {
         setCommandPaletteOpen((current) => !current);
       } else if (event.key === "Escape") {
         setCommandPaletteOpen(false);
+        setMobileMoreOpen(false);
       } else if (event.key.toLowerCase() === "q" && !isInteractiveTarget(event.target)) {
         event.preventDefault();
         setCommandPaletteOpen(true);
@@ -1202,18 +1258,29 @@ export default function Home() {
         setSystemStatus(cached.payload.systemStatus);
         setDealSession(cached.payload.dealSession);
         setOfflineBootstrapAgeHours(cached.ageHours);
+        offlineBootstrapCachedAtRef.current = cached.cachedAt;
         setInventoryLoaded(true);
         setListingsLoaded(true);
         setDashboardLoaded(true);
       }).finally(() => {
-        if (navigator.onLine) void refreshAll();
+        void (async () => {
+          if (!navigator.onLine) {
+            setEbayStatus({ configured: false, connected: false });
+            return;
+          }
+          // The configured Neon pool intentionally uses one Prisma connection.
+          // Finish the main ledger refresh before starting secondary DB reads so
+          // a cold database cannot turn harmless parallel bootstrap calls into
+          // connection-pool timeouts.
+          await refreshAll();
+          await loadManualReviews();
+          await fetch("/api/ebay/status")
+            .then((r) => r.json() as Promise<EbayStatus>)
+            .then(setEbayStatus)
+            .catch(() => setEbayStatus({ configured: false, connected: false }));
+        })();
       });
     void loadSetCatalog();
-    if (navigator.onLine) void loadManualReviews();
-    void fetch("/api/ebay/status")
-      .then((r) => r.json() as Promise<EbayStatus>)
-      .then(setEbayStatus)
-      .catch(() => setEbayStatus({ configured: false, connected: false }));
   }, []);
 
   useEffect(() => {
@@ -1227,8 +1294,14 @@ export default function Home() {
   }, [scanOpen, scanMode]);
 
   useEffect(() => {
-    return () => stopScanCamera();
+    return () => {
+      stopScanCamera();
+      scanRequestRef.current?.abort(new DOMException("Scan closed", "AbortError"));
+      scanAlternativesRef.current?.abort(new DOMException("Scan closed", "AbortError"));
+    };
   }, []);
+
+  useEffect(() => () => compLookupRef.current?.controller.abort(new DOMException("Page closed", "AbortError")), []);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -1355,16 +1428,19 @@ export default function Home() {
   ]);
 
   useEffect(() => {
+    // An eBay listing is only made ACTIVE by the reviewed publish flow. Intake
+    // always prepares a draft so the UI never promises a live listing that the
+    // API will (correctly) refuse to create directly.
+    if (channel === "EBAY" && acquireListingState === "ACTIVE") {
+      setAcquireListingState("DRAFT");
+    }
+  }, [acquireListingState, channel]);
+
+  useEffect(() => {
     if (!notice) return;
     const handle = window.setTimeout(() => setNotice(null), noticeAction ? 12000 : 4200);
     return () => window.clearTimeout(handle);
   }, [notice, noticeAction]);
-
-  useEffect(() => {
-    if (!error) return;
-    const handle = window.setTimeout(() => setError(null), 6500);
-    return () => window.clearTimeout(handle);
-  }, [error]);
 
   // Set autocomplete: search-as-you-type against the bundled offline set
   // catalog while the Set field is focused. Falls back to the curated
@@ -1377,13 +1453,19 @@ export default function Home() {
       setSetSuggestions(buildDefaultSetSuggestions(popularSets, allSets));
       return;
     }
+    const controller = new AbortController();
     const handle = setTimeout(() => {
-      fetch(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=16`)
+      fetch(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=16`, { signal: controller.signal })
         .then(readJson)
         .then((payload) => setSetSuggestions(payload.sets ?? []))
-        .catch(() => {});
+        .catch((error) => {
+          if (!(error instanceof DOMException && error.name === "AbortError")) setSetSuggestions([]);
+        });
     }, 150);
-    return () => clearTimeout(handle);
+    return () => {
+      controller.abort();
+      clearTimeout(handle);
+    };
   }, [setNameValue, setSuggestionsOpen, popularSets, allSets]);
 
   useEffect(() => {
@@ -1391,33 +1473,41 @@ export default function Home() {
     const smartText = quickIntake.trim() || [name.trim(), number.trim()].filter(Boolean).join(" ");
     const parsed = normalizeCatalogCardSearchInput(smartText, setNameValue);
     const query = parsed.query;
-    setCardSuggestions([]);
     if (!query) {
+      setCardSuggestions([]);
+      setCardSuggestionsLoading(false);
+      return;
+    }
+    const cacheKey = `${query.toLowerCase()}|${(parsed.setName ?? setNameValue).toLowerCase()}`;
+    const cached = cardSuggestionCacheRef.current.get(cacheKey);
+    if (cached && Date.now() - cached.cachedAt < 60_000) {
+      setCardSuggestions(cached.cards);
       setCardSuggestionsLoading(false);
       return;
     }
     setCardSuggestionsLoading(true);
-    let cancelled = false;
+    const controller = new AbortController();
     const handle = setTimeout(() => {
       const qs = new URLSearchParams({ q: query, limit: "12" });
       if (parsed.setName ?? setNameValue.trim()) qs.set("set", parsed.setName ?? setNameValue.trim());
-      fetch(`/api/catalog/cards?${qs}`)
+      if (/\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u.test(query)) qs.set("language", "JP");
+      fetch(`/api/catalog/cards?${qs}`, { signal: controller.signal })
         .then(readJson)
         .then((payload) => {
-          if (!cancelled) {
-            setCardSuggestions(payload.cards ?? []);
-            setCardSuggestionsLoading(false);
-          }
+          const cards = payload.cards ?? [];
+          cardSuggestionCacheRef.current.set(cacheKey, { cards, cachedAt: Date.now() });
+          setCardSuggestions(cards);
+          setCardSuggestionsLoading(false);
         })
-        .catch(() => {
-          if (!cancelled) {
+        .catch((error) => {
+          if (!(error instanceof DOMException && error.name === "AbortError")) {
             setCardSuggestions([]);
             setCardSuggestionsLoading(false);
           }
         });
     }, 180);
     return () => {
-      cancelled = true;
+      controller.abort();
       clearTimeout(handle);
     };
   }, [name, number, quickIntake, setNameValue, cardSuggestionsOpen]);
@@ -1525,7 +1615,7 @@ export default function Home() {
         name: item.card.name,
         setName: item.card.setName,
         number: item.card.number,
-        language: "EN",
+        language: item.card.language ?? "EN",
       },
       grade: item.grade,
       listPricePence: savedListPrice,
@@ -1585,8 +1675,12 @@ export default function Home() {
           setName: catalogCard?.setName ?? setNameValue,
           number: catalogCard?.number ?? number,
           tcgApiId: catalogCard?.tcgApiId,
+          tcgDexId: catalogCard?.tcgDexId,
+          cardmarketId: catalogCard?.cardmarketId,
+          edition: catalogCard?.edition,
+          finish: catalogCard?.finish,
           game: "POKEMON",
-          language: "EN",
+          language: catalogCard?.language ?? comp?.headline?.card.language ?? "EN",
         },
         grade,
         pricePence: checkedCompPrice.trim() ? poundsToPence(checkedCompPrice) : 0,
@@ -1602,6 +1696,12 @@ export default function Home() {
       catalogCard?.number,
       catalogCard?.setName,
       catalogCard?.tcgApiId,
+      catalogCard?.tcgDexId,
+      catalogCard?.cardmarketId,
+      catalogCard?.language,
+      catalogCard?.edition,
+      catalogCard?.finish,
+      comp?.headline?.card.language,
       checkedCompNote,
       checkedCompPrice,
       checkedCompSample,
@@ -1736,7 +1836,15 @@ export default function Home() {
       psaResult,
   );
   const canRunSmartComp = Boolean(quickIntake.trim() || name.trim());
-  const selectedCardImage = cardArtUrl ?? payloadDisplayImage(comp) ?? matchingQuickHunt?.imageUrl ?? null;
+  const selectedCardImages = Array.from(new Set([
+    cardArtUrl,
+    ...(comp?.cardImage?.candidates?.map((candidate) => candidate.imageUrl) ?? []),
+    comp?.cardImage?.imageUrl,
+    catalogCard?.imageUrl,
+    catalogCard?.displayImageUrl,
+    matchingQuickHunt?.imageUrl,
+  ].filter((value): value is string => Boolean(value))));
+  const selectedCardImage = selectedCardImages[0] ?? null;
   const shouldShowSelectedCardStrip = Boolean(hasNamedCardIdentity || selectedCardImage);
   const selectedCardMarkUrl = setMarkUrl ?? matchingQuickHunt?.setMarkUrl ?? null;
   const scannedQuery = scanMapping && "query" in scanMapping ? scanMapping.query : null;
@@ -1748,14 +1856,7 @@ export default function Home() {
       : selectedCardImage;
   const scanCompReady = Boolean(scanIdentity && headline && scanMode === "identity");
   const askEvidence = comp?.askEvidence ?? null;
-  const spotlightImage =
-    selectedCardImage ??
-    (hasActiveCardIdentity
-      ? null
-        : activeInventory.map((item) => inventoryDisplayImage(item)).find(Boolean) ??
-        listings.map((listing) => inventoryDisplayImage(listing.item)).find(Boolean) ??
-        quickHunts[0]?.imageUrl ??
-        null);
+  const spotlightImage = selectedCardImage;
   const marketBaseline =
     comp?.all.find((result) => result.source === "pokemon-tcg-market" && result.sampleSize > 0) ?? null;
   const ownedSalesComp =
@@ -1788,8 +1889,11 @@ export default function Home() {
               number: catalogCard?.number ?? number,
               tcgApiId: catalogCard?.tcgApiId,
               tcgDexId: catalogCard?.tcgDexId,
+              cardmarketId: catalogCard?.cardmarketId,
+              language: catalogCard?.language ?? "EN",
+              edition: catalogCard?.edition,
+              finish: catalogCard?.finish,
               game: "POKEMON",
-              language: "EN",
             },
             grade,
           )
@@ -1858,7 +1962,7 @@ export default function Home() {
   const needsManualComp = Boolean(
     apiHeadline &&
       !checkedComp &&
-      (apiHeadline.medianPence <= 0 || apiHeadline.sampleSize <= 0),
+      (apiHeadline.medianPence <= 0 || apiHeadline.sampleSize <= 0 || busy === "lookup" || compProgressPhase !== "receipt"),
   );
   const manualCompCard = useMemo(
     () => ({
@@ -1961,6 +2065,9 @@ export default function Home() {
   const quickStockListPence = listPriceOverride.trim()
     ? poundsToPence(listPriceOverride)
     : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
+  const effectiveAcquireListingState: AcquireListingState = channel === "EBAY" ? "DRAFT" : acquireListingState;
+  const eBayDraftPriceNeedsReview = shouldCreateListing && channel === "EBAY" && quickStockListPence > 0 && quickStockListPence < 99;
+  const effectiveDraftListPricePence = intakeDraftListPricePence(channel, shouldCreateListing, quickStockListPence);
   const hasEnteredBuyCost = cost.trim().length > 0;
   const manualStockReady = Boolean(name.trim() && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence >= 0);
   const totalCostSplit = useMemo(
@@ -2356,7 +2463,16 @@ export default function Home() {
   );
   const primaryTodayAction = todayActions[0] ?? null;
 
-  async function refreshAll(options: RefreshOptions = {}) {
+  function refreshAll(options: RefreshOptions = {}): Promise<void> {
+    if (refreshAllRef.current) return refreshAllRef.current;
+    const work = runRefreshAll(options).finally(() => {
+      if (refreshAllRef.current === work) refreshAllRef.current = null;
+    });
+    refreshAllRef.current = work;
+    return work;
+  }
+
+  async function runRefreshAll(options: RefreshOptions = {}) {
     setRefreshing(true);
     if (options.user) setUserRefreshing(true);
     setError(null);
@@ -2383,26 +2499,26 @@ export default function Home() {
         apply(payload);
       }
 
-      const results = await Promise.allSettled([
-        load<{ items?: InventoryItem[]; priceHistoryPreviews?: Record<string, CardPriceHistoryPreview> }>("/api/inventory", "inventory", (payload) => {
+      const tasks: Array<() => Promise<void>> = [
+        () => load<{ items?: InventoryItem[]; priceHistoryPreviews?: Record<string, CardPriceHistoryPreview> }>("/api/inventory", "inventory", (payload) => {
           nextInventory = payload.items ?? [];
           nextPriceHistoryPreviews = payload.priceHistoryPreviews ?? {};
           setInventory(nextInventory);
           setPriceHistoryPreviews(nextPriceHistoryPreviews);
         }).finally(() => setInventoryLoaded(true)),
-        load<{ listings?: Listing[] }>("/api/listings", "listings", (payload) => {
+        () => load<{ listings?: Listing[] }>("/api/listings", "listings", (payload) => {
           nextListings = payload.listings ?? [];
           setListings(nextListings);
         }).finally(() => setListingsLoaded(true)),
-        load<Dashboard>("/api/dashboard", "dashboard", (payload) => {
+        () => load<Dashboard>("/api/dashboard", "dashboard", (payload) => {
           nextDashboard = payload;
           setDashboard(payload);
         }).finally(() => setDashboardLoaded(true)),
-        load<PortfolioHistory>("/api/snapshots/portfolio", "snapshot history", (payload) => {
+        () => load<PortfolioHistory>("/api/snapshots/portfolio", "snapshot history", (payload) => {
           nextPortfolio = payload;
           setPortfolio(payload);
         }),
-        load<{ watches?: WatchRecord[] }>("/api/watches", "watches", (payload) => {
+        () => load<{ watches?: WatchRecord[] }>("/api/watches", "watches", (payload) => {
           nextWatches = payload.watches ?? [];
           setWatches(nextWatches);
           setWatchEdits((current) => {
@@ -2411,54 +2527,69 @@ export default function Home() {
             return next;
           });
         }),
-        load<{ alerts?: AppAlertRecord[]; unreadCount?: number }>("/api/alerts/inbox", "alerts", (payload) => {
+        () => load<{ alerts?: AppAlertRecord[]; unreadCount?: number }>("/api/alerts/inbox", "alerts", (payload) => {
           nextAlerts = payload.alerts ?? [];
           nextAlertUnreadCount = Number(payload.unreadCount ?? 0);
           setAppAlerts(nextAlerts);
           setAppAlertUnreadCount(nextAlertUnreadCount);
         }),
-        load<{ expenses?: ExpenseRecord[] }>("/api/expenses", "expenses", (payload) => {
+        () => load<{ expenses?: ExpenseRecord[] }>("/api/expenses", "expenses", (payload) => {
           nextExpenses = payload.expenses ?? [];
           setExpenses(nextExpenses);
         }),
-        load<SystemStatus>("/api/system/status", "system status", (payload) => {
+        () => load<SystemStatus>("/api/system/status", "system status", (payload) => {
           nextSystemStatus = payload;
           setSystemStatus(payload);
         }),
-        load<DealSessionPayload>("/api/deal-sessions", "deal session", (payload) => {
+        () => load<DealSessionPayload>("/api/deal-sessions", "deal session", (payload) => {
           nextDealSession = payload;
           setDealSession(payload);
         }),
-      ]);
+      ];
+      const requestedView = typeof window === "undefined"
+        ? view
+        : parseViewQuery(new URL(window.location.href).searchParams.get("view"));
+      const priorityTaskIndex = requestedView === "listings" ? 1 : requestedView === "pnl" ? 2 : 0;
+      const orderedTasks = [tasks[priorityTaskIndex]!, ...tasks.filter((_, index) => index !== priorityTaskIndex)];
+      const results: PromiseSettledResult<void>[] = [];
+      // Keep database-backed bootstrap reads within the configured one-slot
+      // connection budget. Every dataset still paints as soon as it arrives.
+      for (const task of orderedTasks) {
+        try {
+          await task();
+          results.push({ status: "fulfilled", value: undefined });
+        } catch (reason) {
+          results.push({ status: "rejected", reason });
+        }
+      }
 
       const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
-      if (
-        nextInventory &&
-        nextPriceHistoryPreviews &&
-        nextListings &&
-        nextDashboard &&
-        nextPortfolio &&
-        nextWatches &&
-        nextAlerts &&
-        nextAlertUnreadCount !== undefined &&
-        nextExpenses &&
-        nextSystemStatus &&
-        nextDealSession
-      ) {
+      const mergedBootstrap: OfflineBootstrapPayload | null = (nextDashboard ?? dashboard) && (nextPortfolio ?? portfolio) && (nextSystemStatus ?? systemStatus) && (nextDealSession ?? dealSession)
+        ? {
+            inventory: nextInventory ?? inventory,
+            priceHistoryPreviews: nextPriceHistoryPreviews ?? priceHistoryPreviews,
+            listings: nextListings ?? listings,
+            dashboard: (nextDashboard ?? dashboard)!,
+            portfolio: (nextPortfolio ?? portfolio)!,
+            watches: nextWatches ?? watches,
+            alerts: nextAlerts ?? appAlerts,
+            alertUnreadCount: nextAlertUnreadCount ?? appAlertUnreadCount,
+            expenses: nextExpenses ?? expenses,
+            systemStatus: (nextSystemStatus ?? systemStatus)!,
+            dealSession: (nextDealSession ?? dealSession)!,
+          }
+        : null;
+      if (mergedBootstrap) {
+        const fullyFresh = failures.length === 0;
+        const cachedAt = fullyFresh ? new Date().toISOString() : offlineBootstrapCachedAtRef.current ?? new Date().toISOString();
+        offlineBootstrapCachedAtRef.current = cachedAt;
+        setOfflineBootstrapPartial(!fullyFresh);
+        if (fullyFresh) {
         setOfflineBootstrapAgeHours(null);
-        void putOfflineBootstrap<OfflineBootstrapPayload>({
-          inventory: nextInventory,
-          priceHistoryPreviews: nextPriceHistoryPreviews,
-          listings: nextListings,
-          dashboard: nextDashboard,
-          portfolio: nextPortfolio,
-          watches: nextWatches,
-          alerts: nextAlerts,
-          alertUnreadCount: nextAlertUnreadCount,
-          expenses: nextExpenses,
-          systemStatus: nextSystemStatus,
-          dealSession: nextDealSession,
-        }).catch(() => undefined);
+        } else {
+          setOfflineBootstrapAgeHours(Math.max(0, Math.round((Date.now() - new Date(cachedAt).getTime()) / 3_600_000)));
+        }
+        void putOfflineBootstrap<OfflineBootstrapPayload>(mergedBootstrap, cachedAt).catch(() => undefined);
       }
       if (failures.length > 0) {
         throw failures[0]!.reason instanceof Error ? failures[0]!.reason : new Error("Some workspace data could not be refreshed");
@@ -2482,6 +2613,23 @@ export default function Home() {
     } catch {
       // Review work is additive; a failed refresh must not block the buy loop.
     }
+  }
+
+  async function applyStockMutationResult(item: InventoryItem | undefined, listing?: Listing | null): Promise<void> {
+    if (item) {
+      setInventory((current) => [item, ...current.filter((row) => row.id !== item.id)]);
+      setInventoryLoaded(true);
+    }
+    if (listing) {
+      setListings((current) => [listing, ...current.filter((row) => row.id !== listing.id)]);
+      setListingsLoaded(true);
+    }
+    // One summary read replaces the previous nine-dataset workspace reload.
+    const response = await fetch("/api/dashboard").catch(() => null);
+    if (!response?.ok) return;
+    const payload = await readJson(response) as Dashboard;
+    setDashboard(payload);
+    setDashboardLoaded(true);
   }
 
   async function loadPriceHistory(item: InventoryItem, openSheet = true) {
@@ -2696,7 +2844,7 @@ export default function Home() {
     }
     setBusy(`photo-${item.id}`);
     setError(null);
-    setNotice(selected.length === 1 ? "Uploading photo..." : `Uploading ${selected.length} photos...`);
+    setNotice(selected.length === 1 ? "Uploading photo…" : `Uploading ${selected.length} photos…`);
     try {
       const existingCount = item.photos?.length ?? 0;
       for (const [index, file] of selected.entries()) {
@@ -2998,6 +3146,9 @@ export default function Home() {
   }
 
   function openScanCamera() {
+    // Opening a new scan is a new piece of evidence. Never carry a cancelled
+    // photo or identity into the next card.
+    resetScanResult();
     setView("acquire");
     setScanOpen(true);
     updateScanMode("starting");
@@ -3006,10 +3157,13 @@ export default function Home() {
     setError(null);
   }
 
-  function closeScanCamera() {
+  function closeScanCamera(options: { preserveResult?: boolean } = {}) {
+    scanRequestRef.current?.abort(new DOMException("Scan closed", "AbortError"));
+    scanAlternativesRef.current?.abort(new DOMException("Scan closed", "AbortError"));
     stopScanCamera();
     setScanOpen(false);
     updateScanMode("idle");
+    if (!options.preserveResult) resetScanResult();
   }
 
   async function startScanCamera() {
@@ -3021,7 +3175,7 @@ export default function Home() {
     }
     stopScanCamera();
     updateScanMode("starting");
-    setScanMessage("Opening camera...");
+    setScanMessage("Opening camera…");
     try {
       const mediaPromise = navigator.mediaDevices.getUserMedia({
         video: {
@@ -3067,6 +3221,8 @@ export default function Home() {
   }
 
   function resetScanResult(options: { keepPreview?: boolean } = {}) {
+    scanRequestRef.current?.abort(new DOMException("Scan reset", "AbortError"));
+    scanAlternativesRef.current?.abort(new DOMException("Scan reset", "AbortError"));
     setScanIdentity(null);
     setScanMapping(null);
     setScanModel(null);
@@ -3082,6 +3238,15 @@ export default function Home() {
     resetScanResult();
     setScanOpen(true);
     updateScanMode(scanStreamRef.current ? "camera" : "starting");
+  }
+
+  function continueScannedCardToStock() {
+    if (!scanCompReady) return;
+    setShouldCreateListing(true);
+    if (channel === "EBAY") setAcquireListingState("DRAFT");
+    setBuyResultSection("deal");
+    closeScanCamera({ preserveResult: true });
+    window.setTimeout(jumpToCostEntry, 90);
   }
 
   function finishScannedCardDecision(message: string) {
@@ -3101,7 +3266,7 @@ export default function Home() {
 
   async function captureScanFrame() {
     if (!scanQueueAllowsRequest()) {
-      setScanMessage("one sec...");
+      setScanMessage("One sec…");
       return;
     }
     const video = scanVideoRef.current;
@@ -3130,19 +3295,24 @@ export default function Home() {
     const file = files?.[0];
     if (!file) return;
     if (!scanQueueAllowsRequest()) {
-      setScanMessage("one sec...");
+      setScanMessage("One sec…");
       return;
     }
     await scanImageBlob(file);
   }
 
   async function scanImageBlob(blob: Blob) {
+    scanRequestRef.current?.abort(new DOMException("New scan started", "AbortError"));
+    scanAlternativesRef.current?.abort(new DOMException("New scan started", "AbortError"));
+    const controller = new AbortController();
+    scanRequestRef.current = controller;
     updateScanMode("reading");
     setBusy("scan");
     setError(null);
-    setScanMessage("Reading card...");
+    setScanMessage("Reading card…");
     try {
       const prepared = await preparePhotoForScan(blob);
+      if (controller.signal.aborted) return;
       const processed = prepared.photo;
       const dataUrl = await blobToDataUrl(processed.blob);
       setScanPhotoPreview(dataUrl);
@@ -3162,10 +3332,12 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId, "X-Poke-Deal-Session-Id": getScanSessionId() },
         body: JSON.stringify(scanBody),
+        signal: controller.signal,
       }).then((response) => {
         responseReceived = true;
         return response;
       }).catch(async (error) => {
+        if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
         if (!responseReceived) {
           await queueScanIntent(scanBody, mutationId, prepared.transmission.width, prepared.transmission.height);
           throw new Error("Scan queued on this device; it will retry when signal returns.");
@@ -3186,12 +3358,16 @@ export default function Home() {
       setScanEventId(typeof payload.scanEventId === "string" ? payload.scanEventId : null);
       await handleScanIdentity(identity, String(payload.model ?? ""));
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
       updateScanMode("manual");
       const message = err instanceof Error ? err.message : "scan failed";
       setScanMessage(message.startsWith("Scan queued") ? message : "Couldn't read it — retake or type.");
       setError(message.startsWith("Scan queued") ? null : message);
     } finally {
-      setBusy(null);
+      if (scanRequestRef.current === controller) {
+        scanRequestRef.current = null;
+        setBusy(null);
+      }
     }
   }
 
@@ -3236,14 +3412,21 @@ export default function Home() {
   }
 
   async function fetchScanAlternatives(query: ScanCompQuery): Promise<CatalogCard[]> {
+    scanAlternativesRef.current?.abort(new DOMException("New identity check started", "AbortError"));
+    const controller = new AbortController();
+    scanAlternativesRef.current = controller;
     const qs = new URLSearchParams({
       q: [query.name, query.number].filter(Boolean).join(" "),
       limit: "8",
     });
-    const res = await fetch(`/api/catalog/cards?${qs}`);
-    if (!res.ok) return [];
-    const payload = await readJson(res);
-    return Array.isArray(payload.cards) ? payload.cards : [];
+    try {
+      const res = await fetch(`/api/catalog/cards?${qs}`, { signal: controller.signal });
+      if (!res.ok) return [];
+      const payload = await readJson(res);
+      return Array.isArray(payload.cards) ? payload.cards : [];
+    } finally {
+      if (scanAlternativesRef.current === controller) scanAlternativesRef.current = null;
+    }
   }
 
   function applyScanMapping(mapping: ScanIdentityMapping) {
@@ -3280,7 +3463,7 @@ export default function Home() {
       return;
     }
     updateScanMode("identity");
-    setScanMessage(mapping.warnings[0] ?? "Card read. Comp loading...");
+    setScanMessage(mapping.warnings[0] ?? "Card read. Comp loading…");
     void lookupComp(mapping.query);
   }
 
@@ -3292,6 +3475,9 @@ export default function Home() {
     setSetNameValue(query.setName);
     if (query.setName) pinRecentSetName(query.setName);
     setNumber(query.number);
+    setScanPhotoPayload((current) => current
+      ? { ...current, identity: { name: query.name, setName: query.setName, number: query.number } }
+      : current);
     setGrade(query.grade);
     setGraderCert(query.psaCert ?? "");
     setError(null);
@@ -3300,7 +3486,7 @@ export default function Home() {
   function confirmScannedSlab() {
     if (!scanMapping || scanMapping.status !== "confirm-slab") return;
     updateScanMode("identity");
-    setScanMessage("Grade confirmed. Comp loading...");
+    setScanMessage("Grade confirmed. Comp loading…");
     void lookupComp(scanMapping.query);
   }
 
@@ -3312,16 +3498,23 @@ export default function Home() {
       grade: nextGrade,
       ...(card.tcgApiId ? { tcgApiId: card.tcgApiId } : {}),
       ...(card.tcgDexId ? { tcgDexId: card.tcgDexId } : {}),
+      ...(card.cardmarketId ? { cardmarketId: card.cardmarketId } : {}),
+      edition: card.edition,
+      finish: card.finish,
+      language: card.language,
     };
     clearCompEvidence();
     resetBuyCost();
     updateScanMode("identity");
-    setScanMessage("Exact card chosen. Comp loading...");
+    setScanMessage("Exact card chosen. Comp loading…");
     setQuickIntake(cardIdentitySearchText({ name: card.name, setName: card.setName, number: card.number }, nextGrade));
     setName(card.name);
     setSetNameValue(card.setName);
     pinRecentSetName(card.setName);
     setNumber(card.number ?? "");
+    setScanPhotoPayload((current) => current
+      ? { ...current, identity: { name: card.name, setName: card.setName, number: card.number ?? "" } }
+      : current);
     setGrade(nextGrade);
     setCardArtUrl(catalogDisplayImage(card));
     setError(null);
@@ -3340,7 +3533,12 @@ export default function Home() {
         name: correction.name,
         setName: correction.setName,
         number: correction.number,
-        language: "EN",
+        language: correction.language ?? "EN",
+        edition: correction.edition,
+        finish: correction.finish,
+        tcgApiId: correction.tcgApiId,
+        tcgDexId: correction.tcgDexId,
+        cardmarketId: correction.cardmarketId,
         grade: correction.grade,
         condition: condition.trim() || "NM",
       },
@@ -3384,8 +3582,19 @@ export default function Home() {
     }
   }
 
-  async function attachScannedPhotoToInventory(itemId: string, role: "FRONT" | "SLAB" = grade === "RAW" ? "FRONT" : "SLAB") {
-    if (!scanPhotoPayload) return false;
+  async function attachScannedPhotoToInventory(
+    itemId: string,
+    role: "FRONT" | "SLAB" = grade === "RAW" ? "FRONT" : "SLAB",
+  ): Promise<CardPhoto | null> {
+    if (!scanPhotoPayload) return null;
+    const currentIdentity = {
+      name: catalogCard?.name ?? name,
+      setName: catalogCard?.setName ?? setNameValue,
+      number: catalogCard?.number ?? number,
+    };
+    if (!scanPhotoPayload.identity || !sameCardIntakeIdentity(scanPhotoPayload.identity, currentIdentity)) {
+      throw new Error("the captured photo no longer matches the confirmed card identity");
+    }
     const blob = await upload(
       inventoryPhotoUploadPath(itemId, 0),
       scanPhotoPayload.blob,
@@ -3409,7 +3618,7 @@ export default function Home() {
     });
     const savePayload = await readJson(saveRes);
     if (!saveRes.ok) throw new Error(savePayload.error ?? "Scan photo save failed");
-    return true;
+    return (savePayload.photo as CardPhoto | undefined) ?? null;
   }
 
   function clearCheckedComp() {
@@ -3438,6 +3647,8 @@ export default function Home() {
   }
 
   function clearCompEvidence() {
+    compLookupRef.current?.controller.abort(new DOMException("Comp evidence cleared", "AbortError"));
+    compLookupRef.current = null;
     setComp(null);
     setPendingLookup(null);
     setCompProgressSources([]);
@@ -3457,6 +3668,7 @@ export default function Home() {
     resetBuyCost();
     setQuickIntake("");
     setManualCompQuery("");
+    resetScanResult();
   }
 
   function clearCurrentComp(message = "Ready for next comp.") {
@@ -3558,7 +3770,7 @@ export default function Home() {
     const parsed = parseQuickIntake(quickIntake);
     const filled: string[] = [];
     const manualQuery = normalizeManualCompSearchText(quickIntake);
-    const identityChanged = Boolean(parsed.name || parsed.setName);
+    const identityChanged = Boolean(parsed.name || parsed.setName || parsed.number);
     const nextLookup: LookupInput = {
       name: parsed.name ?? name,
       setName: parsed.setName ?? setNameValue,
@@ -3571,6 +3783,7 @@ export default function Home() {
       setName(parsed.name);
       filled.push("card");
     }
+    if (identityChanged) resetScanResult();
     if (parsed.setName) {
       setSetNameValue(parsed.setName);
       pinRecentSetName(parsed.setName);
@@ -3640,7 +3853,7 @@ export default function Home() {
     setError(null);
     if (options.lookupAfter) {
       if (parsed.graderCert) {
-        setNotice(`Filled ${filled.join(", ")}. Verifying PSA cert...`);
+        setNotice(`Filled ${filled.join(", ")}. Verifying PSA cert…`);
         void verifyPsaCertNumber(parsed.graderCert, {
           lookupAfter: true,
           typed: {
@@ -3656,7 +3869,7 @@ export default function Home() {
         setError("Quick comp needs a card name.");
         return;
       }
-      setNotice(`Filled ${filled.join(", ")}. Looking up comp...`);
+      setNotice(`Filled ${filled.join(", ")}. Looking up comp…`);
       void lookupComp(nextLookup, { preserveCost: Boolean(parsed.cost) });
       return;
     }
@@ -3682,18 +3895,24 @@ export default function Home() {
   }
 
   function normalizeLookupInput(input: LookupInput): LookupInput {
+    const originalIdentity = [input.name.trim(), input.setName.trim(), input.number.trim()].filter(Boolean).join(" ");
     const parsed = normalizeCatalogCardSearchInput(
       [input.name.trim(), input.number.trim()].filter(Boolean).join(" "),
       input.setName,
     );
+    const printIdentity = detectCardPrintIdentity({ name: originalIdentity });
 
     return {
-      name: parsed.name || input.name,
+      name: addRequestedPrintHints(parsed.name || input.name, { name: originalIdentity }),
       setName: parsed.setName ?? input.setName,
       number: parsed.number ?? input.number,
       grade: input.grade,
       ...(input.tcgApiId ? { tcgApiId: input.tcgApiId } : {}),
       ...(input.tcgDexId ? { tcgDexId: input.tcgDexId } : {}),
+      ...(input.cardmarketId ? { cardmarketId: input.cardmarketId } : {}),
+      edition: input.edition ?? parsed.edition ?? printIdentity.edition,
+      finish: input.finish ?? parsed.finish ?? printIdentity.finish,
+      language: input.language ?? (/\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u.test(input.name) ? "JP" : "EN"),
       ...(input.psaCert ? { psaCert: input.psaCert } : {}),
     };
   }
@@ -3708,11 +3927,20 @@ export default function Home() {
   }
 
   async function lookupComp(input: LookupInput, options: { preserveCost?: boolean; resultSection?: BuyResultSection } = {}) {
+    compLookupRef.current?.controller.abort(new DOMException("Superseded by a newer comp", "AbortError"));
+    const requestId = ++compLookupSequenceRef.current;
+    const controller = new AbortController();
+    compLookupRef.current = { id: requestId, controller };
     const normalizedInput = normalizeLookupInput(input);
     const identityChanged =
       lookupIdentityKey(normalizedInput) !==
       lookupIdentityKey({ name, setName: setNameValue, number, grade });
     if (identityChanged && !options.preserveCost) resetBuyCost();
+    if (identityChanged) {
+      setComp(null);
+      setCardArtUrl(null);
+      setBuyResultSection(null);
+    }
     applyNormalizedLookupFields(normalizedInput);
     setPendingLookup({
       name: normalizedInput.name,
@@ -3737,13 +3965,18 @@ export default function Home() {
       if (normalizedInput.number?.trim()) qs.set("number", normalizedInput.number.trim());
       if (normalizedInput.tcgApiId) qs.set("tcgApiId", normalizedInput.tcgApiId);
       if (normalizedInput.tcgDexId) qs.set("tcgDexId", normalizedInput.tcgDexId);
+      if (normalizedInput.cardmarketId) qs.set("cardmarketId", normalizedInput.cardmarketId);
+      if (normalizedInput.edition) qs.set("edition", normalizedInput.edition);
+      if (normalizedInput.finish) qs.set("finish", normalizedInput.finish);
+      if (normalizedInput.language) qs.set("language", normalizedInput.language);
       if (normalizedInput.psaCert) qs.set("psaCert", normalizedInput.psaCert);
-      const res = await fetch(`/api/comps/stream?${qs}`, { headers: { Accept: "application/x-ndjson" } });
+      const res = await fetch(`/api/comps/stream?${qs}`, { headers: { Accept: "application/x-ndjson" }, signal: controller.signal });
       if (!res.ok) {
         const payload = await readJson(res);
         throw new Error(payload.error ?? "lookup failed");
       }
       await readCompProgress(res, (event) => {
+        if (compLookupRef.current?.id !== requestId || controller.signal.aborted) return;
         if (event.type === "catalog") {
           catalogProgress = event;
           setCompProgressPhase("catalog");
@@ -3783,7 +4016,8 @@ export default function Home() {
         if (event.type === "error") throw new Error(event.error);
         terminalReceipt = event.receipt as Reconciled;
         setCompProgressPhase("receipt");
-      });
+      }, { signal: controller.signal });
+      if (compLookupRef.current?.id !== requestId || controller.signal.aborted) return;
       const payload = terminalReceipt as Reconciled | null;
       if (!payload) throw new Error("Comp stream ended before its receipt.");
       setComp(payload);
@@ -3798,6 +4032,8 @@ export default function Home() {
       void putOfflineComp(normalizedInput, payload, payload.headline?.asOf ?? new Date().toISOString());
       if (payload.reconciliation?.manualCheck) void loadManualReviews();
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
+      if (compLookupRef.current?.id !== requestId) return;
       setPendingLookup(null);
       const cached = await getOfflineComp<Reconciled>(normalizedInput).catch(() => null);
       if (cached) {
@@ -3820,8 +4056,23 @@ export default function Home() {
         }
       }
     } finally {
-      setBusy(null);
+      if (compLookupRef.current?.id === requestId) {
+        compLookupRef.current = null;
+        setBusy(null);
+        setPendingLookup(null);
+      }
     }
+  }
+
+  function cancelCompLookup() {
+    const active = compLookupRef.current;
+    if (!active) return;
+    active.controller.abort(new DOMException("Cancelled by dealer", "AbortError"));
+    compLookupRef.current = null;
+    setBusy(null);
+    setPendingLookup(null);
+    setCompProgressPhase(null);
+    setNotice("Comp cancelled. No result was applied.");
   }
 
   async function queueCompIntent(input: LookupInput) {
@@ -3890,7 +4141,7 @@ export default function Home() {
         return;
       }
       if (!isPsaPokemonTcgCert(result)) {
-        setNotice("PSA cert verified, but it is not a Pokémon TCG card so it cannot feed comps here.");
+        setNotice("PSA registry record found, but it is not a Pokémon TCG card so it cannot feed comps here.");
         return;
       }
       const lookupFields = buildPsaLookupFields(result);
@@ -3909,7 +4160,7 @@ export default function Home() {
           conflicts,
           lookupAfter: Boolean(options.lookupAfter),
         });
-        setNotice("PSA cert verified. Choose whether to use PSA details or keep your typed card.");
+        setNotice("PSA registry record found. Choose whether to use its details or keep your typed card.");
         return;
       }
       await applyPsaCertToBuyForm(result, lookupFields, { lookupAfter: Boolean(options.lookupAfter) });
@@ -3944,10 +4195,10 @@ export default function Home() {
     if (fields.grade) setGrade(fields.grade);
     if (options.lookupAfter) {
       if (!nextName.trim()) {
-        setError("PSA verified, but it did not include a card name to comp.");
+        setError("The PSA registry record did not include a card name to comp.");
         return;
       }
-      setNotice(`Verified PSA ${result.gradeLabel ?? ""}. Looking up comp...`);
+      setNotice(`Verified PSA ${result.gradeLabel ?? ""}. Looking up comp…`);
       await lookupComp({
         name: nextName,
         setName: nextSetName,
@@ -3958,9 +4209,7 @@ export default function Home() {
       return;
     }
     setNotice(
-      `Verified PSA ${result.gradeLabel ?? ""} ${toTitleCase(result.subject ?? "card")}${
-        result.live ? "" : " (demo cert — add PSA_API_TOKEN for live)"
-      }. Card filled — run a comp.`,
+      `Verified PSA ${result.gradeLabel ?? ""} ${toTitleCase(result.subject ?? "card")}. Card filled — run a comp.`,
     );
   }
 
@@ -4029,6 +4278,10 @@ export default function Home() {
               number: catalogCard?.number ?? (number || undefined),
               tcgApiId: catalogCard?.tcgApiId,
               tcgDexId: catalogCard?.tcgDexId,
+              cardmarketId: catalogCard?.cardmarketId,
+              language: catalogCard?.language ?? comp?.headline?.card.language ?? "EN",
+              edition: catalogCard?.edition ?? comp?.headline?.card.edition,
+              finish: catalogCard?.finish ?? comp?.headline?.card.finish,
               imageUrl: selectedCardImage ?? undefined,
             },
             grade,
@@ -4199,12 +4452,17 @@ export default function Home() {
     }
 
     const acquireBody = {
-      card: {
-        name,
-        setName: setNameValue,
-        number,
-        ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
-      },
+      card: buildCardIntakePayload({
+        name: catalogCard?.name ?? name,
+        setName: catalogCard?.setName ?? setNameValue,
+        number: catalogCard?.number ?? number,
+        tcgApiId: catalogCard?.tcgApiId,
+        tcgDexId: catalogCard?.tcgDexId,
+        cardmarketId: catalogCard?.cardmarketId,
+        language: catalogCard?.language ?? (/\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u.test(name) ? "JP" : "EN"),
+        edition: catalogCard?.edition ?? comp?.headline?.card.edition,
+        finish: catalogCard?.finish ?? comp?.headline?.card.finish,
+      }),
       grade,
       costBasisPence: poundsToPence(cost),
       quantity: intakeQuantity,
@@ -4214,9 +4472,9 @@ export default function Home() {
       graderCert: graderCert.trim() || undefined,
       strategy,
       channel,
-      listPricePence: overrideListPricePence ?? undefined,
-      listingState: overrideListPricePence != null ? acquireListingState : "DRAFT",
-      createListing: shouldCreateListing && overrideListPricePence != null,
+      listPricePence: effectiveDraftListPricePence ?? undefined,
+      listingState: effectiveAcquireListingState,
+      createListing: shouldCreateListing,
       checkedComp: checkedComp
         ? {
             pricePence: checkedComp.medianPence,
@@ -4224,6 +4482,23 @@ export default function Home() {
             windowDays: checkedComp.windowDays,
             source: checkedCompSource,
             note: checkedCompNote.trim() || undefined,
+          }
+        : undefined,
+      reviewedComps: !checkedComp && comp && headline
+        ? {
+            headline: reviewedCompSnapshot(headline),
+            // Empty/unavailable source receipts can legitimately carry n=0.
+            // They remain visible in the UI but are not pricing evidence and
+            // must not invalidate the reviewed receipt sent to acquisition.
+            all: [
+              headline,
+              ...comp.all.filter((result) =>
+                result.sampleSize > 0 &&
+                result.medianPence > 0 &&
+                !(result.source === headline.source && result.asOf === headline.asOf && result.medianPence === headline.medianPence),
+              ),
+            ].slice(0, 12).map(reviewedCompSnapshot),
+            sourcesDisagree: comp.sourcesDisagree,
           }
         : undefined,
     };
@@ -4251,17 +4526,21 @@ export default function Home() {
       });
       responseReceived = true;
       const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "acquire failed");
+      if (!res.ok) throw new Error(intakeRequestError(payload, "Could not add this card to stock."));
       const wasScanned = Boolean(scanIdentity || scanPhotoPreview);
-      let scanPhotoSaved = false;
+      let savedScanPhoto: CardPhoto | null = null;
       let scanPhotoWarning = "";
       if (scanPhotoPayload && payload.item?.id) {
         try {
-          scanPhotoSaved = await attachScannedPhotoToInventory(payload.item.id);
+          savedScanPhoto = await attachScannedPhotoToInventory(payload.item.id);
         } catch (photoErr) {
           scanPhotoWarning = photoErr instanceof Error ? ` Scan photo not saved: ${photoErr.message}` : " Scan photo not saved.";
         }
       }
+      const stockResult = hydrateStockMutationResult(payload.item, payload.listing, savedScanPhoto);
+      const stockedItem = stockResult.item;
+      const stockedListing = stockResult.listing;
+      const scanPhotoSaved = Boolean(savedScanPhoto);
       setSuggestion(payload.suggestion);
       const acquiredComps = payload.comps ?? (payload.comp ? { headline: payload.comp, all: [payload.comp], sourcesDisagree: false } : null);
       if (acquiredComps) {
@@ -4280,31 +4559,33 @@ export default function Home() {
         ? payload.listing.state === "ACTIVE" ? "Listed" : "Drafted"
         : "Not listed";
       setLastStocked({
-        itemId: payload.item.id,
-        listingId: payload.listing?.id ?? null,
+        itemId: stockedItem.id,
+        listingId: stockedListing?.id ?? null,
         name: payload.catalog?.name ?? name,
         setName: payload.catalog?.setName ?? setNameValue,
         number: payload.catalog?.number ?? number,
         grade,
         quantity: intakeQuantity,
         costPence: poundsToPence(cost),
-        listPricePence: listedPence,
+        listPricePence: stockedListing?.listPrice ?? listedPence,
         channel,
-        listingState: payload.listing?.state ?? "DRAFT",
+        listingState: stockedListing?.state ?? "DRAFT",
         imageUrl: payloadDisplayImage(payload) ?? cardArtUrl,
       });
       showStockedNotice(
         `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"}. ${
-          payload.listing
-            ? listedPence != null
-              ? `${listingVerb} at ${gbp(listedPence)}.`
-              : "Unpriced draft saved. Choose Your list price when ready."
-            : "Listing skipped."
+          stockedListing
+            ? stockedListing.listPrice != null
+              ? `${listingVerb} at ${gbp(stockedListing.listPrice)}.`
+              : "Draft saved. Choose Your list price during eBay review."
+            : shouldCreateListing
+              ? `Stock saved, but the listing needs retry${payload.listingWarning ? `: ${payload.listingWarning}` : "."}`
+              : "Listing skipped."
         }${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
-        payload.item.id,
+        stockedItem.id,
         payload.catalog?.name ?? name,
       );
-      await refreshAll();
+      await applyStockMutationResult(stockedItem, stockedListing);
       applyPostStockFlow();
       if (wasScanned) {
         if (keepBuying) finishScannedCardDecision(scanPhotoSaved ? "Stocked with scan photo. Scan next?" : "Stocked. Scan next?");
@@ -4357,9 +4638,9 @@ export default function Home() {
       grade,
       quantity: itemQuantity,
       costPence,
-      listPricePence: listPriceOverride.trim() ? poundsToPence(listPriceOverride) : 0,
+      listPricePence: effectiveDraftListPricePence,
       channel,
-      listingState: acquireListingState,
+      listingState: effectiveAcquireListingState,
       imageUrl: selectedCardImage,
       queued: true,
     });
@@ -4371,7 +4652,13 @@ export default function Home() {
       }),
     });
     applyPostStockFlow();
-    if (scanIdentity || scanPhotoPreview) finishScannedCardDecision("Purchase queued. Photo metadata kept; sync before closing the session.");
+    if (scanIdentity || scanPhotoPreview) {
+      finishScannedCardDecision(
+        scanPhotoPayload
+          ? "Purchase queued without the photo. Add it from Stock after sync."
+          : "Purchase queued. It will sync when signal returns.",
+      );
+    }
   }
 
   async function stockWithoutComp() {
@@ -4402,14 +4689,19 @@ export default function Home() {
     });
     const mutationId = crypto.randomUUID();
     const inventoryBody = {
-      card: {
-        name,
-        setName: setNameValue,
-        number,
-        // Lock to the confirmed catalog printing — the route resolves by
-        // tcgApiId first, so a numberless query cannot drift on replay.
-        ...(catalogCard?.tcgApiId ? { tcgApiId: catalogCard.tcgApiId } : {}),
-      },
+      card: buildCardIntakePayload({
+        name: catalogCard?.name ?? name,
+        setName: catalogCard?.setName ?? setNameValue,
+        number: catalogCard?.number ?? number,
+        // Lock to the confirmed catalog printing so a numberless query cannot
+        // drift to a same-name sibling when it is committed.
+        tcgApiId: catalogCard?.tcgApiId,
+        tcgDexId: catalogCard?.tcgDexId,
+        cardmarketId: catalogCard?.cardmarketId,
+        language: catalogCard?.language ?? (/\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u.test(name) ? "JP" : "EN"),
+        edition: catalogCard?.edition ?? comp?.headline?.card.edition,
+        finish: catalogCard?.finish ?? comp?.headline?.card.finish,
+      }),
       grade,
       quantity: intakeQuantity,
       costBasisPence,
@@ -4430,16 +4722,16 @@ export default function Home() {
       graderCert: graderCert.trim() || undefined,
       strategy,
       channel,
-      listPricePence: shouldCreateListing ? overrideListPricePence ?? undefined : undefined,
-      listingState: overrideListPricePence != null ? acquireListingState : "DRAFT",
-      createListing: shouldCreateListing && overrideListPricePence != null,
+      listPricePence: effectiveDraftListPricePence ?? undefined,
+      listingState: effectiveAcquireListingState,
+      createListing: shouldCreateListing,
     };
 
     if (!navigator.onLine) {
       try {
         await queueQuickFillMutation(quickFillReplayBody, mutationId, overrideListPricePence ?? 0, {
           endpoint: "/api/inventory/acquire",
-          listingQueued: shouldCreateListing && overrideListPricePence != null,
+          listingQueued: shouldCreateListing,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not save this Quick Fill offline.");
@@ -4458,41 +4750,50 @@ export default function Home() {
       });
       responseReceived = true;
       const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "manual stock failed");
+      if (!res.ok) throw new Error(intakeRequestError(payload, "Could not add this card to stock."));
 
       const wasScanned = Boolean(scanIdentity || scanPhotoPreview);
-      let scanPhotoSaved = false;
+      let savedScanPhoto: CardPhoto | null = null;
       let scanPhotoWarning = "";
       if (scanPhotoPayload && payload.item?.id) {
         try {
-          scanPhotoSaved = await attachScannedPhotoToInventory(payload.item.id);
+          savedScanPhoto = await attachScannedPhotoToInventory(payload.item.id);
         } catch (photoErr) {
           scanPhotoWarning = photoErr instanceof Error ? ` Scan photo not saved: ${photoErr.message}` : " Scan photo not saved.";
         }
       }
+      const scanPhotoSaved = Boolean(savedScanPhoto);
 
       let createdListing: Listing | null = null;
-      if (shouldCreateListing && overrideListPricePence != null && payload.item?.id) {
-        const listPricePence = overrideListPricePence ?? undefined;
-        const listingRes = await fetch("/api/listings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            itemId: payload.item.id,
-            channel,
-            state: acquireListingState,
-            ...(listPricePence != null ? { listPricePence } : {}),
-          }),
-        });
-        const listingPayload = await readJson(listingRes);
-        if (!listingRes.ok) {
-          console.warn("[manual stock] draft listing skipped:", listingPayload.error ?? "listing create failed");
-        } else {
-          createdListing = listingPayload.listing as Listing;
+      let listingWarning = "";
+      if (shouldCreateListing && payload.item?.id) {
+        try {
+          const listingRes = await fetch("/api/listings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              itemId: payload.item.id,
+              channel,
+              state: effectiveAcquireListingState,
+              ...(effectiveDraftListPricePence != null ? { listPricePence: effectiveDraftListPricePence } : {}),
+            }),
+          });
+          const listingPayload = await readJson(listingRes);
+          if (!listingRes.ok) {
+            listingWarning = intakeRequestError(listingPayload, "The listing draft could not be created.");
+            console.warn("[manual stock] draft listing skipped:", listingWarning);
+          } else {
+            createdListing = listingPayload.listing as Listing;
+          }
+        } catch (listingError) {
+          listingWarning = listingError instanceof Error ? listingError.message : "The listing draft could not be created.";
+          console.warn("[manual stock] draft listing skipped:", listingWarning);
         }
       }
 
-      const stockedItem = payload.item as InventoryItem | undefined;
+      const stockResult = hydrateStockMutationResult(payload.item, createdListing, savedScanPhoto);
+      const stockedItem = stockResult.item;
+      createdListing = stockResult.listing;
       setLastStocked({
         itemId: stockedItem?.id ?? payload.item?.id,
         listingId: createdListing?.id ?? null,
@@ -4502,19 +4803,21 @@ export default function Home() {
         grade,
         quantity: intakeQuantity,
         costPence: costBasisPence,
-        listPricePence: createdListing?.listPrice ?? overrideListPricePence ?? 0,
+        listPricePence: createdListing?.listPrice ?? effectiveDraftListPricePence,
         channel,
-        listingState: createdListing?.state ?? acquireListingState,
+        listingState: createdListing?.state ?? effectiveAcquireListingState,
         imageUrl: stockedItem?.card?.imageUrl ?? cardArtUrl,
       });
       showStockedNotice(
         createdListing
-          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${overrideListPricePence != null ? `${acquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(overrideListPricePence)}.` : "Unpriced draft created; choose Your list price before publishing."}${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`
-          : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
+          ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. ${effectiveDraftListPricePence != null ? `${effectiveAcquireListingState === "ACTIVE" ? "Listed" : "Drafted"} at ${gbp(effectiveDraftListPricePence)}.` : eBayDraftPriceNeedsReview ? "Draft created unpriced; choose at least £0.99 during review." : "Draft created; choose Your list price during review."}${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`
+          : shouldCreateListing
+            ? `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually, but the listing needs retry${listingWarning ? `: ${listingWarning}` : "."}${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`
+            : `${intakeQuantity > 1 ? `${intakeQuantity} copies stocked` : "Stocked"} manually. Add a listing from Stock when ready.${scanPhotoSaved ? " Scan photo saved." : scanPhotoWarning}`,
         stockedItem?.id ?? payload.item?.id,
         stockedItem?.card?.name ?? name,
       );
-      await refreshAll();
+      await applyStockMutationResult(stockedItem, createdListing);
       applyPostStockFlow();
       if (wasScanned) {
         if (keepBuying) finishScannedCardDecision(scanPhotoSaved ? "Stocked with scan photo. Scan next?" : "Stocked. Scan next?");
@@ -4523,7 +4826,7 @@ export default function Home() {
     } catch (err) {
       if (!responseReceived) {
         try {
-          await queueQuickFillMutation(inventoryBody, mutationId, draftDefaults.listPricePence, {
+          await queueQuickFillMutation(inventoryBody, mutationId, effectiveDraftListPricePence ?? draftDefaults.listPricePence, {
             endpoint: "/api/inventory",
             listingQueued: false,
           });
@@ -4574,7 +4877,7 @@ export default function Home() {
       costPence,
       listPricePence: fallbackListPence,
       channel,
-      listingState: options.listingQueued ? acquireListingState : "DRAFT",
+      listingState: options.listingQueued ? effectiveAcquireListingState : "DRAFT",
       imageUrl: selectedCardImage,
       queued: true,
     });
@@ -4588,7 +4891,13 @@ export default function Home() {
       }),
     });
     applyPostStockFlow();
-    if (scanIdentity || scanPhotoPreview) finishScannedCardDecision("Quick Fill queued. Sync before closing the session.");
+    if (scanIdentity || scanPhotoPreview) {
+      finishScannedCardDecision(
+        scanPhotoPayload
+          ? "Quick Fill queued without the photo. Add it from Stock after sync."
+          : "Quick Fill queued. It will sync when signal returns.",
+      );
+    }
   }
 
   function showStockedNotice(message: string, itemId: string | undefined, itemName: string) {
@@ -4898,7 +5207,7 @@ export default function Home() {
     setNotice(null);
     setError(null);
     if (options.lookupAfter) {
-      setNotice(`Looking up ${card.name}...`);
+      setNotice(`Looking up ${card.name}…`);
       void lookupComp(nextLookup);
     }
   }
@@ -4930,7 +5239,7 @@ export default function Home() {
     setError(null);
 
     if (options.lookupAfter) {
-      setNotice(`Rechecking ${entry.name}...`);
+      setNotice(`Rechecking ${entry.name}…`);
       void lookupComp(nextLookup);
       return;
     }
@@ -4978,7 +5287,7 @@ export default function Home() {
     setCardArtUrl(catalogDisplayImage(card));
     setManualCompQuery(manualSearch);
     setError(null);
-    setNotice(`Rechecking ${lookupName}...`);
+    setNotice(`Rechecking ${lookupName}…`);
     void lookupComp(nextLookup);
   }
 
@@ -5009,14 +5318,12 @@ export default function Home() {
 
   async function loadSetCatalog() {
     try {
-      const [popularRes, allRes] = await Promise.all([
-        fetch("/api/catalog/sets"),
-        fetch("/api/catalog/sets?all=1"),
-      ]);
-      const popularPayload = await readJson(popularRes);
-      const allPayload = await readJson(allRes);
-      if (popularRes.ok) setPopularSets(popularPayload.sets ?? []);
-      if (allRes.ok) setAllSets(allPayload.sets ?? []);
+      const response = await fetch("/api/catalog/sets?bundle=1");
+      const payload = await readJson(response);
+      if (response.ok) {
+        setPopularSets(payload.popularSets ?? []);
+        setAllSets(payload.sets ?? []);
+      }
     } catch {
       // Offline/bundled catalog only -- if this somehow fails, the Set
       // field still works as a plain text input, so fail silently.
@@ -5033,15 +5340,8 @@ export default function Home() {
   function chooseCard(card: CatalogCard, options: { lookupAfter?: boolean } = {}) {
     const typedText = quickIntake.trim();
     const parsed = typedText ? parseQuickIntake(typedText) : null;
-    const firstEditionRequested =
-      textMentionsFirstEdition(typedText) ||
-      textMentionsFirstEdition(name) ||
-      textMentionsFirstEdition(setNameValue) ||
-      textMentionsFirstEdition(number);
-    const lookupName =
-      firstEditionRequested && !textMentionsFirstEdition(card.name)
-        ? `${card.name} 1st Edition`
-        : card.name;
+    const typedPrintIdentity = { name: [typedText, name, setNameValue, number].filter(Boolean).join(" ") };
+    const lookupName = addRequestedPrintHints(card.name, typedPrintIdentity);
     const nextGrade = parsed?.grade ?? grade;
     const conditionSearchTerm = parsed?.condition && parsed.condition.toUpperCase() !== "NM" ? parsed.condition : undefined;
     const manualSearch = normalizeManualCompSearchText(typedText);
@@ -5053,6 +5353,10 @@ export default function Home() {
       grade: nextGrade,
       ...(card.tcgApiId ? { tcgApiId: card.tcgApiId } : {}),
       ...(card.tcgDexId ? { tcgDexId: card.tcgDexId } : {}),
+      ...(card.cardmarketId ? { cardmarketId: card.cardmarketId } : {}),
+      edition: card.edition ?? detectCardPrintIdentity(typedPrintIdentity).edition,
+      finish: card.finish ?? detectCardPrintIdentity(typedPrintIdentity).finish,
+      language: card.language,
     } satisfies LookupInput;
 
     clearCompEvidence();
@@ -5081,7 +5385,7 @@ export default function Home() {
       setNotice(`Filled ${lookupName}`);
       return;
     }
-    setNotice(`Rechecking ${lookupName}...`);
+    setNotice(`Rechecking ${lookupName}…`);
     void lookupComp(nextLookup, { preserveCost: Boolean(parsed?.cost) });
   }
 
@@ -5200,7 +5504,7 @@ export default function Home() {
     setError(null);
 
     if (options.lookupAfter) {
-      setNotice(`Looking up ${item.card.name}...`);
+      setNotice(`Looking up ${item.card.name}…`);
       void lookupComp(nextLookup, { resultSection: options.resultSection });
       return;
     }
@@ -5841,9 +6145,15 @@ export default function Home() {
 
   function openLastStockedPack() {
     if (!lastStocked?.listingId) {
+      const item = lastStocked ? inventory.find((row) => row.id === lastStocked.itemId) : null;
+      if (!item) {
+        setView("inventory");
+        setNotice("Stock saved. Open its row to create the listing draft.");
+        return;
+      }
       setView("listings");
       setListingStateFilter("DRAFT");
-      setNotice("Open Listings to create a pack for that stock row.");
+      openListingCreator(item);
       return;
     }
     const listing = listings.find((row) => row.id === lastStocked.listingId);
@@ -6618,7 +6928,7 @@ export default function Home() {
   function pinCheckedCompEvidence(
     entries: CheckedCompEntry[],
     aggregate: CompResult | null,
-    card: { name: string; setName?: string; number?: string; tcgApiId?: string; tcgDexId?: string },
+    card: Pick<LookupInput, "name"> & Partial<Pick<LookupInput, "setName" | "number" | "tcgApiId" | "tcgDexId" | "cardmarketId" | "language" | "edition" | "finish">>,
   ): CompResult | null {
     const checkedSource =
       aggregate && aggregate.sampleSize > 0 && aggregate.medianPence > 0
@@ -6631,8 +6941,11 @@ export default function Home() {
               number: card.number,
               tcgApiId: card.tcgApiId,
               tcgDexId: card.tcgDexId,
+              cardmarketId: card.cardmarketId,
+              edition: card.edition,
+              finish: card.finish,
               game: "POKEMON",
-              language: "EN",
+              language: card.language ?? "EN",
             },
             grade,
           );
@@ -6659,7 +6972,7 @@ export default function Home() {
   }
 
   async function refreshCurrentCompAfterCheckedComp(
-    card: { name: string; setName?: string; number?: string; tcgApiId?: string; tcgDexId?: string },
+    card: Pick<LookupInput, "name"> & Partial<Pick<LookupInput, "setName" | "number" | "tcgApiId" | "tcgDexId" | "cardmarketId" | "language" | "edition" | "finish">>,
     pinnedCheckedSource: CompResult | null,
   ) {
     try {
@@ -6668,6 +6981,10 @@ export default function Home() {
       if (card.number) qs.set("number", card.number);
       if (card.tcgApiId) qs.set("tcgApiId", card.tcgApiId);
       if (card.tcgDexId) qs.set("tcgDexId", card.tcgDexId);
+      if (card.cardmarketId) qs.set("cardmarketId", card.cardmarketId);
+      if (card.language) qs.set("language", card.language);
+      if (card.edition) qs.set("edition", card.edition);
+      if (card.finish) qs.set("finish", card.finish);
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) return;
@@ -6715,6 +7032,10 @@ export default function Home() {
       number: (catalogCard?.number ?? number) || undefined,
       tcgApiId: catalogCard?.tcgApiId,
       tcgDexId: catalogCard?.tcgDexId,
+      cardmarketId: catalogCard?.cardmarketId,
+      language: catalogCard?.language ?? comp?.headline?.card.language ?? "EN",
+      edition: catalogCard?.edition ?? comp?.headline?.card.edition,
+      finish: catalogCard?.finish ?? comp?.headline?.card.finish,
     };
   }
 
@@ -6954,7 +7275,7 @@ export default function Home() {
                 onClick={() => void logCheckedCompEntry()}
                 disabled={busy === "checked-comp-log" || !checkedCompLogPrice.trim()}
               >
-                {busy === "checked-comp-log" ? "Logging..." : "Log price"}
+                {busy === "checked-comp-log" ? "Logging…" : "Log price"}
               </button>
               <button type="button" className="ghost-button" onClick={() => setCheckedCompLogOpen(false)}>
                 Done
@@ -7005,7 +7326,7 @@ export default function Home() {
               <button type="button" onClick={() => clearCurrentComp("Comp saved. Ready for next card.")}>Save comp &amp; next</button>
             ) : (
               <button type="button" onClick={() => void saveReviewAndNext()} disabled={busy === "manual-review-request"}>
-                {busy === "manual-review-request" ? "Saving..." : "Save review & next"}
+                {busy === "manual-review-request" ? "Saving…" : "Save review & next"}
               </button>
             )}
             <button className="ghost-button" type="button" onClick={skipCurrentComp}>Next card</button>
@@ -7025,8 +7346,8 @@ export default function Home() {
               {requiresCheckedCompBeforeStock
                 ? "Manual check recommended"
                 : quickStockReady
-                  ? shouldCreateListing
-                    ? `${quickStockQuantity} + ${acquireListingState === "ACTIVE" ? "active listing" : "draft"}`
+                ? shouldCreateListing
+                    ? `${quickStockQuantity} + ${channel === "EBAY" ? "eBay draft" : effectiveAcquireListingState === "ACTIVE" ? "active listing" : "draft"}`
                     : `${quickStockQuantity} to stock`
                   : "Add what I paid"}
             </strong>
@@ -7057,13 +7378,36 @@ export default function Home() {
             tone={hasEnteredBuyCost && buyPlan && buyPlan.totalProfitPence >= 0 ? "good" : "warn"}
           />
           <Metric label="Suggested list price" value={projectedListSuggestion ? gbp(projectedListSuggestion.pricePence) : "not available"} />
-          <Metric label="Your list price" value={listPriceOverride.trim() ? gbp(poundsToPence(listPriceOverride)) : "not chosen"} />
+          <Metric
+            label={shouldCreateListing ? `${channelLabel(channel)} ${effectiveAcquireListingState === "ACTIVE" ? "active" : "draft"} price` : "Listing"}
+            value={shouldCreateListing ? effectiveDraftListPricePence != null ? gbp(effectiveDraftListPricePence) : "set in review" : "stock only"}
+          />
         </div>
         <button className="no-cost-button" type="button" onClick={() => setManualBuyCost("0.00")}>
           No tracked cost · £0.00
         </button>
+        <div className={`stock-listing-plan ${shouldCreateListing ? "ready" : "muted"}`}>
+          <div>
+            <span>After stock</span>
+            <strong>
+              {shouldCreateListing
+                ? effectiveAcquireListingState === "ACTIVE"
+                  ? `${channelLabel(channel)} listing will be active`
+                  : `${channelLabel(channel)} draft ready for review`
+                : "Keep in stock only"}
+            </strong>
+            <small>
+              {shouldCreateListing
+                ? eBayDraftPriceNeedsReview
+                  ? `eBay requires at least £0.99; set the final price during review${scanPhotoPayload ? " · scan photo becomes the first listing photo" : ""}.`
+                  : `${listPriceOverride.trim() ? "Your chosen price" : "Suggested price"} ${effectiveDraftListPricePence != null ? gbp(effectiveDraftListPricePence) : "added during review"}${scanPhotoPayload ? " · scan photo becomes the first listing photo" : ""}.`
+                : "No marketplace draft will be created."}
+            </small>
+          </div>
+          {shouldCreateListing && <span className="pill good">{effectiveAcquireListingState === "ACTIVE" ? "Active" : "Draft"} ✓</span>}
+        </div>
         <details className="buy-advanced-details optional-listing-details">
-          <summary>Optional listing after stock</summary>
+          <summary>Change listing plan</summary>
           <div className="form-grid">
             <label>
               Your list price
@@ -7079,7 +7423,7 @@ export default function Home() {
           </div>
           <div className="listing-choice" role="group" aria-label="After stock listing choice">
             <button type="button" className={!shouldCreateListing ? "selected" : ""} onClick={() => setShouldCreateListing(false)}>
-              List later
+              Stock only
             </button>
             <button
               type="button"
@@ -7089,17 +7433,18 @@ export default function Home() {
                 setAcquireListingState("DRAFT");
               }}
             >
-              Draft
+              {channel === "EBAY" ? "eBay draft" : "Draft"}
             </button>
             <button
               type="button"
               className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
+              disabled={channel === "EBAY"}
               onClick={() => {
                 setShouldCreateListing(true);
                 setAcquireListingState("ACTIVE");
               }}
             >
-              Active
+              {channel === "EBAY" ? "Publish after review" : "Active"}
             </button>
           </div>
         </details>
@@ -7166,7 +7511,7 @@ export default function Home() {
           <div className="stock-progress-card" aria-live="polite">
             <span className="lookup-spinner" aria-hidden="true" />
             <div>
-              <strong>Stocking this card...</strong>
+              <strong>Stocking this card…</strong>
               <small>Saving stock, listing draft and comp evidence. If it fails, the button unlocks for retry.</small>
             </div>
           </div>
@@ -7178,11 +7523,13 @@ export default function Home() {
           disabled={busy === "acquire"}
         >
           {busy === "acquire"
-            ? "Stocking..."
+            ? "Stocking…"
             : !quickStockReady
               ? "Add what I paid"
               : shouldCreateListing
-                ? "Confirm stock + listing"
+                ? channel === "EBAY"
+                  ? `Confirm stock + eBay draft${effectiveDraftListPricePence ? ` · ${gbp(effectiveDraftListPricePence)}` : ""}`
+                  : "Confirm stock + listing"
                 : "Confirm stock"}
         </button>
       </div>
@@ -7195,7 +7542,9 @@ export default function Home() {
 
   return (
     <main
+      id="main-content"
       className="app-shell"
+      data-view={view}
       onTouchStart={startPullRefresh}
       onTouchMove={movePullRefresh}
       onTouchEnd={finishPullRefresh}
@@ -7209,27 +7558,35 @@ export default function Home() {
         <span className="pull-refresh-dot" aria-hidden="true" />
         <span>{userRefreshing ? "Refreshing" : pullReady ? "Release to refresh" : "Pull to refresh"}</span>
       </div>
-      <header className="topbar">
-        <div className="brand-lockup">
-          {spotlightImage ? (
-            <CardImage src={spotlightImage} className="app-mark app-mark-image" fallbackClassName="app-mark" alt="" />
-          ) : (
-            <span className="app-mark" aria-hidden="true" />
-          )}
+      <header className="topbar dealer-deck">
+        <div className="brand-lockup dealer-brand">
+          <span className="app-mark" aria-hidden="true" />
           <div>
             <p className="eyebrow">Poke Deal</p>
             <h1>{viewTitle(view)}</h1>
           </div>
-          {selectedCardMarkUrl && (
-            <img
-              className="brand-set-logo"
-              src={selectedCardMarkUrl}
-              alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
-              onError={hideBrokenImage}
-            />
-          )}
         </div>
-        <div className="topbar-actions">
+
+        <nav className="primary-nav bottom-nav" aria-label="Primary">
+          <TabButton active={view === "today"} label="Today" detail="Command" onClick={() => { setMobileMoreOpen(false); setView("today"); }} />
+          <TabButton active={view === "acquire"} label="Comp / Buy" detail="Decide" className="nav-acquire" onClick={() => { setMobileMoreOpen(false); setView("acquire"); }} />
+          <TabButton active={view === "inventory"} label="Stock" detail="Vault" onClick={() => { setMobileMoreOpen(false); setView("inventory"); }} />
+          <TabButton active={view === "listings"} label="List" detail="Market" onClick={() => { setMobileMoreOpen(false); setView("listings"); }} />
+          <TabButton active={view === "pnl"} label="Profit" detail="Ledger" className="nav-profit" onClick={() => { setMobileMoreOpen(false); setView("pnl"); }} />
+          <TabButton active={view === "settings"} label="Setup" detail="Systems" className="nav-setup" onClick={() => { setMobileMoreOpen(false); setView("settings"); }} />
+          <button
+            className={`mobile-more-trigger ${mobileMoreOpen || view === "pnl" || view === "settings" ? "active" : ""}`}
+            type="button"
+            onClick={() => setMobileMoreOpen((current) => !current)}
+            aria-expanded={mobileMoreOpen}
+            aria-controls="mobile-more-menu"
+          >
+            <TabIcon label="More" />
+            <span>More</span>
+          </button>
+        </nav>
+
+        <div className="topbar-actions utility-nav">
           <button
             className={`sync-status ${offlineSync.online ? "online" : "offline"} ${offlineSync.failedCount > 0 ? "error" : ""}`}
             type="button"
@@ -7240,7 +7597,7 @@ export default function Home() {
                 if (result.synced.length > 0) void refreshAll();
               });
             }}
-            title={offlineSync.lastError ?? (offlineBootstrapAgeHours == null ? "Server data is current" : `Offline data snapshot ${offlineBootstrapAgeHours}h old`)}
+            title={offlineSync.lastError ?? (offlineBootstrapAgeHours == null ? "Server data is current" : `${offlineBootstrapPartial ? "Partially refreshed" : "Cached"} snapshot ${offlineBootstrapAgeHours}h old`)}
           >
             <span aria-hidden="true" />
             <strong>
@@ -7250,14 +7607,13 @@ export default function Home() {
                   ? `Offline${offlineSync.pendingCount ? ` · ${offlineSync.pendingCount}` : ""}`
                   : offlineSync.pendingCount
                     ? `${offlineSync.pendingCount} queued`
-                    : "Synced"}
+                    : offlineBootstrapAgeHours != null
+                      ? `${offlineBootstrapPartial ? "Partial" : "Cached"} · ${offlineBootstrapAgeHours}h`
+                      : "Synced"}
             </strong>
           </button>
           <button className="topbar-secondary quick-command-trigger" type="button" onClick={() => setCommandPaletteOpen(true)} aria-label="Open quick actions">
-            Quick
-          </button>
-          <button className="icon-button" type="button" onClick={() => setView("settings")} aria-label="Open setup and health">
-            ⚙
+            <span aria-hidden="true">⌘</span> Quick
           </button>
           <button
             className={`icon-button ${refreshing ? "is-loading" : ""}`}
@@ -7273,17 +7629,32 @@ export default function Home() {
         </div>
       </header>
 
-      {view === "acquire" && !headline && <section className="hero-board" aria-label="Dealer command board">
-        <div className="hero-copy">
-          <p className="eyebrow">Card fair mode</p>
-          <strong>{chaseLine}</strong>
-          <span>GBP comps, stock, listings and profit in one pocket.</span>
-        </div>
-        <div className="hero-card-art" aria-hidden="true">
-          <CardImage src={spotlightImage} fallbackClassName="card-back" alt="" />
-          {selectedCardMarkUrl && <img className="set-mark" src={selectedCardMarkUrl} alt="" onError={hideBrokenImage} />}
-        </div>
-      </section>}
+      {mobileMoreOpen && (
+        <section className="mobile-more-menu" id="mobile-more-menu" role="dialog" aria-modal="true" aria-label="More workspaces">
+          <button className="mobile-more-backdrop" type="button" onClick={() => setMobileMoreOpen(false)} aria-label="Close more workspaces" />
+          <div className="mobile-more-sheet">
+            <div className="mobile-more-heading">
+              <div>
+                <span className="eyebrow">Dealer deck</span>
+                <strong>More workspaces</strong>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setMobileMoreOpen(false)}>Close</button>
+            </div>
+            <button type="button" onClick={() => { setMobileMoreOpen(false); setView("pnl"); }}>
+              <TabIcon label="Profit" />
+              <span><strong>Profit ledger</strong><small>Sales, margin, cash and costs</small></span>
+            </button>
+            <button type="button" onClick={() => { setMobileMoreOpen(false); setView("settings"); }}>
+              <TabIcon label="Setup" />
+              <span><strong>Setup &amp; health</strong><small>Providers, fees and dealer rules</small></span>
+            </button>
+            <button type="button" onClick={() => { setMobileMoreOpen(false); setCommandPaletteOpen(true); }}>
+              <TabIcon label="More" />
+              <span><strong>Quick actions</strong><small>Scan, search or jump straight to a task</small></span>
+            </button>
+          </div>
+        </section>
+      )}
 
       <div className="toast-stack" aria-live="polite" aria-atomic="true">
         {notice && (
@@ -7394,6 +7765,30 @@ export default function Home() {
 
       {view === "acquire" && (
         <section className="workspace buy-workspace">
+          {!headline && (
+            <section className="workspace-masthead buy-masthead" aria-labelledby="buy-workspace-title">
+              <div className="workspace-masthead-copy">
+                <span className="workspace-kicker">Acquisition console</span>
+                <h2 id="buy-workspace-title">Know the card. Know your ceiling.</h2>
+                <p>Identify the exact print, weigh live evidence, then stock it without leaving the deal.</p>
+                <div className="masthead-actions">
+                  <button type="button" className="primary-action" onClick={openScanCamera}>Scan a card</button>
+                  <button type="button" className="ghost-button" onClick={() => quickIntakeRef.current?.focus()}>Type card details</button>
+                </div>
+              </div>
+              <div className="buy-masthead-art" aria-hidden="true">
+                <CardImage
+                  src={spotlightImage
+                    ? [spotlightImage, "/brand/v2/onboarding-scan-512-v1.webp"]
+                    : "/brand/v2/onboarding-scan-512-v1.webp"}
+                  className={`buy-stage-card ${spotlightImage ? "" : "brand-art"}`}
+                  fallbackClassName="buy-stage-card blank"
+                  alt=""
+                />
+                <span className="dealer-ticket"><b>LIVE GBP</b><small>identity · evidence · decision</small></span>
+              </div>
+            </section>
+          )}
           {offlineMutations.length > 0 && (
             <section className="panel offline-queue-panel" aria-label="Actions waiting to sync">
               <div className="panel-heading">
@@ -7424,10 +7819,13 @@ export default function Home() {
             </section>
           )}
           {!headline && (
-          <form className="panel lookup-panel" onSubmit={lookup}>
+          <form className="panel lookup-panel acquisition-console" onSubmit={lookup}>
             <div className="panel-heading">
-              <h2>Comp, buy, stock</h2>
-              <span className="muted">type what is on the card</span>
+              <div>
+                <span className="workspace-kicker">01 · Identify</span>
+                <h2>Find the exact card</h2>
+              </div>
+              <span className="muted">Type, scan, or use a recent comp</span>
             </div>
             <div className="quick-intake-field">
               <label htmlFor="quick-intake">Smart comp search</label>
@@ -7438,7 +7836,6 @@ export default function Home() {
                   value={quickIntake}
                   onChange={(event) => {
                     setQuickIntake(event.target.value);
-                    setCardSuggestions([]);
                     setCardSuggestionsLoading(Boolean(event.target.value.trim()));
                     if (comp || checkedCompPrice.trim()) {
                       clearCompEvidence();
@@ -7458,8 +7855,10 @@ export default function Home() {
                       },
                     );
                   }}
-                  placeholder="Umbreon prismatic, Victini promo..."
+                  name="smart-card-search"
+                  placeholder="Name, set, number…"
                   autoComplete="off"
+                  aria-busy={cardSuggestionsLoading}
                 />
                 <button
                   className="scan-card-button"
@@ -7476,7 +7875,7 @@ export default function Home() {
                   disabled={!canRunSmartComp || busy === "lookup"}
                   aria-label="Comp current card"
                 >
-                  {busy === "lookup" ? "..." : "Comp"}
+                  {busy === "lookup" ? "Comping…" : "Comp"}
                 </button>
                 {canClearCurrentComp && (
                   <button
@@ -7496,6 +7895,7 @@ export default function Home() {
                   className="suggestion-listbox smart-card-suggestions"
                   role="listbox"
                   aria-label="Card suggestions"
+                  aria-busy={cardSuggestionsLoading}
                   onKeyDown={handleSuggestionListKeyDown}
                 >
                   {cardSuggestions.map((card) => (
@@ -7510,7 +7910,8 @@ export default function Home() {
                       </span>
                       <span className="suggestion-set">
                         <strong>{card.setName}</strong>
-                        <small>{card.sourceLabel ?? card.matchLabel ?? "Catalog"}</small>
+                        <small>{[card.matchLabel, card.sourceLabel].filter(Boolean).join(" · ") || "Catalog"}</small>
+                        <small>{[card.variantLabel, card.identityConfidence ? `${card.identityConfidence} identity confidence` : null].filter(Boolean).join(" · ")}</small>
                       </span>
                       <span className="suggestion-number">
                         <strong>{card.number ? `#${card.number}` : "-"}</strong>
@@ -7607,6 +8008,10 @@ export default function Home() {
                       className="selected-set-mark"
                       src={selectedCardMarkUrl}
                       alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+                      width={120}
+                      height={48}
+                      loading="lazy"
+                      decoding="async"
                       onError={hideBrokenImage}
                     />
                   )}
@@ -7635,7 +8040,7 @@ export default function Home() {
                         .join(" · ")}
                     </small>
                   </div>
-                  <span className="lookup-spinner" aria-hidden="true" />
+                  <button type="button" className="ghost-button" onClick={cancelCompLookup}>Cancel</button>
                 </div>
                 <ProgressSourceRail sources={compProgressSources} phase={compProgressPhase} />
                 {pendingRecentComp ? (
@@ -7775,7 +8180,8 @@ export default function Home() {
                     { onEscape: () => setCardSuggestionsOpen(false) },
                   );
                 }}
-                placeholder="Charizard, Moonbreon, Mr Mime..."
+                name="card-name"
+                placeholder="Charizard, Moonbreon, Mr Mime…"
                 autoComplete="off"
               />
               {cardSuggestionsOpen && cardSuggestions.length > 0 && (
@@ -7802,7 +8208,8 @@ export default function Home() {
                       </span>
                       <span className="suggestion-set">
                         <strong>{card.setName}</strong>
-                        <small>{card.sourceLabel ?? card.matchLabel ?? "Catalog"}</small>
+                        <small>{[card.matchLabel, card.sourceLabel].filter(Boolean).join(" · ") || "Catalog"}</small>
+                        <small>{[card.variantLabel, card.identityConfidence ? `${card.identityConfidence} identity confidence` : null].filter(Boolean).join(" · ")}</small>
                       </span>
                       <span className="suggestion-number">
                         <strong>{card.number ? `#${card.number}` : "-"}</strong>
@@ -7831,7 +8238,8 @@ export default function Home() {
                       { onEscape: () => setSetSuggestionsOpen(false) },
                     );
                   }}
-                  placeholder="base set, evo skies, PRE..."
+                  name="card-set"
+                  placeholder="Base Set, Evo Skies, PRE…"
                   autoComplete="off"
                 />
                 {setSuggestionsOpen && setSuggestions.length > 0 && (
@@ -7852,7 +8260,7 @@ export default function Home() {
                         onClick={() => chooseSet(set)}
                       >
                         <span className="suggestion-card-art set-symbol-cell">
-                          {set.symbolUrl ? <img src={set.symbolUrl} alt="" onError={hideBrokenImage} /> : null}
+                          {set.symbolUrl ? <img src={set.symbolUrl} alt="" width={22} height={22} loading="lazy" decoding="async" onError={hideBrokenImage} /> : null}
                         </span>
                         <span className="suggestion-name">
                           <strong>{set.name}</strong>
@@ -7875,7 +8283,8 @@ export default function Home() {
                     editCompIdentity();
                     setNumber(event.target.value);
                   }}
-                  placeholder="199/165"
+                  name="card-number"
+                  placeholder="199/165…"
                 />
               </label>
             </div>
@@ -7888,6 +8297,7 @@ export default function Home() {
                 <label className="grade-select-field">
                   Full grade list
                   <select
+                    name="card-grade"
                     value={grade}
                     onChange={(event) => {
                       clearCompEvidence();
@@ -7910,11 +8320,12 @@ export default function Home() {
                 </span>
                 {isPsaGrade(grade) && (
                   <small className="psa-lookup-hint">
-                    Enter the cert to pull PSA subject, grade, set, card number and population, then run the usual market comps from that verified slab identity.
+                    Enter the cert to pull PSA registry subject, grade, set, card number and population, then run market comps. A registry match is not physical-authenticity proof.
                   </small>
                 )}
                 <div className={`quick-intake-row psa-cert-row ${isPsaGrade(grade) ? "active" : ""}`}>
                   <input
+                    name="psa-cert"
                     inputMode="numeric"
                     value={graderCert}
                     onChange={(event) => setGraderCert(event.target.value)}
@@ -7925,14 +8336,14 @@ export default function Home() {
                     onClick={() => void verifyPsaCert()}
                     disabled={busy === "psa" || !graderCert.trim()}
                   >
-                    {busy === "psa" ? "..." : "Verify"}
+                    {busy === "psa" ? "Verifying…" : "Verify"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void verifyPsaCert({ lookupAfter: true })}
                     disabled={busy === "psa" || busy === "lookup" || !graderCert.trim()}
                   >
-                    {busy === "lookup" ? "Comping..." : isPsaGrade(grade) ? "Verify + comp" : "Comp"}
+                    {busy === "lookup" ? "Comping…" : isPsaGrade(grade) ? "Verify + comp" : "Comp"}
                   </button>
                 </div>
               </label>
@@ -7963,7 +8374,7 @@ export default function Home() {
                   {recentSets.map((set) => (
                     <button key={set.id} type="button" onClick={() => chooseSet(set)}>
                       {set.logoUrl || set.symbolUrl ? (
-                        <img src={set.logoUrl ?? set.symbolUrl} alt="" onError={hideBrokenImage} />
+                        <img src={set.logoUrl ?? set.symbolUrl} alt="" width={96} height={40} loading="lazy" decoding="async" onError={hideBrokenImage} />
                       ) : null}
                       <span>{set.name}</span>
                     </button>
@@ -7978,7 +8389,7 @@ export default function Home() {
                   {visiblePopularSets.map((set) => (
                     <button key={set.id} type="button" onClick={() => chooseSet(set)}>
                       {set.logoUrl || set.symbolUrl ? (
-                        <img src={set.logoUrl ?? set.symbolUrl} alt="" onError={hideBrokenImage} />
+                        <img src={set.logoUrl ?? set.symbolUrl} alt="" width={96} height={40} loading="lazy" decoding="async" onError={hideBrokenImage} />
                       ) : null}
                       <span>{set.name}</span>
                     </button>
@@ -8002,7 +8413,7 @@ export default function Home() {
                 disabled={!canRunSmartComp || busy === "lookup"}
                 aria-label="Comp from smart search"
               >
-                {busy === "lookup" ? "..." : "Comp"}
+                {busy === "lookup" ? "Comping…" : "Comp"}
               </button>
               <button
                 type="button"
@@ -8010,7 +8421,7 @@ export default function Home() {
                 disabled={busy === "lookup" || (!name.trim() && !setNameValue.trim() && !number.trim())}
                 aria-label="Comp from typed fields"
               >
-                {busy === "lookup" ? "..." : "Comp"}
+                {busy === "lookup" ? "Comping…" : "Comp"}
               </button>
             </div>
             </details>
@@ -8056,7 +8467,7 @@ export default function Home() {
                         <span className="quick-art-stack">
                           <CardImage src={card.imageUrl} className="quick-card-art" fallbackClassName="quick-card-art blank" alt="" />
                           {card.setMarkUrl && (
-                            <img className="quick-set-mark" src={card.setMarkUrl} alt="" onError={hideBrokenImage} />
+                            <img className="quick-set-mark" src={card.setMarkUrl} alt="" width={30} height={14} loading="lazy" decoding="async" onError={hideBrokenImage} />
                           )}
                         </span>
                         <span className="quick-hunt-copy">
@@ -8096,32 +8507,34 @@ export default function Home() {
                   <span>Camera comp</span>
                   <strong>
                     {scanMode === "reading"
-                      ? "Reading card..."
+                      ? "Reading card…"
                       : scanMode === "ambiguous"
                         ? "Choose exact card"
                         : scanMode === "confirm-slab"
                           ? "Confirm slab grade"
                           : scanMode === "stocked"
                             ? "Ready for the next one"
-                            : "Scan one card"}
+                            : scanCompReady
+                              ? "Comp ready"
+                              : "Scan one card"}
                   </strong>
                   <small>{scanMessage ?? "Use the rear camera and fill the frame with the printed text."}</small>
                 </div>
-                <button className="ghost-button" type="button" onClick={closeScanCamera}>
+                <button className="ghost-button" type="button" onClick={() => closeScanCamera()}>
                   Close
                 </button>
               </div>
 
               <div className="scan-preview-frame">
                 {scanPhotoPreview && scanMode !== "camera" && scanMode !== "starting" ? (
-                  <img src={scanPhotoPreview} alt="Scanned card" />
+                  <img src={scanPhotoPreview} alt="Scanned card" width={768} height={1024} />
                 ) : (
                   <video ref={scanVideoRef} muted playsInline autoPlay aria-label="Live card camera preview" />
                 )}
                 {(scanMode === "reading" || busy === "scan") && (
                   <div className="scan-reading-overlay" aria-live="polite">
                     <span className="scan-pokeball" aria-hidden="true" />
-                    <strong>Reading card...</strong>
+                    <strong>Reading card…</strong>
                   </div>
                 )}
               </div>
@@ -8159,7 +8572,7 @@ export default function Home() {
               {scanPhotoPreview && scanResolvedArt && (scanMode === "identity" || scanMode === "ambiguous") && (
                 <div className="scan-art-compare" aria-label="Scan compared with catalog art">
                   <figure>
-                    <img src={scanPhotoPreview} alt="Scanned card" />
+                    <img src={scanPhotoPreview} alt="Scanned card" width={768} height={1024} />
                     <figcaption>Scan</figcaption>
                   </figure>
                   <figure>
@@ -8174,9 +8587,28 @@ export default function Home() {
                 </div>
               )}
 
+              {scanCompReady && headline && (
+                <div className="scan-comp-ready" aria-label="Scanned card comp ready">
+                  <div className="scan-comp-ready-heading">
+                    <span>Ready for intake</span>
+                    <strong>{gbp(headline.medianPence)} market comp</strong>
+                    <small>
+                      {headline.sampleSize} sold · suggested list {quickStockListPence > 0 ? gbp(quickStockListPence) : "review needed"}
+                    </small>
+                  </div>
+                  <div className="scan-ready-checks" aria-label="Scan workflow status">
+                    <span>Identity <strong>✓</strong></span>
+                    <span>Comp <strong>✓</strong></span>
+                    <span>Photo <strong>kept</strong></span>
+                    <span>{channelLabel(channel)} <strong>{channel === "EBAY" ? "draft" : effectiveAcquireListingState.toLowerCase()}</strong></span>
+                  </div>
+                  <small>Next: enter what you paid, then confirm stock and the {channelLabel(channel)} draft.</small>
+                </div>
+              )}
+
               {scanMode === "ambiguous" && scanAlternatives.length > 0 && (
                 <div className="scan-candidate-list" aria-label="Possible scan matches">
-                  {scanPhotoPreview && <img className="scan-reference-photo" src={scanPhotoPreview} alt="Scanned card reference" />}
+                  {scanPhotoPreview && <img className="scan-reference-photo" src={scanPhotoPreview} alt="Scanned card reference" width={768} height={1024} />}
                   <div className="scan-candidate-grid">
                     {scanAlternatives.map((card) => (
                       <button
@@ -8214,7 +8646,7 @@ export default function Home() {
                   <strong>{scanMapping.gradeLabel}</strong>
                   <small>Tap confirm if the grade is right, or change it in the grade field before comping.</small>
                   <button type="button" onClick={confirmScannedSlab} disabled={busy === "lookup"}>
-                    {busy === "lookup" ? "Comping..." : "Confirm + comp"}
+                    {busy === "lookup" ? "Comping…" : "Confirm + comp"}
                   </button>
                 </div>
               )}
@@ -8224,6 +8656,15 @@ export default function Home() {
                   <button className="scan-next-action" type="button" onClick={scanNext}>
                     Scan next
                   </button>
+                ) : scanCompReady ? (
+                  <>
+                    <button className="scan-stock-action" type="button" onClick={continueScannedCardToStock}>
+                      Continue to stock
+                    </button>
+                    <button className="ghost-button scan-retake-action" type="button" onClick={scanNext}>
+                      Retake
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button
@@ -8244,9 +8685,9 @@ export default function Home() {
                     >
                       Upload photo instead
                     </label>
-                    {(scanMode === "identity" || scanMode === "ambiguous" || scanMode === "manual" || scanMode === "confirm-slab") && (
+                    {(scanMode === "ambiguous" || scanMode === "manual" || scanMode === "confirm-slab") && (
                       <button type="button" onClick={scanNext} disabled={busy === "scan" || busy === "lookup"}>
-                        {scanCompReady ? "Scan next" : "Retake"}
+                        Retake
                       </button>
                     )}
                   </>
@@ -8270,11 +8711,16 @@ export default function Home() {
 
           {headline && (
             <section
-              className={`panel comp-panel rarity-surface ${rarityConfidenceClass(confidenceLabel?.tone)}`}
+              className={`panel comp-panel deal-sleeve rarity-surface ${rarityConfidenceClass(confidenceLabel?.tone)}`}
               ref={compPanelRef}
               style={selectedCardImage ? ({ "--ambient-card-art": `url("${selectedCardImage}")` } as CSSProperties) : undefined}
             >
-              {busy === "lookup" && <ProgressSourceRail sources={compProgressSources} phase={compProgressPhase} />}
+              {busy === "lookup" && (
+                <div className="comp-progress-with-cancel">
+                  <ProgressSourceRail sources={compProgressSources} phase={compProgressPhase} />
+                  <button type="button" className="ghost-button" onClick={cancelCompLookup}>Cancel lookup</button>
+                </div>
+              )}
               {comp?.ambiguous && (
                 <div className="manual-rescue-card soft">
                   <div>
@@ -8284,11 +8730,13 @@ export default function Home() {
                   <ol>
                     <li>Use the matching image, collector number and rarity.</li>
                     <li>Tap a possible match below to recheck that exact card.</li>
+                    {comp.identityConfidence?.conflicts.map((conflict) => <li key={conflict}>{conflict}</li>)}
                   </ol>
                 </div>
               )}
               <div className="comp-hero">
                 <div>
+                  <span className="workspace-kicker">Dealer decision</span>
                   <p className="eyebrow">
                     {needsManualComp ? "Manual comp recommended" : "Suggested maximum buy"}
                   </p>
@@ -8301,22 +8749,34 @@ export default function Home() {
                 </div>
               </div>
               <div className="comp-identity-strip" aria-label="Comp card identity">
+                <span className="sleeve-tab" aria-hidden="true">Verified print</span>
                 <CardImage
-                  src={selectedCardImage}
+                  src={selectedCardImages}
                   className="comp-identity-art"
                   fallbackClassName="comp-identity-art blank"
                   alt={`${selectedCardTitle} card art`}
+                  eager
                 />
                 <div>
                   <span>{grade.replace(/_/g, " ")}</span>
                   <strong>{selectedCardTitle}</strong>
                   <small>{selectedCardMeta}</small>
                 </div>
+                {comp?.identityConfidence && (
+                  <div className={`identity-confidence-badge ${comp.identityConfidence.level}`} title={[...comp.identityConfidence.reasons, ...comp.identityConfidence.conflicts].join(" · ")}>
+                    <strong>{comp.identityConfidence.score}% identity</strong>
+                    <small>{comp.identityConfidence.level} · {comp.identityConfidence.autoSelectable ? "confirmed" : "pick/check required"}</small>
+                  </div>
+                )}
                 {selectedCardMarkUrl && (
                   <img
                     className="comp-identity-set-mark"
                     src={selectedCardMarkUrl}
                     alt={`${selectedSet?.name ?? catalogCard?.setName ?? setNameValue} set logo`}
+                    width={110}
+                    height={45}
+                    loading="lazy"
+                    decoding="async"
                     onError={hideBrokenImage}
                   />
                 )}
@@ -8344,13 +8804,13 @@ export default function Home() {
                   onClick={runDecisionBarBuy}
                   disabled={busy === "acquire" || busy === "manual-stock"}
                 >
-                  {busy === "acquire" ? "Stocking..." : buyResultSection === "deal" ? "Add to stock" : "Just bought it"}
+                  {busy === "acquire" ? "Stocking…" : buyResultSection === "deal" ? "Add to stock" : "Just bought it"}
                 </button>
                 <button className="verdict-ebay-action" type="button" aria-label="eBay UK" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
                   eBay UK
                 </button>
                 <button className="verdict-watch-action" type="button" onClick={watchDecisionTarget} disabled={busy === "watch-create" || decisionBarWatchTargetPence <= 0}>
-                  {busy === "watch-create" ? "Watching..." : "Watch"}
+                  {busy === "watch-create" ? "Watching…" : "Watch"}
                 </button>
                 <button type="button" className="ghost-button verdict-pass-action" aria-label="Next card" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
                   Next card
@@ -8407,7 +8867,7 @@ export default function Home() {
                     <small>Use when you are pricing several cards before deciding the total offer.</small>
                   </div>
                   <button type="button" onClick={() => void addCurrentCompToSession()} disabled={busy === "deal-session-add" || !headline}>
-                    {busy === "deal-session-add" ? "Adding..." : "Add to lot"}
+                    {busy === "deal-session-add" ? "Adding…" : "Add to lot"}
                   </button>
                 </div>
               )}
@@ -8464,7 +8924,7 @@ export default function Home() {
                             {priceHint && <small>{priceHint}</small>}
                           </span>
                           {(card.setLogoUrl || card.setSymbolUrl) && (
-                            <img src={card.setLogoUrl ?? card.setSymbolUrl} alt="" onError={hideBrokenImage} />
+                            <img src={card.setLogoUrl ?? card.setSymbolUrl} alt="" width={96} height={40} loading="lazy" decoding="async" onError={hideBrokenImage} />
                           )}
                         </button>
                       );
@@ -8569,7 +9029,7 @@ export default function Home() {
                         onClick={() => void applyStockCompReprice()}
                         disabled={busy === `listing-${stockCompListing.id}`}
                       >
-                        {busy === `listing-${stockCompListing.id}` ? "Updating..." : "Use suggestion"}
+                        {busy === `listing-${stockCompListing.id}` ? "Updating…" : "Use suggestion"}
                       </button>
                       <button type="button" className="ghost-button" onClick={() => openListingEditor(stockCompListing)}>
                         Enter another
@@ -8585,7 +9045,7 @@ export default function Home() {
               {buyResultSection === "evidence" && askEvidence && (
                 <div className={`ask-evidence-card ${askEvidence.skipped ? "muted" : ""}`}>
                   <div className="receipt-heading">
-                    <span>UK asks (live)</span>
+                    <span>UK asks ({askEvidence.cached ? "cached" : "checked now"})</span>
                     <strong>
                       {askEvidence.count > 0 && askEvidence.lowestPence != null
                         ? `from ${gbp(askEvidence.lowestPence)} · ${askEvidence.count} listing${askEvidence.count === 1 ? "" : "s"}`
@@ -8596,7 +9056,7 @@ export default function Home() {
                   </div>
                   <p className="hint">
                     Asking prices only, not sold comps. They are shown for listing context and do not change the headline comp.
-                    {askEvidence.cached ? " Cached for this card." : ""}
+                    {askEvidence.cached ? ` Cached evidence · ${ageLabel(askEvidence.asOf)}.` : ` Checked ${ageLabel(askEvidence.asOf)}.`}
                   </p>
                   {askEvidence.undercutPence != null && (
                     <div className="ask-undercut">
@@ -8606,6 +9066,15 @@ export default function Home() {
                     </div>
                   )}
                   {askEvidence.reason && <p className="hint">{askEvidence.reason}</p>}
+                  {(askEvidence.filteredCount ?? 0) > 0 && (
+                    <p className="hint">
+                      Filtered {askEvidence.filteredCount} misleading result{askEvidence.filteredCount === 1 ? "" : "s"}: {Object.entries(askEvidence.rejectionCounts ?? {})
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 4)
+                        .map(([reason, count]) => `${reason.replace(/-/g, " ")} ${count}`)
+                        .join(" · ")}.
+                    </p>
+                  )}
                   {askEvidence.listings.length > 0 && (
                     <div className="ask-listings">
                       {askEvidence.listings.slice(0, 3).map((listing) => (
@@ -8680,7 +9149,7 @@ export default function Home() {
                   </div>
                   {comp?.psaCert?.found && (
                     <div className="psa-receipt-chip">
-                      <span>PSA verified</span>
+                      <span>PSA registry match</span>
                       <strong>
                         Cert {comp.psaCert.certNumber}
                         {comp.psaCert.gradeLabel ? ` · ${comp.psaCert.gradeLabel}` : ""}
@@ -8706,7 +9175,7 @@ export default function Home() {
               {buyResultSection === "confidence" && reconciliationReasons.length > 0 && (
                 <div className="reconciliation-notes" title={reconciliationReasons.map((item) => item.label).join(" · ")}>
                   <div className="receipt-heading">
-                    <span>Why check</span>
+                    <span>Why this price</span>
                     <strong>{headline.raw?.reconciliation?.confidence ?? comp?.reconciliation?.confidence ?? "review"}</strong>
                   </div>
                   <ul>
@@ -8784,19 +9253,24 @@ export default function Home() {
                     </small>
                   </div>
                   {setMarkUrl && (
-                    <img
-                      className="catalog-set-logo"
-                      src={setMarkUrl}
-                      alt={`${catalogCard.setName} logo`}
-                      onError={hideBrokenImage}
-                    />
+                  <img
+                    className="catalog-set-logo"
+                    src={setMarkUrl}
+                    alt={`${catalogCard.setName} logo`}
+                    width={74}
+                    height={38}
+                    loading="lazy"
+                    decoding="async"
+                    onError={hideBrokenImage}
+                  />
                   )}
                 </div>
               )}
               {buyResultSection === "evidence" && sourceMatchedCard && (
                 <div className="catalog-strip source-match-strip">
                   <CardImage
-                    src={comp?.cardImage?.source !== "catalog" ? comp?.cardImage?.imageUrl ?? null : null}
+                    src={comp?.cardImage?.candidates?.filter((candidate) => candidate.source !== "catalog").map((candidate) => candidate.imageUrl)
+                      ?? (comp?.cardImage?.source !== "catalog" ? comp?.cardImage?.imageUrl ?? null : null)}
                     className="catalog-art"
                     fallbackClassName="catalog-art blank"
                     alt=""
@@ -8848,7 +9322,10 @@ export default function Home() {
                 </p>
               )}
               {buyResultSection === "confidence" && comp?.sourcesDisagree && !checkedComp && (
-                <p className="hint danger-text">Sources disagree materially. Treat this as a check-before-buy price.</p>
+                <p className="hint danger-text">
+                  Sources disagree by {comp?.reconciliation?.selection ? `${gbp(comp.reconciliation.selection.spreadPence)} (${comp.reconciliation.selection.spreadPct.toFixed(1)}%)` : `${compSpreadPct ?? "15+"}%`}.
+                  {" "}{sourceLabel(headline.source, false)} is selected; treat this as a check-before-buy price.
+                </p>
               )}
               {buyResultSection === "confidence" && comp?.sourcesDisagree && checkedComp && (
                 <p className="hint danger-text">API sources disagree; the checked comp is driving this buy.</p>
@@ -8960,7 +9437,7 @@ export default function Home() {
                 onClick={() => void completeDealSession()}
                 disabled={busy === "deal-session-complete" || !dealSession.summary.completionReady}
               >
-                {busy === "deal-session-complete" ? "Stocking..." : "Stock this lot"}
+                {busy === "deal-session-complete" ? "Stocking…" : "Stock this lot"}
               </button>
             </section>
           )}
@@ -8983,7 +9460,7 @@ export default function Home() {
                 </label>
               </div>
               <button className="secondary-action" type="button" onClick={lookupGradeEv} disabled={busy === "grade-ev"}>
-                {busy === "grade-ev" ? "Checking slab..." : "Check PSA 10 EV"}
+                {busy === "grade-ev" ? "Checking slab…" : "Check PSA 10 EV"}
               </button>
               {gradeEv && gradeComp && (
                 <div className={`grade-verdict ${gradeEv.liftPence >= 0 ? "good" : "warn"}`}>
@@ -9045,12 +9522,12 @@ export default function Home() {
                 </div>
               )}
               <button className="secondary-action" type="button" onClick={() => void createWatch()} disabled={busy === "watch-create"}>
-                {busy === "watch-create" ? "Saving watch..." : "Watch for buy price"}
+                {busy === "watch-create" ? "Saving watch…" : "Watch for buy price"}
               </button>
             </details>
           )}
 
-          {hasBuyContext && (!headline || needsManualComp) && (
+          {hasBuyContext && busy !== "lookup" && (!headline || needsManualComp) && (
           <form
             className="panel fallback-stock-panel"
             onSubmit={(event) => {
@@ -9117,7 +9594,7 @@ export default function Home() {
                   Listing
                   <select value={acquireListingState} onChange={(event) => setAcquireListingState(event.target.value as AcquireListingState)}>
                     <option value="DRAFT">Draft</option>
-                    <option value="ACTIVE">Active</option>
+                    <option value="ACTIVE" disabled={channel === "EBAY"}>{channel === "EBAY" ? "Publish after review" : "Active"}</option>
                   </select>
                 </label>
               </div>
@@ -9137,13 +9614,15 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
-                  className={shouldCreateListing && acquireListingState === "ACTIVE" ? "selected" : ""}
+                  className={shouldCreateListing && effectiveAcquireListingState === "ACTIVE" ? "selected" : ""}
                   onClick={() => {
                     setShouldCreateListing(true);
                     setAcquireListingState("ACTIVE");
                   }}
+                  disabled={channel === "EBAY"}
+                  title={channel === "EBAY" ? "eBay listings are published only after review." : undefined}
                 >
-                  Active
+                  {channel === "EBAY" ? "Publish after review" : "Active"}
                 </button>
               </div>
               <div className="form-grid">
@@ -9175,7 +9654,7 @@ export default function Home() {
               <div className="form-grid">
                 <label>
                   Condition
-                  <input value={condition} onChange={(event) => setCondition(event.target.value)} placeholder="NM, LP, edgewear..." />
+                  <input name="stock-condition" value={condition} onChange={(event) => setCondition(event.target.value)} placeholder="NM, LP, edgewear…" />
                 </label>
                 <label>
                   Cert
@@ -9275,7 +9754,7 @@ export default function Home() {
               <div className="stock-progress-card" aria-live="polite">
                 <span className="lookup-spinner" aria-hidden="true" />
                 <div>
-                  <strong>Stocking manually...</strong>
+                  <strong>Stocking manually…</strong>
                   <small>Saving this card now. If it fails, the button unlocks for retry.</small>
                 </div>
               </div>
@@ -9286,11 +9765,13 @@ export default function Home() {
               disabled={busy === "manual-stock" || !manualStockReady}
             >
               {busy === "manual-stock"
-                ? "Stocking..."
+                ? "Stocking…"
                 : shouldCreateListing
-                  ? acquireListingState === "ACTIVE"
+                  ? effectiveAcquireListingState === "ACTIVE"
                     ? "Stock + active listing"
-                    : "Stock + draft"
+                    : channel === "EBAY"
+                      ? "Stock + eBay draft"
+                      : "Stock + draft"
                   : "Stock now"}
             </button>
             {!manualStockReady && <p className="hint">Add a card, quantity and what you paid—or choose No tracked cost.</p>}
@@ -9395,7 +9876,7 @@ export default function Home() {
                 }
               >
                 {busy === "stock-import"
-                  ? "Importing..."
+                  ? "Importing…"
                   : stockImportPreview.rows.length > 0
                     ? `Import ${stockImportPreview.rows.length} row${stockImportPreview.rows.length === 1 ? "" : "s"}`
                     : "Import rows"}
@@ -9454,7 +9935,7 @@ export default function Home() {
               </div>
             </section>
           )}
-          {!headline && (name.trim() || setNameValue.trim() || number.trim() || checkedComp) && (
+          {((headline && buyResultSection === "deal") || (!headline && (name.trim() || setNameValue.trim() || number.trim() || checkedComp))) && (
             <div className="mobile-buy-spacer" aria-hidden="true" />
           )}
         </section>
@@ -9648,10 +10129,10 @@ export default function Home() {
                 </label>
                 <label>
                   Listing URL
-                  <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
+                  <input name="listing-url" type="url" inputMode="url" value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://example.com/item…" />
                 </label>
                 <button className="primary-action" type="submit" disabled={busy === `listing-${editingListingId}` || (listingChannel === "EBAY" && poundsToPence(listingPrice) < 99)}>
-                  {busy === `listing-${editingListingId}` ? "Saving..." : "Save listing"}
+                  {busy === `listing-${editingListingId}` ? "Saving…" : "Save listing"}
                 </button>
               </form>
             ) : null
@@ -9700,6 +10181,10 @@ export default function Home() {
           setDealSettings={setDealSettings}
           listingCopySettings={listingCopySettings}
           setListingCopySettings={setListingCopySettings}
+          sources={setupSources}
+          checkedAt={deepHealth?.checkedAt}
+          checking={busy === "deep-health"}
+          onDeepCheck={() => void runDeepHealthCheck()}
         />
       )}
 
@@ -10000,7 +10485,7 @@ export default function Home() {
           )}
           <div className="sale-submit-row">
             <button className="primary-action" type="submit" value="done" disabled={busy === `sell-${sellingId}`}>
-              {busy === `sell-${sellingId}` ? "Saving..." : "Create sale"}
+              {busy === `sell-${sellingId}` ? "Saving…" : "Create sale"}
             </button>
             {nextSaleAfterCurrentTarget && (
               <button className="secondary-action" type="submit" value="next" disabled={busy === `sell-${sellingId}`}>
@@ -10045,6 +10530,45 @@ export default function Home() {
         </section>
       )}
 
+      {view === "acquire" && headline && buyResultSection === "deal" && (
+        <section
+          className={`mobile-buy-action ${buyPlan?.tone ?? "warn"}`}
+          aria-label="Confirm current stock intake"
+        >
+          <div>
+            <span>{shouldCreateListing ? `${channelLabel(channel)} ${effectiveAcquireListingState === "ACTIVE" ? "active" : "draft"}` : "Stock only"}</span>
+            <strong>{quickStockReady ? `${quickStockQuantity} ready` : "Add cost"}</strong>
+            <small>
+              {quickStockReady
+                ? `${effectiveDraftListPricePence != null ? gbp(effectiveDraftListPricePence) : "price in review"}${scanPhotoPayload ? " · scan photo ready" : ""}`
+                : "enter what you paid, then confirm"}
+            </small>
+          </div>
+          <button
+            className="mobile-skip-button"
+            type="button"
+            onClick={() => clearCurrentComp()}
+            disabled={busy === "acquire"}
+          >
+            Next
+          </button>
+          <button
+            className="primary-action"
+            type="button"
+            onClick={runStockAction}
+            disabled={busy === "acquire"}
+          >
+            {busy === "acquire"
+              ? "Stocking…"
+              : quickStockReady
+                ? shouldCreateListing
+                  ? channel === "EBAY" ? "Stock + draft" : effectiveAcquireListingState === "ACTIVE" ? "Stock + active" : "Stock + draft"
+                  : "Stock now"
+                : "Add cost"}
+          </button>
+        </section>
+      )}
+
       {view === "acquire" && !headline && (name.trim() || number.trim() || checkedComp) && (
         <section
           className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`}
@@ -10069,18 +10593,11 @@ export default function Home() {
             onClick={manualStockReady ? () => void stockWithoutComp() : () => openManualCompLink("EBAY_UK_SOLD")}
             disabled={busy === "acquire" || busy === "manual-stock" || (!manualStockReady && !manualCompFallbackQuery.trim())}
           >
-            {manualStockReady ? (busy === "manual-stock" ? "Stocking..." : "Stock now") : "Open UK"}
+            {manualStockReady ? (busy === "manual-stock" ? "Stocking…" : "Stock now") : "Open UK"}
           </button>
         </section>
       )}
 
-      <nav className="bottom-nav" aria-label="Primary">
-        <TabButton active={view === "today"} label="Today" onClick={() => setView("today")} />
-        <TabButton active={view === "acquire"} label="Comp / Buy" onClick={() => setView("acquire")} />
-        <TabButton active={view === "inventory"} label="Stock" onClick={() => setView("inventory")} />
-        <TabButton active={view === "listings"} label="List" onClick={() => setView("listings")} />
-        <TabButton active={view === "pnl"} label="Profit" onClick={() => setView("pnl")} />
-      </nav>
     </main>
   );
 }
@@ -10101,7 +10618,7 @@ function PsaCertMismatchCard({
     <div className="psa-cert-card warn psa-mismatch-card" aria-label="PSA cert mismatch decision">
       <div className="psa-cert-heading">
         <div>
-          <span>PSA cert {result.certNumber} verified</span>
+          <span>PSA registry record {result.certNumber}</span>
           <strong>{toTitleCase(result.subject ?? "PSA card")}</strong>
           <small>
             {[fields.setName, fields.number ? `#${fields.number}` : null, fields.grade?.replace(/_/g, " ")]
@@ -10126,7 +10643,7 @@ function PsaCertMismatchCard({
         </p>
         <div className="psa-mismatch-actions">
           <button type="button" onClick={onUsePsa} disabled={busy}>
-            {busy && lookupAfter ? "Comping..." : "Use PSA details"}
+            {busy && lookupAfter ? "Comping…" : "Use PSA details"}
           </button>
           <button type="button" onClick={onKeepTyped} disabled={busy}>
             Keep typed card
@@ -10377,7 +10894,7 @@ function ListingPackSheet({
           tone="publish"
           label="slide to publish live"
           valueLabel={`${gbp(effectivePricePence)} on eBay`}
-          completeLabel={busy ? "Publishing..." : "Release to publish"}
+          completeLabel={busy ? "Publishing…" : "Release to publish"}
           disabled={busy || !ebayPublishReady || !ebayTitleReady || !ebayPriceReady}
           onConfirm={() => onPublish({
             title: reviewedEbayTitle,
@@ -10527,7 +11044,7 @@ function ListingPackSheet({
                 })}
                 disabled={busy || !ebayReadiness.ready || !ebayTitleReady || !ebayPriceReady}
               >
-                {busy ? "Checking..." : "Run read-only preflight"}
+                {busy ? "Checking…" : "Run read-only preflight"}
               </button>
             )}
             {ebayPreflight && <EbayPreflightCard preflight={ebayPreflight} />}
@@ -10562,13 +11079,13 @@ function ListingPackSheet({
         </label>
         <div className="listing-pack-actions">
           {venueAction && (
-            <button className="primary-action" type="button" onClick={onCopyAndOpen} disabled={busy}>{busy ? "Working..." : "Copy + open"}</button>
+            <button className="primary-action" type="button" onClick={onCopyAndOpen} disabled={busy}>{busy ? "Working…" : "Copy + open"}</button>
           )}
           <button className={venueAction ? "ghost-button" : "primary-action"} type="button" onClick={onCopy}>
             {copied ? "Copied" : venueAction ? "Copy only" : "Copy listing pack"}
           </button>
           {venueAction && <a className="export-link" href={venueAction.url} target="_blank" rel="noreferrer">{venueAction.label}</a>}
-          {canActivate && <button className="ghost-button" type="button" onClick={onActivate} disabled={busy}>{busy ? "Activating..." : "Mark active"}</button>}
+          {canActivate && <button className="ghost-button" type="button" onClick={onActivate} disabled={busy}>{busy ? "Activating…" : "Mark active"}</button>}
           {listing.externalUrl ? (
             <a className="export-link" href={listing.externalUrl} target="_blank" rel="noreferrer">View live</a>
           ) : (
@@ -10607,7 +11124,7 @@ function buildListingPackInputFromItem(
       name: item.card.name,
       setName: item.card.setName,
       number: item.card.number,
-      language: "EN",
+      language: item.card.language ?? "EN",
     },
     grade: item.grade,
     listPricePence: options.listPricePence,
@@ -10741,7 +11258,7 @@ function ListingNextActionCard({
         <small>{action.detail}</small>
       </div>
       <button type="button" onClick={onRun} disabled={busy || done || disabled}>
-        {busy ? "Working..." : action.cta}
+        {busy ? "Working…" : action.cta}
       </button>
     </div>
   );
@@ -10766,7 +11283,7 @@ function SalePromptCard({
       </div>
       {needsPrice && (
         <button type="button" disabled={busy} onClick={onPasteGross}>
-          {busy ? "Working..." : prompt.cta}
+          {busy ? "Working…" : prompt.cta}
         </button>
       )}
     </div>
@@ -10871,7 +11388,17 @@ function InventoryRow({
       ? `${gbp(item.costBasis)} each · ${gbp(item.costBasis * item.quantity)} total`
       : gbp(item.costBasis);
   const latestMarketPoint = historyPreview?.market[historyPreview.market.length - 1];
-  const marketCompPence = historyPreview?.soldEvidence?.medianPence ?? latestMarketPoint?.marketPence ?? null;
+  const soldEvidence = historyPreview?.soldEvidence;
+  const marketCompPence = soldEvidence?.medianPence ?? latestMarketPoint?.marketPence ?? null;
+  const marketCompAsOf = soldEvidence?.asOf ?? latestMarketPoint?.takenAt;
+  const marketCompAgeDays = marketCompAsOf
+    ? Math.max(0, Math.floor((Date.now() - new Date(marketCompAsOf).getTime()) / 86_400_000))
+    : null;
+  const marketCompMeta = soldEvidence
+    ? `${sourceLabel(soldEvidence.source, false)}${soldEvidence.sourceRegion ? ` ${soldEvidence.sourceRegion}` : ""} · n=${soldEvidence.sampleSize}/${soldEvidence.windowDays}d · ${ageLabel(soldEvidence.asOf)}`
+    : latestMarketPoint
+      ? `cached snapshot · ${ageLabel(latestMarketPoint.takenAt)}`
+      : "refresh needed";
   const listingSummary = listing
     ? `Your list price ${listPrice != null ? gbp(listPrice) : "not set"} · ${listingStateLabel} ${channelLabel(listing.channel)}`
     : "Your list price not set";
@@ -10969,18 +11496,20 @@ function InventoryRow({
           </div>
           <div className="inventory-row-money">
             <span>{listingSummary}{soldNote}</span>
-            <span>Market comp {marketCompPence != null ? gbp(marketCompPence) : "refresh needed"}</span>
+            <span>
+              Market comp {marketCompPence != null ? gbp(marketCompPence) : "refresh needed"}
+              {marketCompPence != null ? ` · ${marketCompAgeDays != null && marketCompAgeDays > 90 ? "stale — refresh · " : ""}${marketCompMeta}` : ""}
+            </span>
             {stockNotes && <span>{stockNotes}</span>}
             <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`Open ${item.card.name} price history`}>
               <StockHistorySparkline history={history} preview={historyPreview} />
               <span>History</span>
             </button>
           </div>
-          {(needsListing || needsPhotos || photoCount > 0 || needsReprice) && (
-            <div className="inventory-row-flags" aria-label="Stock tasks">
+          {(needsListing || (needsPhotos && !needsEbayPhotos) || photoCount > 0 || needsReprice) && (
+            <div className="inventory-row-flags" role="group" aria-label="Stock tasks">
               {needsListing && <span>Needs listing</span>}
-              {needsPhotos && <span>Needs photos</span>}
-              {!needsPhotos && needsEbayPhotos && <span>Needs real photo</span>}
+              {needsPhotos && !needsEbayPhotos && <span>Needs photos</span>}
               {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
               {needsReprice && <span className="reprice-nudge">Reprice · {ageDays}d held</span>}
             </div>
@@ -10988,7 +11517,7 @@ function InventoryRow({
           {needsEbayPhotos && (
             <div className="next-action-strip">
               <label className={`next-action-button row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
-                {busy === `photo-${item.id}` ? "Uploading..." : "Add photos"}
+                {busy === `photo-${item.id}` ? "Uploading…" : "Add photos"}
                 <input
                   type="file"
                   accept="image/*"
@@ -11191,8 +11720,8 @@ function deleteTargetBusy(target: DeleteTarget, busy: string | null): boolean {
 }
 
 function deleteTargetButtonLabel(target: DeleteTarget, busy: string | null): string {
-  if (target.kind === "sale") return busy === `sale-${target.sale.id}` ? "Undoing..." : "Undo sale";
-  return busy?.startsWith("delete-") || busy?.startsWith("watch-") ? "Deleting..." : "Delete";
+  if (target.kind === "sale") return busy === `sale-${target.sale.id}` ? "Undoing…" : "Undo sale";
+  return busy?.startsWith("delete-") || busy?.startsWith("watch-") ? "Deleting…" : "Delete";
 }
 
 function Toast({
@@ -11337,27 +11866,48 @@ function ProgressSourceRail({
   const remaining = Math.max(0, total - sources.length);
   return (
     <div className="progress-source-rail" aria-label="Live comp source progress">
-      <span className="source-progress-chip priced">Identity</span>
+      <span className={`source-progress-chip ${phase === "catalog" ? "waiting" : "priced"}`}>
+        {phase === "catalog" ? "Checking identity…" : "Identity checked"}
+      </span>
       {sources.map((source) => (
         <span className={`source-progress-chip ${source.status} source-${sourceVisualKind(source.source.name)}`} key={source.source.name}>
-          {source.source.name.replace(/^pokemon-/i, "")} · {source.status === "priced" ? `${source.latencyMs}ms` : source.status}
+          {sourceLabel(source.source.name, false)} · {source.status === "priced" ? `${source.latencyMs}ms` : source.status}
         </span>
       ))}
       {Array.from({ length: remaining }, (_, index) => (
         <span className="source-progress-chip waiting" key={`waiting-${index}`}>Source…</span>
       ))}
       <span className={`source-progress-chip verdict ${phase ?? "waiting"}`}>
-        {phase === "receipt" ? "Receipt final" : phase === "quorum" ? "Quorum" : phase === "provisional" ? "Provisional" : "Pricing…"}
+        {phase === "receipt" ? `Receipt final · ${sources.length}/${total}` : phase === "quorum" ? `Quorum · ${sources.length}/${total}` : phase === "provisional" ? `Provisional · ${sources.length}/${total}` : "Pricing…"}
       </span>
     </div>
   );
 }
 
-function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+function TabButton({
+  active,
+  label,
+  detail,
+  className = "",
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  detail?: string;
+  className?: string;
+  onClick: () => void;
+}) {
   return (
-    <button className={active ? "active" : ""} type="button" onClick={onClick}>
+    <button
+      className={`${className} ${active ? "active" : ""}`.trim()}
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+      aria-pressed={active}
+    >
       <TabIcon label={label} />
-      <span>{label}</span>
+      <span className="nav-copy"><strong>{label}</strong>{detail && <small>{detail}</small>}</span>
     </button>
   );
 }
@@ -11403,6 +11953,23 @@ function TabIcon({ label }: { label: string }) {
         <circle cx="12" cy="12" r="7" />
         <path d="M9.5 10.5c.45-.85 1.25-1.35 2.45-1.35 1.35 0 2.3.64 2.3 1.68 0 2.28-4.75.95-4.75 3.22 0 1.02.94 1.75 2.52 1.75 1.06 0 1.92-.34 2.5-1.05" />
         <path d="M12 7.5v9" />
+      </svg>
+    );
+  }
+  if (label === "Setup") {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 3.5v2M12 18.5v2M20.5 12h-2M5.5 12h-2M18 6l-1.4 1.4M7.4 16.6 6 18M18 18l-1.4-1.4M7.4 7.4 6 6" />
+      </svg>
+    );
+  }
+  if (label === "More") {
+    return (
+      <svg {...common}>
+        <circle cx="6" cy="12" r="1.4" />
+        <circle cx="12" cy="12" r="1.4" />
+        <circle cx="18" cy="12" r="1.4" />
       </svg>
     );
   }
@@ -11666,14 +12233,19 @@ function buildCompLimitations(comp: Reconciled): Array<{ key: string; reason: st
 
 function buildReconciliationReasons(comp: Reconciled): Array<{ key: string; label: string }> {
   const reconciliation = comp.reconciliation ?? comp.headline?.raw?.reconciliation;
-  if (!reconciliation?.manualCheck && reconciliation?.confidence !== "low") return [];
-  return (reconciliation?.reasons ?? [])
+  const explanation = reconciliation?.selection?.chosenBecause
+    ? [{ key: "chosen", label: `Chosen because: ${reconciliation.selection.chosenBecause}.` }]
+    : comp.headline
+      ? [{ key: "chosen", label: `Chosen because: ${sourceLabel(comp.headline.source, false)}, ${comp.headline.sampleSize} samples, ${ageLabel(comp.headline.asOf)}.` }]
+      : [];
+  const caveats = (reconciliation?.reasons ?? [])
     .filter((reason) => reason !== "reconciled-cleanly")
     .map((reason, index) => ({
       key: `${index}-${reason}`,
       label: humanReconciliationReason(reason),
     }))
     .filter((item, index, rows) => rows.findIndex((row) => row.label === item.label) === index);
+  return [...explanation, ...caveats];
 }
 
 function humanReconciliationReason(reason: string): string {
@@ -11713,6 +12285,8 @@ function sourceLabel(source: string, headline: boolean): string {
         ? "PokeTrace"
       : source === "pokemon-tcg-market"
         ? "Catalog"
+      : source === "ebay-marketplace-insights"
+        ? "eBay UK sold"
       : source === "owned-sales"
           ? "Owned sales"
         : source === "checked-comps"
@@ -11734,7 +12308,7 @@ function freshnessVisualKind(value: string): "live" | "recent" | "aging" | "stal
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) return "expired";
   const ageDays = Math.max(0, (Date.now() - timestamp) / (24 * 60 * 60 * 1_000));
-  if (ageDays <= 1) return "live";
+  if (ageDays <= 1) return "recent";
   if (ageDays <= 30) return "recent";
   if (ageDays <= 90) return "aging";
   if (ageDays <= 180) return "stale";
@@ -12132,6 +12706,93 @@ function poundsToPence(value: string): number {
 
 function penceToPounds(pence: number): string {
   return (pence / 100).toFixed(2);
+}
+
+function hydrateStockMutationResult(
+  rawItem: InventoryItem | (Partial<InventoryItem> & { costBasisPence?: number }),
+  rawListing: Listing | null | undefined,
+  savedPhoto: CardPhoto | null,
+): { item: InventoryItem; listing: Listing | null } {
+  const existingListings = Array.isArray(rawItem.listings) ? rawItem.listings : [];
+  const listingShell = rawListing ? ({ ...rawListing, item: undefined } as Listing) : null;
+  const listings = listingShell
+    ? [listingShell, ...existingListings.filter((listing) => listing.id !== listingShell.id)]
+    : existingListings;
+  const existingPhotos = Array.isArray(rawItem.photos) ? rawItem.photos : [];
+  const photos = savedPhoto
+    ? [savedPhoto, ...existingPhotos.filter((photo) => photo.id !== savedPhoto.id)]
+    : existingPhotos;
+  const rawCard = rawItem.card ?? ({ name: "Unknown card", setName: "", number: null } as InventoryItem["card"]);
+  const item = {
+    ...rawItem,
+    card: {
+      ...rawCard,
+      setName: rawCard.setName ?? "",
+      number: rawCard.number ?? null,
+      imageUrl: rawCard.imageUrl ?? null,
+    },
+    costBasis:
+      typeof rawItem.costBasis === "number"
+        ? rawItem.costBasis
+        : "costBasisPence" in rawItem && typeof rawItem.costBasisPence === "number"
+          ? rawItem.costBasisPence
+          : 0,
+    acquiredFrom: rawItem.acquiredFrom ?? null,
+    location: rawItem.location ?? null,
+    condition: rawItem.condition ?? null,
+    graderCert: rawItem.graderCert ?? null,
+    listings,
+    sales: Array.isArray(rawItem.sales) ? rawItem.sales : [],
+    photos,
+  } as InventoryItem;
+
+  return {
+    item,
+    listing: rawListing ? ({ ...rawListing, item } as Listing) : null,
+  };
+}
+
+function reviewedCompSnapshot(result: CompResult) {
+  return {
+    source: result.source,
+    medianPence: result.medianPence,
+    meanPence: result.meanPence,
+    lowPence: result.lowPence,
+    highPence: result.highPence,
+    sampleSize: result.sampleSize,
+    windowDays: result.windowDays,
+    trendPct: result.trendPct,
+    outliersRemoved: result.outliersRemoved,
+    asOf: result.asOf,
+  };
+}
+
+function intakeRequestError(payload: any, fallback: string): string {
+  const message = typeof payload?.error === "string" && payload.error.trim() ? payload.error.trim() : fallback;
+  const issues = Array.isArray(payload?.issues) ? payload.issues : [];
+  if (issues.length === 0) return message;
+
+  const labels: Record<string, string> = {
+    "card.name": "Card name",
+    "card.setName": "Set",
+    "card.number": "Collector number",
+    grade: "Grade",
+    costBasisPence: "What I paid",
+    quantity: "Quantity",
+    listPricePence: "List price",
+  };
+  const details = issues
+    .slice(0, 3)
+    .map((issue: { path?: unknown; message?: unknown }) => {
+      const path = typeof issue?.path === "string" ? issue.path : "";
+      const label = (labels[path] ?? path) || "Field";
+      const issueMessage = typeof issue?.message === "string" ? issue.message : "is invalid";
+      if (/at least 1 character/i.test(issueMessage)) return `${label} is blank`;
+      return `${label}: ${issueMessage}`;
+    })
+    .join(" · ");
+  const heading = /^invalid\b/i.test(message) ? fallback : message;
+  return `${heading} ${details}`.trim();
 }
 
 async function readJson(response: Response): Promise<any> {

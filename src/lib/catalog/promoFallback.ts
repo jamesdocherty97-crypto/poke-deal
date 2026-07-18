@@ -37,7 +37,6 @@ export function buildPromoCatalogFallback(card: CardRef): CatalogCard | null {
     setCode: setId,
     number,
     rarity: "Promo",
-    imageUrl: scrydexFallbackImageUrl(providerId),
     tcgApiId: providerId,
   };
 }
@@ -54,8 +53,4 @@ function formatPromoNumber(value: string | undefined, prefix: string): string | 
 
 function stripPromoNumber(number: string, prefix: string): string {
   return String(Number.parseInt(number.replace(new RegExp(`^${prefix}`, "i"), ""), 10));
-}
-
-function scrydexFallbackImageUrl(id: string): string | undefined {
-  return /^(?:svp|mep)-\d{1,4}$/i.test(id) ? `https://images.scrydex.com/pokemon/${id.toLowerCase()}/large` : undefined;
 }

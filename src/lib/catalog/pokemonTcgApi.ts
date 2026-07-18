@@ -6,6 +6,7 @@ import { tokenizeSearchText } from "./fuzzy.js";
 import { normalizeCatalogCardSearchInput } from "./cardSearch.js";
 import { createAbortScope } from "../http/abortScope.js";
 import type { CatalogSourceContext } from "./types.js";
+import { fetchReadWithRetry } from "../http/fetchReadWithRetry.js";
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
 const CARD_IDENTITY_FIELDS = "id,name,number,rarity,images,set";
@@ -83,13 +84,15 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       return null;
     }
 
-    const rates = await getRates();
+    // FX refresh and catalog I/O are independent. Starting both together keeps
+    // a cold daily FX refresh from adding its full latency to every card call.
+    const ratesPromise = getRates();
 
     if (card.tcgApiId) {
       const json = await this.request(`/cards/${encodeURIComponent(card.tcgApiId)}`, {
         select: MARKET_SELECT_FIELDS,
       }, context.signal);
-      return mapPokemonTcgCard(readDataObject(json), rates);
+      return mapPokemonTcgCard(readDataObject(json), await ratesPromise);
     }
 
     for (const candidateId of buildPokemonTcgIdCandidates(card)) {
@@ -97,7 +100,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       const json = await this.request(`/cards/${encodeURIComponent(candidateId)}`, {
         select: MARKET_SELECT_FIELDS,
       }, context.signal);
-      const direct = mapPokemonTcgCard(readDataObject(json), rates);
+      const direct = mapPokemonTcgCard(readDataObject(json), await ratesPromise);
       if (direct) return direct;
     }
 
@@ -122,7 +125,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
       }, context.signal);
       const cards = readDataArray(json);
       if (cards.length > 0) {
-        return pickBestPokemonTcgCard(cards, card, resolvedSetId, rates);
+        return pickBestPokemonTcgCard(cards, card, resolvedSetId, await ratesPromise);
       }
     }
     return null;
@@ -188,7 +191,7 @@ export class PokemonTcgApiCatalogSource implements CatalogSource {
         headers["X-Api-Key"] = this.apiKey.trim();
       }
 
-      const res = await this.fetchImpl(url, { headers, signal: abort.signal });
+      const res = await fetchReadWithRetry(this.fetchImpl, url, { headers, signal: abort.signal }, { totalDeadlineMs: this.fetchTimeoutMs });
       const value = res.ok ? await res.json() : null;
       if (cacheKey) writeCachedRequest(cacheKey, value);
       return value;
@@ -318,16 +321,12 @@ export function mapPokemonTcgCard(card: unknown, rates: FxRates = STATIC_RATES):
     setCode: readString(payload?.set?.id),
     number,
     rarity: readString(payload?.rarity),
-    imageUrl: readString(payload?.images?.large) ?? readString(payload?.images?.small) ?? scrydexFallbackImageUrl(id),
+    imageUrl: readString(payload?.images?.large) ?? readString(payload?.images?.small),
     setLogoUrl: readString(payload?.set?.images?.logo),
     setSymbolUrl: readString(payload?.set?.images?.symbol),
     tcgApiId: id,
     priceSignals: readCatalogPriceSignals(payload, rates),
   };
-}
-
-function scrydexFallbackImageUrl(id: string): string | undefined {
-  return /^(?:svp|mep)-\d{1,4}$/i.test(id) ? `https://images.scrydex.com/pokemon/${id.toLowerCase()}/large` : undefined;
 }
 
 export function pickCatalogPriceSignal(signals: CatalogPriceSignal[] | undefined): CatalogPriceSignal | null {

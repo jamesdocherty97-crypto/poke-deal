@@ -3,15 +3,14 @@
 // Never logs token values.
 
 import type { EbayConfig } from "./config.js";
+import { boundedEbayFetch } from "./client.js";
 
 export const EBAY_RECONNECT_HINT = "Reconnect eBay to grant new permissions — /api/ebay/connect";
 
 export const EBAY_USER_SCOPES = [
   "https://api.ebay.com/oauth/api_scope",
   "https://api.ebay.com/oauth/api_scope/sell.inventory",
-  "https://api.ebay.com/oauth/api_scope/sell.account",
   "https://api.ebay.com/oauth/api_scope/sell.account.readonly",
-  "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
   "https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly",
 ] as const;
 
@@ -52,7 +51,7 @@ export async function exchangeCodeForTokens(
     code,
     redirect_uri: config.ruName,
   });
-  const response = await fetchImpl(config.tokenUrl, {
+  const response = await boundedEbayFetch(fetchImpl, config.tokenUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -72,12 +71,15 @@ export async function refreshAccessToken(
   refreshToken: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<EbayTokenResponse> {
+  // eBay defaults a refresh to the scopes granted during consent. Omitting
+  // `scope` keeps older valid tokens usable when this app's requested scopes
+  // change; a capability that was never granted still fails at the API call
+  // with the existing reconnect guidance.
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    scope: EBAY_SCOPES,
   });
-  const response = await fetchImpl(config.tokenUrl, {
+  const response = await boundedEbayFetch(fetchImpl, config.tokenUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -100,7 +102,7 @@ export async function fetchApplicationAccessToken(
     grant_type: "client_credentials",
     scope: "https://api.ebay.com/oauth/api_scope",
   });
-  const response = await fetchImpl(config.tokenUrl, {
+  const response = await boundedEbayFetch(fetchImpl, config.tokenUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",

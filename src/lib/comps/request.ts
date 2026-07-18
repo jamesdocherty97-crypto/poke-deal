@@ -1,7 +1,7 @@
 import { normalizeCatalogCardSearchInput } from "../catalog/cardSearch.js";
 import type { CardRef, Grade } from "../domain/types.js";
 import { normalizeGradeLabel } from "./cleaning.js";
-import { addRequestedVariantHint } from "./variants.js";
+import { addRequestedPrintHints } from "./variants.js";
 
 export interface CompLookupRequest {
   card: CardRef;
@@ -20,10 +20,19 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
   const explicitNumber = readFirst(searchParams, "number", "collectorNumber", "cardNumber");
   const explicitTcgApiId = readFirst(searchParams, "tcgApiId", "pokemonTcgId");
   const explicitTcgDexId = readFirst(searchParams, "tcgDexId");
+  const explicitCardmarketId = readFirst(searchParams, "cardmarketId");
+  const requestedLanguage = readFirst(searchParams, "language", "lang")?.toUpperCase() === "JP" ? "JP" : "EN";
+  const explicitEdition = readFirst(searchParams, "edition")?.toUpperCase();
+  const explicitFinish = readFirst(searchParams, "finish")?.toUpperCase();
   const parsedNameParam = rawNameParam ? normalizeCatalogCardSearchInput(rawNameParam, explicitSetName) : null;
   const rawName = cleanCompRequestName(parsedNameParam?.name ?? parsed?.name);
-  const variantAwareNameSource = [freeText, rawNameParam].filter(Boolean).join(" ");
-  const name = cleanCompRequestName(addRequestedVariantHint(rawName ?? "", variantAwareNameSource));
+  const variantAwareNameSource = [
+    freeText,
+    rawNameParam,
+    isEdition(explicitEdition) ? explicitEdition.replace(/_/g, " ") : null,
+    isFinish(explicitFinish) ? explicitFinish.replace(/_/g, " ") : null,
+  ].filter(Boolean).join(" ");
+  const name = cleanCompRequestName(addRequestedPrintHints(rawName ?? "", { name: variantAwareNameSource }));
 
   if (!name?.trim()) return { error: "name is required" };
 
@@ -41,11 +50,26 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
       number,
       ...(explicitTcgApiId ? { tcgApiId: explicitTcgApiId } : {}),
       ...(explicitTcgDexId ? { tcgDexId: explicitTcgDexId } : {}),
+      ...(explicitCardmarketId ? { cardmarketId: explicitCardmarketId } : {}),
+      ...((isEdition(explicitEdition) ? explicitEdition : parsedNameParam?.edition ?? parsed?.edition) ? {
+        edition: (isEdition(explicitEdition) ? explicitEdition : parsedNameParam?.edition ?? parsed?.edition)!,
+      } : {}),
+      ...((isFinish(explicitFinish) ? explicitFinish : parsedNameParam?.finish ?? parsed?.finish) ? {
+        finish: (isFinish(explicitFinish) ? explicitFinish : parsedNameParam?.finish ?? parsed?.finish)!,
+      } : {}),
       game: "POKEMON",
-      language: "EN",
+      language: requestedLanguage,
     },
     grade,
   };
+}
+
+function isEdition(value: string | undefined): value is NonNullable<CardRef["edition"]> {
+  return ["UNLIMITED", "FIRST_EDITION", "SHADOWLESS", "STAFF", "PRERELEASE"].includes(value ?? "");
+}
+
+function isFinish(value: string | undefined): value is NonNullable<CardRef["finish"]> {
+  return ["NORMAL", "HOLO", "REVERSE_HOLO"].includes(value ?? "");
 }
 
 function parseGradeFromText(input: string | undefined): Grade | undefined {

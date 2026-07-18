@@ -9,7 +9,7 @@ export interface CompSource {
   /** Stable identifier, stored on persisted comps, e.g. "pokemon-price-tracker". */
   readonly name: string;
 
-  /** True if real credentials are present; false means the source runs on fixtures. */
+  /** True if the source is configured for live calls; false means unavailable. */
   readonly live: boolean;
 
   /**

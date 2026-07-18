@@ -118,6 +118,17 @@ test("T5: strong unambiguous PokeTrace baseline can be high confidence", () => {
   assert.equal(result.headlinePence, 1282);
   assert.equal(result.confidence, "high");
   assert.equal(result.manualCheck, false);
+  assert.deepEqual(result.selection, {
+    sourceTier: 0.6,
+    region: "US",
+    sampleSize: 24491,
+    ageDays: 7,
+    corroboratingCount: 0,
+    appliedPenalties: ["penalty-region-us:poketrace"],
+    spreadPence: 0,
+    spreadPct: 0,
+    chosenBecause: "US PokeTrace · 24491 samples · 7d old · best eligible evidence",
+  });
 });
 
 test("T5b: identity gate accepts ME-era zero-padded numeric card numbers", () => {

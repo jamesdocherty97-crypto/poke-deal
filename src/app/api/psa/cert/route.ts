@@ -1,6 +1,6 @@
 // PSA cert lookup: GET /api/psa/cert?cert=79721014
-// Returns normalized cert/grade/population data. Runs in fixture mode (a demo
-// cert) until PSA_API_TOKEN is set, so the flow is usable offline.
+// Returns normalized cert/grade/population data. Missing credentials return an
+// explicit unavailable result; no fixture cert can replace user input.
 
 import { NextResponse } from "next/server";
 import { PsaCertLookup } from "@/lib/psa/psaCert";

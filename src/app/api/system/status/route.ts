@@ -9,6 +9,10 @@ import { PokemonPriceTrackerSource } from "@/lib/comps/sources/pokemonPriceTrack
 import { PsaCertLookup } from "@/lib/psa/psaCert";
 import { getFxHealth } from "@/lib/comps/currency";
 import { readSourceFreshness } from "@/lib/system/sourceFreshness";
+import { getEbayConfig } from "@/lib/ebay/config";
+import { resolveEbayRefreshToken } from "@/lib/ebay/credentials";
+import { accountDeletionVerificationToken } from "@/lib/ebay/accountDeletion";
+import { readScanEvaluation, type ScanEvaluationDb } from "@/lib/scan/scanEvaluation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,14 +33,22 @@ export async function GET() {
   const pokeTraceHealth = getPokeTraceHealth();
   const ebayMi = new EbayMarketplaceInsightsSource();
   const psa = new PsaCertLookup();
-  const fx = await getFxHealth();
   const webhookReady = alertWebhookConfigured();
-  const cronRuns = process.env.DATABASE_URL?.trim()
-    ? await getPrisma().cronRun.findMany({
-        orderBy: { startedAt: "desc" },
-        take: 20,
-      })
-    : [];
+  const ebayConfig = getEbayConfig();
+  const geminiConfigured = Boolean(process.env.GEMINI_API_KEY?.trim());
+  const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+  const deletionTokenConfigured = Boolean(accountDeletionVerificationToken());
+  const databaseReady = Boolean(process.env.DATABASE_URL?.trim());
+  const [fx, ebayRefreshToken, scanEvaluation, cronRuns] = await Promise.all([
+    getFxHealth(),
+    ebayConfig ? resolveEbayRefreshToken().catch(() => null) : Promise.resolve(null),
+    databaseReady
+      ? readScanEvaluation(getPrisma() as unknown as ScanEvaluationDb).catch(() => null)
+      : Promise.resolve(null),
+    databaseReady
+      ? getPrisma().cronRun.findMany({ orderBy: { startedAt: "desc" }, take: 20 })
+      : Promise.resolve([]),
+  ]);
   const lastSnapshot = latestSuccessfulRun(cronRuns, "daily-portfolio-snapshot");
   const lastWatchCheck = latestSuccessfulRun(cronRuns, "daily-buy-watch-check");
   const lastReprice = latestSuccessfulRun(cronRuns, "weekly-stock-health-reprice");
@@ -46,11 +58,19 @@ export async function GET() {
       id: "pokemon-price-tracker",
       label: "Price Tracker",
       role: "eBay sold comps",
-      status: priceTracker.live ? "ready" : "fixture",
+      status: priceTracker.live ? "ready" : "missing",
       required: true,
       setupHint: priceTracker.live
         ? "Primary sold-price source is live."
         : "Add POKEMON_PRICE_TRACKER_API_KEY in Vercel before relying on live buys.",
+    },
+    {
+      id: "tcgdex",
+      label: "TCGdex",
+      role: "fallback catalog and art",
+      status: "public",
+      required: false,
+      setupHint: "Public fallback is implemented; deep health proves whether it currently resolves live data.",
     },
     {
       id: "pokemon-tcg-api",
@@ -65,7 +85,7 @@ export async function GET() {
     {
       id: "poketrace",
       label: "PokeTrace",
-      role: "EU-first RAW cross-check",
+      role: "US RAW cross-check; optional entitled EU",
       status: pokeTraceHealth.persistentKeyProblem
         ? "problem"
         : pokeTrace.live && pokeTraceHealth.inCooldown
@@ -80,7 +100,7 @@ export async function GET() {
           ? `PokeTrace is cooling down after ${pokeTraceHealth.cooldownReason === "rate-limit" ? "rate limits" : "authorization errors"} until ${pokeTraceHealth.cooldownUntil}.`
           : pokeTrace.live
             ? `PokeTrace is configured for RAW cross-checks.${pokeTraceHealth.deniedMarkets.length > 0 ? ` Skipping plan-gated markets: ${pokeTraceHealth.deniedMarkets.map((item) => item.market).join(", ")}.` : ""} Graded coverage depends on account tier and source data.`
-            : "Add POKETRACE_API_KEY in Vercel for EU/Cardmarket and US cross-checks.",
+            : "Add POKETRACE_API_KEY in Vercel for the private-use US RAW cross-check.",
     },
     {
       id: "ebay-marketplace-insights",
@@ -96,11 +116,63 @@ export async function GET() {
       id: "psa-public-api",
       label: "PSA cert lookup",
       role: "graded slab verification + population",
-      status: psa.live ? "ready" : "fixture",
+      status: psa.live ? "ready" : "missing",
       required: false,
       setupHint: psa.live
-        ? "Live PSA cert verification is available (100 lookups/day on the free tier)."
-        : "Add PSA_API_TOKEN in Vercel for live cert lookups. Runs on a demo cert until then.",
+        ? "PSA credentials are configured; deep health proves current lookup availability."
+        : "Add PSA_API_TOKEN in Vercel for live cert lookups; no fixture identity is substituted.",
+    },
+    {
+      id: "gemini",
+      label: "Gemini",
+      role: "card image OCR",
+      status: geminiConfigured ? "building" : "missing",
+      required: false,
+      setupHint: geminiConfigured
+        ? scanEvaluation?.total
+          ? `Last ${scanEvaluation.periodDays}d: ${scanEvaluation.readableRatePct ?? 0}% readable, ${scanEvaluation.correctionRatePct ?? 0}% dealer-corrected, p95 ${scanEvaluation.latencyMs.p95 ?? "—"}ms across ${scanEvaluation.total} scans.`
+          : "Key is configured; no measured scans yet. Run a card scan to start quality and latency tracking."
+        : "Add GEMINI_API_KEY to enable scan-to-comp.",
+    },
+    {
+      id: "ebay-browse",
+      label: "eBay Browse",
+      role: "UK active asks",
+      status: ebayConfig ? "building" : "missing",
+      required: false,
+      setupHint: ebayConfig
+        ? "App credentials are configured; deep health proves live Browse responses and filtering."
+        : "Add eBay application credentials for active asks.",
+    },
+    {
+      id: "ebay-sell-api",
+      label: "eBay Sell",
+      role: "listing and order automation",
+      status: ebayRefreshToken ? "building" : "missing",
+      required: false,
+      setupHint: ebayRefreshToken
+        ? "A refresh token is stored; deep health proves current authentication and policy access."
+        : "Connect the seller account through /api/ebay/connect.",
+    },
+    {
+      id: "ebay-account-deletion",
+      label: "eBay account deletion",
+      role: "marketplace privacy compliance",
+      status: deletionTokenConfigured ? "building" : "missing",
+      required: false,
+      setupHint: deletionTokenConfigured
+        ? "Callback token is configured; dashboard subscription/exemption and signed delivery still require verification."
+        : "Configure the dashboard callback/token or confirm an eBay exemption.",
+    },
+    {
+      id: "blob",
+      label: "Vercel Blob",
+      role: "inventory photos",
+      status: blobConfigured ? "building" : "missing",
+      required: false,
+      setupHint: blobConfigured
+        ? "Blob credentials are configured; deep health proves store access."
+        : "Add BLOB_READ_WRITE_TOKEN to enable owned photo uploads and deletion.",
     },
     {
       id: "fx-rates",
@@ -172,6 +244,7 @@ export async function GET() {
       lastSnapshotAt: lastSnapshot?.startedAt.toISOString() ?? null,
       lastWatchCheckAt: lastWatchCheck?.startedAt.toISOString() ?? null,
       lastRepriceAt: lastReprice?.startedAt.toISOString() ?? null,
+      scanEvaluation,
     },
   });
 }

@@ -1,6 +1,6 @@
 import { getPrisma } from "../db/prisma.js";
 import type { Grade } from "../domain/types.js";
-import { CompService } from "./compService.js";
+import { createAppCompService } from "./appCompLookup.js";
 import { PrismaCompResultRepo } from "./prismaCompResultRepo.js";
 import { warmComps, type WarmCompOptions, type WarmCompSummary, type WarmCompItem } from "./warmComps.js";
 import { getPokeTraceHealth, resetPokeTraceRunStats } from "./sources/pokeTrace.js";
@@ -28,7 +28,7 @@ export async function runInventoryCompWarmup(options: WarmCompOptions = {}): Pro
     take: Math.max(options.limit ?? 100, 100),
   });
   const warmItems = toWarmItems(items as WarmInventoryItem[]);
-  const compService = CompService.default();
+  const compService = createAppCompService();
   const compRepo = new PrismaCompResultRepo();
   resetPokeTraceRunStats();
 

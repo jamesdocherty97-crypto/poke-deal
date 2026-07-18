@@ -6,6 +6,7 @@ import {
   buildEbayAskSearchPath,
   fetchEbayAskEvidence,
   mapBrowseAskListings,
+  mapBrowseAskListingsWithDiagnostics,
   resetEbayAskCacheForTests,
   titleMatchesAskContext,
   undercutAskPence,
@@ -87,6 +88,8 @@ test("titleMatchesAskContext filters number, raw slab leakage and obvious bad li
   assert.equal(titleMatchesAskContext("Custom proxy Umbreon VMAX 215/203", moonbreon, "RAW"), false);
   assert.equal(titleMatchesAskContext("Umbreon VMAX 215/203 Evolving Skies Extended Binder Inserts", moonbreon, "RAW"), false);
   assert.equal(titleMatchesAskContext("Umbreon VMAX 215/203 Evolving Skies Secret Rare Holo Pokemon chance pack", moonbreon, "RAW"), false);
+  assert.equal(titleMatchesAskContext("CHARIZARD 4/102 POKEMON CARD GOLDEN FRIDGE MAGNET 50X70MM BASE SET WOTC", { name: "Charizard", number: "4/102" }, "RAW"), false);
+  assert.equal(titleMatchesAskContext("Wizards of the Coast Pokémon TCG Charizard 4/102 Base Set Holo Rare Spanish 2016", { name: "Charizard", number: "4/102" }, "RAW"), false);
   assert.equal(titleMatchesAskContext("BGS 9.5 Zapdos ex 192/165 Pokemon 151", { name: "Zapdos ex", number: "192/165" }, "BGS_9_5"), true);
 });
 
@@ -119,6 +122,23 @@ test("mapBrowseAskListings maps relevant GBP asks and sorts can use total price"
   assert.equal(rows.length, 1);
   assert.equal(rows[0]!.totalPence, 170350);
   assert.equal(rows[0]!.shippingPence, 350);
+});
+
+test("ask filtering explains every rejected false match", () => {
+  const result = mapBrowseAskListingsWithDiagnostics({ itemSummaries: [
+    { itemId: "ok", title: "Pokemon Umbreon VMAX 215/203 Evolving Skies NM", itemWebUrl: "https://ebay.test/ok", price: { value: "100", currency: "GBP" } },
+    { itemId: "magnet", title: "Umbreon VMAX 215/203 fridge magnet", itemWebUrl: "https://ebay.test/magnet", price: { value: "10", currency: "GBP" } },
+    { itemId: "spanish", title: "Umbreon VMAX 215/203 Spanish card", itemWebUrl: "https://ebay.test/spanish", price: { value: "80", currency: "GBP" } },
+    { itemId: "slab", title: "PSA 10 Umbreon VMAX 215/203", itemWebUrl: "https://ebay.test/slab", price: { value: "500", currency: "GBP" } },
+  ] }, moonbreon, "RAW", rates);
+
+  assert.equal(result.listings.length, 1);
+  assert.equal(result.filteredCount, 3);
+  assert.deepEqual(result.rejectionCounts, {
+    "non-card": 1,
+    "wrong-language": 1,
+    "graded-for-raw": 1,
+  });
 });
 
 test("fetchEbayAskEvidence uses app token, caches for one hour and applies the daily budget", async () => {

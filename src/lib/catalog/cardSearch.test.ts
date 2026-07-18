@@ -234,6 +234,7 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     name: "Hitmontop",
     setName: "Neo Genesis",
     number: undefined,
+    edition: "FIRST_EDITION",
   });
 
   assert.deepEqual(normalizeCatalogCardSearchInput("Lugia Neo Genesis BGS 7.5"), {
@@ -248,6 +249,7 @@ test("normalizeCatalogCardSearchInput understands curated set aliases inside ful
     name: "Hitmontop",
     setName: "Neo Genesis",
     number: undefined,
+    edition: "FIRST_EDITION",
   });
   assert.deepEqual(normalizeCatalogCardSearchInput("Blastoise XY Evolutions"), {
     query: "Blastoise",

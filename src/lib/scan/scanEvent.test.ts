@@ -32,7 +32,7 @@ test("scanEventDataFromResult stores a readable raw-card observation", () => {
   assert.equal(event.language, "EN");
   assert.equal(event.grade, "RAW");
   assert.equal(event.model, "gemini-flash-latest");
-  assert.deepEqual(event.raw, { identity: result.identity, usage: result.usage });
+  assert.deepEqual(event.raw, { identity: result.identity, promptVersion: "legacy-unversioned", usage: result.usage });
   assert.equal(event.latencyMs, 912);
   assert.equal(event.requestBytes, 2048);
   assert.equal(event.inputKind, "camera");

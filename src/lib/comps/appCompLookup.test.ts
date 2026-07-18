@@ -172,9 +172,13 @@ test("resolveCatalogCard rejects same-name cards from the wrong requested set", 
 });
 
 test("resolveCatalogCard can time out slow catalog misses", async () => {
+  let observedSignal: AbortSignal | undefined;
   const source = {
-    async resolve() {
-      return new Promise<CatalogCard | null>(() => undefined);
+    async resolve(_card: unknown, context?: { signal?: AbortSignal }) {
+      observedSignal = context?.signal;
+      return new Promise<CatalogCard | null>((_resolve, reject) => {
+        observedSignal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+      });
     },
     async search() {
       return [];
@@ -189,6 +193,7 @@ test("resolveCatalogCard can time out slow catalog misses", async () => {
   );
 
   assert.equal(resolved, null);
+  assert.equal(observedSignal?.aborted, true);
   assert.ok(Date.now() - started < 500, "slow catalog resolution should not block the comp flow");
 });
 
@@ -275,7 +280,7 @@ test("resolveCatalogCard can fall back to modern promo metadata before live cata
   assert.equal(resolved?.setCode, "mep");
   assert.equal(resolved?.number, "MEP049");
   assert.equal(resolved?.tcgApiId, "mep-49");
-  assert.equal(resolved?.imageUrl, "https://images.scrydex.com/pokemon/mep-49/large");
+  assert.equal(resolved?.imageUrl, undefined);
 });
 
 test("resolveCatalogCard creates a future promo identity when the live catalog has not caught up", async () => {
@@ -298,7 +303,7 @@ test("resolveCatalogCard creates a future promo identity when the live catalog h
   assert.equal(resolved?.setCode, "svp");
   assert.equal(resolved?.number, "SVP208");
   assert.equal(resolved?.tcgApiId, "svp-208");
-  assert.equal(resolved?.imageUrl, "https://images.scrydex.com/pokemon/svp-208/large");
+  assert.equal(resolved?.imageUrl, undefined);
 });
 
 test("resolveCatalogCard preserves typed future promo padding", async () => {
@@ -351,7 +356,9 @@ test("findCatalogAlternatives returns safe wrong-set recovery candidates", async
     source,
   );
 
-  assert.deepEqual(alternatives, [wrongSetCard]);
+  assert.equal(alternatives.length, 1);
+  assert.equal(alternatives[0]?.tcgApiId, wrongSetCard.tcgApiId);
+  assert.equal(alternatives[0]?.setName, wrongSetCard.setName);
 });
 
 test("findCatalogAlternatives falls back to bundled alternatives when live catalog is slow", async () => {

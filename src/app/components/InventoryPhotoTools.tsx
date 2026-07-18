@@ -121,7 +121,7 @@ export function InventoryPhotoTools({
       {item.status !== "SOLD" && (
         <div className="photo-tool-actions">
           <label className={`row-file-action ${isBusy ? "disabled" : ""}`}>
-            {isBusy ? "Uploading..." : photoCount > 0 ? "Add photos" : "Photos"}
+            {isBusy ? "Uploading…" : photoCount > 0 ? "Add photos" : "Photos"}
             <input
               type="file"
               accept="image/*"
@@ -149,10 +149,12 @@ export function InventoryPhotoTools({
             <summary>Image URL</summary>
             <div>
               <input
-                type="url"
                 value={manualUrl}
                 onChange={(event) => setManualUrl(event.target.value)}
-                placeholder="https://..."
+                name="inventory-photo-url"
+                type="url"
+                inputMode="url"
+                placeholder="https://example.com/photo…"
                 disabled={isBusy}
               />
               <button

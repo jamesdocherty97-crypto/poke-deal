@@ -97,6 +97,20 @@ test("ebayJson includes eBay errorId and long message on failure", async () => {
   );
 });
 
+test("ebayJson aborts a stalled eBay REST call at its configured boundary", async () => {
+  let observedSignal: AbortSignal | undefined;
+  await assert.rejects(
+    () => ebayJson(TEST_CONFIG, "/sell/inventory/v1/inventory_item/test", "token-xyz", { timeoutMs: 5 }, (async (_url, init) => {
+      observedSignal = init?.signal ?? undefined;
+      return await new Promise<Response>((_resolve, reject) => {
+        observedSignal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+      });
+    }) as typeof fetch),
+    /abort/i,
+  );
+  assert.equal(observedSignal?.aborted, true);
+});
+
 test("eBay insufficient-permissions errors carry the reconnect hint", async () => {
   const fetch = mockFetch(403, {
     errors: [
@@ -152,11 +166,11 @@ test("buildAuthUrl produces correct sandbox consent URL", () => {
   assert.match(url, /client_id=TestClient-123/);
   assert.match(url, /redirect_uri=TestApp-RuName-1234/);
   assert.match(url, /response_type=code/);
+  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.account"), false);
+  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.fulfillment"), false);
   assert.deepEqual(scopes, [...EBAY_USER_SCOPES]);
   assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.inventory"), true);
-  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.account"), true);
   assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.account.readonly"), true);
-  assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.fulfillment"), true);
   assert.equal(scopes.includes("https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly"), true);
 });
 
@@ -251,8 +265,7 @@ test("refreshAccessToken sends refresh_token grant and returns access token", as
   assert.equal(result.access_token, "v^1.1-refreshed");
   assert.match(capturedBody, /grant_type=refresh_token/);
   assert.match(capturedBody, /refresh_token=v%5E1.1-refresh-abc/);
-  assert.match(capturedBody, /scope=.*sell\.inventory/);
-  assert.match(capturedBody, /scope=.*sell\.fulfillment/);
+  assert.doesNotMatch(capturedBody, /(?:^|&)scope=/);
 });
 
 test("token refresh scope failures also request eBay reconnect", async () => {
@@ -333,7 +346,7 @@ test("encryptSecret decryptSecret round-trip without exposing plaintext", () => 
   assert.equal(decryptSecret(encrypted, key), "v^1.1-refresh-secret");
 });
 
-test("resolveEbayRefreshToken reads DB first and falls back to env only when no row exists", async () => {
+test("resolveEbayRefreshToken reads a usable DB token first and otherwise falls back to env", async () => {
   const db = fakeEbayCredentialDb();
   await persistEbayRefreshToken(TEST_CONFIG, "db-refresh-token", {
     db,
@@ -354,6 +367,22 @@ test("resolveEbayRefreshToken reads DB first and falls back to env only when no 
   });
 
   assert.deepEqual(fallback, { token: "env-refresh-token", source: "env" });
+});
+
+test("resolveEbayRefreshToken recovers with the env token when the stored-token key is unavailable", async () => {
+  const db = fakeEbayCredentialDb();
+  await persistEbayRefreshToken(TEST_CONFIG, "db-refresh-token", {
+    db,
+    env: { TOKEN_ENCRYPTION_KEY: TEST_TOKEN_KEY },
+  });
+
+  const recovered = await resolveEbayRefreshToken({
+    db,
+    env: { EBAY_REFRESH_TOKEN: "env-refresh-token" },
+  });
+  assert.deepEqual(recovered, { token: "env-refresh-token", source: "env" });
+
+  await assert.rejects(() => resolveEbayRefreshToken({ db, env: {} }), /TOKEN_ENCRYPTION_KEY is not set/);
 });
 
 test("OAuth callback persists the returned refresh token and never displays it", async () => {
@@ -848,6 +877,8 @@ test("buildTradingFixedPriceItemXml emits graded descriptors and cert additional
     quantity: 1,
     imageUrls: ["https://img.example.com/zard-slab.jpg"],
     policies: MOCK_POLICIES,
+    location: "Manchester",
+    postalCode: "M1 1AA",
   });
 
   assert.match(xml, /<ConditionID>2750<\/ConditionID>/);
@@ -869,6 +900,8 @@ test("buildTradingFixedPriceItemXml sends the exact reviewed title when supplied
     quantity: 1,
     imageUrls: ["https://img.example.com/kofu.jpg"],
     policies: MOCK_POLICIES,
+    location: "Manchester",
+    postalCode: "M1 1AA",
   });
 
   assert.match(xml, /<Title>Pokemon TCG Kofu Stellar Crown 165\/142 NM Raw English<\/Title>/);
@@ -881,11 +914,26 @@ test("buildTradingVerifyFixedPriceItemXml swaps the Trading API request wrapper"
     quantity: 1,
     imageUrls: ["https://img.example.com/umbreon-front.jpg"],
     policies: MOCK_POLICIES,
+    location: "Manchester",
+    postalCode: "M1 1AA",
   });
 
   assert.match(xml, /<VerifyAddFixedPriceItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">/);
   assert.doesNotMatch(xml, /<AddFixedPriceItemRequest xmlns=/);
   assert.match(xml, /<\/VerifyAddFixedPriceItemRequest>/);
+});
+
+test("Trading fallback never invents a seller location", () => {
+  assert.throws(
+    () => buildTradingFixedPriceItemXml({
+      listingId: "pdos-listing-123",
+      packInput: rawInput,
+      quantity: 1,
+      imageUrls: ["https://img.example.com/umbreon-front.jpg"],
+      policies: MOCK_POLICIES,
+    }),
+    /requires the configured seller city and postal code/,
+  );
 });
 
 test("parseTradingApiResult captures ack item id and errors", () => {
@@ -940,6 +988,8 @@ test("verifyTradingFixedPriceItem throws Trading API error with eBay error code"
         quantity: 1,
         imageUrls: [],
         policies: MOCK_POLICIES,
+        location: "Manchester",
+        postalCode: "M1 1AA",
       },
       fetch,
     ),

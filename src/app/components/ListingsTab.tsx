@@ -189,17 +189,43 @@ export function ListingsTab({
     });
   }
 
-  if (loading) return <section className="workspace listings-workspace"><WorkspaceSkeleton label="Loading listings" rows={5} /></section>;
+  if (loading) return (
+    <section className="workspace listings-workspace">
+      <section className="workspace-masthead market-masthead" aria-labelledby="listings-loading-title">
+        <div className="workspace-masthead-copy">
+          <span className="workspace-kicker">Marketplace operations</span>
+          <h2 id="listings-loading-title">Listings</h2>
+          <p>Loading the live draft, active, and sold queues.</p>
+        </div>
+        <div className="market-pipeline loading" aria-label="Loading listing pipeline">
+          <span>Draft</span><i aria-hidden="true" />
+          <span>Active</span><i aria-hidden="true" />
+          <span>Sold</span>
+        </div>
+      </section>
+      <WorkspaceSkeleton label="Loading listings" rows={5} />
+    </section>
+  );
 
   return (
     <section className="workspace listings-workspace">
-      <div className="detail-grid">
-        <Metric label="Draft" value={String(dashboard?.listingsByState.DRAFT ?? 0)} />
-        <Metric label="Active" value={String(dashboard?.listingsByState.ACTIVE ?? 0)} />
-        <Metric label="Sold" value={String(dashboard?.listingsByState.SOLD ?? 0)} />
-      </div>
+      <section className="workspace-masthead market-masthead" aria-labelledby="listings-title">
+        <div className="workspace-masthead-copy">
+          <span className="workspace-kicker">Marketplace operations</span>
+          <h2 id="listings-title">Listings</h2>
+          <p>Move each card from draft to live listing to booked sale with the next action always in view.</p>
+        </div>
+        <div className="market-pipeline" aria-label="Listing pipeline">
+          <Metric label="Draft" value={String(dashboard?.listingsByState.DRAFT ?? 0)} />
+          <span aria-hidden="true">›</span>
+          <Metric label="Active" value={String(dashboard?.listingsByState.ACTIVE ?? 0)} />
+          <span aria-hidden="true">›</span>
+          <Metric label="Sold" value={String(dashboard?.listingsByState.SOLD ?? 0)} />
+        </div>
+      </section>
+      <div className="market-command-grid" aria-label="Next marketplace actions">
       {(firstDraftListingTarget || unlistedStock.length > 0) && (
-        <section className="panel listing-desk-panel">
+        <section className="panel listing-desk-panel market-next-action">
           <div className="panel-heading">
             <div>
               <h2>Listing desk</h2>
@@ -317,7 +343,7 @@ export function ListingsTab({
               onClick={syncEbaySales}
               disabled={busy === "ebay-sales-sync" || !ebayStatus.connected}
             >
-              {busy === "ebay-sales-sync" ? "Syncing..." : "Sync eBay sales"}
+              {busy === "ebay-sales-sync" ? "Syncing…" : "Sync eBay sales"}
             </button>
           </div>
           {ebaySalesSync && !ebaySalesSync.skipped && (
@@ -343,53 +369,22 @@ export function ListingsTab({
           )}
         </section>
       )}
-      <div className="export-actions" aria-label="Listing exports">
-        <a className="export-link" href="/api/export/listings?state=DRAFT" download>
-          Draft CSV
-        </a>
-        <a className="export-link" href="/api/export/listings" download>
-          All listings CSV
-        </a>
-        <a className="export-link" href="/api/export/listing-pack" download>
-          eBay pack CSV
-        </a>
       </div>
-      <section className="panel listing-workhorse" aria-label="Build selected listing pack">
-        <div className="panel-heading">
-          <div>
-            <h2>Pack builder</h2>
-            <span className="muted">select items → channel → download or copy</span>
-          </div>
-          <button className="ghost-button" type="button" onClick={() => {
-            setSelectedIds(selectedListings.length === visibleListings.length ? new Set() : new Set(visibleListings.map((listing) => listing.id)));
-          }} disabled={visibleListings.length === 0}>
-            {selectedListings.length === visibleListings.length && visibleListings.length > 0 ? "Clear" : "Select visible"}
-          </button>
-        </div>
-        <div className="listing-workhorse-actions">
-          <strong>{selectedListings.length} selected</strong>
-          <label>
-            Channel
-            <select value={packChannel} onChange={(event) => setPackChannel(event.target.value as Channel)}>
-              <option value="EBAY">eBay</option><option value="CARDMARKET">Cardmarket</option><option value="VINTED">Vinted</option><option value="IN_PERSON">In person</option>
-            </select>
-          </label>
-          <button type="button" className="primary-action" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "download")}>Download pack</button>
-          <button type="button" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "copy")}>Copy pack</button>
-        </div>
-      </section>
-      <div className="dex-controls listings-controls" aria-label="Listing search and sort">
+      <div className="dex-controls listings-controls market-toolbar" aria-label="Listing search and sort">
         <label className="search-control">
           Search
           <input
             value={listingQuery}
             onChange={(event) => setListingQuery(event.target.value)}
-            placeholder="Card, channel, grade..."
+            name="listing-search"
+            placeholder="Card, channel, grade…"
+            autoComplete="off"
           />
         </label>
         <label>
           State
           <select
+            name="listing-state"
             value={listingStateFilter}
             onChange={(event) => setListingStateFilter(event.target.value as ListingStateFilter)}
           >
@@ -402,7 +397,7 @@ export function ListingsTab({
         </label>
         <label>
           Sort
-          <select value={listingSort} onChange={(event) => setListingSort(event.target.value as ListingSort)}>
+          <select name="listing-sort" value={listingSort} onChange={(event) => setListingSort(event.target.value as ListingSort)}>
             <option value="newest">newest</option>
             <option value="oldest">oldest</option>
             <option value="highest-price">highest price</option>
@@ -413,10 +408,10 @@ export function ListingsTab({
         </label>
       </div>
       {(listingStateFilter === "ALL" || listingStateFilter === "DRAFT") && unlistedStock.length > 0 && (
-        <section className="panel listing-queue-panel">
+        <section className="panel listing-queue-panel market-queue">
           <div className="panel-heading">
             <div>
-              <h2>Listing queue</h2>
+              <h2>Stock to draft</h2>
               <span className="muted">{rowCountLabel(visibleUnlistedStock.length, unlistedStock.length)}</span>
             </div>
             <button className="ghost-button" type="button" onClick={onAddBuy}>
@@ -441,7 +436,7 @@ export function ListingsTab({
               />
             ))}
           </div>
-          {visibleUnlistedStock.length === 0 && <EmptyState text="No unlisted stock matches this search." />}
+          {visibleUnlistedStock.length === 0 && <EmptyState art="search" text="No unlisted stock matches this search." />}
           {visibleUnlistedStock.length > 6 && (
             <p className="hint">
               Showing 6 of {visibleUnlistedStock.length}. Use search to narrow the queue.
@@ -449,7 +444,7 @@ export function ListingsTab({
           )}
         </section>
       )}
-      <div className="section-heading tight">
+      <div className="section-heading tight market-list-heading">
         <h2>Listings</h2>
         <span>{rowCountLabel(visibleListings.length, listings.length)}</span>
       </div>
@@ -484,7 +479,7 @@ export function ListingsTab({
           {ebayLocationCreateAvailable ? (
             <form className="ebay-location-form compact" onSubmit={createEbaySellerLocation}>
               <button type="submit" disabled={busy === "ebay-location"}>
-                {busy === "ebay-location" ? "Creating location..." : "Create seller location"}
+                {busy === "ebay-location" ? "Creating location…" : "Create seller location"}
               </button>
               {ebayLocationMissingRecommendedFields.length > 0 && (
                 <small>Using default key pdos-main; optional env missing: {ebayLocationMissingRecommendedFields.join(", ")}.</small>
@@ -493,44 +488,56 @@ export function ListingsTab({
           ) : (
             <form className="ebay-location-form" onSubmit={createEbaySellerLocation}>
               <input
+                name="ebay-location-name"
+                aria-label="Location name"
                 value={ebayLocationName}
                 onChange={(event) => setEbayLocationName(event.target.value)}
-                placeholder="Location name"
+                placeholder="Poke Deal dispatch…"
                 autoComplete="organization"
               />
               <input
+                name="ebay-address-line-1"
+                aria-label="Address line 1"
                 value={ebayLocationAddress1}
                 onChange={(event) => setEbayLocationAddress1(event.target.value)}
-                placeholder="Address line 1"
+                placeholder="10 High Street…"
                 autoComplete="address-line1"
               />
               <input
+                name="ebay-address-line-2"
+                aria-label="Address line 2"
                 value={ebayLocationAddress2}
                 onChange={(event) => setEbayLocationAddress2(event.target.value)}
-                placeholder="Address line 2"
+                placeholder="Unit 2…"
                 autoComplete="address-line2"
               />
               <input
+                name="ebay-address-city"
+                aria-label="City"
                 value={ebayLocationCity}
                 onChange={(event) => setEbayLocationCity(event.target.value)}
-                placeholder="City"
+                placeholder="London…"
                 autoComplete="address-level2"
               />
               <input
+                name="ebay-address-postcode"
+                aria-label="Postcode"
                 value={ebayLocationPostcode}
                 onChange={(event) => setEbayLocationPostcode(event.target.value)}
-                placeholder="Postcode"
+                placeholder="SW1A 1AA…"
                 autoComplete="postal-code"
               />
               <input
+                name="ebay-address-country"
+                aria-label="Country code"
                 value={ebayLocationCountry}
                 onChange={(event) => setEbayLocationCountry(event.target.value.toUpperCase().slice(0, 2))}
-                placeholder="GB"
+                placeholder="GB…"
                 autoComplete="country"
                 inputMode="text"
               />
               <button type="submit" disabled={busy === "ebay-location" || !ebayLocationFormReady}>
-                {busy === "ebay-location" ? "Creating location..." : "Create seller location"}
+                {busy === "ebay-location" ? "Creating location…" : "Create seller location"}
               </button>
               {ebayLocationMissingFields.length > 0 && (
                 <small>Server env missing: {ebayLocationMissingFields.join(", ")}.</small>
@@ -542,10 +549,11 @@ export function ListingsTab({
           </a>
         </div>
       )}
+      <div className="market-list" aria-live="polite">
       {visibleListings.map((listing) => (
         <div className={`bulk-select-row listing-select-row${selectedIds.has(listing.id) ? " selected" : ""}`} key={listing.id}>
           <label className="bulk-row-checkbox">
-            <input type="checkbox" checked={selectedIds.has(listing.id)} onChange={() => toggleListing(listing.id)} />
+            <input name={`select-listing-${listing.id}`} type="checkbox" checked={selectedIds.has(listing.id)} onChange={() => toggleListing(listing.id)} />
             <span>Select {listing.item?.card.name ?? listing.title ?? "listing"}</span>
           </label>
           <ListingRow
@@ -574,10 +582,46 @@ export function ListingsTab({
         </div>
       ))}
       {listings.length === 0 ? (
-        <EmptyState text="No listings yet. Comp / Buy can create draft listings automatically." />
+        <EmptyState art="sales" text="No listings yet. Comp / Buy can create draft listings automatically." />
       ) : visibleListings.length === 0 ? (
-        <EmptyState text="No matching listings. Clear the search or change the state filter." />
+        <EmptyState art="search" text="No matching listings. Clear the search or change the state filter." />
       ) : null}
+      </div>
+      <section className="panel listing-workhorse market-pack-tools" aria-label="Build selected listing pack">
+        <div className="panel-heading">
+          <div>
+            <h2>Pack builder</h2>
+            <span className="muted">select listings above → channel → download or copy</span>
+          </div>
+          <button className="ghost-button" type="button" onClick={() => {
+            setSelectedIds(selectedListings.length === visibleListings.length ? new Set() : new Set(visibleListings.map((listing) => listing.id)));
+          }} disabled={visibleListings.length === 0}>
+            {selectedListings.length === visibleListings.length && visibleListings.length > 0 ? "Clear" : "Select visible"}
+          </button>
+        </div>
+        <div className="listing-workhorse-actions">
+          <strong>{selectedListings.length} selected</strong>
+          <label>
+            Channel
+            <select name="listing-pack-channel" value={packChannel} onChange={(event) => setPackChannel(event.target.value as Channel)}>
+              <option value="EBAY">eBay</option><option value="CARDMARKET">Cardmarket</option><option value="VINTED">Vinted</option><option value="IN_PERSON">In person</option>
+            </select>
+          </label>
+          <button type="button" className="primary-action" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "download")}>Download pack</button>
+          <button type="button" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "copy")}>Copy pack</button>
+        </div>
+      </section>
+      <div className="export-actions" aria-label="Listing exports">
+        <a className="export-link" href="/api/export/listings?state=DRAFT" download>
+          Draft CSV
+        </a>
+        <a className="export-link" href="/api/export/listings" download>
+          All listings CSV
+        </a>
+        <a className="export-link" href="/api/export/listing-pack" download>
+          eBay pack CSV
+        </a>
+      </div>
       {editListingSheet}
       {listingPackSheet}
     </section>
@@ -640,15 +684,18 @@ function ListingQueueRow({
             {" "}ready for eBay prep
           </p>
         )}
-        <InventoryPhotoTools
-          item={item}
-          busy={busy}
-          onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
-          onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
-          onCatalogArt={(target) => onCatalogArt(target as InventoryItem)}
-          onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
-          onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
-        />
+        <details className="row-more-actions row-photo-tools">
+          <summary>{photoCount > 0 ? `Photos · ${photoCount}` : "Add photos"}</summary>
+          <InventoryPhotoTools
+            item={item}
+            busy={busy}
+            onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
+            onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
+            onCatalogArt={(target) => onCatalogArt(target as InventoryItem)}
+            onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
+            onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
+          />
+        </details>
         <div className="next-action-strip listing-next-action">
           <button
             className="next-action-button"
@@ -808,8 +855,9 @@ function ListingRow({
             {needsEbayPhotos && listing.item ? (
               <>
                 <label className={`next-action-button row-file-action ${busy === `photo-${listing.item.id}` ? "disabled" : ""}`}>
-                  {busy === `photo-${listing.item.id}` ? "Uploading..." : "Add photos"}
+                  {busy === `photo-${listing.item.id}` ? "Uploading…" : "Add photos"}
                   <input
+                    name={`listing-photos-${listing.id}`}
                     type="file"
                     accept="image/*"
                     multiple
@@ -824,12 +872,19 @@ function ListingRow({
               </>
             ) : isEbay && ebayConnected && hasOffer && !isPublished ? (
               <button className="next-action-button" type="button" onClick={onEbayPublish} disabled={isEbayPublishBusy || belowEbayMinimum}>
-                {isEbayPublishBusy ? "Syncing..." : belowEbayMinimum ? "Edit price first" : "Sync & publish to eBay"}
+                {isEbayPublishBusy ? "Syncing…" : belowEbayMinimum ? "Edit price first" : "Sync & publish to eBay"}
               </button>
             ) : isEbay && isPublished ? (
-              <a className="next-action-button good" href={listing.externalUrl!} target="_blank" rel="noreferrer">
-                View live listing
-              </a>
+              <div className="listing-live-actions">
+                <a className="next-action-button good" href={listing.externalUrl!} target="_blank" rel="noreferrer">
+                  View live listing
+                </a>
+                {canSell && (
+                  <button className="next-action-button" type="button" onClick={() => onSell(listing)} disabled={Boolean(busy?.startsWith("sell-"))}>
+                    Record sale
+                  </button>
+                )}
+              </div>
             ) : listing.state === "DRAFT" ? (
               <button className="next-action-button" type="button" onClick={() => onPack(listing)} disabled={isBusy}>
                 {isEbay && ebayConnected ? "Review & publish to eBay" : "Open listing pack"}
@@ -926,7 +981,7 @@ function ListingRow({
               onClick={onEbayPublish}
               disabled={isEbayPublishBusy || belowEbayMinimum}
             >
-              {isEbayPublishBusy ? "Syncing..." : belowEbayMinimum ? "Edit price first" : "Sync & publish"}
+              {isEbayPublishBusy ? "Syncing…" : belowEbayMinimum ? "Edit price first" : "Sync & publish"}
             </button>
           )}
           {isEbay && isPublished && (

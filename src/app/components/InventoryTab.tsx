@@ -157,24 +157,49 @@ export function InventoryTab({
 
   return (
     <section className="workspace inventory-workspace">
-      {loading ? <WorkspaceSkeleton label="Loading stock" rows={5} /> : <>
-      <div className="section-heading">
-        <h2>Inventory</h2>
-        <div className="heading-actions">
+      {loading ? <>
+      <section className="workspace-masthead vault-masthead" aria-labelledby="inventory-loading-title">
+        <div className="workspace-masthead-copy">
+          <span className="workspace-kicker">Collection vault</span>
+          <h2 id="inventory-loading-title">Inventory</h2>
+          <p>Loading holdings, values, and listing readiness.</p>
+        </div>
+      </section>
+      <WorkspaceSkeleton label="Loading stock" rows={5} />
+      </> : <>
+      <section className="workspace-masthead vault-masthead" aria-labelledby="inventory-title">
+        <div className="workspace-masthead-copy">
+          <span className="workspace-kicker">Collection vault</span>
+          <h2 id="inventory-title">Inventory</h2>
+          <p>Scan the collection by card, value and readiness—then move the right stock forward.</p>
+        </div>
+        <div className="vault-summary" aria-label="Inventory summary">
+          <span><strong>{holdings.length}</strong> holdings</span>
+          <span><strong>{activeInventory.length}</strong> active cards</span>
+          <span><strong>{visibleInventory.length}</strong> in view</span>
+        </div>
+      </section>
+      <section className="vault-commandbar" aria-label="Vault controls">
+        <div className="section-heading vault-heading">
+          <div>
+            <span className="workspace-kicker">Binder view</span>
+            <h3>Browse stock</h3>
+          </div>
+          <div className="heading-actions">
           {onWarmComps && (
             <button className="ghost-button" type="button" onClick={onWarmComps} disabled={warmCompsBusy || activeInventory.length === 0}>
-              {warmCompsBusy ? "Refreshing..." : "Refresh comps"}
+              {warmCompsBusy ? "Refreshing…" : "Refresh comps"}
             </button>
           )}
-          <span>{holdings.length} holding{holdings.length === 1 ? "" : "s"} · {rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
+          <span>{rowCountLabel(visibleInventory.length, filteredInventory.length)}</span>
           <button className="ghost-button" type="button" onClick={() => {
             setSelectedIds(allVisibleSelected ? new Set() : new Set(visibleInventory.map((item) => item.id)));
           }} disabled={visibleInventory.length === 0}>
             {allVisibleSelected ? "Clear" : "Select all"}
           </button>
+          </div>
         </div>
-      </div>
-      <div className="inventory-filter-tabs" role="group" aria-label="Inventory filters">
+        <div className="inventory-filter-tabs" role="group" aria-label="Inventory filters">
         {inventoryFilters.map((filter) => (
           <button
             key={filter.value}
@@ -187,14 +212,15 @@ export function InventoryTab({
             <strong>{inventoryFilterCounts[filter.value]}</strong>
           </button>
         ))}
-      </div>
-      <div className="dex-controls" aria-label="Inventory search and sort">
+        </div>
+        <div className="dex-controls vault-search" aria-label="Inventory search and sort">
         <label className="search-control">
           Search
           <input
             value={inventoryQuery}
             onChange={(event) => setInventoryQuery(event.target.value)}
-            placeholder="Name, set, grade..."
+            name="inventory-search"
+            placeholder="Name, set, grade…"
           />
         </label>
         <label>
@@ -208,7 +234,8 @@ export function InventoryTab({
             <option value="name">name</option>
           </select>
         </label>
-      </div>
+        </div>
+      </section>
       {selectedItems.length > 0 && (
         <div className="bulk-action-bar" aria-label="Bulk stock actions">
           <strong>{selectedItems.length} selected</strong>
@@ -222,6 +249,7 @@ export function InventoryTab({
           <button className="ghost-button" type="button" onClick={() => setSelectedIds(new Set())}>Done</button>
         </div>
       )}
+      <div className="vault-grid" aria-live="polite">
       {holdings.map((holding) => holding.items.length === 1 ? (
         <InventoryLotRow key={holding.key} item={holding.items[0]!} selectedIds={selectedIds} onToggle={toggleSelected} renderInventoryRow={renderInventoryRow} />
       ) : (
@@ -236,12 +264,13 @@ export function InventoryTab({
         </details>
       ))}
       {inventoryFilter === "all" && activeInventory.length === 0 ? (
-        <EmptyState text="No active stock. Add your next card from Comp / Buy." />
+        <EmptyState art="stock" text="No active stock. Add your next card from Comp / Buy." />
       ) : filteredInventory.length === 0 ? (
         <EmptyState text={emptyInventoryFilterText(inventoryFilter)} />
       ) : visibleInventory.length === 0 ? (
-        <EmptyState text="No matching stock. Clear the search or change the sort." />
+        <EmptyState art="search" text="No matching stock. Clear the search or change the sort." />
       ) : null}
+      </div>
 
       </>}
       {!loading && editingItemId && (
@@ -293,7 +322,8 @@ export function InventoryTab({
               <input
                 value={itemCondition}
                 onChange={(event) => setItemCondition(event.target.value)}
-                placeholder="NM, LP, light edgewear..."
+                name="inventory-condition"
+                placeholder="NM, LP, light edgewear…"
                 disabled={busy === `edit-${editingItemId}`}
               />
             </label>
@@ -321,7 +351,7 @@ export function InventoryTab({
             </select>
           </label>
           <button className="primary-action" type="submit" disabled={busy === `edit-${editingItemId}`}>
-            {busy === `edit-${editingItemId}` ? "Saving..." : "Save stock"}
+            {busy === `edit-${editingItemId}` ? "Saving…" : "Save stock"}
           </button>
         </form>
       )}
@@ -362,13 +392,13 @@ export function InventoryTab({
               </label>
               <label>
                 Listing URL
-                <input value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://..." />
+                <input name="inventory-listing-url" type="url" inputMode="url" value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://example.com/item…" />
               </label>
             </>
           )}
           <button className="primary-action" type="submit" disabled={busy === `create-listing-${creatingListingItemId}` || (listingChannel === "EBAY" && Number(listingPrice || 0) < 0.99)}>
             {busy === `create-listing-${creatingListingItemId}`
-              ? "Saving..."
+              ? "Saving…"
               : listingChannel === "EBAY"
                 ? "Continue to eBay review"
                 : "Create listing"}

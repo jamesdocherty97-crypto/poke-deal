@@ -1,19 +1,24 @@
 // PSA Public API cert-lookup adapter.
 //
 // Endpoint: GET https://api.psacard.com/publicapi/cert/GetByCertNumber/{certNo}
-// Auth:     Authorization: bearer <PSA_API_TOKEN>   (free tier: 100 calls/day)
+// Auth:     Authorization: bearer <PSA_API_TOKEN>
 // Envelope: { IsValidRequest: bool, ServerMessage: string, PSACert: {...}, DNACert?: {...} }
 //
-// Two modes, mirroring the comp sources:
-//   • FIXTURE (no token) → returns a bundled sample cert so the UI flow works offline.
-//   • LIVE   (token present) → calls the API and maps the PSACert object.
+// Missing credentials return explicit unavailable evidence. Captured fixtures are
+// used only by tests and never substitute for a requested cert.
 // Never throws: failures degrade to { found:false, reason }.
 
 import type { PsaCertResult } from "./types.js";
 import { psaGradeLabelToGrade } from "./types.js";
+import { fetchReadWithRetry } from "../http/fetchReadWithRetry.js";
 
 const BASE_URL = "https://api.psacard.com/publicapi";
 const DEFAULT_FETCH_TIMEOUT_MS = 6000;
+const SUCCESS_CACHE_TTL_MS = 60 * 60 * 1000;
+const NOT_FOUND_CACHE_TTL_MS = 5 * 60 * 1000;
+const certCache = new Map<string, { result: PsaCertResult; cachedAt: number; expiresAt: number }>();
+const fetchIds = new WeakMap<typeof fetch, number>();
+let nextFetchId = 1;
 
 export class PsaCertLookup {
   readonly name = "psa-public-api";
@@ -34,26 +39,44 @@ export class PsaCertLookup {
     }
 
     if (!this.live) {
-      // Offline: serve a representative fixture so the flow is demoable without a token.
-      return { ...fixtureCert(cert), live: false };
+      return notFound(cert, false, "PSA API token missing");
     }
 
+    const cacheKey = `${fetchId(this.fetchImpl)}|${cert}`;
+    const cached = readCertCache(cacheKey);
+    if (cached) return cached;
+
     try {
-      const res = await this.fetchImpl(`${BASE_URL}/cert/GetByCertNumber/${cert}`, {
+      const res = await fetchReadWithRetry(this.fetchImpl, `${BASE_URL}/cert/GetByCertNumber/${cert}`, {
         headers: { Authorization: `bearer ${this.token}`, Accept: "application/json" },
         signal: timeoutSignal(this.fetchTimeoutMs),
-      });
+      }, { totalDeadlineMs: this.fetchTimeoutMs });
 
-      if (res.status === 204) return notFound(cert, true, "PSA returned no cert data (empty request)");
+      if (res.status === 204) return writeCertCache(cacheKey, notFound(cert, true, "PSA returned no cert data (empty request)"), NOT_FOUND_CACHE_TTL_MS);
       if (res.status === 500) return notFound(cert, true, "PSA rejected the request (often invalid credentials)");
-      if (!res.ok) return notFound(cert, true, `PSA HTTP ${res.status}`);
+      if (!res.ok) return notFound(cert, true, describePsaHttpFailure(res));
 
       const json = (await res.json()) as unknown;
-      return mapPsaCertResponse(json, cert, true);
+      const mapped = mapPsaCertResponse(json, cert, true);
+      return writeCertCache(cacheKey, mapped, mapped.found ? SUCCESS_CACHE_TTL_MS : NOT_FOUND_CACHE_TTL_MS);
     } catch (err) {
       return notFound(cert, true, `PSA lookup failed: ${(err as Error).message}`);
     }
   }
+}
+
+function describePsaHttpFailure(response: Response): string {
+  const server = response.headers.get("server")?.toLowerCase() ?? "";
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const cloudflare = server.includes("cloudflare") || response.headers.has("cf-ray");
+  if (response.status === 403 && (cloudflare || contentType.includes("text/html"))) {
+    return "PSA blocked this network before token validation (Cloudflare HTTP 403)";
+  }
+  if (response.status === 429) {
+    const retryAfter = response.headers.get("retry-after")?.trim();
+    return `PSA rate limited the lookup (HTTP 429${retryAfter ? `; retry after ${retryAfter}` : ""})`;
+  }
+  return `PSA HTTP ${response.status}`;
 }
 
 type PsaCertObject = Record<string, unknown>;
@@ -91,32 +114,45 @@ export function mapPsaCertResponse(json: unknown, certNumber: string, live: bool
     isDualCert: readBool(get(cert, "IsDualCert")) ?? false,
     live,
     raw: cert,
+    checkedAt: new Date().toISOString(),
   };
 }
 
 function notFound(certNumber: string, live: boolean, reason: string): PsaCertResult {
-  return { found: false, certNumber, grade: null, live, reason };
+  return { found: false, certNumber, grade: null, live, reason, checkedAt: new Date().toISOString() };
 }
 
-/** Bundled sample so the cert flow demos offline. A real Umbreon VMAX alt-art slab shape. */
-function fixtureCert(certNumber: string): PsaCertResult {
+function readCertCache(key: string): PsaCertResult | null {
+  const entry = certCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    certCache.delete(key);
+    return null;
+  }
   return {
-    found: true,
-    certNumber,
-    subject: "UMBREON VMAX",
-    brand: "POKEMON SWORD & SHIELD EVOLVING SKIES",
-    category: "TCG CARDS",
-    year: "2021",
-    cardNumber: "215",
-    variety: "ALTERNATE ART SECRET",
-    gradeLabel: "GEM MT 10",
-    grade: "PSA_10",
-    totalPopulation: 12863,
-    populationHigher: 0,
-    isDualCert: false,
+    ...entry.result,
     live: false,
-    raw: { fixture: true },
+    cached: true,
+    cacheAgeMinutes: Math.max(0, Math.floor((Date.now() - entry.cachedAt) / 60_000)),
   };
+}
+
+function writeCertCache(key: string, result: PsaCertResult, ttlMs: number): PsaCertResult {
+  const cachedAt = Date.now();
+  certCache.set(key, { result, cachedAt, expiresAt: cachedAt + ttlMs });
+  return result;
+}
+
+export function resetPsaCertCacheForTests(): void {
+  certCache.clear();
+}
+
+function fetchId(fetchImpl: typeof fetch): number {
+  const existing = fetchIds.get(fetchImpl);
+  if (existing) return existing;
+  const id = nextFetchId++;
+  fetchIds.set(fetchImpl, id);
+  return id;
 }
 
 function sanitizeCertNumber(value: string | undefined): string | null {

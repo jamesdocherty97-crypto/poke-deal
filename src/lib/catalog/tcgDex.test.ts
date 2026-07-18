@@ -48,8 +48,50 @@ test("TcgDexCatalogSource resolves by set and local promo number before name sea
 
   assert.equal(card?.tcgDexId, "svp-208");
   assert.equal(card?.number, "SVP208");
-  assert.equal(card?.imageUrl, "https://images.scrydex.com/pokemon/svp-208/large");
+  assert.equal(card?.imageUrl, undefined);
   assert.deepEqual(requested, ["https://api.example.test/v2/en/sets/svp/208"]);
+});
+
+test("unknown set resolution uses one brief set index instead of fetching every set detail", async () => {
+  const requested: string[] = [];
+  const source = new TcgDexCatalogSource((async (input) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.endsWith("/sets")) return Response.json([{ id: "dealer1", name: "Dealer Test Set" }]);
+    if (url.endsWith("/sets/dealer1/1")) return Response.json({
+      id: "dealer1-1",
+      localId: "1",
+      name: "Pikachu",
+      image: "https://assets.tcgdex.net/en/test/pikachu",
+      set: { id: "dealer1", name: "Dealer Test Set" },
+    });
+    return new Response("not found", { status: 404 });
+  }) as typeof fetch, "https://api.example.test/v2/en", 50);
+
+  const card = await source.resolve({ name: "Pikachu", setName: "Dealer Test Set", number: "1" });
+  assert.equal(card?.tcgDexId, "dealer1-1");
+  assert.deepEqual(requested, [
+    "https://api.example.test/v2/en/sets",
+    "https://api.example.test/v2/en/sets/dealer1/1",
+  ]);
+});
+
+test("TcgDexCatalogSource rejects a direct id that does not match the requested printing", async () => {
+  const source = new TcgDexCatalogSource((async () => Response.json({
+    id: "base4-4",
+    localId: "4",
+    name: "Charizard",
+    set: { id: "base4", name: "Base Set 2" },
+  })) as typeof fetch, "https://api.example.test/v2/en");
+
+  const card = await source.resolve({
+    name: "Charizard",
+    setName: "Base",
+    number: "4/102",
+    tcgDexId: "base4-4",
+  });
+
+  assert.equal(card, null);
 });
 
 test("mapTcgDexSetCards skips TCG Pocket digital-only sets", () => {

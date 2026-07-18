@@ -134,7 +134,7 @@ test("Quick Fill queues stock and its chosen listing when signal drops", async (
 
   await context.setOffline(true);
   await page.evaluate(() => window.dispatchEvent(new Event("offline")));
-  await quickFill.getByRole("button", { name: "Stock + draft" }).click();
+  await quickFill.getByRole("button", { name: "Stock + eBay draft" }).click();
 
   await expect(page.getByTestId("offline-sync-status")).toContainText(/Offline.*1/);
   await expect(page.getByTestId("offline-queue-item")).toContainText("Quick Fill Gengar");
@@ -159,6 +159,39 @@ test("Quick Fill queues stock and its chosen listing when signal drops", async (
 
   await page.getByRole("button", { name: "Stock" }).click();
   await expect(page.getByText("Gengar", { exact: true }).first()).toBeVisible();
+});
+
+test("Quick Fill keeps committed stock when draft creation loses the connection", async ({ context, page }) => {
+  let acquired = false;
+  let inventoryCreates = 0;
+  let inventoryBody: Record<string, unknown> | undefined;
+  await mockAppApis(context, () => acquired, (request) => {
+    acquired = true;
+    inventoryCreates += 1;
+    inventoryBody = request.body;
+  });
+  await context.route("**/api/listings", async (route) => {
+    if (route.request().method() === "POST") return route.abort("internetdisconnected");
+    return route.fallback();
+  });
+
+  await page.goto("/?view=buy");
+  // Set and collector number are intentionally unknown: omitted optional
+  // identity must still be valid stock intake.
+  await page.getByLabel("Smart comp search").fill("Gengar RAW £9");
+  await page.getByRole("button", { name: "Fill", exact: true }).last().click();
+  const quickFill = page.locator(".fallback-stock-panel");
+  await expect(quickFill.getByRole("heading", { name: "Add to stock" })).toBeVisible();
+  await quickFill.getByRole("button", { name: "Stock + eBay draft" }).click();
+
+  await expect.poll(() => acquired).toBe(true);
+  expect(inventoryCreates).toBe(1);
+  expect(inventoryBody?.card).toMatchObject({ name: "Gengar" });
+  expect(inventoryBody?.card).not.toHaveProperty("setName");
+  expect(inventoryBody?.card).not.toHaveProperty("number");
+  await expect(page.getByText(/Stocked manually, but the listing needs retry/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create draft", exact: true })).toBeVisible();
+  expect(inventoryCreates).toBe(1);
 });
 
 async function mockAppApis(

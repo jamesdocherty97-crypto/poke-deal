@@ -9,6 +9,7 @@ import {
   mapPokeTraceCardsToComp,
   PokeTraceSource,
   readPokeTraceMarkets,
+  readPokeTraceRuntimeApiKey,
   resetPokeTraceSourceHealthForTests,
   resetPokeTraceSharedThrottleForTests,
 } from "./pokeTrace.js";
@@ -624,10 +625,15 @@ test("PokeTraceSource marks repeated all-market forbidden cooldowns as a key pro
 });
 
 test("readPokeTraceMarkets parses env order and ignores invalid values", () => {
-  assert.deepEqual(readPokeTraceMarkets(undefined), ["US", "EU"]);
+  assert.deepEqual(readPokeTraceMarkets(undefined), ["US"]);
   assert.deepEqual(readPokeTraceMarkets("EU,US"), ["EU", "US"]);
   assert.deepEqual(readPokeTraceMarkets(" eu, nonsense, us, EU "), ["EU", "US"]);
-  assert.deepEqual(readPokeTraceMarkets("nonsense"), ["US", "EU"]);
+  assert.deepEqual(readPokeTraceMarkets("nonsense"), ["US"]);
+});
+
+test("runtime PokeTrace calls accept the configured private-use key", () => {
+  assert.equal(readPokeTraceRuntimeApiKey({ POKETRACE_API_KEY: " key " }), "key");
+  assert.equal(readPokeTraceRuntimeApiKey({}), undefined);
 });
 
 test("free tier: spaces the fallback US request to clear the 1-req/2s burst window", async () => {

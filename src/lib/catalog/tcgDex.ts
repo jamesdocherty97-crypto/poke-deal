@@ -2,7 +2,9 @@ import type { CardRef } from "../domain/types.js";
 import { catalogCardMatchesLookupContext, rankCatalogCards } from "./cardSearch.js";
 import { normalizeSearchText } from "./fuzzy.js";
 import { getSetById, resolveSetIdForCard } from "./setCatalog.js";
-import type { CatalogCard, CatalogSource } from "./types.js";
+import { createAbortScope } from "../http/abortScope.js";
+import type { CatalogCard, CatalogSource, CatalogSourceContext } from "./types.js";
+import { fetchReadWithRetry } from "../http/fetchReadWithRetry.js";
 
 const BASE_URL = "https://api.tcgdex.net/v2/en";
 const DEFAULT_FETCH_TIMEOUT_MS = 6500;
@@ -66,33 +68,35 @@ export class TcgDexCatalogSource implements CatalogSource {
     private readonly fetchTimeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
   ) {}
 
-  async resolve(card: CardRef): Promise<CatalogCard | null> {
-    if ((card.game && card.game !== "POKEMON") || (card.language && card.language !== "EN")) {
+  async resolve(card: CardRef, context: CatalogSourceContext = {}): Promise<CatalogCard | null> {
+    if (card.game && card.game !== "POKEMON") {
       return null;
     }
+    const language = card.language ?? "EN";
 
     if (card.tcgDexId) {
-      const direct = mapTcgDexCard(await this.request(`/cards/${encodeURIComponent(card.tcgDexId)}`));
-      return direct && catalogCardMatchesLookupContext(direct, card) ? direct : direct;
+      const direct = mapTcgDexCard(await this.request(`/cards/${encodeURIComponent(card.tcgDexId)}`, {}, context.signal, language), language);
+      return direct && catalogCardMatchesLookupContext(direct, card) ? direct : null;
     }
 
-    const exact = await this.resolveBySetNumber(card);
+    const exact = await this.resolveBySetNumber(card, context.signal);
     if (exact) return exact;
 
-    return (await this.search(card, 1))[0] ?? null;
+    return (await this.search(card, 1, context))[0] ?? null;
   }
 
-  async search(card: CardRef, limit = 10): Promise<CatalogCard[]> {
-    if ((card.game && card.game !== "POKEMON") || (card.language && card.language !== "EN")) {
+  async search(card: CardRef, limit = 10, context: CatalogSourceContext = {}): Promise<CatalogCard[]> {
+    if (card.game && card.game !== "POKEMON") {
       return [];
     }
+    const language = card.language ?? "EN";
 
     const name = card.name.trim();
     if (!name) return [];
 
-    const payload = await this.request("/cards", { name });
+    const payload = await this.request("/cards", { name }, context.signal, language);
     const briefs = Array.isArray(payload) ? payload : [];
-    const setHint = await this.resolveTcgDexSetId(card.setName, card.number);
+    const setHint = await this.resolveTcgDexSetId(card.setName, card.number, context.signal, language);
     const detailed = await Promise.all(
       briefs
         .filter((brief) => {
@@ -100,7 +104,7 @@ export class TcgDexCatalogSource implements CatalogSource {
           return !setHint || id?.startsWith(`${setHint}-`);
         })
         .slice(0, Math.max(limit * 4, 12))
-        .map((brief) => this.resolveBrief(brief)),
+        .map((brief) => this.resolveBrief(brief, context.signal, language)),
     );
 
     return rankCatalogCards(name, detailed.filter((item): item is CatalogCard => Boolean(item)), {
@@ -123,23 +127,24 @@ export class TcgDexCatalogSource implements CatalogSource {
     return sets.filter((set): set is TcgDexSetPayload => Boolean(set && isPhysicalPokemonSet(set)));
   }
 
-  private async resolveBySetNumber(card: CardRef): Promise<CatalogCard | null> {
-    const setId = await this.resolveTcgDexSetId(card.setName, card.number);
+  private async resolveBySetNumber(card: CardRef, signal?: AbortSignal): Promise<CatalogCard | null> {
+    const language = card.language ?? "EN";
+    const setId = await this.resolveTcgDexSetId(card.setName, card.number, signal, language);
     const localId = tcgDexLocalId(card.number, setId);
     if (!setId || !localId) return null;
 
-    const direct = mapTcgDexCard(await this.request(`/sets/${encodeURIComponent(setId)}/${encodeURIComponent(localId)}`));
+    const direct = mapTcgDexCard(await this.request(`/sets/${encodeURIComponent(setId)}/${encodeURIComponent(localId)}`, {}, signal, language), language);
     if (!direct || !catalogCardMatchesLookupContext(direct, card)) return null;
     return direct;
   }
 
-  private async resolveBrief(brief: unknown): Promise<CatalogCard | null> {
+  private async resolveBrief(brief: unknown, signal?: AbortSignal, language: CardRef["language"] = "EN"): Promise<CatalogCard | null> {
     const id = readString((brief as TcgDexCardBrief | null)?.id);
     if (!id) return null;
-    return mapTcgDexCard(await this.request(`/cards/${encodeURIComponent(id)}`));
+    return mapTcgDexCard(await this.request(`/cards/${encodeURIComponent(id)}`, {}, signal, language), language);
   }
 
-  private async resolveTcgDexSetId(setName: string | undefined, number: string | undefined): Promise<string | undefined> {
+  private async resolveTcgDexSetId(setName: string | undefined, number: string | undefined, signal?: AbortSignal, language: CardRef["language"] = "EN"): Promise<string | undefined> {
     const pokemonSetId = resolveSetIdForCard(setName, number);
     if (pokemonSetId) {
       return TCGDEX_SET_ID_BY_POKEMON_TCG_ID[pokemonSetId] ?? pokemonSetId;
@@ -147,7 +152,9 @@ export class TcgDexCatalogSource implements CatalogSource {
 
     const normalizedSetName = normalizeSearchText(setName ?? "");
     if (!normalizedSetName) return undefined;
-    const sets = await this.listPhysicalSets().catch(() => []);
+    if (signal?.aborted) return undefined;
+    const payload = await this.request("/sets", {}, signal, language).catch(() => []);
+    const sets = Array.isArray(payload) ? payload as TcgDexSetBrief[] : [];
     return sets.find((set) => normalizeSearchText(readString(set.name) ?? "") === normalizedSetName)?.id as string | undefined;
   }
 
@@ -157,9 +164,11 @@ export class TcgDexCatalogSource implements CatalogSource {
     return setId ? (payload as TcgDexSetPayload) : null;
   }
 
-  private async request(path: string, params: Record<string, string> = {}): Promise<unknown> {
+  private async request(path: string, params: Record<string, string> = {}, parentSignal?: AbortSignal, language: CardRef["language"] = "EN"): Promise<unknown> {
+    const abort = createAbortScope(parentSignal, this.fetchTimeoutMs);
     try {
-      const url = new URL(`${this.baseUrl}${path}`);
+      const baseUrl = this.baseUrl === BASE_URL && language === "JP" ? "https://api.tcgdex.net/v2/ja" : this.baseUrl;
+      const url = new URL(`${baseUrl}${path}`);
       for (const [key, value] of Object.entries(params)) {
         url.searchParams.set(key, value);
       }
@@ -168,12 +177,14 @@ export class TcgDexCatalogSource implements CatalogSource {
       const cached = readCachedRequest(cacheKey);
       if (cached !== undefined) return cached;
 
-      const res = await this.fetchImpl(url, { headers: { Accept: "application/json" }, signal: timeoutSignal(this.fetchTimeoutMs) });
+      const res = await fetchReadWithRetry(this.fetchImpl, url, { headers: { Accept: "application/json" }, signal: abort.signal }, { totalDeadlineMs: this.fetchTimeoutMs });
       const value = res.ok ? await res.json() : null;
       writeCachedRequest(cacheKey, value);
       return value;
     } catch {
       return null;
+    } finally {
+      abort.cleanup();
     }
   }
 }
@@ -189,7 +200,7 @@ export function mapTcgDexSetCards(set: TcgDexSetPayload): CatalogCard[] {
     .filter((card): card is CatalogCard => Boolean(card));
 }
 
-export function mapTcgDexCard(card: unknown): CatalogCard | null {
+export function mapTcgDexCard(card: unknown, language: CardRef["language"] = "EN"): CatalogCard | null {
   const payload = card as TcgDexCardPayload | null;
   const id = readString(payload?.id);
   const name = readString(payload?.name);
@@ -201,13 +212,13 @@ export function mapTcgDexCard(card: unknown): CatalogCard | null {
 
   return {
     game: "POKEMON",
-    language: "EN",
+    language: language ?? "EN",
     name,
     setName: displaySetName(setId, setName),
     setCode: setId,
     number: displayCardNumber(setId, localId),
     rarity: readString(payload?.rarity),
-    imageUrl: assetUrl(readString(payload?.image), "card") ?? scrydexFallbackImageUrl(id),
+    imageUrl: assetUrl(readString(payload?.image), "card"),
     setLogoUrl: assetUrl(readString(payload?.set?.logo), "set"),
     setSymbolUrl: assetUrl(readString(payload?.set?.symbol), "set"),
     tcgDexId: id,
@@ -226,10 +237,6 @@ function readCachedRequest(key: string): unknown | undefined {
 
 function writeCachedRequest(key: string, value: unknown): void {
   requestCache.set(key, { value, expiresAt: Date.now() + REQUEST_CACHE_TTL_MS });
-}
-
-function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
 }
 
 function tcgDexLocalId(number: string | undefined, setId: string | undefined): string | undefined {
@@ -278,10 +285,6 @@ function displayCardNumber(setId: string, localId: string | undefined): string |
 function assetUrl(base: string | undefined, kind: "card" | "set"): string | undefined {
   if (!base) return undefined;
   return kind === "card" ? `${base}/high.webp` : `${base}.webp`;
-}
-
-function scrydexFallbackImageUrl(id: string): string | undefined {
-  return /^(?:svp|mep)-\d{1,4}$/i.test(id) ? `https://images.scrydex.com/pokemon/${id.toLowerCase()}/large` : undefined;
 }
 
 function isPhysicalPokemonSet(set: TcgDexSetPayload): boolean {

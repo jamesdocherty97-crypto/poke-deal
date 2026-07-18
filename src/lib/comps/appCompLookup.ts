@@ -9,6 +9,7 @@ import { searchChaseCards } from "../catalog/chaseCards.js";
 import { buildPromoCatalogFallback } from "../catalog/promoFallback.js";
 import { TcgDexCatalogSource } from "../catalog/tcgDex.js";
 import type { CatalogCard, CatalogSource } from "../catalog/types.js";
+import { catalogIdentityKey, mergeCatalogCards } from "../catalog/catalogIdentity.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
 import { CompService } from "./compService.js";
@@ -20,41 +21,53 @@ import { PokemonTcgMarketSource } from "./sources/pokemonTcgMarket.js";
 import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from "./sources/ebayMarketplaceInsights.js";
 import { CheckedCompsSource, type CheckedCompDb } from "./sources/checkedComps.js";
 import { addRequestedVariantHint } from "./variants.js";
+import { createAbortScope } from "../http/abortScope.js";
 
 export async function resolveCatalogCard(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<CatalogCard | null> {
-  return withOptionalTimeout(resolveCatalogCardUnbounded(card, catalogSource), options.timeoutMs, findTimeoutCatalogFallback(card));
+  const abort = createAbortScope(options.signal, options.timeoutMs ?? 0);
+  return withOptionalTimeout(
+    resolveCatalogCardUnbounded(card, catalogSource, abort.signal),
+    options.timeoutMs,
+    findTimeoutCatalogFallback(card),
+  ).finally(abort.cleanup);
 }
 
 async function resolveCatalogCardUnbounded(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource,
+  signal?: AbortSignal,
 ): Promise<CatalogCard | null> {
-  if (card.tcgApiId) {
-    const directById = await catalogSource.resolve(card).catch(() => null);
+  const pokemonTcgSupportsRequest = !(card.language === "JP" && catalogSource.name === "pokemon-tcg-api");
+  if (card.tcgApiId && pokemonTcgSupportsRequest) {
+    const directById = await catalogSource.resolve(card, { signal }).catch(() => null);
     if (directById) return directById;
   }
 
   const cached = catalogSource.name === "pokemon-tcg-api"
     ? await findCachedCatalogMatch(card).catch(() => null)
     : null;
-  if (cached) return refreshCachedCatalogPriceSignals(cached, card, catalogSource);
+  if (cached) return refreshCachedCatalogPriceSignals(cached, card, catalogSource, signal);
 
-  const direct = await catalogSource.resolve(card).catch(() => null);
+  const direct = pokemonTcgSupportsRequest
+    ? await catalogSource.resolve(card, { signal }).catch(() => null)
+    : null;
   if (direct && catalogCardMatchesLookupContext(direct, card)) return direct;
 
-  const searched = await catalogSource.search(card, 5).catch(() => []);
+  const searched = pokemonTcgSupportsRequest
+    ? await catalogSource.search(card, 5, { signal }).catch(() => [])
+    : [];
   const best = searched.find((candidate) => catalogCardMatchesLookupContext(candidate, card)) ?? null;
   const tcgDexFallback = best || catalogSource.name !== "pokemon-tcg-api"
     ? null
-    : await new TcgDexCatalogSource().resolve(card).catch(() => null);
+    : await new TcgDexCatalogSource().resolve(card, { signal }).catch(() => null);
   const fallback = best ?? tcgDexFallback ?? findChaseCatalogMatch(card) ?? buildPromoCatalogFallback(card);
   if (!fallback?.tcgApiId) return fallback;
 
-  return catalogSource.resolve({ ...card, tcgApiId: fallback.tcgApiId })
+  return catalogSource.resolve({ ...card, tcgApiId: fallback.tcgApiId }, { signal })
     .then((resolved) => (resolved && catalogCardMatchesLookupContext(resolved, card) ? resolved : fallback))
     .catch(() => fallback);
 }
@@ -77,9 +90,10 @@ export async function refreshCachedCatalogPriceSignals(
   cached: CatalogCard,
   card: CardRef,
   catalogSource: CatalogSource,
+  signal?: AbortSignal,
 ): Promise<CatalogCard> {
   if ((cached.priceSignals?.length ?? 0) > 0 || !cached.tcgApiId) return cached;
-  const refreshed = await catalogSource.resolve({ ...card, tcgApiId: cached.tcgApiId }).catch(() => null);
+  const refreshed = await catalogSource.resolve({ ...card, tcgApiId: cached.tcgApiId }, { signal }).catch(() => null);
   return refreshed ?? cached;
 }
 
@@ -87,7 +101,7 @@ export async function findCatalogAlternatives(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
   limit = 4,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<CatalogCard[]> {
   const safeLimit = Math.max(1, Math.min(8, Math.round(limit)));
   const normalized = normalizeCatalogCardSearchInput(card.name, card.setName);
@@ -98,11 +112,12 @@ export async function findCatalogAlternatives(
   const cachedCardsPromise = catalogSource.name === "pokemon-tcg-api"
     ? findCachedCatalogCandidates(card, Math.max(safeLimit * 4, 24)).catch(() => [])
     : Promise.resolve<CatalogCard[]>([]);
-  const liveSearch = catalogSource.search(card, Math.max(safeLimit * 2, 8)).catch(() => []);
+  const abort = createAbortScope(options.signal, options.timeoutMs ?? 0);
+  const liveSearch = catalogSource.search(card, Math.max(safeLimit * 2, 8), { signal: abort.signal }).catch(() => []);
   const [cachedCards, liveCards] = await Promise.all([
     withOptionalTimeout(cachedCardsPromise, cachedLookupTimeoutMs(options.timeoutMs), []),
     withOptionalTimeout(liveSearch, options.timeoutMs, []),
-  ]);
+  ]).finally(abort.cleanup);
   const ranked = rankCatalogCards(query, [...cachedCards, ...liveCards, ...chaseCards], {
     setName: card.setName ?? normalized.setName,
     limit: Math.max(safeLimit * 3, 12),
@@ -125,7 +140,7 @@ export async function findAmbiguousCatalogCandidates(
   card: CardRef,
   catalogSource: PokemonTcgApiCatalogSource = new PokemonTcgApiCatalogSource(),
   limit = 8,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<CatalogCard[]> {
   if (card.tcgApiId || requestHasExplicitCardNumber(card)) return [];
   const safeLimit = Math.max(2, Math.min(12, Math.round(limit)));
@@ -137,11 +152,12 @@ export async function findAmbiguousCatalogCandidates(
   const cachedCardsPromise = catalogSource.name === "pokemon-tcg-api"
     ? findCachedCatalogCandidates(card, Math.max(safeLimit * 4, 24)).catch(() => [])
     : Promise.resolve<CatalogCard[]>([]);
-  const liveSearch = catalogSource.search(card, Math.max(safeLimit * 2, 12)).catch(() => []);
+  const abort = createAbortScope(options.signal, options.timeoutMs ?? 0);
+  const liveSearch = catalogSource.search(card, Math.max(safeLimit * 2, 12), { signal: abort.signal }).catch(() => []);
   const [cachedCards, liveCards] = await Promise.all([
     withOptionalTimeout(cachedCardsPromise, cachedLookupTimeoutMs(options.timeoutMs), []),
     withOptionalTimeout(liveSearch, options.timeoutMs, []),
-  ]);
+  ]).finally(abort.cleanup);
   const ranked = rankCatalogCards(query, [...cachedCards, ...liveCards, ...chaseCards], {
     setName: card.setName ?? normalized.setName,
     limit: Math.max(safeLimit * 3, 16),
@@ -221,10 +237,18 @@ export function resolveBareSetAmbiguity(
   };
 }
 
-function withOptionalTimeout<T>(promise: Promise<T>, timeoutMs: number | undefined, fallback: T): Promise<T> {
+function withOptionalTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number | undefined,
+  fallback: T,
+  onTimeout?: () => void,
+): Promise<T> {
   if (!Number.isFinite(timeoutMs) || !timeoutMs || timeoutMs <= 0) return promise;
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(fallback), timeoutMs);
+    const timer = setTimeout(() => {
+      onTimeout?.();
+      resolve(fallback);
+    }, timeoutMs);
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -246,14 +270,17 @@ export function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardR
     number: catalog.number ?? fallback.number,
     tcgApiId: catalog.tcgApiId,
     tcgDexId: catalog.tcgDexId,
+    cardmarketId: catalog.cardmarketId,
+    edition: catalog.edition ?? fallback.edition,
+    finish: catalog.finish ?? fallback.finish,
     game: catalog.game,
     language: catalog.language,
   };
 }
 
 export function createAppCompService(
-  catalogSource: CatalogSource,
-  catalog: CatalogCard | null,
+  catalogSource: CatalogSource = new PokemonTcgApiCatalogSource(),
+  catalog: CatalogCard | null = null,
 ): CompService {
   return new CompService(
     [
@@ -279,28 +306,8 @@ export function fixedCatalogSource(live: boolean, catalog: CatalogCard): Catalog
   };
 }
 
-function catalogIdentityKey(card: CatalogCard): string {
-  return (
-    card.tcgApiId ??
-    card.tcgDexId ??
-    [
-      card.name.trim().toLowerCase(),
-      card.setName.trim().toLowerCase(),
-      (card.number ?? "").trim().toLowerCase(),
-    ].join("|")
-  );
-}
-
 function dedupeCatalogCards(cards: CatalogCard[]): CatalogCard[] {
-  const seen = new Set<string>();
-  const deduped: CatalogCard[] = [];
-  for (const card of cards) {
-    const key = catalogIdentityKey(card);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(card);
-  }
-  return deduped;
+  return mergeCatalogCards(cards);
 }
 
 async function findCachedCatalogMatch(card: CardRef): Promise<CatalogCard | null> {
@@ -317,7 +324,9 @@ async function findCachedCatalogCandidates(card: CardRef, limit: number): Promis
   const rows = await getPrisma().card.findMany({
     where: {
       game: "POKEMON",
-      language: "EN",
+      language: card.language ?? "EN",
+      ...(card.edition ? { edition: card.edition } : {}),
+      ...(card.finish ? { finish: card.finish } : {}),
       OR: [
         { name: { contains: normalized.name || card.name, mode: "insensitive" } },
         ...(normalized.number ?? card.number
@@ -346,6 +355,14 @@ async function findCachedCatalogCandidates(card: CardRef, limit: number): Promis
       displayImageUrl: row.displayImageUrl ?? undefined,
       tcgApiId: row.tcgApiId ?? undefined,
       tcgDexId: row.tcgDexId ?? undefined,
+      cardmarketId: row.cardmarketId ?? undefined,
+      edition: row.edition as CardRef["edition"],
+      finish: row.finish as CardRef["finish"],
+      provenance: {
+        origin: "cache",
+        providers: [row.tcgApiId ? "pokemon-tcg-api" : null, row.tcgDexId ? "tcgdex" : null].filter((value): value is string => Boolean(value)),
+        cachedAt: row.updatedAt.toISOString(),
+      },
     })),
     { setName: normalized.setName ?? card.setName, limit },
   );

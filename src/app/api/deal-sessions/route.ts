@@ -19,6 +19,10 @@ const lineSchema = z.object({
     number: z.string().min(1).optional(),
     tcgApiId: z.string().min(1).optional(),
     tcgDexId: z.string().min(1).optional(),
+    cardmarketId: z.string().min(1).optional(),
+    language: z.enum(["EN", "JP"]).default("EN"),
+    edition: z.enum(["UNLIMITED", "FIRST_EDITION", "SHADOWLESS", "STAFF", "PRERELEASE"]).optional(),
+    finish: z.enum(["NORMAL", "HOLO", "REVERSE_HOLO"]).optional(),
     imageUrl: z.string().url().optional(),
   }),
   grade: gradeSchema.default("RAW"),
@@ -93,6 +97,10 @@ export async function POST(request: Request) {
           number: data.line.card.number,
           tcgApiId: data.line.card.tcgApiId,
           tcgDexId: data.line.card.tcgDexId,
+          cardmarketId: data.line.card.cardmarketId,
+          language: data.line.card.language,
+          edition: data.line.card.edition,
+          finish: data.line.card.finish,
           imageUrl: data.line.card.imageUrl,
           grade: data.line.grade,
           headlinePence: data.line.headlinePence,
@@ -180,16 +188,31 @@ async function resolveCardId(card: z.infer<typeof lineSchema>["card"]): Promise<
         imageUrl: card.imageUrl,
         tcgApiId: card.tcgApiId,
         tcgDexId: card.tcgDexId,
+        cardmarketId: card.cardmarketId,
+        language: card.language,
+        edition: card.edition,
+        finish: card.finish,
       },
       select: { id: true },
     });
     return created.id;
+  }
+  if (card.tcgDexId) {
+    const existing = await prisma.card.findUnique({ where: { tcgDexId: card.tcgDexId }, select: { id: true } });
+    if (existing) return existing.id;
+  }
+  if (card.cardmarketId) {
+    const existing = await prisma.card.findFirst({ where: { cardmarketId: card.cardmarketId }, select: { id: true } });
+    if (existing) return existing.id;
   }
   const existing = await prisma.card.findFirst({
     where: {
       name: card.name,
       setName: card.setName ?? "Unknown",
       number: card.number ?? null,
+      language: card.language,
+      edition: card.edition ?? null,
+      finish: card.finish ?? null,
     },
     select: { id: true },
   });
@@ -202,6 +225,10 @@ async function resolveCardId(card: z.infer<typeof lineSchema>["card"]): Promise<
       number: card.number,
       imageUrl: card.imageUrl,
       tcgDexId: card.tcgDexId,
+      cardmarketId: card.cardmarketId,
+      language: card.language,
+      edition: card.edition,
+      finish: card.finish,
     },
     select: { id: true },
   });
@@ -260,13 +287,32 @@ async function resolveCardIdForTransaction(tx: Prisma.TransactionClient, line: {
   imageUrl: string | null;
   tcgApiId: string | null;
   tcgDexId: string | null;
+  cardmarketId: string | null;
+  language: "EN" | "JP";
+  edition: string | null;
+  finish: string | null;
 }) {
   if (line.tcgApiId) {
     const existing = await tx.card.findUnique({ where: { tcgApiId: line.tcgApiId }, select: { id: true } });
     if (existing) return existing.id;
   }
+  if (line.tcgDexId) {
+    const existing = await tx.card.findUnique({ where: { tcgDexId: line.tcgDexId }, select: { id: true } });
+    if (existing) return existing.id;
+  }
+  if (line.cardmarketId) {
+    const existing = await tx.card.findFirst({ where: { cardmarketId: line.cardmarketId }, select: { id: true } });
+    if (existing) return existing.id;
+  }
   const existing = await tx.card.findFirst({
-    where: { name: line.name, setName: line.setName ?? "Unknown", number: line.number },
+    where: {
+      name: line.name,
+      setName: line.setName ?? "Unknown",
+      number: line.number,
+      language: line.language,
+      edition: line.edition,
+      finish: line.finish,
+    },
     select: { id: true },
   });
   if (existing) return existing.id;
@@ -279,6 +325,10 @@ async function resolveCardIdForTransaction(tx: Prisma.TransactionClient, line: {
       imageUrl: line.imageUrl ?? undefined,
       tcgApiId: line.tcgApiId ?? undefined,
       tcgDexId: line.tcgDexId ?? undefined,
+      cardmarketId: line.cardmarketId ?? undefined,
+      language: line.language,
+      edition: line.edition ?? undefined,
+      finish: line.finish ?? undefined,
     },
     select: { id: true },
   });

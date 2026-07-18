@@ -35,6 +35,10 @@ test("catalog art wins and remains listing-safe", () => {
     imageUrl: "https://images.pokemontcg.io/me4/69_hires.png",
     source: "catalog",
     listingSafe: true,
+    candidates: [
+      { imageUrl: "https://images.pokemontcg.io/me4/69_hires.png", source: "catalog", listingSafe: true },
+      { imageUrl: "https://cdn.poketrace.com/cards/tauros.webp", source: "cached-display", listingSafe: false },
+    ],
   });
 });
 
@@ -47,6 +51,7 @@ test("no catalog image falls back to PokeTrace provider art for display only", (
     imageUrl: "https://cdn.poketrace.com/cards/tauros.webp",
     source: "poketrace",
     listingSafe: false,
+    candidates: [{ imageUrl: "https://cdn.poketrace.com/cards/tauros.webp", source: "poketrace", listingSafe: false }],
   });
 });
 
@@ -63,7 +68,7 @@ test("no catalog or PokeTrace image falls back to Price Tracker provider art for
 test("no image anywhere returns a placeholder instruction rather than a broken URL", () => {
   const image = resolveCompCardImage({ all: [comp("poketrace", { providerCard: { name: "Tauros" } })] });
 
-  assert.deepEqual(image, { imageUrl: null, source: "none", listingSafe: false });
+  assert.deepEqual(image, { imageUrl: null, source: "none", listingSafe: false, candidates: [] });
 });
 
 test("providerImageFromCompResult ignores non-http and malformed values", () => {

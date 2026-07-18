@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
+import { isManagedInventoryPhotoBlobUrl } from "@/lib/photos/uploadPolicy";
+import { del } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,7 +72,14 @@ export async function DELETE(
 ) {
   const params = await props.params;
   try {
-    await getPrisma().$transaction(async (tx) => {
+    const prisma = getPrisma();
+    const photos = await prisma.cardPhoto.findMany({
+      where: { inventoryItemId: params.id },
+      select: { url: true },
+    });
+    const managedBlobUrls = [...new Set(photos.map((photo) => photo.url).filter(isManagedInventoryPhotoBlobUrl))];
+    if (managedBlobUrls.length > 0) await del(managedBlobUrls);
+    await prisma.$transaction(async (tx) => {
       await tx.sale.deleteMany({ where: { itemId: params.id } });
       await tx.listing.deleteMany({ where: { itemId: params.id } });
       await tx.inventoryItem.delete({ where: { id: params.id } });

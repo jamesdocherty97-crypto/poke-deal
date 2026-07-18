@@ -5,6 +5,7 @@ import { cardSearchQuery, ebaySoldSearchQuery } from "../dealer/compLinks.js";
 import { EBAY_UK_CATEGORY_POKEMON, getEbayConfig } from "./config.js";
 import { ebayJson } from "./client.js";
 import { getApplicationAccessToken } from "./tokens.js";
+import { detectCardPrintIdentity } from "../comps/variants.js";
 
 export interface EbayAskListing {
   itemId: string;
@@ -31,6 +32,8 @@ export interface EbayAskEvidence {
   cached?: boolean;
   skipped?: boolean;
   reason?: string;
+  filteredCount?: number;
+  rejectionCounts?: Record<string, number>;
 }
 
 interface BrowseSearchResponse {
@@ -48,6 +51,9 @@ interface BrowseItemSummary {
   buyingOptions?: string[];
   condition?: string;
   seller?: { username?: string };
+  categories?: Array<{ categoryId?: string; categoryName?: string }>;
+  leafCategoryIds?: string[];
+  localizedAspects?: Array<{ name?: string; value?: string }>;
 }
 
 interface MoneyValue {
@@ -155,7 +161,8 @@ export async function fetchEbayAskEvidence(
       );
       const rates = options.rates ?? await getRates();
       if (controller.signal.aborted) return baseEvidence({ skipped: true, reason: "eBay Browse ask lookup cancelled" });
-      const listings = mapBrowseAskListings(response, card, grade, rates)
+      const diagnostics = mapBrowseAskListingsWithDiagnostics(response, card, grade, rates);
+      const listings = diagnostics.listings
         .sort((a, b) => a.totalPence - b.totalPence)
         .slice(0, ASK_DISPLAY_LIMIT);
       const lowestPence = listings[0]?.totalPence ?? null;
@@ -164,6 +171,8 @@ export async function fetchEbayAskEvidence(
         listings,
         lowestPence,
         undercutPence: lowestPence == null ? null : undercutAskPence(lowestPence),
+        filteredCount: diagnostics.filteredCount,
+        rejectionCounts: diagnostics.rejectionCounts,
       });
       askCache.set(cacheKey, { evidence, expiresAt: now.getTime() + ASK_CACHE_MS });
       return evidence;
@@ -209,31 +218,60 @@ export function mapBrowseAskListings(
   grade: Grade,
   rates = { asOf: "2026-07-03", perGbp: { GBP: 1, EUR: 1, USD: 1, JPY: 1 } } as FxRates,
 ): EbayAskListing[] {
-  return (response.itemSummaries ?? [])
+  return mapBrowseAskListingsWithDiagnostics(response, card, grade, rates).listings;
+}
+
+export function mapBrowseAskListingsWithDiagnostics(
+  response: BrowseSearchResponse,
+  card: CardRef,
+  grade: Grade,
+  rates = { asOf: "2026-07-03", perGbp: { GBP: 1, EUR: 1, USD: 1, JPY: 1 } } as FxRates,
+): { listings: EbayAskListing[]; filteredCount: number; rejectionCounts: Record<string, number> } {
+  const mapped = (response.itemSummaries ?? [])
     .map((item) => mapBrowseAskListing(item, rates))
-    .filter((item): item is EbayAskListing => item != null)
-    .filter((item) => titleMatchesAskContext(item.title, card, grade));
+    .filter((item): item is EbayAskListing => item != null);
+  const rejectionCounts: Record<string, number> = {};
+  const listings = mapped.filter((item) => {
+    const reason = askTitleRejectionReason(item.title, card, grade);
+    if (!reason) return true;
+    rejectionCounts[reason] = (rejectionCounts[reason] ?? 0) + 1;
+    return false;
+  });
+  return { listings, filteredCount: mapped.length - listings.length, rejectionCounts };
 }
 
 export function titleMatchesAskContext(title: string, card: CardRef, grade: Grade): boolean {
+  return askTitleRejectionReason(title, card, grade) == null;
+}
+
+export function askTitleRejectionReason(title: string, card: CardRef, grade: Grade): string | null {
   const normalizedTitle = normalizeSearchTitle(title);
-  if (!normalizedTitle) return false;
+  if (!normalizedTitle) return "empty-title";
 
   const nameTokens = meaningfulTokens(card.name);
-  if (nameTokens.length > 0 && !nameTokens.every((token) => normalizedTitle.includes(token))) return false;
+  if (nameTokens.length > 0 && !nameTokens.every((token) => normalizedTitle.includes(token))) return "wrong-name";
 
-  if (card.number && !titleMentionsCollectorNumber(title, normalizedTitle, card.number)) return false;
+  if (card.number && !titleMentionsCollectorNumber(title, normalizedTitle, card.number)) return "wrong-number";
 
   const isDamaged = /\b(?:damaged|damage|dmg|poor|crease|creased|heavily played|hp)\b/.test(normalizedTitle);
-  if (isDamaged) return false;
-  if (/\b(?:proxy|custom|metal|jumbo|oversized|digital|binder|insert|display|sticker|poster|canvas|artwork|fan\s*art|extended\s*art|chance\s*pack|mystery|repack)\b/.test(normalizedTitle)) return false;
+  if (isDamaged) return "damaged";
+  if (/\b(?:proxy|custom|metal|jumbo|oversized|digital|binder|insert|display|sticker|magnet|poster|canvas|artwork|fan\s*art|extended\s*art|chance\s*pack|mystery|repack)\b/.test(normalizedTitle)) return "non-card";
+  if (/\b(?:reproduction|repro|orica|facsimile|fake)\b/.test(normalizedTitle)) return "reproduction";
+  if (/\b(?:lot\s+of|bundle|playset|complete\s+set|[2-9]\s*x|x\s*[2-9])\b/.test(normalizedTitle)) return "lot-or-bundle";
+  if (/\b(?:empty|wrapper|booster\s*(?:box|pack)|sealed\s+pack|theme\s+deck|tin\s+only)\b/.test(normalizedTitle)) return "sealed-or-empty-product";
+  if (/\b(?:japanese|spanish|french|german|italian|portuguese|korean|chinese|dutch|indonesian|thai)\b/.test(normalizedTitle)) return "wrong-language";
+
+  const requestedPrint = { ...detectCardPrintIdentity(card), edition: card.edition ?? detectCardPrintIdentity(card).edition, finish: card.finish ?? detectCardPrintIdentity(card).finish };
+  const titlePrint = detectCardPrintIdentity({ name: title });
+  if (requestedPrint.edition && titlePrint.edition !== requestedPrint.edition) return "wrong-edition";
+  if (requestedPrint.finish && titlePrint.finish && titlePrint.finish !== requestedPrint.finish) return "wrong-finish";
 
   if (grade === "RAW") {
-    return !/\b(?:psa|bgs|cgc|ace|sgc)\s*(?:10|9(?:\.5)?|[1-8](?:\.5)?)\b/.test(normalizedTitle) &&
-      !/\bgraded\b/.test(normalizedTitle);
+    return /\b(?:psa|bgs|cgc|ace|sgc)\s*(?:10|9(?:\.5)?|[1-8](?:\.5)?)\b/.test(normalizedTitle) || /\bgraded\b/.test(normalizedTitle)
+      ? "graded-for-raw" : null;
   }
 
-  return titleMentionsGrade(normalizedTitle, grade);
+  return titleMentionsGrade(normalizedTitle, grade) ? null : "wrong-grade";
 }
 
 export function undercutAskPence(lowestPence: number): number {

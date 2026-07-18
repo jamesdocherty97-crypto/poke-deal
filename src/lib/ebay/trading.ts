@@ -4,6 +4,7 @@ import type { EbayConfig } from "./config.js";
 import { EBAY_UK_CATEGORY_POKEMON } from "./config.js";
 import { buildInventoryItemPayload } from "./inventoryItem.js";
 import type { EbayPolicies } from "./policies.js";
+import { boundedEbayFetch } from "./client.js";
 
 export interface TradingListingInput {
   listingId: string;
@@ -71,8 +72,11 @@ export function buildTradingFixedPriceItemXml(input: TradingListingInput): strin
   const imageUrls = input.imageUrls.map((url) => url.trim()).filter(Boolean).slice(0, 12);
   const quantity = Math.max(1, input.quantity);
   const conditionId = inventoryItem.condition === "LIKE_NEW" ? "2750" : "4000";
-  const location = input.location?.trim() || "Glasgow";
-  const postalCode = input.postalCode?.trim() || "G14 9QL";
+  const location = input.location?.trim();
+  const postalCode = input.postalCode?.trim();
+  if (!location || !postalCode) {
+    throw new Error("eBay Trading publish requires the configured seller city and postal code");
+  }
 
   return [
     '<?xml version="1.0" encoding="utf-8"?>',
@@ -137,7 +141,7 @@ async function callTradingApi(
   xmlBody: string,
   fetchImpl: typeof fetch,
 ): Promise<TradingApiResult> {
-  const response = await fetchImpl(tradingEndpoint(config), {
+  const response = await boundedEbayFetch(fetchImpl, tradingEndpoint(config), {
     method: "POST",
     headers: {
       "Content-Type": "text/xml",

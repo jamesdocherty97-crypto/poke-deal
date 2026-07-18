@@ -34,8 +34,12 @@ export interface PsaCertResult {
   isDualCert?: boolean;
   /** Reason when found === false (missing token, invalid cert, no data, network error). */
   reason?: string;
-  /** Whether this came from the live API (true) or bundled fixture (false). */
+  /** Whether this came from the live API. False is never actionable provider proof. */
   live: boolean;
+  /** True when reused from the bounded cert cache rather than fetched in this request. */
+  cached?: boolean;
+  checkedAt?: string;
+  cacheAgeMinutes?: number;
   /** Original payload, retained for debugging. Never relied on downstream. */
   raw?: unknown;
 }

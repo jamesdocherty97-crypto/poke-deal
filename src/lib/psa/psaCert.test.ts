@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { PsaCertLookup, mapPsaCertResponse } from "./psaCert.js";
+import { PsaCertLookup, mapPsaCertResponse, resetPsaCertCacheForTests } from "./psaCert.js";
 import {
   buildPsaCompSearchParams,
   buildPsaLookupFields,
@@ -200,13 +200,14 @@ test("mapPsaCertResponse handles invalid and empty responses", () => {
   assert.match(empty.reason ?? "", /No data/);
 });
 
-test("offline mode returns a demoable fixture cert", async () => {
+test("missing-token mode never substitutes a fixture cert", async () => {
   const offline = new PsaCertLookup(undefined);
   assert.equal(offline.live, false);
   const r = await offline.lookup("79721014");
-  assert.equal(r.found, true);
-  assert.equal(r.grade, "PSA_10");
+  assert.equal(r.found, false);
+  assert.equal(r.grade, null);
   assert.equal(r.live, false);
+  assert.match(r.reason ?? "", /token missing/i);
 });
 
 test("non-numeric cert input is rejected before any network call", async () => {
@@ -233,6 +234,66 @@ test("live mode sends bearer token and maps the response", async () => {
   assert.equal(r.found, true);
   assert.equal(r.subject, "UMBREON VMAX");
   assert.equal(r.live, true);
+});
+
+test("successful registry reads are cached and labelled cached rather than live", async () => {
+  resetPsaCertCacheForTests();
+  let calls = 0;
+  const fetchImpl = (async () => {
+    calls += 1;
+    return Response.json(fixture);
+  }) as typeof fetch;
+  const lookup = new PsaCertLookup("secret-token", fetchImpl, 50);
+
+  const live = await lookup.lookup("79721014");
+  const cached = await lookup.lookup("79721014");
+
+  assert.equal(calls, 1);
+  assert.equal(live.live, true);
+  assert.equal(cached.live, false);
+  assert.equal(cached.cached, true);
+  assert.equal(cached.cacheAgeMinutes, 0);
+  assert.ok(cached.checkedAt);
+});
+
+test("authorization failures are not cached", async () => {
+  resetPsaCertCacheForTests();
+  let calls = 0;
+  const lookup = new PsaCertLookup("secret-token", (async () => {
+    calls += 1;
+    return new Response("forbidden", { status: 403 });
+  }) as typeof fetch, 50);
+
+  await lookup.lookup("11223344");
+  await lookup.lookup("11223344");
+  assert.equal(calls, 2);
+});
+
+test("Cloudflare access blocks are distinguished from rejected PSA credentials", async () => {
+  const lookup = new PsaCertLookup("secret-token", (async () =>
+    new Response("<html>blocked</html>", {
+      status: 403,
+      headers: { "content-type": "text/html; charset=UTF-8", server: "cloudflare", "cf-ray": "test" },
+    })) as typeof fetch, 50);
+
+  const result = await lookup.lookup("22334455");
+  assert.equal(result.found, false);
+  assert.match(result.reason ?? "", /blocked this network.*before token validation/i);
+});
+
+test("PSA rate limits remain explicit and are not cached", async () => {
+  resetPsaCertCacheForTests();
+  let calls = 0;
+  const lookup = new PsaCertLookup("secret-token", (async () => {
+    calls += 1;
+    return new Response("", { status: 429, headers: { "retry-after": "0" } });
+  }) as typeof fetch, 50);
+
+  const first = await lookup.lookup("33445566");
+  const second = await lookup.lookup("33445566");
+  assert.match(first.reason ?? "", /rate limited.*retry after 0/i);
+  assert.match(second.reason ?? "", /rate limited/i);
+  assert.equal(calls, 2, "a zero Retry-After returns immediately and no failure is cached");
 });
 
 test("live mode degrades gracefully on network/HTTP errors", async () => {

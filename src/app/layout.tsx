@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   title: "Poke Deal",
   description: "Value, stock, price, list, sell.",
   manifest: "/manifest.webmanifest",
+  robots: {
+    index: false,
+    follow: false,
+    noarchive: true,
+    nocache: true,
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -53,12 +59,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preload" as="image" href="/visual/empty/stock.webp" type="image/webp" fetchPriority="high" />
-        <link rel="preload" as="image" href="/visual/celebration/pikachu.webp" type="image/webp" fetchPriority="high" />
-        <link rel="preload" as="image" href="/visual/empty/session.webp" type="image/webp" fetchPriority="high" />
-      </head>
-      <body>{children}</body>
+      <body>
+        <a className="skip-link" href="#main-content">Skip to main content</a>
+        {children}
+      </body>
     </html>
   );
 }

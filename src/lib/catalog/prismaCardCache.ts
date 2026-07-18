@@ -14,6 +14,9 @@ export type PrismaCard = {
   displayImageUrl: string | null;
   tcgApiId: string | null;
   tcgDexId?: string | null;
+  cardmarketId?: string | null;
+  edition?: string | null;
+  finish?: string | null;
 };
 
 export type PrismaCardData = {
@@ -28,12 +31,15 @@ export type PrismaCardData = {
   displayImageUrl?: string;
   tcgApiId?: string;
   tcgDexId?: string;
+  cardmarketId?: string;
+  edition?: string;
+  finish?: string;
 };
 
 export type PrismaCardDb = {
   card: {
     findUnique(args: any): Promise<PrismaCard | null>;
-    findFirst(args: { where: Partial<PrismaCardData> }): Promise<PrismaCard | null>;
+    findFirst(args: { where: Record<string, unknown> }): Promise<PrismaCard | null>;
     create(args: { data: PrismaCardData }): Promise<PrismaCard>;
     upsert(args: any): Promise<PrismaCard>;
   };
@@ -90,6 +96,10 @@ export class PrismaCardCache {
       const existing = await this.db.card.findUnique({ where: { tcgDexId: data.tcgDexId } });
       if (existing) return existing;
     }
+    if (data.cardmarketId) {
+      const existing = await this.db.card.findFirst({ where: { cardmarketId: data.cardmarketId } });
+      if (existing) return existing;
+    }
 
     return this.db.card.findFirst({ where: cardLookupWhere(data) });
   }
@@ -114,6 +124,9 @@ export function toCardRef(card: PrismaCard): CardRef {
     number: card.number ?? undefined,
     tcgApiId: card.tcgApiId ?? undefined,
     tcgDexId: card.tcgDexId ?? undefined,
+    cardmarketId: card.cardmarketId ?? undefined,
+    edition: card.edition as CardRef["edition"],
+    finish: card.finish as CardRef["finish"],
   };
 }
 
@@ -134,24 +147,25 @@ export function toCardData(card: CardRef | CatalogCard): PrismaCardData {
     displayImageUrl: cleanOptional("displayImageUrl" in card ? card.displayImageUrl : undefined),
     tcgApiId: cleanOptional(card.tcgApiId),
     tcgDexId: cleanOptional("tcgDexId" in card ? card.tcgDexId : undefined),
+    cardmarketId: cleanOptional("cardmarketId" in card ? card.cardmarketId : undefined),
+    edition: cleanOptional("edition" in card ? card.edition : undefined),
+    finish: cleanOptional("finish" in card ? card.finish : undefined),
   };
 }
 
-function cardLookupWhere(data: PrismaCardData): Partial<PrismaCardData> {
-  return dropUndefined({
+function cardLookupWhere(data: PrismaCardData): Record<string, unknown> {
+  return {
     game: data.game,
     language: data.language,
     name: data.name,
     setName: data.setName,
-    number: data.number,
-  });
+    number: data.number ?? null,
+    edition: data.edition ?? null,
+    finish: data.finish ?? null,
+  };
 }
 
 function cleanOptional(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
-}
-
-function dropUndefined<T extends Record<string, unknown>>(data: T): Partial<T> {
-  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as Partial<T>;
 }

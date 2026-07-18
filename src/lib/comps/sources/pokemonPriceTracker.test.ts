@@ -11,6 +11,7 @@ import {
   normalizeProviderCollectorNumber,
   PokemonPriceTrackerSource,
   providerPayloadMatchesRequest,
+  resetPokemonPriceTrackerCacheForTests,
 } from "./pokemonPriceTracker.js";
 import type { CardRef } from "../../domain/types.js";
 
@@ -152,6 +153,25 @@ test("PokemonPriceTrackerSource live requests use provider-style prefixed number
   assert.equal(requestedUrl.searchParams.get("limit"), "1");
 });
 
+test("Price Tracker cache provenance never presents a cached comp as live", async () => {
+  resetPokemonPriceTrackerCacheForTests();
+  let calls = 0;
+  const fetchImpl = (async () => {
+    calls += 1;
+    return Response.json(fixture);
+  }) as typeof fetch;
+  const source = new PokemonPriceTrackerSource("secret", fetchImpl, 50);
+
+  const live = await source.lookup(card, { grade: "RAW", windowDays: 89 });
+  const cached = await source.lookup(card, { grade: "RAW", windowDays: 89 });
+
+  assert.equal(calls, 1);
+  assert.equal((live.raw as { cache: { state: string } }).cache.state, "live");
+  assert.equal((cached.raw as { cache: { state: string; ageMinutes: number } }).cache.state, "cached");
+  assert.equal((cached.raw as { cache: { ageMinutes: number } }).cache.ageMinutes, 0);
+  resetPokemonPriceTrackerCacheForTests();
+});
+
 test("providerPayloadMatchesRequest validates fallback provider cards", () => {
   const celebrationReprint = {
     data: [
@@ -201,6 +221,13 @@ test("providerPayloadMatchesRequest validates fallback provider cards", () => {
 
   assert.equal(
     providerPayloadMatchesRequest(celebrationReprint, { name: "Charizard", setName: "Base", number: "4/102" }),
+    false,
+  );
+  assert.equal(
+    providerPayloadMatchesRequest(
+      { data: [{ name: "Charizard", setName: "Base Set 2", cardNumber: "004/130" }] },
+      { name: "Charizard", setName: "Base", number: "4/102" },
+    ),
     false,
   );
   assert.equal(
@@ -286,6 +313,17 @@ test("providerPayloadMatchesRequest validates fallback provider cards", () => {
     ),
     true,
   );
+});
+
+test("PokemonPriceTrackerSource never turns fixtures into prices when the key is missing", async () => {
+  const comp = await new PokemonPriceTrackerSource(undefined).lookup(
+    { name: "Any requested card", setName: "Any set", number: "1/1" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.medianPence, 0);
+  assert.match(JSON.stringify(comp.raw), /key missing/i);
 });
 
 test("providerPayloadMatchesRequest accepts ME-era zero-padded PPT identity", () => {

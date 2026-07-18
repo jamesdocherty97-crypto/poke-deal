@@ -1,6 +1,7 @@
 // Lightweight password gate for when the app is deployed publicly (e.g. Vercel).
-// Disabled locally: if APP_PASSWORD is unset, every request passes through, so
-// local dev and tests are unaffected. Set APP_PASSWORD in your Vercel env to turn it on.
+// Disabled for local development and Vercel previews when APP_PASSWORD is unset.
+// Production fails closed when the variable is missing so a deployment cannot
+// silently expose inventory, sales, costs, and provider configuration.
 //
 // Uses HTTP Basic auth — the browser shows a native login prompt and remembers it,
 // which works fine inside an iOS "Add to Home Screen" PWA. Single operator, so any
@@ -9,14 +10,34 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isAuthorizedCronRequest } from "./lib/automation/cronAuth";
+import { isEbayAccountDeletionCallbackPath } from "./lib/ebay/callbackPath";
+import { allowsPublicAppAccess, requiresAppPassword } from "./lib/auth/appAccess";
 
 export function middleware(req: NextRequest) {
-  const password = process.env.APP_PASSWORD;
-  if (!password) return NextResponse.next(); // gate disabled
+  // eBay must reach this provider callback without the operator's Basic auth.
+  // The route performs its own challenge/signature validation.
+  if (isEbayAccountDeletionCallbackPath(req.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
 
   const header = req.headers.get("authorization");
   if (req.nextUrl.pathname.startsWith("/api/cron/") && isAuthorizedCronRequest(header)) {
     return NextResponse.next();
+  }
+
+  // Explicit testing mode. Production remains fail-closed unless this opt-in is set.
+  if (allowsPublicAppAccess()) return NextResponse.next();
+
+  const password = process.env.APP_PASSWORD?.trim();
+  if (!password) {
+    if (!requiresAppPassword()) return NextResponse.next();
+    return new NextResponse("Poke Deal production access is not configured.", {
+      status: 503,
+      headers: {
+        "Content-Type": "text/plain; charset=UTF-8",
+        "Cache-Control": "no-store",
+      },
+    });
   }
 
   if (header?.startsWith("Basic ")) {
@@ -33,6 +54,7 @@ export function middleware(req: NextRequest) {
     status: 401,
     headers: {
       "Content-Type": "text/html; charset=UTF-8",
+      "Cache-Control": "no-store",
       "WWW-Authenticate": 'Basic realm="Poke Deal", charset="UTF-8"',
     },
   });

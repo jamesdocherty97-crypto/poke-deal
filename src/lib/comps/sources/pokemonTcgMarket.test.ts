@@ -326,6 +326,40 @@ test("PokemonTcgMarketSource refuses regular market prices for first-edition req
   assert.equal((comp.raw as { reason?: string }).reason, "no first edition catalog market price");
 });
 
+test("catalog market never substitutes holo for an explicit reverse-holo request", () => {
+  const comp = mapCatalogCardToMarketComp(
+    { ...catalogCard, priceSignals: [catalogCard.priceSignals[0]!] },
+    { source: "catalog-market", card: { ...inputCard, finish: "REVERSE_HOLO" }, grade: "RAW", windowDays: 90 },
+  );
+  assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.medianPence, 0);
+});
+
+test("catalog market refuses generic prices for unsupported shadowless identity", () => {
+  const comp = mapCatalogCardToMarketComp(
+    catalogCard,
+    { source: "catalog-market", card: { name: "Charizard", setName: "Base", number: "4/102", edition: "SHADOWLESS", finish: "HOLO" }, grade: "RAW", windowDays: 90 },
+  );
+  assert.equal(comp.sampleSize, 0);
+});
+
+test("catalog market requires both first-edition and requested finish", () => {
+  const comp = mapCatalogCardToMarketComp(
+    {
+      ...catalogCard,
+      name: "Hitmontop",
+      setName: "Neo Genesis",
+      number: "3/111",
+      priceSignals: [
+        { ...catalogCard.priceSignals[0]!, variant: "1stEditionNormal", pricePence: 1800 },
+        { ...catalogCard.priceSignals[0]!, variant: "1stEditionHolofoil", pricePence: 5200 },
+      ],
+    },
+    { source: "catalog-market", card: { name: "Hitmontop", setName: "Neo Genesis", number: "3/111", edition: "FIRST_EDITION", finish: "HOLO" }, grade: "RAW", windowDays: 90 },
+  );
+  assert.equal(comp.medianPence, 5200);
+});
+
 test("PokemonTcgMarketSource returns empty comps for graded cards", async () => {
   const catalog: CatalogSource = {
     name: "fake-catalog",

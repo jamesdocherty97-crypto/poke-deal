@@ -91,6 +91,51 @@ test("getRates fetches live rates once per day and writes the cache", async () =
   assert.equal(db.rows.find((item) => item.quote === "EUR")?.perGbp, 1.19);
 });
 
+test("freecurrencyapi sends the key in the documented header and strips it from the URL", async () => {
+  const db = fakeFxDb();
+  const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+    const parsed = new URL(String(url));
+    assert.equal(parsed.searchParams.has("apikey"), false);
+    assert.equal(parsed.searchParams.get("base_currency"), "GBP");
+    assert.equal(parsed.searchParams.get("currencies"), "EUR,USD,JPY");
+    assert.equal(new Headers(init?.headers).get("apikey"), "secret-key");
+    return Response.json({ base_currency: "GBP", data: { USD: 1.3, EUR: 1.19, JPY: 195 } });
+  }) as typeof fetch;
+
+  const rates = await getRates({
+    db: db.client,
+    now: new Date("2026-07-03T09:00:00.000Z"),
+    apiKey: "secret-key",
+    endpoint: "https://api.freecurrencyapi.com/v1/latest?apikey=old-query-value",
+    fetchImpl,
+  });
+
+  assert.equal(rates.source, "live");
+  assert.equal(rates.provider, "freecurrencyapi");
+});
+
+test("exchangeratesapi retains its provider-specific access_key query contract", async () => {
+  const db = fakeFxDb();
+  const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+    const parsed = new URL(String(url));
+    assert.equal(parsed.searchParams.get("access_key"), "key");
+    assert.equal(parsed.searchParams.get("base"), "GBP");
+    assert.equal(new Headers(init?.headers).get("apikey"), null);
+    return Response.json({ base: "GBP", date: "2026-07-03", rates: { USD: 1.3, EUR: 1.19, JPY: 195 } });
+  }) as typeof fetch;
+
+  const rates = await getRates({
+    db: db.client,
+    now: new Date("2026-07-03T09:00:00.000Z"),
+    apiKey: "key",
+    endpoint: "https://api.exchangeratesapi.io/v1/latest",
+    fetchImpl,
+  });
+
+  assert.equal(rates.source, "live");
+  assert.equal(rates.provider, "exchangeratesapi");
+});
+
 test("getRates falls back to cached rates up to seven days old", async () => {
   const db = fakeFxDb([
     row("GBP", 1, "2026-06-28"),

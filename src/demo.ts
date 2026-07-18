@@ -1,4 +1,4 @@
-// End-to-end spine demo — runs with NO API keys (fixture mode).
+// End-to-end spine demo — runs with an explicit demo-only fixture source.
 //   search a card → cleaned GBP comps (raw + graded) → suggest price → add to inventory
 //
 // Run: npm run demo
@@ -6,6 +6,9 @@
 
 import type { CardRef } from "./lib/domain/types.js";
 import { CompService } from "./lib/comps/compService.js";
+import type { CompSource } from "./lib/comps/CompSource.js";
+import { cleanToComp, DEFAULT_WINDOW_DAYS } from "./lib/comps/cleaning.js";
+import { sampleRawSales } from "./lib/comps/sources/fixtures.js";
 import { formatGbp } from "./lib/comps/currency.js";
 import { suggestListPrice } from "./lib/comps/pricing.js";
 import { realizedProfit } from "./lib/comps/pricing.js";
@@ -27,9 +30,25 @@ function line() {
 }
 
 async function main() {
-  const comps = CompService.default();
+  const demoSource: CompSource = {
+    // The reconciler only accepts known evidence classes. Exercise the
+    // checked-evidence path while the surrounding banner and live=false flag
+    // keep this demo unmistakably fixture-only.
+    name: "checked-comps",
+    live: false,
+    async lookup(requestedCard, query = {}) {
+      return cleanToComp({
+        source: "checked-comps",
+        card: requestedCard,
+        grade: query.grade ?? "RAW",
+        sales: sampleRawSales(),
+        windowDays: query.windowDays ?? DEFAULT_WINDOW_DAYS,
+      });
+    },
+  };
+  const comps = new CompService([demoSource]);
   console.log(`Poke Deal - spine demo`);
-  console.log(`Source live? ${comps.sourceSummaries[0]?.live ? "yes (API key)" : "no (fixture mode)"}`);
+  console.log("Evidence: explicit demo fixture (never used by the app)");
   line();
 
   // 1) Comp lookup across grades

@@ -3,6 +3,7 @@ import type { CardRef, Grade } from "../domain/types.js";
 import type { CompCardImageEvidence } from "./cardArt.js";
 import type { CompSourceProgress, ReconciledComp } from "./compService.js";
 import type { EbayAskEvidence } from "../ebay/browseAsks.js";
+import type { IdentityConfidence } from "../catalog/identityConfidence.js";
 
 export const COMP_PROGRESS_VERSION = 1 as const;
 
@@ -13,6 +14,7 @@ export interface AppCompReceipt extends ReconciledComp {
   psaCert: unknown | null;
   cardImage: CompCardImageEvidence;
   askEvidence: EbayAskEvidence;
+  identityConfidence: IdentityConfidence;
 }
 
 type CompProgressBase<T extends string> = {
@@ -30,6 +32,7 @@ export type CompCatalogEvent = CompProgressBase<"catalog"> & {
   catalog: CatalogCard | null;
   ambiguity: "pending" | boolean;
   sources: Array<{ name: string; live: boolean }>;
+  identityConfidence?: IdentityConfidence;
 };
 
 export type CompSourceEvent = CompProgressBase<"source"> & CompSourceProgress;

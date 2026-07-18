@@ -10,3 +10,15 @@ export function validateInventoryPhotoUploadPath(itemId: string, pathname: strin
     throw new Error("Photo path does not match this inventory item.");
   }
 }
+
+/** True only for inventory blobs owned by the configured Vercel Blob store. */
+export function isManagedInventoryPhotoBlobUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" &&
+      url.hostname.endsWith(".blob.vercel-storage.com") &&
+      url.pathname.startsWith("/inventory/");
+  } catch {
+    return false;
+  }
+}

@@ -10,7 +10,7 @@ For a non-technical walkthrough of the product, daily workflows, future features
 
 ## What works right now
 
-The whole spine runs **offline, with no API keys** (fixture mode):
+The demo spine runs **offline with an explicit demo-only fixture**; the app itself never substitutes fixtures for live provider data:
 
 ```bash
 npm install            # full install (Next, Prisma, etc.)
@@ -37,8 +37,8 @@ src/lib/comps/
   compService.ts               Orchestrates sources, reconciles to one headline comp.
   prismaCompResultRepo.ts      Persists headline comps for audit/history.
   sources/
-    pokemonPriceTracker.ts     Reference adapter. Fixture mode (no key) or live fetch.
-    fixtures.ts                Messy sample sales so everything runs offline.
+    pokemonPriceTracker.ts     Reference adapter. Missing key is unavailable; configured key fetches live.
+    fixtures.ts                Messy sample sales used only by tests and the explicit CLI demo.
 src/lib/inventory/
   inventoryService.ts          comp → inventory → price spine. Repo INTERFACE.
   prismaInventoryRepo.ts       Prisma-backed InventoryRepo used by app/API persistence.
@@ -55,35 +55,35 @@ prisma/schema.prisma           Full domain model: Card, InventoryItem, Listing, 
 1. **GBP pence everywhere below the adapter boundary.** Convert at ingestion via `toGbpPence`. Never store/compare floats or foreign currency downstream.
 2. **No comp is a bare number.** Every `CompResult` carries `sampleSize`, `windowDays`, `outliersRemoved`. UI must show confidence.
 3. **`cleaning.ts` stays pure** — no DB, no network, no framework imports. It's the reason the app is trustworthy and fast to test.
-4. **Sources degrade, never throw** for "no data". Missing key → fixture mode. Dead API → empty result, not a crash.
+4. **Sources degrade, never throw** for "no data". Missing key or dead API → explicit empty/unavailable result, never a fixture price.
 5. **Domain is card-agnostic.** Don't bake "Pokémon" into inventory/listing/sale logic — sports cards reuse it.
 
 ---
 
 ## Accounts & keys you need
 
-The frame runs without any of these (fixture mode). Add them to `.env` (copy from `.env.example`) to go live. **You create the accounts; point me/Codex at the dashboards and I'll wire them in.**
+The UI can run without these, but provider-backed features remain explicitly unavailable. Add them to `.env` (copy from `.env.example`) to go live. **You create the accounts; point me/Codex at the dashboards and I'll wire them in.**
 
 | Service | Why | Cost | Where |
 |---|---|---|---|
 | **Pokemon Price Tracker** | Primary comps (raw + graded), GBP-capable | Free tier → $9.99/mo | https://www.pokemonpricetracker.com/pricing |
 | **Pokémon TCG API** | Catalog, images, baseline price | Free | https://dev.pokemontcg.io |
 | **PSA Public API** | Cert lookup / slab verification | Free | https://www.psacard.com/publicapi |
-| **PokeTrace** | Secondary comps / US or EU raw cross-check | Free tier → Pro | https://poketrace.com/developers |
+| **PokeTrace** | Secondary comps / US or EU cross-check | Pro+ for commercial use | https://poketrace.com/pricing |
 | **eBay Developer** | Push your *own* listings via Sell API; restricted MI adds UK sold comps | Free, MI approval-gated | https://developer.ebay.com |
 | **Discord webhook** | Price/repricing alerts | Free | Server Settings → Integrations → Webhooks |
-| **FX provider** | Daily USD/EUR/JPY → GBP conversion cache | Free tier | exchangeratesapi/freecurrencyapi-style daily rates |
+| **FX provider** | Daily USD/EUR/JPY → GBP conversion cache | Commercial plan required for dealer use | exchangeratesapi/freecurrencyapi-style daily rates |
 | **Postgres** | Storage | Free local / Neon free tier | docker or https://neon.tech |
 
 **Pokemon Price Tracker live path:** set `POKEMON_PRICE_TRACKER_API_KEY` to use the live v2 adapter. The response shape is pinned in `src/lib/comps/sources/__fixtures__/ppt-cards-ebay.json`; the adapter requests `limit=1` to keep credit usage low and maps provider aggregates into GBP `CompResult`s without caching stale prices as truth.
 
-**PokeTrace cross-check path:** set `POKETRACE_API_KEY` in Vercel before relying on bigger raw-card buys. The adapter defaults to `POKETRACE_MARKETS=US,EU`, but the current free-tier production account should use `POKETRACE_MARKETS=US` because EU/Cardmarket access can be plan-gated. Pro accounts can switch to `EU,US` for Cardmarket-first cross-checks. The source maps Cardmarket/TCGPlayer/eBay tiers into GBP `CompResult`s so noisy RAW buckets can be challenged by a second source.
+**PokeTrace cross-check path:** the current deployment is owner-declared private, non-commercial use, which fits the published Free plan. Set `POKETRACE_API_KEY` and keep the default `POKETRACE_MARKETS=US`; Free remains raw-only and rate-limited. Pro accounts can explicitly use `EU,US` for Cardmarket-first cross-checks. Re-audit and upgrade before any commercial use. The source maps Cardmarket/TCGPlayer/eBay tiers into GBP `CompResult`s so noisy RAW buckets can be challenged by a second source.
 
 **eBay account connection path:** set `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_RU_NAME` and `TOKEN_ENCRYPTION_KEY`, then visit `/api/ebay/connect`. The callback stores the seller refresh token encrypted in Neon; `EBAY_REFRESH_TOKEN` is only a legacy fallback if no DB token exists.
 
 **eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and seller OAuth connection (`EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` still works as the legacy flag). Until then the source stays out of comp aggregation and the manual UK sold link remains the reliable fallback.
 
-**FX path:** set `FX_API_KEY` to fetch daily GBP-based rates into Neon. If the provider is down, the app uses cached rates up to seven days old; if no usable cache exists, comps still work with a visible `static FX` note on converted evidence rows.
+**FX path:** the current owner-declared private, non-commercial deployment can use the active freecurrencyapi Free account. Set `FX_API_KEY` to fetch daily GBP-based rates into Neon. For freecurrencyapi endpoints the key is sent in the documented `apikey` header and removed from the URL; exchangeratesapi retains its provider-specific `access_key` query contract. If the provider is down, the app uses cached rates up to seven days old; if no usable cache exists, comps still work with a visible `static FX` note on converted evidence rows. Re-audit licensing before any commercial use.
 
 ---
 

@@ -215,9 +215,9 @@ const SET_SNAPSHOT: CatalogSet[] = [
   { id: "rsv10pt5", name: "White Flare", series: "Scarlet & Violet", printedTotal: 86, total: 173, releaseDate: "2025-07-18", ptcgoCode: "WHT", symbolUrl: "https://images.pokemontcg.io/rsv10pt5/symbol.png", logoUrl: "https://images.pokemontcg.io/rsv10pt5/logo.png" },
   { id: "me1", name: "Mega Evolution", series: "Mega Evolution", printedTotal: 132, total: 188, releaseDate: "2025-09-26", ptcgoCode: "MEG", symbolUrl: "https://images.pokemontcg.io/me1/symbol.png", logoUrl: "https://images.pokemontcg.io/me1/logo.png" },
   { id: "me2", name: "Phantasmal Flames", series: "Mega Evolution", printedTotal: 94, total: 130, releaseDate: "2025-11-14", ptcgoCode: "PFL", symbolUrl: "https://images.pokemontcg.io/me2/symbol.png", logoUrl: "https://images.pokemontcg.io/me2/logo.png" },
-  { id: "me2pt5", name: "Ascended Heroes", series: "Mega Evolution", printedTotal: 217, total: 295, releaseDate: "2026-01-30", ptcgoCode: "ASC", symbolUrl: "https://images.scrydex.com/pokemon/me2pt5-symbol/symbol", logoUrl: "https://images.scrydex.com/pokemon/me2pt5-logo/logo" },
-  { id: "me3", name: "Perfect Order", series: "Mega Evolution", printedTotal: 88, total: 124, releaseDate: "2026-03-27", ptcgoCode: "POR", symbolUrl: "https://images.scrydex.com/pokemon/me3-symbol/symbol", logoUrl: "https://images.scrydex.com/pokemon/me3-logo/logo" },
-  { id: "me4", name: "Chaos Rising", series: "Mega Evolution", printedTotal: 86, total: 122, releaseDate: "2026-05-22", ptcgoCode: "CRI", symbolUrl: "https://images.scrydex.com/pokemon/me4-symbol/symbol", logoUrl: "https://images.scrydex.com/pokemon/me4-logo/logo" },
+  { id: "me2pt5", name: "Ascended Heroes", series: "Mega Evolution", printedTotal: 217, total: 295, releaseDate: "2026-01-30", ptcgoCode: "ASC" },
+  { id: "me3", name: "Perfect Order", series: "Mega Evolution", printedTotal: 88, total: 124, releaseDate: "2026-03-27", ptcgoCode: "POR" },
+  { id: "me4", name: "Chaos Rising", series: "Mega Evolution", printedTotal: 86, total: 122, releaseDate: "2026-05-22", ptcgoCode: "CRI" },
   { id: "mep", name: "Mega Evolution Promos", series: "Mega Evolution", releaseDate: "2025-09-26", ptcgoCode: "MEP" },
 ];
 

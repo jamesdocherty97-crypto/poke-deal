@@ -1,3 +1,4 @@
+import path from "node:path";
 import { expect, test, type BrowserContext } from "playwright/test";
 
 const CARD = {
@@ -31,17 +32,25 @@ test("buy workspace keeps the fast path focused and reveals precision controls o
 });
 
 test("stock and list show loading skeletons instead of false zero states", async ({ context, page }) => {
-  await mockDealerApis(context, new FixtureDealerLedger(), { criticalDelayMs: 2500 });
+  let releaseCriticalReads!: () => void;
+  const criticalReads = new Promise<void>((resolve) => {
+    releaseCriticalReads = resolve;
+  });
+  await mockDealerApis(context, new FixtureDealerLedger(), { criticalReads });
   const listPage = await context.newPage();
-  await Promise.all([page.goto("/?view=stock"), listPage.goto("/?view=list")]);
-  await expect(page.locator(".inventory-workspace .workspace-skeleton")).toBeVisible();
-  await expect(listPage.locator(".listings-workspace .workspace-skeleton")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
-  await expect(listPage.getByRole("heading", { name: "Listings" })).toBeVisible();
-  await listPage.close();
+  try {
+    await Promise.all([page.goto("/?view=stock"), listPage.goto("/?view=list")]);
+    await expect(page.locator(".inventory-workspace .workspace-skeleton")).toBeVisible();
+    await expect(listPage.locator(".listings-workspace .workspace-skeleton")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
+    await expect(listPage.getByRole("heading", { name: "Listings" })).toBeVisible();
+  } finally {
+    releaseCriticalReads();
+    await listPage.close();
+  }
 });
 
-test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", async ({ context, page }) => {
+test("fixture dealer loop: comp -> buy -> stock + eBay draft -> review -> sell -> profit", async ({ context, page }) => {
   const ledger = new FixtureDealerLedger();
   await mockDealerApis(context, ledger);
 
@@ -82,22 +91,19 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
     grade: "RAW",
     costBasisPence: 2500,
     quantity: 1,
-    createListing: false,
+    createListing: true,
+    channel: "EBAY",
+    listingState: "DRAFT",
+    reviewedComps: {
+      headline: { medianPence: 4200, sampleSize: 7 },
+      sourcesDisagree: false,
+    },
   });
-
-  await page.getByRole("button", { name: "Stock", exact: true }).click();
-  const stockRow = page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" });
-  await expect(stockRow).toContainText("Needs listing");
-  await stockRow.getByRole("button", { name: "Draft listing" }).click();
-
-  const listingCreator = page.locator(".sell-sheet").filter({
-    has: page.getByRole("heading", { name: "Create listing" }),
-  });
-  await expect(listingCreator.getByLabel(/^Your list price/)).toHaveValue("33.75");
-  await listingCreator.getByRole("button", { name: "Continue to eBay review" }).click();
+  expect(Number(ledger.acquireBody?.listPricePence)).toBeGreaterThan(0);
+  expect((ledger.acquireBody?.reviewedComps as { all: unknown[] }).all).toHaveLength(2);
 
   await expect.poll(() => ledger.listingState).toBe("DRAFT");
-  expect(ledger.listingBody).toMatchObject({ itemId: "item-fixture-gengar", channel: "EBAY", state: "DRAFT" });
+  await page.getByRole("button", { name: "Review draft", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Listing pack" })).toBeVisible();
   await page.locator(".listing-pack-sheet").getByRole("button", { name: "Close" }).click();
 
@@ -133,16 +139,91 @@ test("fixture dealer loop: comp -> buy -> stock -> draft -> sell -> profit", asy
   await expect(profitSummary.locator(".metric").filter({ hasText: "Net" })).toContainText("£25.00");
 });
 
+test("camera scan hands the reviewed comp and photo into the stock form", async ({ context, page }) => {
+  const ledger = new FixtureDealerLedger();
+  await mockDealerApis(context, ledger);
+  await context.route("**/api/scan", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      identity: {
+        name: "Gengar",
+        setName: "Lost Origin Trainer Gallery",
+        setCode: "swsh11tg",
+        number: "TG06/TG30",
+        language: "English",
+        isSlab: false,
+        grader: null,
+        grade: null,
+        certNumber: null,
+        stamps: [],
+        readable: true,
+        notes: "",
+      },
+      model: "fixture-vision-v1",
+      scanEventId: "scan-fixture-gengar",
+    }),
+  }));
+
+  await page.goto("/?view=buy");
+  await page.getByRole("button", { name: "Scan card with camera" }).click();
+  await page.locator("#scan-photo-upload").setInputFiles(path.join(process.cwd(), "public", "icon-512.png"));
+
+  const scanSheet = page.getByRole("dialog", { name: "Scan a card" });
+  await expect(scanSheet.getByText("Comp ready", { exact: true })).toBeVisible();
+  await expect(scanSheet.getByText("£42.00 market comp", { exact: true })).toBeVisible();
+  await expect(scanSheet.locator(".scan-ready-checks")).toContainText("Photo kept");
+  await scanSheet.getByRole("button", { name: "Continue to stock", exact: true }).click();
+
+  await expect(scanSheet).toBeHidden();
+  const quickStock = page.locator(".quick-stock-card");
+  await expect(quickStock).toContainText("eBay draft ready for review");
+  await expect(quickStock).toContainText("scan photo becomes the first listing photo");
+  await expect(quickStock.getByLabel(/^What I paid/)).toBeFocused();
+  await quickStock.getByLabel(/^What I paid/).fill("25.00");
+  await quickStock.getByRole("button", { name: /Confirm stock \+ eBay draft/ }).click();
+
+  await expect.poll(() => ledger.acquired).toBe(true);
+  await expect.poll(() => ledger.savedPhotos.length).toBe(1);
+  expect(ledger.acquireBody).toMatchObject({
+    card: { name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" },
+    createListing: true,
+    listingState: "DRAFT",
+  });
+  expect(ledger.savedPhotos[0]).toMatchObject({ role: "FRONT", origin: "SCAN", order: 0 });
+  await expect(page.getByText("Scan photo saved.")).toBeVisible();
+  await page.getByRole("button", { name: "Review draft", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Listing pack" })).toBeVisible();
+});
+
+test("listing workspace starts with unfinished drafts and keeps the sale transition visible", async ({ context, page }) => {
+  const ledger = new FixtureDealerLedger();
+  ledger.acquired = true;
+  ledger.listingState = "ACTIVE";
+  await mockDealerApis(context, ledger);
+
+  await page.goto("/?view=list");
+  const stateFilter = page.locator('select[name="listing-state"]');
+  await expect(stateFilter).toHaveValue("DRAFT");
+  await expect(page.getByText("No matching listings. Clear the search or change the state filter.")).toBeVisible();
+
+  await stateFilter.selectOption("ACTIVE");
+  const listingRow = page.locator(".market-list .item-row").filter({ hasText: "Gengar" });
+  await expect(listingRow.getByRole("link", { name: "View live listing" })).toBeVisible();
+  await expect(listingRow.getByRole("button", { name: "Record sale" })).toBeVisible();
+});
+
 class FixtureDealerLedger {
   acquired = false;
   sold = false;
-  listingState: "DRAFT" | "SOLD" | null = null;
+  listingState: "DRAFT" | "ACTIVE" | "SOLD" | null = null;
   acquireMutationId: string | undefined;
   saleMutationId: string | undefined;
   acquireBody: Record<string, unknown> | null = null;
   listingBody: Record<string, unknown> | null = null;
   saleBody: Record<string, unknown> | null = null;
   compEventTypes: string[] = [];
+  savedPhotos: Array<Record<string, unknown>> = [];
 
   readonly createdAt = new Date().toISOString();
 
@@ -163,12 +244,13 @@ class FixtureDealerLedger {
       updatedAt: this.createdAt,
       listings: this.listingState ? [this.listing(false)] : [],
       sales: this.sold ? [this.sale()] : [],
-      photos: [],
+      photos: this.savedPhotos,
     };
   }
 
   listing(includeItem: boolean): Record<string, unknown> {
     const item = includeItem ? this.inventoryItem() : null;
+    const isActive = this.listingState === "ACTIVE";
     return {
       id: "listing-fixture-gengar",
       itemId: "item-fixture-gengar",
@@ -177,9 +259,9 @@ class FixtureDealerLedger {
       title: "Gengar TG06/TG30 Lost Origin Trainer Gallery Pokemon Card RAW",
       suggestedPrice: 4499,
       listPrice: 4499,
-      externalRef: null,
-      externalUrl: null,
-      listedAt: null,
+      externalRef: isActive ? "fixture-ebay-listing" : null,
+      externalUrl: isActive ? "https://www.ebay.co.uk/itm/fixture-gengar" : null,
+      listedAt: isActive ? this.createdAt : null,
       endedAt: this.sold ? this.createdAt : null,
       createdAt: this.createdAt,
       updatedAt: this.createdAt,
@@ -262,7 +344,7 @@ class FixtureDealerLedger {
       },
       listingsByState: {
         DRAFT: this.listingState === "DRAFT" ? 1 : 0,
-        ACTIVE: 0,
+        ACTIVE: this.listingState === "ACTIVE" ? 1 : 0,
         SOLD: this.listingState === "SOLD" ? 1 : 0,
         ENDED: 0,
       },
@@ -287,8 +369,9 @@ class FixtureDealerLedger {
     const asOf = new Date().toISOString();
     const checked = compResult("checked-comps", 4200, 7, asOf);
     const owned = compResult("owned-sales", 4100, 3, asOf);
+    const unavailableReceipt = compResult("empty-source", 500, 0, asOf);
     const partial = reconciled([checked]);
-    const complete = reconciled([checked, owned]);
+    const complete = reconciled([checked, owned, unavailableReceipt]);
     const receipt = {
       ...complete,
       catalog: CARD,
@@ -356,7 +439,26 @@ function reconciled(all: ReturnType<typeof compResult>[]) {
   };
 }
 
-async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedger, options: { criticalDelayMs?: number } = {}) {
+async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedger, options: { criticalReads?: Promise<void> } = {}) {
+  await context.route("https://vercel.com/api/blob/**", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "PUT, OPTIONS", "Access-Control-Allow-Headers": "*" } });
+    }
+    const pathname = new URL(route.request().url()).searchParams.get("pathname") ?? "inventory/fixture/front.jpg";
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({
+        url: `https://fixture.public.blob.vercel-storage.com/${pathname}`,
+        downloadUrl: `https://fixture.public.blob.vercel-storage.com/${pathname}?download=1`,
+        pathname,
+        contentType: "image/jpeg",
+        contentDisposition: "inline",
+        etag: "fixture-etag",
+      }),
+    });
+  });
   await context.route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -366,8 +468,8 @@ async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedg
       contentType: "application/json",
       body: JSON.stringify(body),
     });
-    if (method === "GET" && options.criticalDelayMs && ["/api/inventory", "/api/listings", "/api/dashboard"].includes(url.pathname)) {
-      await new Promise((resolve) => setTimeout(resolve, options.criticalDelayMs));
+    if (method === "GET" && options.criticalReads && ["/api/inventory", "/api/listings", "/api/dashboard"].includes(url.pathname)) {
+      await options.criticalReads;
     }
 
     if (url.pathname === "/api/comps/stream") {
@@ -384,12 +486,33 @@ async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedg
       ledger.acquireMutationId = request.headers()["x-poke-deal-mutation-id"];
       ledger.acquireBody = request.postDataJSON() as Record<string, unknown>;
       ledger.acquired = true;
+      if (ledger.acquireBody.createListing) ledger.listingState = "DRAFT";
       return json({
         item: ledger.inventoryItem(),
         suggestion: { pricePence: 4499, rationale: "fixture market price" },
-        listing: null,
+        listing: ledger.listingState ? ledger.listing(true) : null,
         catalog: CARD,
       }, 201);
+    }
+
+    if (url.pathname === "/api/inventory/item-fixture-gengar/photos/upload-token" && method === "POST") {
+      return json({ clientToken: "vercel_blob_client_fixture_token" });
+    }
+
+    if (url.pathname === "/api/inventory/item-fixture-gengar/photos" && method === "POST") {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      const photo = {
+        id: "photo-fixture-gengar-front",
+        url: body.url,
+        role: body.role,
+        origin: body.origin,
+        width: body.width,
+        height: body.height,
+        order: body.order,
+        createdAt: ledger.createdAt,
+      };
+      ledger.savedPhotos = [photo];
+      return json({ photo }, 201);
     }
 
     if (url.pathname === "/api/listings" && method === "POST") {
