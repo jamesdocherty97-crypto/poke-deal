@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import {
   DEFAULT_DEAL_CALC_SETTINGS,
@@ -42,6 +43,14 @@ export function SettingsTab({
   const attentionSourceCount = sources.filter(
     (source) => source.deepCheck?.status === "fail" || source.status === "missing" || source.status === "problem",
   ).length;
+  const [showAllProviders, setShowAllProviders] = useState(false);
+  const providerNeedsAttention = (source: (typeof sources)[number]) =>
+    source.deepCheck?.status === "fail" ||
+    source.status === "missing" ||
+    source.status === "problem" ||
+    source.status === "info";
+  const attentionProviders = sources.filter(providerNeedsAttention);
+  const visibleProviders = showAllProviders || attentionProviders.length === 0 ? sources : attentionProviders;
 
   return (
     <section className="workspace settings-workspace">
@@ -130,7 +139,7 @@ export function SettingsTab({
                   </tr>
                 </thead>
                 <tbody>
-                  {sources.map((source, sourceIndex) => {
+                  {visibleProviders.map((source, sourceIndex) => {
                     const check = source.deepCheck;
                     const state =
                       check?.status ??
@@ -149,14 +158,12 @@ export function SettingsTab({
                           {source.setupHint && <small>{source.setupHint}</small>}
                         </th>
                         <td data-label="Role">{source.role}</td>
-                        <td data-label="Live signal">
-                          {check?.detail ?? "No live response recorded yet."}
+                        <td data-label="Live signal" className={check ? undefined : "provider-cell-quiet"}>
+                          {check?.detail ?? "—"}
                         </td>
                         <td data-label="Status">
                           <span className="provider-status-badge">{statusLabel}</span>
-                          <small>
-                            {check ? `${check.latencyMs}ms · ${formatAge(check.checkedAt)}` : "Configuration only"}
-                          </small>
+                          {check && <small>{`${check.latencyMs}ms · ${formatAge(check.checkedAt)}`}</small>}
                         </td>
                       </tr>
                     );
@@ -164,6 +171,18 @@ export function SettingsTab({
                 </tbody>
               </table>
             </div>
+            {attentionProviders.length > 0 && (
+              <button
+                className="ghost-button provider-table-toggle"
+                type="button"
+                aria-expanded={showAllProviders}
+                onClick={() => setShowAllProviders((current) => !current)}
+              >
+                {showAllProviders
+                  ? `Show only providers needing attention (${attentionProviders.length})`
+                  : `Show all ${sources.length} providers`}
+              </button>
+            )}
           </section>
 
           <section className="panel settings-section" id="listing-copy" aria-labelledby="listing-copy-title">

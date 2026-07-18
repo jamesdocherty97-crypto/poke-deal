@@ -370,41 +370,6 @@ export function ListingsTab({
         </section>
       )}
       </div>
-      <div className="export-actions" aria-label="Listing exports">
-        <a className="export-link" href="/api/export/listings?state=DRAFT" download>
-          Draft CSV
-        </a>
-        <a className="export-link" href="/api/export/listings" download>
-          All listings CSV
-        </a>
-        <a className="export-link" href="/api/export/listing-pack" download>
-          eBay pack CSV
-        </a>
-      </div>
-      <section className="panel listing-workhorse market-pack-tools" aria-label="Build selected listing pack">
-        <div className="panel-heading">
-          <div>
-            <h2>Pack builder</h2>
-            <span className="muted">select items → channel → download or copy</span>
-          </div>
-          <button className="ghost-button" type="button" onClick={() => {
-            setSelectedIds(selectedListings.length === visibleListings.length ? new Set() : new Set(visibleListings.map((listing) => listing.id)));
-          }} disabled={visibleListings.length === 0}>
-            {selectedListings.length === visibleListings.length && visibleListings.length > 0 ? "Clear" : "Select visible"}
-          </button>
-        </div>
-        <div className="listing-workhorse-actions">
-          <strong>{selectedListings.length} selected</strong>
-          <label>
-            Channel
-            <select name="listing-pack-channel" value={packChannel} onChange={(event) => setPackChannel(event.target.value as Channel)}>
-              <option value="EBAY">eBay</option><option value="CARDMARKET">Cardmarket</option><option value="VINTED">Vinted</option><option value="IN_PERSON">In person</option>
-            </select>
-          </label>
-          <button type="button" className="primary-action" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "download")}>Download pack</button>
-          <button type="button" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "copy")}>Copy pack</button>
-        </div>
-      </section>
       <div className="dex-controls listings-controls market-toolbar" aria-label="Listing search and sort">
         <label className="search-control">
           Search
@@ -446,7 +411,7 @@ export function ListingsTab({
         <section className="panel listing-queue-panel market-queue">
           <div className="panel-heading">
             <div>
-              <h2>Listing queue</h2>
+              <h2>Stock to draft</h2>
               <span className="muted">{rowCountLabel(visibleUnlistedStock.length, unlistedStock.length)}</span>
             </div>
             <button className="ghost-button" type="button" onClick={onAddBuy}>
@@ -622,6 +587,41 @@ export function ListingsTab({
         <EmptyState art="search" text="No matching listings. Clear the search or change the state filter." />
       ) : null}
       </div>
+      <section className="panel listing-workhorse market-pack-tools" aria-label="Build selected listing pack">
+        <div className="panel-heading">
+          <div>
+            <h2>Pack builder</h2>
+            <span className="muted">select listings above → channel → download or copy</span>
+          </div>
+          <button className="ghost-button" type="button" onClick={() => {
+            setSelectedIds(selectedListings.length === visibleListings.length ? new Set() : new Set(visibleListings.map((listing) => listing.id)));
+          }} disabled={visibleListings.length === 0}>
+            {selectedListings.length === visibleListings.length && visibleListings.length > 0 ? "Clear" : "Select visible"}
+          </button>
+        </div>
+        <div className="listing-workhorse-actions">
+          <strong>{selectedListings.length} selected</strong>
+          <label>
+            Channel
+            <select name="listing-pack-channel" value={packChannel} onChange={(event) => setPackChannel(event.target.value as Channel)}>
+              <option value="EBAY">eBay</option><option value="CARDMARKET">Cardmarket</option><option value="VINTED">Vinted</option><option value="IN_PERSON">In person</option>
+            </select>
+          </label>
+          <button type="button" className="primary-action" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "download")}>Download pack</button>
+          <button type="button" disabled={selectedListings.length === 0} onClick={() => onBulkPack(selectedListings, packChannel, "copy")}>Copy pack</button>
+        </div>
+      </section>
+      <div className="export-actions" aria-label="Listing exports">
+        <a className="export-link" href="/api/export/listings?state=DRAFT" download>
+          Draft CSV
+        </a>
+        <a className="export-link" href="/api/export/listings" download>
+          All listings CSV
+        </a>
+        <a className="export-link" href="/api/export/listing-pack" download>
+          eBay pack CSV
+        </a>
+      </div>
       {editListingSheet}
       {listingPackSheet}
     </section>
@@ -684,15 +684,18 @@ function ListingQueueRow({
             {" "}ready for eBay prep
           </p>
         )}
-        <InventoryPhotoTools
-          item={item}
-          busy={busy}
-          onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
-          onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
-          onCatalogArt={(target) => onCatalogArt(target as InventoryItem)}
-          onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
-          onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
-        />
+        <details className="row-more-actions row-photo-tools">
+          <summary>{photoCount > 0 ? `Photos · ${photoCount}` : "Add photos"}</summary>
+          <InventoryPhotoTools
+            item={item}
+            busy={busy}
+            onPhotos={(target, files) => onPhotos(target as InventoryItem, files)}
+            onPhotoUrl={(target, url) => onPhotoUrl(target as InventoryItem, url)}
+            onCatalogArt={(target) => onCatalogArt(target as InventoryItem)}
+            onMovePhoto={(target, photoId, direction) => onMovePhoto(target as InventoryItem, photoId, direction)}
+            onDeletePhoto={(target, photoId) => onDeletePhoto(target as InventoryItem, photoId)}
+          />
+        </details>
         <div className="next-action-strip listing-next-action">
           <button
             className="next-action-button"
