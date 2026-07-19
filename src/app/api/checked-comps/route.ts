@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 const gradeSchema = z.enum(GRADE_VALUES);
 const conditionSchema = z.enum(RAW_CONDITION_VALUES);
 const platformSchema = z.enum(["ebay-uk", "cardmarket", "vinted", "other"]);
-const priceBasisSchema = z.enum(["ITEM_PRICE", "BUYER_TOTAL", "BEST_OFFER_UNKNOWN"]);
+const priceBasisSchema = z.enum(["DISPLAYED_PRICE", "ITEM_PRICE", "BUYER_TOTAL", "BEST_OFFER_UNKNOWN"]);
 
 const checkedCompPostSchema = z.object({
   card: z.object({

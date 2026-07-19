@@ -40,7 +40,7 @@ function checkedRow(id: string, itemId: string, pricePence: number, soldDate: st
     soldDate: new Date(soldDate),
     platform: "ebay-uk",
     condition: "NM",
-    priceBasis: "ITEM_PRICE",
+    priceBasis: "DISPLAYED_PRICE",
     note: null,
     sourceUrl: `https://www.ebay.co.uk/itm/${itemId}`,
     sourceListingId: `ebay-uk:${itemId}`,

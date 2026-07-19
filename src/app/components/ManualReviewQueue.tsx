@@ -14,7 +14,7 @@ export function ManualReviewQueue({
   reviews: ManualCompReview[];
   busyId: string | null;
   onAccept: (review: ManualCompReview) => void;
-  onAddCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; condition?: string; priceBasis: "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN"; sourceUrl: string; note?: string }) => void;
+  onAddCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; condition?: string; priceBasis: "DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN"; sourceUrl: string; note?: string }) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [price, setPrice] = useState("");
@@ -22,7 +22,7 @@ export function ManualReviewQueue({
   const [note, setNote] = useState("");
   const [condition, setCondition] = useState("NM");
   const [sourceUrl, setSourceUrl] = useState("");
-  const [priceBasis, setPriceBasis] = useState<"ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN">("ITEM_PRICE");
+  const [priceBasis, setPriceBasis] = useState<"DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN">("DISPLAYED_PRICE");
 
   if (reviews.length === 0) {
     return <EmptyState art="alerts" text="No manual checks waiting. Every cautious verdict has been reviewed." />;
@@ -102,8 +102,9 @@ export function ManualReviewQueue({
                 <label>
                   Price basis
                   <select value={priceBasis} onChange={(event) => setPriceBasis(event.target.value as typeof priceBasis)}>
-                    <option value="ITEM_PRICE">Exact item price · excludes fees/postage</option>
-                    <option value="BUYER_TOTAL">Buyer total · includes protection fee</option>
+                    <option value="DISPLAYED_PRICE">Displayed sold price · excludes delivery</option>
+                    <option value="ITEM_PRICE">Seller item price · before Buyer Protection</option>
+                    <option value="BUYER_TOTAL">Checkout total · includes delivery/fees</option>
                     <option value="BEST_OFFER_UNKNOWN">Best Offer · accepted price hidden</option>
                   </select>
                 </label>
@@ -147,7 +148,7 @@ export function ManualReviewQueue({
                   setNote("");
                   setCondition(review.condition ?? "NM");
                   setSourceUrl("");
-                  setPriceBasis("ITEM_PRICE");
+                  setPriceBasis("DISPLAYED_PRICE");
                 }}>
                   Add checked comp
                 </button>

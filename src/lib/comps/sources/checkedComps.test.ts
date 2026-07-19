@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   CheckedCompsSource,
+  PrismaCheckedCompRepo,
   buildCheckedCompsWhere,
   checkedCompPlatformRegion,
   checkedCompSourceListingId,
@@ -75,14 +76,32 @@ test("source-backed Rayquaza fixture refuses hidden Best Offers, buyer totals, a
       },
     ));
 
-  const comp = mapCheckedCompsToComp(rows, { ...context("NM"), windowDays: 120 });
+  const comp = mapCheckedCompsToComp(rows, context("NM"));
   const raw = comp.raw as { entries?: Array<{ evidenceStatus?: string; exclusionReasons?: string[] }> };
 
-  assert.equal(comp.sampleSize, 1);
-  assert.equal(comp.medianPence, 55_000);
-  assert.equal(raw.entries?.filter((entry) => entry.evidenceStatus === "used").length, 1);
-  assert.equal(raw.entries?.filter((entry) => entry.exclusionReasons?.includes("inexact-price-basis")).length, 4);
+  assert.equal(comp.sampleSize, 3);
+  assert.equal(comp.medianPence, 85_000);
+  assert.equal(comp.lowPence, 66_080);
+  assert.equal(comp.highPence, 105_000);
+  assert.equal(raw.entries?.filter((entry) => entry.evidenceStatus === "used").length, 3);
+  assert.equal(raw.entries?.filter((entry) => entry.exclusionReasons?.includes("inexact-price-basis")).length, 5);
   assert.equal(fixture.observations.some((observation) => observation.grade === "OTHER_8"), true, "wrong-grade control is retained");
+});
+
+test("RAW repository writes fail closed when the condition bucket is missing", async () => {
+  const repo = new PrismaCheckedCompRepo({} as never);
+  await assert.rejects(
+    repo.create({
+      card,
+      grade: "RAW",
+      pricePence: 66_080,
+      soldDate: daysAgo(1),
+      platform: "ebay-uk",
+      priceBasis: "DISPLAYED_PRICE",
+      sourceUrl: "https://www.ebay.co.uk/itm/257584212141",
+    }),
+    /need NM, LP, MP, HP or DMG condition/,
+  );
 });
 
 test("RAW checked evidence never crosses condition buckets", () => {
@@ -254,6 +273,7 @@ test("platform and price-basis normalization fail closed", () => {
   assert.equal(checkedCompPlatformRegion("cardmarket"), "EU");
   assert.equal(checkedCompPlatformRegion("vinted"), "UK");
   assert.equal(normalizeCheckedCompPriceBasis("ITEM_PRICE"), "ITEM_PRICE");
+  assert.equal(normalizeCheckedCompPriceBasis("DISPLAYED_PRICE"), "DISPLAYED_PRICE");
   assert.equal(normalizeCheckedCompPriceBasis("unexpected"), "UNKNOWN");
 });
 
@@ -285,7 +305,7 @@ function checkedComp(
     soldDate,
     platform: options.platform ?? "ebay-uk",
     condition: options.condition === undefined ? "NM" : options.condition,
-    priceBasis: options.priceBasis ?? "ITEM_PRICE",
+    priceBasis: options.priceBasis ?? "DISPLAYED_PRICE",
     note: null,
     sourceUrl,
     sourceListingId: options.sourceListingId === undefined && itemId ? `ebay-uk:${itemId}` : options.sourceListingId ?? null,

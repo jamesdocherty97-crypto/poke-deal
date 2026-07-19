@@ -80,7 +80,7 @@ test("old no-cost stock keeps purchase cost, market guidance and user list price
     pricePence: 600,
     soldDate: "2026-07-01",
     condition: "NM",
-    priceBasis: "ITEM_PRICE",
+    priceBasis: "DISPLAYED_PRICE",
     sourceUrl: "https://www.ebay.co.uk/itm/157802426654",
   });
   expect(ledger.listingPatches).toHaveLength(0);
@@ -144,7 +144,7 @@ test("high-value Rayquaza disagreement shows the traceable UK range and never au
 
   const compPanel = page.locator(".comp-panel");
   await expect(compPanel.getByRole("heading", { name: "No auto-offer" })).toBeVisible();
-  await expect(compPanel.getByText("Unverified range", { exact: true })).toBeVisible();
+  await expect(compPanel.getByText("eBay UK sold range", { exact: true })).toBeVisible();
   await expect(compPanel.getByText("£450.00–£750.00", { exact: true })).toBeVisible();
   await expect(compPanel.getByText(/3 traceable UK solds/).first()).toBeVisible();
 
@@ -160,6 +160,34 @@ test("high-value Rayquaza disagreement shows the traceable UK range and never au
   await expect.poll(() => ledger.acquireBody).not.toBeNull();
   expect(ledger.acquireBody?.reviewedComps).toMatchObject({ manualCheck: true });
   expect(ledger.acquireBody).not.toHaveProperty("listPricePence");
+});
+
+test("one traceable Rayquaza sale leads the UI without becoming an automatic comp", async ({ context, page }) => {
+  const ledger = new RayquazaThinPricingLedger();
+  await mockPricingApis(context, ledger);
+  await context.route("https://www.ebay.co.uk/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>eBay UK solds</title>" }));
+
+  await page.goto("/?view=buy");
+  await page.getByLabel("Smart comp search").fill("Rayquaza VMAX Evolving Skies 218/203 RAW NM");
+  await page.getByRole("button", { name: "Comp current card" }).click();
+
+  const compPanel = page.locator(".comp-panel");
+  await expect(compPanel.getByRole("heading", { name: "No auto-offer" })).toBeVisible();
+  await expect(compPanel.getByText("eBay UK reference", { exact: true })).toBeVisible();
+  await expect(compPanel.getByText("£660.80", { exact: true }).first()).toBeVisible();
+  await expect(compPanel.getByText(/provider £1039\.81 unverified/)).toBeVisible();
+
+  const ebayPagePromise = context.waitForEvent("page");
+  await compPanel.getByRole("button", { name: "eBay UK", exact: true }).click();
+  const ebayPage = await ebayPagePromise;
+  await ebayPage.close();
+  await page.getByRole("button", { name: "Manual sold comps", exact: true }).click();
+  const manualCompCard = page.locator(".checked-comp-card.priority").first();
+  await expect(manualCompCard).toContainText("1 traceable UK sold · median £660.80");
+  await expect(manualCompCard.getByRole("button", { name: /Use comp/ })).toHaveCount(0);
+  await expect(manualCompCard).toContainText("One logged comp is shown as corroboration");
+  await manualCompCard.getByText("Individual sold-item link · needed for trusted evidence").click();
+  await expect(manualCompCard.getByPlaceholder("https://www.ebay.co.uk/itm/…")).toHaveValue("");
 });
 
 class PricingLedger {
@@ -331,6 +359,94 @@ class RayquazaPricingLedger extends PricingLedger {
       cardImage: { imageUrl: RAYQUAZA.imageUrl, source: "catalog", listingSafe: true },
     };
     const base = { version: 1, lookupId: "lookup-fixture-rayquaza", emittedAt: asOf };
+    return [
+      { ...base, sequence: 1, type: "catalog", requested: RAYQUAZA, identity: RAYQUAZA, grade: "RAW", catalog: RAYQUAZA, ambiguity: false, sources: [{ name: checked.source, live: true }, { name: poketrace.source, live: true }] },
+      { ...base, sequence: 2, type: "source", source: { name: checked.source, live: true }, status: "priced", latencyMs: 10, completed: 1, total: 2, result: checked, receipt },
+      { ...base, sequence: 3, type: "source", source: { name: poketrace.source, live: true }, status: "priced", latencyMs: 12, completed: 2, total: 2, result: poketrace, receipt },
+      { ...base, sequence: 4, type: "receipt", latencyMs: 14, receipt },
+    ];
+  }
+}
+
+class RayquazaThinPricingLedger extends PricingLedger {
+  override compEvents() {
+    const asOf = "2026-07-18T20:00:00.000Z";
+    const entry = {
+      id: "rayquaza-checked-1",
+      cardId: RAYQUAZA.id,
+      grade: "RAW",
+      pricePence: 66_080,
+      soldDate: "2026-07-01T12:00:00.000Z",
+      platform: "ebay-uk",
+      condition: "NM",
+      priceBasis: "DISPLAYED_PRICE",
+      sourceUrl: "https://www.ebay.co.uk/itm/257584212141",
+      sourceListingId: "ebay-uk:257584212141",
+      traceable: true,
+      evidenceStatus: "used",
+      createdAt: "2026-07-19T12:00:00.000Z",
+    };
+    const checked = {
+      source: "checked-comps",
+      card: RAYQUAZA,
+      grade: "RAW",
+      currency: "GBP",
+      medianPence: 66_080,
+      meanPence: 66_080,
+      lowPence: 66_080,
+      highPence: 66_080,
+      sampleSize: 1,
+      windowDays: 90,
+      trendPct: null,
+      outliersRemoved: 0,
+      asOf: entry.soldDate,
+      raw: { kind: "checked-comps", region: "UK", condition: "NM", conditionMatched: true, traceableCount: 1, entries: [entry] },
+    };
+    const poketrace = {
+      ...checked,
+      source: "poketrace",
+      medianPence: 103_981,
+      meanPence: 103_981,
+      lowPence: 103_981,
+      highPence: 103_981,
+      sampleSize: 64,
+      asOf,
+      raw: { kind: "sold-aggregate", market: "US", priceSource: "ebay", approxSaleCount: true },
+    };
+    const receipt = {
+      headline: poketrace,
+      all: [checked, poketrace],
+      sourcesDisagree: true,
+      reconciliation: {
+        headlinePence: 103_981,
+        confidence: "medium",
+        manualCheck: true,
+        reasons: ["corroboration-thin-checked-comps", "high-value-without-uk-solds"],
+        chosenSource: "poketrace",
+        trendPct: null,
+        selection: {
+          sourceTier: 0.6,
+          region: "US",
+          sampleSize: 50,
+          ageDays: 1,
+          corroboratingCount: 0,
+          appliedPenalties: [],
+          spreadPence: 0,
+          spreadPct: 0,
+          lowPence: 103_981,
+          highPence: 103_981,
+          crossSourceLowPence: 103_981,
+          crossSourceHighPence: 103_981,
+          chosenBecause: "US PokeTrace · 50 weighted samples · 1d old · best eligible evidence",
+        },
+      },
+      catalog: RAYQUAZA,
+      alternatives: [],
+      ambiguous: false,
+      psaCert: null,
+      cardImage: { imageUrl: RAYQUAZA.imageUrl, source: "catalog", listingSafe: true },
+    };
+    const base = { version: 1, lookupId: "lookup-fixture-rayquaza-thin", emittedAt: asOf };
     return [
       { ...base, sequence: 1, type: "catalog", requested: RAYQUAZA, identity: RAYQUAZA, grade: "RAW", catalog: RAYQUAZA, ambiguity: false, sources: [{ name: checked.source, live: true }, { name: poketrace.source, live: true }] },
       { ...base, sequence: 2, type: "source", source: { name: checked.source, live: true }, status: "priced", latencyMs: 10, completed: 1, total: 2, result: checked, receipt },

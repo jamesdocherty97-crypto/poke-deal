@@ -7,7 +7,7 @@ import { mean, median, removeOutliersIQR } from "../cleaning.js";
 import { normalizeRawCondition } from "../pricing.js";
 
 export type CheckedCompPlatform = "ebay-uk" | "cardmarket" | "vinted" | "other";
-export type CheckedCompPriceBasis = "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN" | "UNKNOWN";
+export type CheckedCompPriceBasis = "DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN" | "UNKNOWN";
 export type CheckedCompEvidenceStatus = "used" | "corroboration" | "outlier";
 
 type CheckedCompCard = PrismaCard & {
@@ -122,7 +122,7 @@ export class PrismaCheckedCompRepo {
 
     const platform = normalizeCheckedCompPlatform(input.platform);
     const condition = input.grade === "RAW" ? normalizeRawCondition(input.condition) : null;
-    if (input.grade === "RAW" && input.condition && !condition) {
+    if (input.grade === "RAW" && !condition) {
       throw new CheckedCompEvidenceError("RAW checked comps need NM, LP, MP, HP or DMG condition.", "invalid-condition");
     }
 
@@ -254,7 +254,7 @@ export function mapCheckedCompsToComp(rows: CheckedCompRow[], ctx: CheckedCompsC
     asOf: latest.row.soldDate.toISOString(),
     raw: {
       kind: "checked-comps",
-      caveat: "Distinct dealer-checked eBay UK sold listings for this exact card, grade and RAW condition.",
+      caveat: "Distinct dealer-checked eBay UK displayed sold prices for this exact card, grade and RAW condition; delivery is excluded.",
       region: "UK",
       condition: ctx.grade === "RAW" ? ctx.condition : undefined,
       conditionMatched: true,
@@ -318,7 +318,7 @@ export function checkedCompPlatformRegion(platform: string | undefined): "UK" | 
 }
 
 export function normalizeCheckedCompPriceBasis(value: string | undefined): CheckedCompPriceBasis {
-  if (value === "ITEM_PRICE" || value === "BUYER_TOTAL" || value === "BEST_OFFER_UNKNOWN") return value;
+  if (value === "DISPLAYED_PRICE" || value === "ITEM_PRICE" || value === "BUYER_TOTAL" || value === "BEST_OFFER_UNKNOWN") return value;
   return "UNKNOWN";
 }
 
@@ -375,7 +375,13 @@ function qualifyEvidence(rows: CheckedCompRow[], ctx: CheckedCompsContext): Evid
     if (platform !== "ebay-uk") reasons.push("not-ebay-uk");
     if (!listingId) reasons.push("missing-direct-sold-listing");
     if (listingId && storedListingId && listingId !== storedListingId) reasons.push("listing-id-mismatch");
-    if (normalizeCheckedCompPriceBasis(row.priceBasis) !== "ITEM_PRICE") reasons.push("inexact-price-basis");
+    const priceBasis = normalizeCheckedCompPriceBasis(row.priceBasis);
+    // eBay UK includes Buyer Protection in the price a UK buyer sees for
+    // private listings. The sold-search price, with delivery shown separately,
+    // is the buyer-visible market comparison Poke Deal needs. Older rows
+    // explicitly recorded as seller item price remain valid; checkout totals
+    // and hidden Best Offers do not.
+    if (priceBasis !== "DISPLAYED_PRICE" && priceBasis !== "ITEM_PRICE") reasons.push("inexact-price-basis");
     if (ctx.grade === "RAW") {
       const rowCondition = normalizeRawCondition(row.condition);
       if (!ctx.condition) reasons.push("lookup-condition-missing");

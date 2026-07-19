@@ -293,7 +293,7 @@ type OwnedSaleCompRow = {
 };
 
 type CheckedCompPlatform = "ebay-uk" | "cardmarket" | "vinted" | "other";
-type CheckedCompPriceBasis = "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN";
+type CheckedCompPriceBasis = "DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN";
 
 type CheckedCompEntry = {
   id: string;
@@ -983,7 +983,7 @@ export default function Home() {
   const [checkedCompLogPrice, setCheckedCompLogPrice] = useState("");
   const [checkedCompLogSoldDate, setCheckedCompLogSoldDate] = useState(todayInputValue());
   const [checkedCompLogPlatform, setCheckedCompLogPlatform] = useState<CheckedCompPlatform>("ebay-uk");
-  const [checkedCompLogPriceBasis, setCheckedCompLogPriceBasis] = useState<CheckedCompPriceBasis>("ITEM_PRICE");
+  const [checkedCompLogPriceBasis, setCheckedCompLogPriceBasis] = useState<CheckedCompPriceBasis>("DISPLAYED_PRICE");
   const [checkedCompLogNote, setCheckedCompLogNote] = useState("");
   const [checkedCompLogSourceUrl, setCheckedCompLogSourceUrl] = useState("");
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
@@ -2139,24 +2139,6 @@ export default function Home() {
       return true;
     });
   }, [deal?.targetBuyPence, quickStockListPence]);
-  const checkedCompPriceOptions = useMemo(() => {
-    if (!apiHeadline || apiHeadline.medianPence <= 0) return [];
-    const options = [
-      { label: "Use comp", valuePence: apiHeadline.medianPence },
-      ...(apiHeadline.lowPence > 0 && apiHeadline.lowPence !== apiHeadline.medianPence
-        ? [{ label: "Low", valuePence: apiHeadline.lowPence }]
-        : []),
-      ...(apiHeadline.highPence > 0 && apiHeadline.highPence !== apiHeadline.medianPence
-        ? [{ label: "High", valuePence: apiHeadline.highPence }]
-        : []),
-    ];
-    const seen = new Set<number>();
-    return options.filter((option) => {
-      if (seen.has(option.valuePence)) return false;
-      seen.add(option.valuePence);
-      return true;
-    });
-  }, [apiHeadline]);
   const buyTargetSuggestion = useMemo(
     () =>
       headline
@@ -2197,6 +2179,44 @@ export default function Home() {
       : deal?.targetBuyPence
       ? `Target ${gbp(deal.targetBuyPence)}`
       : "Add what you paid for profit maths";
+  const thinCheckedUkReference = unverifiedHeadline && checkedCompsSummary?.count === 1
+    ? { pricePence: checkedCompsSummary.medianPence }
+    : null;
+  const checkedUkHeadline = Boolean(
+    headline?.source === "checked-comps" &&
+      headline.raw?.conditionMatched === true &&
+      (headline.raw?.traceableCount ?? headline.sampleSize) >= 2,
+  );
+  const primaryEvidenceLabel = !headline
+    ? "No verified evidence"
+    : thinCheckedUkReference
+      ? `eBay UK reference ${gbp(thinCheckedUkReference.pricePence)} · 1 traceable sold / 90d · add another; provider context ${unverifiedRange} unverified`
+      : checkedUkHeadline
+        ? `Checked eBay UK ${formatCompRange(headline.lowPence, headline.highPence)} · ${headlineEvidenceSummary(headline)} / ${headline.windowDays}d · ${ageLabel(headline.asOf)}`
+        : unverifiedHeadline
+          ? `Unverified provider evidence ${unverifiedRange} · ${headlineEvidenceSummary(headline)} / ${headline.windowDays}d · ${ageLabel(headline.asOf)}`
+          : `Market ${gbp(headline.medianPence)} · ${headlineEvidenceSummary(headline)} / ${headline.windowDays}d · ${ageLabel(headline.asOf)}`;
+  const primaryRangeLabel = thinCheckedUkReference
+    ? "eBay UK reference"
+    : checkedUkHeadline
+      ? "eBay UK sold range"
+      : unverifiedHeadline
+        ? "Unverified provider range"
+        : "Market comp";
+  const primaryRangeValue = !headline
+    ? "No verified range"
+    : thinCheckedUkReference
+      ? gbp(thinCheckedUkReference.pricePence)
+      : checkedUkHeadline
+        ? formatCompRange(headline.lowPence, headline.highPence)
+        : unverifiedHeadline
+          ? unverifiedRange
+          : gbp(headline.medianPence);
+  const primaryRangeDetail = !headline
+    ? "Run a comp lookup"
+    : thinCheckedUkReference
+      ? `1 traceable sold · add another before it can headline · provider ${unverifiedRange} unverified`
+      : `${headlineEvidenceSummary(headline)} · ${ageLabel(headline.asOf)} · ${decisionBarOfferText}`;
   const buyFlowSteps = useMemo<BuyFlowStep[]>(() => {
     const cardReady = Boolean(name.trim() && (setNameValue.trim() || number.trim()));
     const compReady = Boolean(headline && !isAmbiguousComp);
@@ -3693,7 +3713,7 @@ export default function Home() {
     setCheckedCompLogPrice("");
     setCheckedCompLogSoldDate(todayInputValue());
     setCheckedCompLogPlatform("ebay-uk");
-    setCheckedCompLogPriceBasis("ITEM_PRICE");
+    setCheckedCompLogPriceBasis("DISPLAYED_PRICE");
     setCheckedCompLogNote("");
     setCheckedCompLogSourceUrl("");
     setManualCompReturnArmed(false);
@@ -6877,7 +6897,7 @@ export default function Home() {
     if (!link?.url) return;
     setManualCompQuery(link.query);
     setManualCompReturnArmed(true);
-    if (kind === "EBAY_UK_SOLD") openCheckedCompLogger("ebay-uk", link.url);
+    if (kind === "EBAY_UK_SOLD") openCheckedCompLogger("ebay-uk");
     const opened = openExternalUrl(link.url);
     setNotice(
       opened
@@ -6899,11 +6919,10 @@ export default function Home() {
     return true;
   }
 
-  function openCheckedCompLogger(platform: CheckedCompPlatform = "ebay-uk", sourceUrl?: string) {
+  function openCheckedCompLogger(platform: CheckedCompPlatform = "ebay-uk") {
     setCheckedCompLogOpen(true);
     setCheckedCompLogPlatform(platform);
     setCheckedCompLogSoldDate((current) => current || todayInputValue());
-    if (sourceUrl) setCheckedCompLogSourceUrl(sourceUrl);
     setManualCompReturnArmed(true);
   }
 
@@ -6924,14 +6943,6 @@ export default function Home() {
           : ""
       }.`,
     );
-    setError(null);
-  }
-
-  function applyCheckedCompPrice(valuePence: number) {
-    setCheckedCompLogPrice(penceToPounds(valuePence));
-    setCheckedCompLogOpen(true);
-    setManualCompReturnArmed(false);
-    setNotice("Checked comp price filled. Tap Log price to store it.");
     setError(null);
   }
 
@@ -7003,7 +7014,7 @@ export default function Home() {
       setCheckedCompLogPrice("");
       setCheckedCompLogNote("");
       setCheckedCompLogSourceUrl("");
-      setCheckedCompLogPriceBasis("ITEM_PRICE");
+      setCheckedCompLogPriceBasis("DISPLAYED_PRICE");
       setManualCompReturnArmed(false);
       const pinnedCheckedSource = pinCheckedCompEvidence(nextLoggedEntries, aggregate ?? null, card);
       const savedEntry = payload.entry as CheckedCompEntry | null | undefined;
@@ -7356,8 +7367,9 @@ export default function Home() {
               <label>
                 Price basis
                 <select value={checkedCompLogPriceBasis} onChange={(event) => setCheckedCompLogPriceBasis(event.target.value as CheckedCompPriceBasis)}>
-                  <option value="ITEM_PRICE">Exact item price · excludes fees/postage</option>
-                  <option value="BUYER_TOTAL">Buyer total · includes protection fee</option>
+                  <option value="DISPLAYED_PRICE">Displayed sold price · excludes delivery</option>
+                  <option value="ITEM_PRICE">Seller item price · before Buyer Protection</option>
+                  <option value="BUYER_TOTAL">Checkout total · includes delivery/fees</option>
                   <option value="BEST_OFFER_UNKNOWN">Best Offer · accepted price hidden</option>
                 </select>
               </label>
@@ -7411,7 +7423,11 @@ export default function Home() {
                   <span>
                     {checkedCompPlatformLabel(entry.platform)} · {shortDate(entry.soldDate)}
                     {entry.condition ? ` · ${entry.condition}` : ""}
-                    {entry.priceBasis !== "ITEM_PRICE" ? " · inexact price" : ""}
+                    {entry.priceBasis === "DISPLAYED_PRICE"
+                      ? " · displayed price"
+                      : entry.priceBasis === "ITEM_PRICE"
+                        ? " · seller item price"
+                        : " · inexact price"}
                     {entry.evidenceStatus === "used" ? " · used" : entry.evidenceStatus === "outlier" ? " · outlier removed" : " · corroboration"}
                   </span>
                 </div>
@@ -7420,15 +7436,6 @@ export default function Home() {
                   <a href={entry.sourceUrl} target="_blank" rel="noreferrer">Open sold item</a>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-        {checkedCompPriceOptions.length > 0 && (
-          <div className="checked-comp-price-presets" aria-label="Checked comp price shortcuts">
-            {checkedCompPriceOptions.map((option) => (
-              <button key={`${option.label}-${option.valuePence}`} type="button" onClick={() => applyCheckedCompPrice(option.valuePence)}>
-                {option.label} {gbp(option.valuePence)}
-              </button>
             ))}
           </div>
         )}
@@ -8869,7 +8876,7 @@ export default function Home() {
                   </p>
                   <h2>{offerCalc?.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}</h2>
                   <small>
-                    {unverifiedHeadline ? `Unverified evidence ${unverifiedRange}` : `Market ${gbp(headline.medianPence)}`} · {headlineEvidenceSummary(headline)} / {headline.windowDays}d · {ageLabel(headline.asOf)}
+                    {primaryEvidenceLabel}
                     {comp?.cached ? ` · cached ${comp.cached.ageHours}h` : ""}
                     {compProgressPhase === "provisional" ? " · provisional" : ""}
                   </small>
@@ -8918,9 +8925,9 @@ export default function Home() {
                   <strong>{dealerVerdict?.title ?? (needsManualComp ? "Check solds" : "Priced")}</strong>
                 </button>
                 <div>
-                  <span>{unverifiedHeadline ? "Unverified range" : "Market comp"}</span>
-                  <strong>{unverifiedHeadline ? unverifiedRange : gbp(headline.medianPence)}</strong>
-                  <small>{headlineEvidenceSummary(headline)} · {ageLabel(headline.asOf)} · {decisionBarOfferText}</small>
+                  <span>{primaryRangeLabel}</span>
+                  <strong>{primaryRangeValue}</strong>
+                  <small>{primaryRangeDetail}</small>
                 </div>
               </div>
               <div className="buy-result-action-row" aria-label="Buy actions">
@@ -12249,7 +12256,7 @@ function checkedCompLogNotice(entry: CheckedCompEntry | null | undefined, priceP
   }
   const reasons = entry?.exclusionReasons ?? [];
   if (reasons.includes("inexact-price-basis")) {
-    return `Logged ${gbp(pricePence)} as corroboration. Buyer totals and hidden Best Offers cannot prove the sold item price.`;
+    return `Logged ${gbp(pricePence)} as corroboration. Checkout totals and hidden Best Offers cannot prove the displayed sold price excluding delivery.`;
   }
   if (reasons.some((reason) => reason.startsWith("condition-mismatch") || reason === "entry-condition-missing")) {
     return `Logged ${gbp(pricePence)} as corroboration because its RAW condition does not match this lookup.`;
@@ -12316,7 +12323,7 @@ function buildLocalCheckedCompResult(
     asOf: latest.soldDate,
     raw: {
       kind: "checked-comps",
-      caveat: "Distinct dealer-checked eBay UK sold listings for this exact card, grade and RAW condition.",
+      caveat: "Distinct dealer-checked eBay UK displayed sold prices for this exact card, grade and RAW condition; delivery is excluded.",
       region: "UK",
       condition: grade === "RAW" ? condition : undefined,
       conditionMatched: true,

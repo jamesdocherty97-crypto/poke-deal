@@ -8,6 +8,54 @@
   },
   "observations": [
     {
+      "itemId": "257584212141",
+      "url": "https://www.ebay.co.uk/itm/257584212141",
+      "soldAt": "2026-07-01T12:00:00.000Z",
+      "displayedTotalPence": 66080,
+      "itemPricePence": null,
+      "priceBasis": "DISPLAYED_PRICE",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "AUCTION",
+      "notes": "eBay UK sold search says Sold 1 Jul 2026, 20 bids, Near Mint; £660.80 is the displayed sold price and delivery is separate."
+    },
+    {
+      "itemId": "358710939479",
+      "url": "https://www.ebay.co.uk/itm/358710939479",
+      "soldAt": "2026-06-26T12:00:00.000Z",
+      "displayedTotalPence": 85000,
+      "itemPricePence": null,
+      "priceBasis": "DISPLAYED_PRICE",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "FIXED_PRICE",
+      "notes": "eBay UK sold search says Sold 26 Jun 2026, Buy It Now, Near Mint To Mint; delivery is separate."
+    },
+    {
+      "itemId": "178211468741",
+      "url": "https://www.ebay.co.uk/itm/178211468741",
+      "soldAt": "2026-06-11T12:00:00.000Z",
+      "displayedTotalPence": 105000,
+      "itemPricePence": null,
+      "priceBasis": "DISPLAYED_PRICE",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "FIXED_PRICE",
+      "notes": "eBay UK sold search says Sold 11 Jun 2026, Buy It Now, Near Mint; delivery is separate."
+    },
+    {
+      "itemId": "168425460368",
+      "url": "https://www.ebay.co.uk/itm/168425460368",
+      "soldAt": "2026-06-03T12:00:00.000Z",
+      "displayedTotalPence": 56500,
+      "itemPricePence": null,
+      "priceBasis": "BEST_OFFER_UNKNOWN",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "BEST_OFFER",
+      "notes": "The sold result still says or Best Offer, so the accepted price cannot be proven from the displayed amount."
+    },
+    {
       "itemId": "157802426654",
       "url": "https://www.ebay.co.uk/itm/157802426654",
       "soldAt": "2026-04-18T03:07:00.000Z",
