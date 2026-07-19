@@ -84,7 +84,7 @@ export class PrismaCardCache {
       });
     }
 
-    const existing = await this.db.card.findFirst({ where: cardLookupWhere(data) });
+    const existing = await this.findPreferredIdentityCard(data);
     return existing ?? this.db.card.create({ data });
   }
 
@@ -102,7 +102,15 @@ export class PrismaCardCache {
       if (existing) return existing;
     }
 
-    return this.db.card.findFirst({ where: cardLookupWhere(data) });
+    return this.findPreferredIdentityCard(data);
+  }
+
+  private async findPreferredIdentityCard(data: PrismaCardData): Promise<PrismaCard | null> {
+    for (const where of cardLookupWheres(data)) {
+      const existing = await this.db.card.findFirst({ where });
+      if (existing) return existing;
+    }
+    return null;
   }
 
   private async resolveFromCatalog(card: CardRef | CatalogCard): Promise<CatalogCard | null> {
@@ -154,7 +162,7 @@ export function toCardData(card: CardRef | CatalogCard): PrismaCardData {
   };
 }
 
-function cardLookupWhere(data: PrismaCardData): Record<string, unknown> {
+function cardLookupWheres(data: PrismaCardData): Record<string, unknown>[] {
   const base = {
     game: data.game,
     language: data.language,
@@ -163,15 +171,20 @@ function cardLookupWhere(data: PrismaCardData): Record<string, unknown> {
     edition: data.edition ?? null,
     finish: data.finish ?? null,
   };
-  if (!data.number) return { ...base, number: null };
+  if (!data.number) return [{ ...base, number: null }];
   const parts = collectorNumberLookupParts(data.number);
-  return {
-    ...base,
-    OR: [
-      ...parts.exact.map((number) => ({ number })),
-      ...parts.prefixes.map((prefix) => ({ number: { startsWith: `${prefix}/` } })),
-    ],
-  };
+  const printedExact = parts.exact.filter((number) => number.includes("/"));
+  const numeratorExact = parts.exact.filter((number) => !number.includes("/"));
+  return [
+    // Prefer a dealer/provider's full printed identity when it is known.
+    ...(printedExact.length > 0 ? [{ ...base, OR: printedExact.map((number) => ({ number })) }] : []),
+    // When a provider supplied only a numerator, prefer an existing printed
+    // total (218/203) over a legacy numerator-only row (218).
+    ...(parts.prefixes.length > 0
+      ? [{ ...base, OR: parts.prefixes.map((prefix) => ({ number: { startsWith: `${prefix}/` } })) }]
+      : []),
+    ...(numeratorExact.length > 0 ? [{ ...base, OR: numeratorExact.map((number) => ({ number })) }] : []),
+  ];
 }
 
 function cleanOptional(value: string | undefined): string | undefined {
