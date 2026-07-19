@@ -248,7 +248,7 @@ Landing verification: typecheck ✅ · unit 865/865 ✅ · overhaul 12/12 ✅ ·
 
 ### Mechanical cleanup checkpoint
 
-Work continued from merged `main` on `codex/ui-mechanical-sweep`. Commit `919da9c` completes the four ordered tasks in `CODEX_UI_MECHANICAL_2026-07-18.md`:
+Work continued from merged `main` on `codex/ui-mechanical-sweep`. Commit [`919da9c`](https://github.com/jamesdocherty97-crypto/poke-deal/commit/919da9cb187e2fec2ca5f0ac77b428834fdc5bb2) completes the four ordered tasks in `CODEX_UI_MECHANICAL_2026-07-18.md`:
 
 1. **Type scale — complete.** 286 target declarations migrated in ten bounded batches (9×30 + 16); zero mapped `px`/`.62rem`–`.72rem` values remain in `components.css`. No constrained-control exception was needed.
 2. **Colour tokens — complete with one explicit scope exception.** 69 hard-coded info/yellow/warning/success uses migrated. Brand-token contrast is at least 5.30:1 on the darkest relevant surface set. `.grade-badge.raw { color: #fff4b0; }` remains untouched because grade-badge colours are explicitly out of scope.
@@ -265,6 +265,12 @@ Screenshot and diff evidence:
 - `output/ui-audit/codex-mechanical/task4-dead-rules/`
 - `output/ui-audit/codex-mechanical/axe-results.json`
 
-**Exact next action:** review the retained live inventory-tab exception, then push `codex/ui-mechanical-sweep` and open a separate PR into `main`; do not deploy the mechanical sweep before that review.
+### Mechanical landing and final production closeout
 
-Remaining judgment work, in value order: (1) full List queue/listing merge into one stateful list, (2) Setup row-level disclosure beyond the current attention filter, (3) the today@768 spacing regression, (4) `page.tsx` decomposition with `next/dynamic`, and (5) Stock/List virtualization at scale.
+[PR #8](https://github.com/jamesdocherty97-crypto/poke-deal/pull/8) contained exactly the three intended files (`components.css`, `screens.css`, and this handover), was two commits ahead and zero behind `main`, and passed the complete GitHub `required-gates` workflow: dependency audit, Prisma validation/migration against the disposable CI database, unit, overhaul, UX, pricing red-team, typecheck, production build, and Playwright E2E. Its Vercel preview also passed. The PR was made ready only after those gates completed and merged as [`36d9fbf`](https://github.com/jamesdocherty97-crypto/poke-deal/commit/36d9fbfc1f129a8ede268515927fcb524998077e).
+
+The resulting Vercel production deployment completed successfully. A final read-only smoke of all six workspaces at both 375 and 1280 recorded **0 console errors, 0 failed HTTP responses, and 0 horizontal-overflow cases**. Settled screenshots confirmed the Today desktop balance, Stock inventory tabs/cards, List order and controls, and Setup attention-only provider disclosure. The retained Stock-tab rule still computes to its intentional `7px` gap, `2px 1px 4px` padding, yellow selected background, and red selected underline. No acquire, sale, reset, or publish control was used. Final production evidence is in `output/playwright/mechanical-production-smoke/settled/`.
+
+**Codex execution status: complete end to end.** The July audit, Phases 7–10, mechanical Tasks 1–4, both PR landings, CI gates, Vercel deployments, local/preview/production browser verification, accessibility scans, and handover documentation are complete. There is no pending Codex implementation or deployment phase.
+
+**Exact next action:** Fable 5 reviews the landed result and recommends any judgment-led follow-up. Suggested review queue (not incomplete UI-quality delivery): (1) whether a full List queue/listing merge is still worth the complexity after the rename/reorder, (2) deeper Setup row-level disclosure, (3) the today@768 spacing trade-off, (4) `page.tsx` decomposition with `next/dynamic`, and (5) Stock/List virtualization at scale.
