@@ -234,11 +234,37 @@ Final verification: typecheck ✅ · unit 865/865 ✅ · e2e 11/11 ✅ · build 
 
 ## Checkpoint / continuation
 
-**Sessions complete through Quick Wins + Focused Improvements + List/Setup IA.** Mechanical cleanup (type-scale tokens, color tokens, uppercase grammar, dead rules) is specced for Codex in `CODEX_UI_MECHANICAL_2026-07-18.md` with guard rails. Remaining judgment work, in value order: (1) full List queue/listing merge into one stateful list (partially defused by rename+reorder; revisit after Codex sweep), (2) page.tsx decomposition with `next/dynamic` — mistake-prone, keep with Claude/owner, (3) stock/list virtualization at scale. Working tree holds the uncommitted QW diff (intentionally uncommitted — owner to review/commit). Branch `codex/workflow-integration-hardening` @ ca096fc + working-tree changes. Local `main` retains its unpushed commit `21ae43d` (untouched).
+### July UI landing and deployment
 
-Remaining roadmap (next session):
-1. **List IA merge** — unify "Listing queue" and "Listings" into one stateful list (`ListingsTab.tsx` + page.tsx list section); the largest unaddressed finding (list@375 still ~5800px, same item rendered twice).
-2. Setup deeper disclosure — collapse provider rows to status-line + expand (beyond this session's slimming).
-3. today@768 regression micro-fix — tighten `.priority-queue .sale-ready-sleeve` spacing under 1024px (~280px growth).
-4. Type-scale sweep of components.css (the 104× 11px / 92× 12px hard-coded sizes) — one stylesheet at a time with screenshot diffs.
-5. Deeper: decompose page.tsx per workspace with `next/dynamic` (cuts the 164 kB route bundle); virtualize stock/list at scale.
+The Phase 7–10 working tree was cross-checked hunk-by-hunk against this handover; every source hunk was accounted for and no undocumented application change was found. It landed as three commits:
+
+1. [`76e2041` — restore action hierarchy and AA contrast quick wins](https://github.com/jamesdocherty97-crypto/poke-deal/commit/76e2041255030e348d0f802109cf448733160520)
+2. [`6d23723` — rebalance Today and compact Buy and Stock states](https://github.com/jamesdocherty97-crypto/poke-deal/commit/6d23723d7932b317399fd20b962b84f60aa0614c)
+3. [`fdcaaaa` — reorder List pipeline and add Setup disclosure](https://github.com/jamesdocherty97-crypto/poke-deal/commit/fdcaaaabd6de9c8ab27ebd1b31baaa3f3926f66f)
+
+[PR #7](https://github.com/jamesdocherty97-crypto/poke-deal/pull/7) was refreshed with the measured evidence (axe 2→0, Lighthouse mobile 0.85→0.92, Setup mobile −45%, Today desktop dead zone removed), made ready after the local full gate, and merged to `main` as [`618a670`](https://github.com/jamesdocherty97-crypto/poke-deal/commit/618a6706cbd7a0ec37cc166acb3196893d759135). Local `main` was fast-forwarded, so its previously unpushed `21ae43d` remains in the merged ancestry; it was not reset or discarded.
+
+Landing verification: typecheck ✅ · unit 865/865 ✅ · overhaul 12/12 ✅ · pricing red-team 1/1 ✅ · e2e 11/11 ✅ · build ✅ 267 kB · audit 0 vulnerabilities. The Vercel deployment from `main` completed successfully. Read-only smoke testing of [poke-deal.vercel.app](https://poke-deal.vercel.app/) loaded all six workspaces at 1280 plus Today/List/Setup at 375 with no console errors, failed HTTP responses, or horizontal overflow. Styles were intact; Today columns, the Setup provider disclosure, and List's Stock-to-draft → Listings → Pack builder order matched `output/ui-audit/after/`. No acquire, sale, reset, or publish action was triggered. Production evidence is in `output/playwright/production-smoke/`.
+
+### Mechanical cleanup checkpoint
+
+Work continued from merged `main` on `codex/ui-mechanical-sweep`. Commit `919da9c` completes the four ordered tasks in `CODEX_UI_MECHANICAL_2026-07-18.md`:
+
+1. **Type scale — complete.** 286 target declarations migrated in ten bounded batches (9×30 + 16); zero mapped `px`/`.62rem`–`.72rem` values remain in `components.css`. No constrained-control exception was needed.
+2. **Colour tokens — complete with one explicit scope exception.** 69 hard-coded info/yellow/warning/success uses migrated. Brand-token contrast is at least 5.30:1 on the darkest relevant surface set. `.grade-badge.raw { color: #fff4b0; }` remains untouched because grade-badge colours are explicitly out of scope.
+3. **Uppercase grammar — complete.** The current file contains 42 uppercase-label rules (the brief's 43 count was stale); all 42 now use `--letter-spacing-label`. No wordmark or grade-badge rule was changed.
+4. **Dead rules — complete with one evidence-backed exception.** Removed the 410-line disabled `screens.css` block, the inert component `.secondary-action`, three inert inventory-filter blocks, and two inert grouped selectors. The live top-level inventory-filter block was retained: computed styles showed its gap, padding, and selected background still participate in the cascade, so deleting it would not be a no-op. Stock Task 3→4 image differences were only 0.0192% at 375 and 0.0079% at 1280, confined to the animated refresh glyph/subpixel noise.
+
+Mechanical verification: per-task typecheck + production build ✅ · final typecheck ✅ · unit 865/865 ✅ · overhaul 12/12 ✅ · pricing red-team 1/1 ✅ · e2e 11/11 ✅ · build ✅ 267 kB · audit 0 vulnerabilities · axe-core 4.10.2 12/12 scans clean ✅ · no console errors or horizontal overflow in every 375/1280 capture. The production server was stopped before E2E and the app was rebuilt afterwards.
+
+Screenshot and diff evidence:
+
+- `output/ui-audit/codex-mechanical/task1-batch-{01..10}/`
+- `output/ui-audit/codex-mechanical/task2-color-tokens/`
+- `output/ui-audit/codex-mechanical/task3-uppercase-grammar/`
+- `output/ui-audit/codex-mechanical/task4-dead-rules/`
+- `output/ui-audit/codex-mechanical/axe-results.json`
+
+**Exact next action:** review the retained live inventory-tab exception, then push `codex/ui-mechanical-sweep` and open a separate PR into `main`; do not deploy the mechanical sweep before that review.
+
+Remaining judgment work, in value order: (1) full List queue/listing merge into one stateful list, (2) Setup row-level disclosure beyond the current attention filter, (3) the today@768 spacing regression, (4) `page.tsx` decomposition with `next/dynamic`, and (5) Stock/List virtualization at scale.
