@@ -69,10 +69,16 @@ test("old no-cost stock keeps purchase cost, market guidance and user list price
   await manualLogSheet.getByRole("textbox").first().fill("6.00");
   await manualLogSheet.getByText("Individual sold-item link · needed for trusted evidence").click();
   await manualLogSheet.getByPlaceholder("https://www.ebay.co.uk/itm/…").fill("https://www.ebay.co.uk/itm/157802426654");
+  const soldDate = manualLogSheet.getByLabel("Sold date");
+  await soldDate.fill("2026-07-01");
+  await soldDate.press("Enter");
+  await expect.poll(() => ledger.manualCompBodies.length).toBe(0);
+  await expect(soldDate).toHaveValue("2026-07-01");
   await manualLogSheet.getByRole("button", { name: "Log price", exact: true }).click();
   await expect.poll(() => ledger.manualCompBodies.length).toBe(1);
   expect(ledger.manualCompBodies[0]).toMatchObject({
     pricePence: 600,
+    soldDate: "2026-07-01",
     condition: "NM",
     priceBasis: "ITEM_PRICE",
     sourceUrl: "https://www.ebay.co.uk/itm/157802426654",

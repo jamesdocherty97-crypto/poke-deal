@@ -7320,15 +7320,7 @@ export default function Home() {
           </button>
         </div>
         {checkedCompLogOpen && (
-          <div
-            className="checked-comp-log-sheet"
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              event.stopPropagation();
-              void logCheckedCompEntry();
-            }}
-          >
+          <div className="checked-comp-log-sheet">
             <div className="form-grid">
               <label>
                 Sold price
