@@ -1,4 +1,5 @@
 import type { CardRef, Game, Language } from "../domain/types.js";
+import { collectorNumberLookupParts } from "../cards/identity.js";
 import type { CatalogCard, CatalogSource } from "./types.js";
 
 export type PrismaCard = {
@@ -154,14 +155,22 @@ export function toCardData(card: CardRef | CatalogCard): PrismaCardData {
 }
 
 function cardLookupWhere(data: PrismaCardData): Record<string, unknown> {
-  return {
+  const base = {
     game: data.game,
     language: data.language,
     name: data.name,
     setName: data.setName,
-    number: data.number ?? null,
     edition: data.edition ?? null,
     finish: data.finish ?? null,
+  };
+  if (!data.number) return { ...base, number: null };
+  const parts = collectorNumberLookupParts(data.number);
+  return {
+    ...base,
+    OR: [
+      ...parts.exact.map((number) => ({ number })),
+      ...parts.prefixes.map((prefix) => ({ number: { startsWith: `${prefix}/` } })),
+    ],
   };
 }
 

@@ -1,5 +1,5 @@
 import type { CardRef, CompQuery, CompResult, Grade, RawCondition } from "../../domain/types.js";
-import { normalizeCollectorNumberForCompare } from "../../cards/identity.js";
+import { collectorNumberLookupParts } from "../../cards/identity.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { mean, median } from "../cleaning.js";
@@ -137,10 +137,13 @@ function ownedSaleCompPricePence(row: OwnedSaleRow): number {
 
 export function buildOwnedSalesWhere(card: CardRef, grade: Grade, windowDays: number): unknown {
   const soldAfter = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
-  const cardWhere =
-    card.tcgApiId
-      ? { tcgApiId: card.tcgApiId }
-      : ownedSalesCardWhere(card);
+  const identity = ownedSalesCardWhere(card);
+  const providerIds = [
+    card.tcgApiId ? { tcgApiId: card.tcgApiId } : null,
+    card.tcgDexId ? { tcgDexId: card.tcgDexId } : null,
+    card.cardmarketId ? { cardmarketId: card.cardmarketId } : null,
+  ].filter((candidate) => candidate != null);
+  const cardWhere = providerIds.length > 0 ? { OR: [...providerIds, identity] } : identity;
 
   return {
     soldAt: { gte: soldAfter },
@@ -159,9 +162,14 @@ function ownedSalesCardWhere(card: CardRef): unknown {
     ...(card.setName ? { setName: card.setName } : {}),
   };
   if (!card.number) return base;
-  const comparableNumber = normalizeCollectorNumberForCompare(card.number);
-  if (!comparableNumber || comparableNumber === card.number.trim()) return { ...base, number: card.number };
-  return { ...base, OR: [{ number: card.number }, { number: comparableNumber }] };
+  const parts = collectorNumberLookupParts(card.number);
+  return {
+    ...base,
+    OR: [
+      ...parts.exact.map((number) => ({ number })),
+      ...parts.prefixes.map((prefix) => ({ number: { startsWith: `${prefix}/` } })),
+    ],
+  };
 }
 
 function emptyOwnedSalesComp(ctx: OwnedSalesContext, reason: string): CompResult {

@@ -212,7 +212,7 @@ test("CheckedCompsSource degrades to explicit empty evidence when the database f
   assert.equal((comp.raw as { reason?: string }).reason, "checked comp lookup failed");
 });
 
-test("CheckedCompsSource requests only the exact card and grade", async () => {
+test("CheckedCompsSource keeps provider ids and exact print identity in the lookup", async () => {
   let seenWhere: unknown = null;
   const source = new CheckedCompsSource({
     card: {} as never,
@@ -229,10 +229,12 @@ test("CheckedCompsSource requests only the exact card and grade", async () => {
 
   await source.lookup(card, { grade: "PSA_10" });
 
-  const where = seenWhere as { grade?: string; condition?: string | null; card?: { tcgApiId?: string } };
+  const where = seenWhere as { grade?: string; condition?: string | null; card?: unknown };
   assert.equal(where.grade, "PSA_10");
   assert.equal(where.condition, null);
-  assert.equal(where.card?.tcgApiId, "swsh7-218");
+  assert.match(JSON.stringify(where.card), /swsh7-218/);
+  assert.match(JSON.stringify(where.card), /Rayquaza VMAX/);
+  assert.match(JSON.stringify(where.card), /218\/203/);
 });
 
 test("buildCheckedCompsWhere pins exact identities and canonical numeric numbers", () => {
@@ -245,12 +247,23 @@ test("buildCheckedCompsWhere pins exact identities and canonical numeric numbers
     { name: "Tauros", setName: "Chaos Rising", number: "069/086", game: "POKEMON", language: "EN" },
     "RAW",
     90,
-  ) as { card?: { OR?: Array<{ number: string }> } };
+  ) as { card?: unknown };
+  const shortProviderNumber = buildCheckedCompsWhere(
+    { name: "Rayquaza VMAX", setName: "Evolving Skies", number: "218", tcgDexId: "swsh7-218", game: "POKEMON", language: "EN" },
+    "RAW",
+    90,
+    "NM",
+  ) as { card?: unknown };
 
   assert.equal(byId.grade, "RAW");
   assert.equal(byId.condition, "NM");
   assert.equal(byId.card?.id, "card_1");
-  assert.deepEqual(byNumber.card?.OR, [{ number: "069/086" }, { number: "69/86" }]);
+  assert.match(JSON.stringify(byNumber.card), /069\/086/);
+  assert.match(JSON.stringify(byNumber.card), /69\/86/);
+  assert.match(JSON.stringify(byNumber.card), /startsWith/);
+  assert.match(JSON.stringify(shortProviderNumber.card), /swsh7-218/);
+  assert.match(JSON.stringify(shortProviderNumber.card), /"startsWith":"218\/"/);
+  assert.match(JSON.stringify(shortProviderNumber.card), /Evolving Skies/);
 });
 
 test("eBay item URL normalization is strict, stable, and UK-only", () => {

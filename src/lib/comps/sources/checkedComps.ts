@@ -1,7 +1,7 @@
 import { PrismaCardCache, toCardRef, type PrismaCardDb, type PrismaCard } from "../../catalog/prismaCardCache.js";
 import type { CatalogSource } from "../../catalog/types.js";
 import type { CardRef, CompQuery, CompResult, Grade, RawCondition } from "../../domain/types.js";
-import { normalizeCollectorNumberForCompare } from "../../cards/identity.js";
+import { collectorNumberLookupParts } from "../../cards/identity.js";
 import type { CompSource } from "../CompSource.js";
 import { mean, median, removeOutliersIQR } from "../cleaning.js";
 import { normalizeRawCondition } from "../pricing.js";
@@ -427,18 +427,30 @@ function checkedCompDecisionForRaw(decision: EvidenceDecision) {
 
 function cardLookupWhere(card: CardRef): unknown {
   if (card.id) return { id: card.id };
-  if (card.tcgApiId) return { tcgApiId: card.tcgApiId };
-  if (card.tcgDexId) return { tcgDexId: card.tcgDexId };
   const base = {
     game: card.game ?? "POKEMON",
     language: card.language ?? "EN",
     name: card.name,
     ...(card.setName ? { setName: card.setName } : {}),
   };
-  if (!card.number) return base;
-  const comparableNumber = normalizeCollectorNumberForCompare(card.number);
-  if (!comparableNumber || comparableNumber === card.number.trim()) return { ...base, number: card.number };
-  return { ...base, OR: [{ number: card.number }, { number: comparableNumber }] };
+  const identity = card.number ? { ...base, ...collectorNumberWhere(card.number) } : base;
+  const providerIds: Array<Record<string, string> | null> = [
+    card.tcgApiId ? { tcgApiId: card.tcgApiId } : null,
+    card.tcgDexId ? { tcgDexId: card.tcgDexId } : null,
+    card.cardmarketId ? { cardmarketId: card.cardmarketId } : null,
+  ];
+  const exactProviderIds = providerIds.filter((candidate): candidate is Record<string, string> => candidate != null);
+  return exactProviderIds.length > 0 ? { OR: [...exactProviderIds, identity] } : identity;
+}
+
+function collectorNumberWhere(value: string): { OR: Array<{ number: string | { startsWith: string } }> } {
+  const parts = collectorNumberLookupParts(value);
+  return {
+    OR: [
+      ...parts.exact.map((number) => ({ number })),
+      ...parts.prefixes.map((prefix) => ({ number: { startsWith: `${prefix}/` } })),
+    ],
+  };
 }
 
 function emptyCheckedCompsComp(

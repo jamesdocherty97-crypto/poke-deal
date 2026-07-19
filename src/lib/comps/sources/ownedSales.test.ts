@@ -99,13 +99,15 @@ test("OwnedSalesSource degrades to empty comp when the db lookup fails", async (
   assert.equal((comp.raw as { reason?: string }).reason, "owned sale lookup failed");
 });
 
-test("buildOwnedSalesWhere prefers exact tcgApiId when available", () => {
+test("buildOwnedSalesWhere keeps provider id and exact print fallbacks", () => {
   const where = buildOwnedSalesWhere(card, "RAW", 90) as {
-    item?: { grade?: string; card?: { tcgApiId?: string } };
+    item?: { grade?: string; card?: unknown };
   };
 
   assert.equal(where.item?.grade, "RAW");
-  assert.equal(where.item?.card?.tcgApiId, "base1-4");
+  assert.match(JSON.stringify(where.item?.card), /base1-4/);
+  assert.match(JSON.stringify(where.item?.card), /Charizard/);
+  assert.match(JSON.stringify(where.item?.card), /4\/102/);
 });
 
 test("RAW owned sales never cross condition buckets", () => {
@@ -144,11 +146,11 @@ test("buildOwnedSalesWhere matches canonical numeric collector numbers", () => {
     { name: "Tauros", setName: "Chaos Rising", number: "069/086", game: "POKEMON", language: "EN" },
     "RAW",
     90,
-  ) as {
-    item?: { card?: { OR?: Array<{ number: string }> } };
-  };
+  ) as { item?: { card?: unknown } };
 
-  assert.deepEqual(where.item?.card?.OR, [{ number: "069/086" }, { number: "69/86" }]);
+  assert.match(JSON.stringify(where.item?.card), /069\/086/);
+  assert.match(JSON.stringify(where.item?.card), /69\/86/);
+  assert.match(JSON.stringify(where.item?.card), /startsWith/);
 });
 
 function ownedSale(
