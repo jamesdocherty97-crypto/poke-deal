@@ -56,6 +56,12 @@ function constantTimeBytesEqual(left: Uint8Array, right: Uint8Array): boolean {
   return difference === 0;
 }
 
+/** Constant-time string equality via digest comparison; safe for secrets of unequal length. */
+export async function timingSafeStringEqual(provided: string, expected: string): Promise<boolean> {
+  const [providedDigest, expectedDigest] = await Promise.all([sha256(provided), sha256(expected)]);
+  return constantTimeBytesEqual(providedDigest, expectedDigest);
+}
+
 export async function isValidAccessToken(provided: unknown, expected: string): Promise<boolean> {
   if (typeof provided !== "string") return false;
   if (provided.length < ACCESS_TOKEN_MIN_LENGTH || provided.length > ACCESS_TOKEN_MAX_LENGTH) {

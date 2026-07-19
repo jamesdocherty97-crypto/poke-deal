@@ -95,6 +95,23 @@ test("reviewed high-value foreign RAW evidence stays manual even if a client omi
   }), false);
 });
 
+test("a single client-supplied manual-check price cannot auto-price high-value RAW stock", () => {
+  // Guards the acquire route's legacy `checkedComp` field: stale offline
+  // replays and direct API callers must hit the same manual gate.
+  assert.equal(reviewedCompRequiresManualPricing({
+    sourcesDisagree: false,
+    grade: "RAW",
+    source: "manual-check",
+    medianPence: 103_981,
+  }), true);
+  assert.equal(reviewedCompRequiresManualPricing({
+    sourcesDisagree: false,
+    grade: "RAW",
+    source: "manual-check",
+    medianPence: 2_500,
+  }), false);
+});
+
 test("realized profit nets fees, postage and cost", () => {
   assert.equal(
     realizedProfit({ salePrice: 3000, fees: 414, postage: 120, costBasis: 1800 }),

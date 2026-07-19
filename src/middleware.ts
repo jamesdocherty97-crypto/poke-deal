@@ -17,6 +17,7 @@ import {
   hasPasswordlessAccessConfig,
   isValidAccessSession,
   readPasswordlessAccessConfig,
+  timingSafeStringEqual,
 } from "./lib/auth/accessSession";
 
 export async function middleware(req: NextRequest) {
@@ -70,7 +71,7 @@ export async function middleware(req: NextRequest) {
       const separator = decoded.indexOf(":");
       if (separator >= 0) {
         const provided = decoded.slice(separator + 1);
-        if (provided === password) return NextResponse.next();
+        if (await timingSafeStringEqual(provided, password)) return NextResponse.next();
       }
     } catch {
       // fall through to 401

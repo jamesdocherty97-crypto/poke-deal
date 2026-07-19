@@ -96,8 +96,16 @@ export async function POST(request: Request) {
     const comps: ReconciledComp = reviewedComps ?? (checkedComp
       ? { headline: checkedComp, all: [checkedComp], sourcesDisagree: false }
       : await createAppCompService(catalogSource, catalog).lookup(compCard, { grade: d.grade, condition: compCondition }));
+    // A client-supplied single checked price is not traceable evidence; run it
+    // through the same high-value RAW guard as reviewed receipts so a stale
+    // offline replay or direct API call cannot auto-price from one bare number.
     const compNeedsManualCheck = checkedComp
-      ? false
+      ? reviewedCompRequiresManualPricing({
+          sourcesDisagree: false,
+          grade: d.grade,
+          source: checkedComp.source,
+          medianPence: checkedComp.medianPence,
+        })
       : d.reviewedComps
         ? reviewedCompRequiresManualPricing({
             explicitManualCheck: d.reviewedComps.manualCheck,

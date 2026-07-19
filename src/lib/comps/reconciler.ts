@@ -225,6 +225,9 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     ukSoldsDisagree ? "uk-solds-disagree" : null,
     regionalHighValueManualCheck ? "high-value-without-uk-solds" : null,
     shouldManualCheckForSpread ? "cross-source-spread" : null,
+    // Every manual check must carry a nameable cause in the receipt.
+    lowConfidenceManualCheck ? "low-confidence-headline" : null,
+    damagedChosenManualCheck ? "damaged-evidence-quality" : null,
     ...suppressedSpreadReasons,
   ].filter((reason): reason is string => reason != null);
 

@@ -7363,6 +7363,9 @@ export default function Home() {
                     </option>
                   ))}
                 </select>
+                {checkedCompLogPlatform !== "ebay-uk" && (
+                  <small>Only eBay UK sold items can become trusted evidence; other platforms are logged as context.</small>
+                )}
               </label>
               <label>
                 Price basis
@@ -12438,6 +12441,9 @@ function humanReconciliationReason(reason: string): string {
   if (reason.includes("trend-suppressed")) return "Impossible trend was hidden.";
   if (reason.includes("approximate-sample-capped")) return "An approximate provider count was capped so it cannot overpower direct sold evidence.";
   if (reason.includes("high-value-without-uk-solds")) return "This £100+ value has no qualifying UK sold evidence and needs an eBay UK check.";
+  if (reason.includes("low-confidence-headline")) return "The chosen evidence is too thin or scattered to price automatically.";
+  if (reason.includes("damaged-evidence-quality")) return "The chosen source carries heavy quality penalties, so check solds by hand.";
+  if (reason.includes("cross-source-spread")) return "Sources are too far apart to trust a single number.";
   if (reason.includes("corroboration-fallback") || reason.includes("corroboration-only")) return "Only fallback evidence was available.";
   if (reason.includes("no-eligible-candidates")) return "No source passed the quality gates.";
   return reason.replace(/[-:]/g, " ");
