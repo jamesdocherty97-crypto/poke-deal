@@ -166,6 +166,7 @@ test("one traceable Rayquaza sale leads the UI without becoming an automatic com
   const ledger = new RayquazaThinPricingLedger();
   await mockPricingApis(context, ledger);
   await context.route("https://www.ebay.co.uk/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>eBay UK solds</title>" }));
+  await page.setViewportSize({ width: 320, height: 800 });
 
   await page.goto("/?view=buy");
   await page.getByLabel("Smart comp search").fill("Rayquaza VMAX Evolving Skies 218/203 RAW NM");
@@ -188,6 +189,7 @@ test("one traceable Rayquaza sale leads the UI without becoming an automatic com
   await expect(manualCompCard).toContainText("One logged comp is shown as corroboration");
   await manualCompCard.getByText("Individual sold-item link · needed for trusted evidence").click();
   await expect(manualCompCard.getByPlaceholder("https://www.ebay.co.uk/itm/…")).toHaveValue("");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 
 class PricingLedger {
