@@ -293,6 +293,21 @@ export function preferPrintedCollectorNumber(
   return catalog;
 }
 
+/**
+ * Preserve the full printed collector number in dealer-facing catalogue data.
+ * Some providers identify secret rares by numerator only (for example `218`),
+ * which is sufficient for their API but loses the printed `218/203` identity
+ * the dealer supplied and checked against sold listings.
+ */
+export function catalogWithPrintedCollectorNumber(
+  catalog: CatalogCard | null,
+  requestedNumber: string | null | undefined,
+): CatalogCard | null {
+  if (!catalog) return null;
+  const number = preferPrintedCollectorNumber(catalog.number, requestedNumber);
+  return number === catalog.number ? catalog : { ...catalog, number };
+}
+
 export function createAppCompService(
   catalogSource: CatalogSource = new PokemonTcgApiCatalogSource(),
   catalog: CatalogCard | null = null,
