@@ -132,3 +132,11 @@ test("removeRecentComp removes by card and grade identity", () => {
 test("recentCompKey includes grade so raw and slab checks stay separate", () => {
   assert.notEqual(recentCompKey(baseComp), recentCompKey({ ...baseComp, grade: "PSA_10" }));
 });
+
+test("recentCompKey keeps RAW condition receipts separate", () => {
+  assert.notEqual(recentCompKey({ ...baseComp, condition: "NM" }), recentCompKey({ ...baseComp, condition: "LP" }));
+  assert.equal(
+    recentCompKey({ ...baseComp, grade: "PSA_10", condition: "NM" }),
+    recentCompKey({ ...baseComp, grade: "PSA_10", condition: "LP" }),
+  );
+});

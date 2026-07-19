@@ -22,6 +22,9 @@ export const GRADE_VALUES = [
 
 export type Grade = (typeof GRADE_VALUES)[number];
 
+export const RAW_CONDITION_VALUES = ["NM", "LP", "MP", "HP", "DMG"] as const;
+export type RawCondition = (typeof RAW_CONDITION_VALUES)[number];
+
 export type Currency = "GBP" | "EUR" | "USD" | "JPY";
 
 /** Lightweight reference to a card, enough for any adapter to resolve a lookup. */
@@ -77,6 +80,8 @@ export interface CompResult {
 
 export interface CompQuery {
   grade?: Grade;
+  /** Exact RAW condition bucket. Checked sold evidence never crosses buckets. */
+  condition?: RawCondition;
   /** Lookback window in days. Default 90. */
   windowDays?: number;
   /** Target display currency. Only GBP supported in v1 (the whole point). */

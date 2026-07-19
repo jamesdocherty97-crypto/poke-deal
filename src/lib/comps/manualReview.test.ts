@@ -15,6 +15,7 @@ function reviewRow() {
       displayImageUrl: null,
     },
     grade: "RAW" as const,
+    condition: "NM",
     medianPence: 4200,
     source: "checked-comps",
     sampleSize: 7,
@@ -64,6 +65,7 @@ test("manual review list returns full confidence and source evidence", async () 
   assert.equal(result.reviews[0]?.headlinePence, 4200);
   assert.equal(result.reviews[0]?.sampleSize, 7);
   assert.equal(result.reviews[0]?.windowDays, 90);
+  assert.equal(result.reviews[0]?.condition, "NM");
   assert.deepEqual(result.reviews[0]?.reasons, ["source-disagreement"]);
   assert.deepEqual(result.reviews[0]?.receipt, { all: [{ source: "checked-comps", sampleSize: 7 }] });
 });
@@ -97,7 +99,7 @@ test("repeating the same review resolution is idempotent but a different one con
 test("explicit review request refreshes one expiring task", async () => {
   const { db, row } = fakeDb();
   const now = new Date("2026-07-13T10:00:00.000Z");
-  const result = await requestManualCompReview(db, { cardId: "card_1", grade: "RAW", now, ttlDays: 14 });
+  const result = await requestManualCompReview(db, { cardId: "card_1", grade: "RAW", condition: "NM", now, ttlDays: 14 });
   assert.equal(result.kind, "requested");
   assert.equal(row.reviewRequestedAt?.toISOString(), now.toISOString());
   assert.equal(row.reviewExpiresAt?.toISOString(), "2026-07-27T10:00:00.000Z");

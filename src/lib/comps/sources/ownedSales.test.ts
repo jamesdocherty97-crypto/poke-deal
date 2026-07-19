@@ -28,6 +28,7 @@ test("mapOwnedSalesToComp summarizes owned sale prices as GBP comp evidence", ()
     source: "owned-sales",
     card,
     grade: "RAW",
+    condition: "NM",
     windowDays: 90,
   });
 
@@ -44,7 +45,7 @@ test("mapOwnedSalesToComp summarizes owned sale prices as GBP comp evidence", ()
 test("mapOwnedSalesToComp ignores rows for the wrong grade", () => {
   const comp = mapOwnedSalesToComp(
     [...rows, ownedSale("sale_4", 999999, "2026-06-21T12:00:00.000Z", "PSA_10")],
-    { source: "owned-sales", card, grade: "RAW", windowDays: 90 },
+    { source: "owned-sales", card, grade: "RAW", condition: "NM", windowDays: 90 },
   );
 
   assert.equal(comp.sampleSize, 3);
@@ -58,7 +59,7 @@ test("mapOwnedSalesToComp removes buyer-paid postage from posted marketplace sal
       ownedSale("sale_2", 6175, "2026-06-02T12:00:00.000Z", "RAW", "CARDMARKET"),
       ownedSale("sale_3", 7000, "2026-06-03T12:00:00.000Z", "RAW", "IN_PERSON"),
     ],
-    { source: "owned-sales", card, grade: "RAW", windowDays: 90 },
+    { source: "owned-sales", card, grade: "RAW", condition: "NM", windowDays: 90 },
   );
 
   assert.equal(comp.sampleSize, 3);
@@ -93,7 +94,7 @@ test("OwnedSalesSource degrades to empty comp when the db lookup fails", async (
     },
   });
 
-  const comp = await source.lookup(card, { grade: "RAW" });
+  const comp = await source.lookup(card, { grade: "RAW", condition: "NM" });
   assert.equal(comp.sampleSize, 0);
   assert.equal((comp.raw as { reason?: string }).reason, "owned sale lookup failed");
 });
@@ -105,6 +106,37 @@ test("buildOwnedSalesWhere prefers exact tcgApiId when available", () => {
 
   assert.equal(where.item?.grade, "RAW");
   assert.equal(where.item?.card?.tcgApiId, "base1-4");
+});
+
+test("RAW owned sales never cross condition buckets", () => {
+  const comp = mapOwnedSalesToComp(
+    [
+      ownedSale("sale_nm", 60_000, "2026-06-01T12:00:00.000Z", "RAW", "IN_PERSON", "NM"),
+      ownedSale("sale_lp", 45_000, "2026-06-02T12:00:00.000Z", "RAW", "IN_PERSON", "LP"),
+    ],
+    { source: "owned-sales", card, grade: "RAW", condition: "NM", windowDays: 90 },
+  );
+
+  assert.equal(comp.sampleSize, 1);
+  assert.equal(comp.medianPence, 60_000);
+  assert.equal((comp.raw as { conditionMatched?: boolean }).conditionMatched, true);
+});
+
+test("RAW owned sales without a requested condition fail closed", async () => {
+  let queried = false;
+  const source = new OwnedSalesSource({
+    sale: {
+      async findMany() {
+        queried = true;
+        return rows;
+      },
+    },
+  });
+
+  const comp = await source.lookup(card, { grade: "RAW" });
+  assert.equal(queried, false);
+  assert.equal(comp.sampleSize, 0);
+  assert.match(String((comp.raw as { reason?: string }).reason), /condition bucket/);
 });
 
 test("buildOwnedSalesWhere matches canonical numeric collector numbers", () => {
@@ -125,6 +157,7 @@ function ownedSale(
   soldAt: string,
   grade: "RAW" | "PSA_10" = "RAW",
   channel: OwnedSaleRow["channel"] = "IN_PERSON",
+  condition: string | null = "NM",
 ): OwnedSaleRow {
   return {
     id,
@@ -136,6 +169,7 @@ function ownedSale(
     item: {
       id: `item_${id}`,
       grade,
+      condition: grade === "RAW" ? condition : null,
       costBasis: 100000,
       card: {
         id: "card_1",

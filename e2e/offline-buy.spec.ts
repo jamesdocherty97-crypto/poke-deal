@@ -55,7 +55,7 @@ test("offline buy stays visibly queued across reload and flushes once on reconne
   await page.getByLabel("Smart comp search").fill("Gengar Lost Origin TG06/TG30 RAW £25");
   await page.getByRole("button", { name: "Comp current card" }).click();
   await expect(page.getByText("Suggested maximum buy")).toBeVisible();
-  await expect(page.getByText(/7 sold \/ 90d/)).toBeVisible();
+  await expect(page.getByText(/7 traceable UK solds \/ 90d/)).toBeVisible();
 
   await expect.poll(() => page.evaluate(() => new Promise<number>((resolve, reject) => {
     const request = indexedDB.open("poke-deal-offline", 2);

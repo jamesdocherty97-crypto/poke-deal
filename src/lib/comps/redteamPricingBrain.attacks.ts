@@ -67,7 +67,7 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
   ]);
 
   const checkedTrap = reconcileComps(baseQuery, [
-    candidate({ source: "checked-comps", valuePence: 20000, n: 2, ageDays: 80, region: "UK" }),
+    candidate({ source: "checked-comps", valuePence: 20000, n: 2, ageDays: 80, region: "UK", traceableUkSales: 2, conditionMatched: true }),
     candidate({ source: "poketrace", valuePence: 12000, n: 2, ageDays: 5, region: "US" }),
   ]);
 
@@ -120,11 +120,11 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
 
   const dominantBadSource = reconcileComps(baseQuery, [
     candidate({ source: "poketrace", valuePence: 2000, n: 5000, ageDays: 3, region: "US" }),
-    candidate({ source: "ebay-insights", valuePence: 10000, n: 50, ageDays: 2, region: "UK" }),
+    candidate({ source: "checked-comps", valuePence: 10000, n: 50, ageDays: 2, region: "UK", traceableUkSales: 50, conditionMatched: true }),
   ]);
 
   const ukSmallVsHugeUs = reconcileComps(baseQuery, [
-    candidate({ source: "ebay-insights", valuePence: 10000, n: 8, ageDays: 2, region: "UK" }),
+    candidate({ source: "checked-comps", valuePence: 10000, n: 8, ageDays: 2, region: "UK", traceableUkSales: 8, conditionMatched: true }),
     candidate({ source: "poketrace", valuePence: 14000, n: 5000, ageDays: 2, region: "US" }),
   ]);
 
@@ -215,8 +215,8 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
     {
       id: "A8",
       name: "Dominant bad source suppresses a good UK source",
-      setup: "A huge US PokeTrace bucket is wrong at GBP 20; a smaller UK eBay MI bucket is correct at GBP 100.",
-      expectedHonestBehaviour: "UK exact solds should not be excluded purely because a huge source disagrees by count.",
+      setup: "A huge US PokeTrace bucket is wrong at GBP 20; 50 distinct condition-matched UK sold items are correct at GBP 100.",
+      expectedHonestBehaviour: "Traceable UK exact solds should not be excluded purely because a huge approximate source disagrees by count.",
       verdict: dominantBadSource.chosenSource === "poketrace" ? "FAILS" : "SURVIVES",
       moneyAtRiskPence: 8000,
       reconciler: dominantBadSource,
@@ -225,8 +225,8 @@ export function runPricingBrainAttackSuite(): PricingBrainAttackOutput[] {
     {
       id: "A9",
       name: "UK small sample loses to huge US baseline",
-      setup: "Eight UK eBay MI solds say GBP 100; huge US PokeTrace baseline says GBP 140.",
-      expectedHonestBehaviour: "For a UK dealer, the UK solds should probably headline or at least force a manual decision.",
+      setup: "Eight distinct condition-matched UK sold items say GBP 100; a huge US PokeTrace baseline says GBP 140.",
+      expectedHonestBehaviour: "For a UK dealer, traceable UK solds should headline and the regional disagreement must force a manual decision.",
       verdict: ukSmallVsHugeUs.chosenSource === "poketrace" ? "DEGRADED" : "SURVIVES",
       moneyAtRiskPence: 4000,
       reconciler: ukSmallVsHugeUs,

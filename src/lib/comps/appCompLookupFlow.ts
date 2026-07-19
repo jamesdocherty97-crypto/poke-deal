@@ -79,7 +79,7 @@ export async function runAppCompLookup(
     : inputSearchParams;
   const lookup = readCompLookupRequest(effectiveSearchParams);
   if ("error" in lookup) throw new AppCompLookupError(lookup.error, 400);
-  const { card, grade } = lookup;
+  const { card, grade, condition } = lookup;
 
   const catalogSource = new PokemonTcgApiCatalogSource();
   const catalog = await resolveCatalogCard(card, catalogSource, { timeoutMs: CATALOG_RESOLVE_TIMEOUT_MS, signal: options.signal });
@@ -107,7 +107,7 @@ export async function runAppCompLookup(
     signal: options.signal,
     timeoutMs: EBAY_ASK_TIMEOUT_MS,
   });
-  const compPromise = compService.lookup(compCard, { grade }, {
+  const compPromise = compService.lookup(compCard, { grade, condition }, {
     ambiguous: !explicitIdentity || identityNeedsConfirmation,
     signal: options.signal,
     onProgress: options.onSource,
@@ -117,7 +117,7 @@ export async function runAppCompLookup(
     compPromise,
     askEvidencePromise,
   ]);
-  const result = reconcileCompReceipt(provisionalResult, compCard, { grade }, { ambiguous: ambiguous || identityNeedsConfirmation });
+  const result = reconcileCompReceipt(provisionalResult, compCard, { grade, condition }, { ambiguous: ambiguous || identityNeedsConfirmation });
 
   let alternatives: CatalogCard[] = [];
   const cardImage = resolveCompCardImage({ catalog, headline: result.headline, all: result.all });
@@ -158,6 +158,7 @@ export async function runAppCompLookup(
     if (process.env.DATABASE_URL && result.headline) {
       writes.push(new PrismaCompResultRepo().create(result.headline, {
         reconciliation: result.reconciliation,
+        condition,
         receipt: {
           all: result.all,
           unavailableSources: result.unavailableSources,

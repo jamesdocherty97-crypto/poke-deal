@@ -3,6 +3,7 @@ export interface RecentCompEntry {
   setName: string;
   number?: string;
   grade: string;
+  condition?: string;
   pricePence: number;
   lowPence: number;
   highPence: number;
@@ -58,12 +59,14 @@ export function serializeRecentComps(entries: readonly RecentCompEntry[]): strin
   return JSON.stringify(dedupeRecentComps(entries, MAX_RECENT_COMPS));
 }
 
-export function recentCompKey(entry: Pick<RecentCompEntry, "name" | "setName" | "number" | "grade">): string {
+export function recentCompKey(entry: Pick<RecentCompEntry, "name" | "setName" | "number" | "grade" | "condition">): string {
+  const grade = normalizeRecentCompKeyText(entry.grade);
   return [
     normalizeRecentCompKeyText(entry.name),
     normalizeRecentCompKeyText(entry.setName),
     normalizeRecentCompKeyText(entry.number ?? ""),
-    normalizeRecentCompKeyText(entry.grade),
+    grade,
+    grade === "raw" ? normalizeRecentCompKeyText(entry.condition ?? "") : "",
   ].join("|");
 }
 
@@ -91,6 +94,7 @@ function normalizeRecentComp(value: unknown): RecentCompEntry | null {
   const setName = cleanText(row?.setName);
   const number = cleanText(row?.number);
   const grade = cleanText(row?.grade);
+  const condition = cleanText(row?.condition);
   const source = cleanText(row?.source) || "unknown";
   const confidenceLabel = cleanText(row?.confidenceLabel) || "Checked";
   const confidenceTone = cleanText(row?.confidenceTone) || "";
@@ -110,6 +114,7 @@ function normalizeRecentComp(value: unknown): RecentCompEntry | null {
     setName,
     ...(number ? { number } : {}),
     grade,
+    ...(grade.toUpperCase() === "RAW" && condition ? { condition } : {}),
     pricePence,
     lowPence,
     highPence,

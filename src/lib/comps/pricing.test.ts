@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { conditionAdjustedPricePence, rawConditionPriceFactor, suggestListPrice, realizedProfit } from "./pricing.js";
+import { compForAutomaticPricing, conditionAdjustedPricePence, rawConditionPriceFactor, reviewedCompRequiresManualPricing, suggestListPrice, realizedProfit } from "./pricing.js";
 import type { CompResult } from "../domain/types.js";
 
 function comp(medianPence: number, sampleSize = 8): CompResult {
@@ -68,6 +68,31 @@ test("no comps falls back to cost + margin with 'none' confidence", () => {
   const s = suggestListPrice({ comp: comp(0, 0), costBasisPence: 1800 });
   assert.equal(s.confidence, "none");
   assert.equal(s.pricePence, 1980);
+});
+
+test("manual-check evidence cannot re-enter automatic list pricing", () => {
+  const unverified = compForAutomaticPricing(comp(103_981), true);
+  const suggestion = suggestListPrice({ comp: unverified, costBasisPence: 50_000 });
+
+  assert.equal(unverified, null);
+  assert.equal(suggestion.pricePence, 55_000);
+  assert.equal(suggestion.confidence, "none");
+  assert.match(suggestion.rationale, /No usable comps/);
+});
+
+test("reviewed high-value foreign RAW evidence stays manual even if a client omits the flag", () => {
+  assert.equal(reviewedCompRequiresManualPricing({
+    sourcesDisagree: false,
+    grade: "RAW",
+    source: "poketrace",
+    medianPence: 103_981,
+  }), true);
+  assert.equal(reviewedCompRequiresManualPricing({
+    sourcesDisagree: false,
+    grade: "RAW",
+    source: "checked-comps",
+    medianPence: 60_000,
+  }), false);
 });
 
 test("realized profit nets fees, postage and cost", () => {

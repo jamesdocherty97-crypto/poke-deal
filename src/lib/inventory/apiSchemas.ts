@@ -61,6 +61,7 @@ export const acquireRequestSchema = z.object({
       headline: reviewedCompResultSchema,
       all: z.array(reviewedCompResultSchema).min(1).max(12),
       sourcesDisagree: z.boolean(),
+      manualCheck: z.boolean().optional(),
     })
     .optional(),
 });

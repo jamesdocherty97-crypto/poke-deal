@@ -82,9 +82,11 @@ test("acquire accepts a reviewed comp receipt without another lookup", () => {
         },
       ],
       sourcesDisagree: false,
+      manualCheck: true,
     },
   });
 
   assert.equal(result.reviewedComps?.headline.medianPence, 14_500);
   assert.equal(result.reviewedComps?.all.length, 1);
+  assert.equal(result.reviewedComps?.manualCheck, true);
 });

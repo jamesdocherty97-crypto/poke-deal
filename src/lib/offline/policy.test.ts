@@ -41,6 +41,15 @@ test("offline comp keys partition language, edition and finish even when a provi
   assert.notEqual(canonicalCompCacheKey(base), canonicalCompCacheKey({ ...base, language: "JP" }));
 });
 
+test("offline RAW comp keys partition exact condition but graded keys do not", () => {
+  const raw = { name: "Rayquaza VMAX", setName: "Evolving Skies", number: "218/203", grade: "RAW" };
+  assert.notEqual(canonicalCompCacheKey({ ...raw, condition: "NM" }), canonicalCompCacheKey({ ...raw, condition: "LP" }));
+  assert.equal(
+    canonicalCompCacheKey({ ...raw, grade: "PSA_10", condition: "NM" }),
+    canonicalCompCacheKey({ ...raw, grade: "PSA_10", condition: "LP" }),
+  );
+});
+
 test("cache policy distinguishes usable fresh, stale and expired receipts", () => {
   const now = Date.UTC(2026, 6, 11, 12);
   assert.equal(compCacheFreshness(now - 60_000, now).state, "fresh");

@@ -47,7 +47,10 @@ export interface ReconCandidate {
   trendWindowDays?: number;
   trendBucketDaysApart?: number;
   candidateHasGradeScopedData?: boolean;
-  nBoostedByAgreeingSignals?: boolean;
+  sampleSizeApproximate?: boolean;
+  traceableUkSales?: number;
+  conditionMatched?: boolean;
+  evidenceFamily?: string;
   adjacentLowerGradeMedianPence?: number;
   convertedFromNonGbp?: boolean;
   fxAgeDays?: number;
@@ -69,6 +72,12 @@ export interface ReconResult {
     appliedPenalties: string[];
     spreadPence: number;
     spreadPct: number;
+    lowPence: number;
+    highPence: number;
+    crossSourceLowPence: number;
+    crossSourceHighPence: number;
+    reportedSampleSize?: number;
+    sampleSizeApproximate?: boolean;
     chosenBecause: string;
   };
 }
@@ -156,13 +165,19 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
   const gradeBleedManualCheck = isGradeBleedSuspect(chosen, query);
   const fxAged = chosen.candidate.convertedFromNonGbp === true && (chosen.candidate.fxAgeDays ?? 0) > 3;
   const fxAgedManualCheck = fxAged && chosen.valuePence >= 50_000;
-  const ukSoldsDisagree = chosen.candidate.region === "US" && hasUkSoldDisagreement(chosen, states);
+  const ukSoldsDisagree = hasUkSoldDisagreement(chosen, states);
+  const regionalHighValueManualCheck =
+    query.gradeBucket === "RAW" &&
+    chosen.valuePence >= 10_000 &&
+    chosen.candidate.region !== "UK" &&
+    !states.some(isQualifiedUkSoldState);
 
   const capsMedium =
     Boolean(query.ambiguous) ||
     (isGraded(query.gradeBucket) && eligible.length === 1) ||
     chosen.qualityPenaltyProduct < 1 ||
     chosen.trendSuppressed ||
+    chosen.candidate.sampleSizeApproximate === true ||
     staleCorroborationDisagrees;
 
   const confidence = confidenceFor({
@@ -189,7 +204,8 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     staleConsensusManualCheck ||
     gradeBleedManualCheck ||
     fxAgedManualCheck ||
-    ukSoldsDisagree;
+    ukSoldsDisagree ||
+    regionalHighValueManualCheck;
   const spreadOnly = spreadManualCheck && !otherManualCheck;
   const suppressedSpreadReasons = spreadOnly
     ? [
@@ -207,6 +223,8 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     gradeBleedManualCheck ? "grade-bleed-suspect" : null,
     fxAged ? "fx-aged" : null,
     ukSoldsDisagree ? "uk-solds-disagree" : null,
+    regionalHighValueManualCheck ? "high-value-without-uk-solds" : null,
+    shouldManualCheckForSpread ? "cross-source-spread" : null,
     ...suppressedSpreadReasons,
   ].filter((reason): reason is string => reason != null);
 
@@ -223,20 +241,27 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
 
 function buildSelectionDiagnostics(chosen: CandidateState, eligible: CandidateState[]): NonNullable<ReconResult["selection"]> {
   const values = eligible.map((state) => state.valuePence).filter((value) => value > 0);
-  const low = values.length ? Math.min(...values) : chosen.valuePence;
-  const high = values.length ? Math.max(...values) : chosen.valuePence;
-  const spreadPence = Math.max(0, high - low);
-  const spreadPct = low > 0 ? (spreadPence / low) * 100 : 0;
+  const crossSourceLow = values.length ? Math.min(...values) : chosen.valuePence;
+  const crossSourceHigh = values.length ? Math.max(...values) : chosen.valuePence;
+  const spreadPence = Math.max(0, crossSourceHigh - crossSourceLow);
+  const spreadPct = crossSourceLow > 0 ? (spreadPence / crossSourceLow) * 100 : 0;
+  const chosenEvidenceLow = positiveFinite(chosen.candidate.raw?.min) ?? chosen.valuePence;
+  const chosenEvidenceHigh = positiveFinite(chosen.candidate.raw?.max) ?? chosen.valuePence;
+  const useChosenEvidenceRange = isQualifiedUkSoldState(chosen) && chosenEvidenceLow <= chosen.valuePence && chosenEvidenceHigh >= chosen.valuePence;
+  const low = useChosenEvidenceRange ? chosenEvidenceLow : chosen.valuePence;
+  const high = useChosenEvidenceRange ? chosenEvidenceHigh : chosen.valuePence;
   const corroboratingCount = eligible.filter((state) =>
     state !== chosen && Math.abs(state.valuePence - chosen.valuePence) / chosen.valuePence <= 0.15,
-  ).length;
+  ).reduce((families, state) => families.add(evidenceFamily(state.candidate)), new Set<string>()).size;
   const freshness = Number.isFinite(chosen.ageDays)
     ? chosen.ageDays < 1 ? "today" : `${Math.round(chosen.ageDays)}d old`
     : "undated";
   const region = chosen.candidate.region;
   const chosenBecause = [
     `${region} ${humanReconSource(chosen.candidate.source)}`,
-    `${chosen.n} sample${chosen.n === 1 ? "" : "s"}`,
+    chosen.candidate.sampleSizeApproximate
+      ? `${chosen.n} weighted samples (${chosen.candidate.n} reported approx)`
+      : `${chosen.n} sample${chosen.n === 1 ? "" : "s"}`,
     freshness,
     corroboratingCount > 0 ? `${corroboratingCount} corroborating source${corroboratingCount === 1 ? "" : "s"}` : "best eligible evidence",
   ].join(" · ");
@@ -249,6 +274,12 @@ function buildSelectionDiagnostics(chosen: CandidateState, eligible: CandidateSt
     appliedPenalties: [...new Set(chosen.reasons.filter((reason) => reason.includes("penalty") || reason.includes("stale") || reason.includes("suppressed")))],
     spreadPence,
     spreadPct,
+    lowPence: low,
+    highPence: high,
+    crossSourceLowPence: crossSourceLow,
+    crossSourceHighPence: crossSourceHigh,
+    ...(chosen.candidate.sampleSizeApproximate ? { reportedSampleSize: chosen.candidate.n } : {}),
+    ...(chosen.candidate.sampleSizeApproximate ? { sampleSizeApproximate: true } : {}),
     chosenBecause,
   };
 }
@@ -267,14 +298,20 @@ function humanReconSource(source: ReconSource): string {
 }
 
 function initialState(candidate: ReconCandidate): CandidateState {
+  const reportedN = Math.round(candidate.n);
+  const effectiveN = candidate.sampleSizeApproximate ? Math.min(reportedN, APPROX_SAMPLE_WEIGHT_CAP) : Math.round(candidate.n);
   return {
     candidate,
     valuePence: Math.round(candidate.valuePence),
-    n: Math.round(candidate.n),
+    n: effectiveN,
     ageDays: candidate.ageDays ?? Number.POSITIVE_INFINITY,
     excluded: false,
     corroborationOnly: false,
-    reasons: candidate.nBoostedByAgreeingSignals ? ["n-boosted-by-agreeing-signals"] : [],
+    reasons: [
+      candidate.sampleSizeApproximate && reportedN > effectiveN
+        ? `approximate-sample-capped:${reportedN}-to-${effectiveN}:${candidate.source}`
+        : null,
+    ].filter((reason): reason is string => reason != null),
     penalties: [],
     penaltyProduct: 1,
     qualityPenaltyProduct: 1,
@@ -331,6 +368,14 @@ function applySourceSanityGates(state: CandidateState, query: ReconQuery): void 
       state.valuePence = Math.round(avg30);
       state.reasons.push("tcg-used-avg30-over-trendPrice");
     }
+  }
+  if (state.candidate.source === "checked-comps" && rawSpread(state.candidate.raw) > GROSS_CHECKED_COMP_SPREAD_LIMIT) {
+    state.corroborationOnly = true;
+    state.reasons.push("corroboration-wide-checked-comps");
+  }
+  if (state.candidate.source === "ebay-insights" && query.gradeBucket === "RAW" && state.candidate.conditionMatched !== true) {
+    state.corroborationOnly = true;
+    state.reasons.push("corroboration-unscoped-raw-condition:ebay-insights");
   }
 }
 
@@ -453,6 +498,17 @@ function pickEligibleHeadline(eligible: CandidateState[]): CandidateState {
     .sort((a, b) => b.n - a.n)[0];
   if (owned) return owned;
 
+  const ukSolds = eligible
+    .filter(isQualifiedUkSoldState)
+    .sort((a, b) => {
+      if (a.candidate.source !== b.candidate.source) {
+        return TIER_ORDER.indexOf(a.candidate.source) - TIER_ORDER.indexOf(b.candidate.source);
+      }
+      if (a.weight !== b.weight) return b.weight - a.weight;
+      return b.n - a.n;
+    })[0];
+  if (ukSolds) return ukSolds;
+
   return eligible.reduce((best, state) => {
     if (state.weight !== best.weight) return state.weight > best.weight ? state : best;
     const tierDelta = TIER_ORDER.indexOf(state.candidate.source) - TIER_ORDER.indexOf(best.candidate.source);
@@ -503,15 +559,34 @@ function isGradeBleedSuspect(chosen: CandidateState, query: ReconQuery): boolean
 }
 
 function hasUkSoldDisagreement(chosen: CandidateState, states: CandidateState[]): boolean {
-  return states.some(
-    (state) =>
-      state !== chosen &&
-      !state.excluded &&
-      state.valuePence > 0 &&
-      state.n >= 5 &&
-      isUkSoldSource(state.candidate) &&
-      spreadRatio([state.valuePence, chosen.valuePence]) > 1.15,
+  const qualifiedUk = states.filter(isQualifiedUkSoldState);
+  if (qualifiedUk.length === 0) return false;
+  if (isQualifiedUkSoldState(chosen)) {
+    return states.some(
+      (state) =>
+        state !== chosen &&
+        !state.excluded &&
+        !state.corroborationOnly &&
+        state.valuePence > 0 &&
+        state.n >= 2 &&
+        spreadRatio([state.valuePence, chosen.valuePence]) > 1.15,
+    );
+  }
+  return qualifiedUk.some(
+    (state) => spreadRatio([state.valuePence, chosen.valuePence]) > 1.15,
   );
+}
+
+function isQualifiedUkSoldState(state: CandidateState): boolean {
+  if (state.excluded || state.corroborationOnly || state.candidate.region !== "UK") return false;
+  if (state.candidate.source === "checked-comps") {
+    return (state.candidate.traceableUkSales ?? 0) >= 2 && state.candidate.conditionMatched === true;
+  }
+  return state.candidate.source === "ebay-insights" && state.n >= 2 && state.candidate.conditionMatched === true;
+}
+
+function evidenceFamily(candidate: ReconCandidate): string {
+  return candidate.evidenceFamily?.trim() || `${candidate.source}:${candidate.region}`;
 }
 
 function isUkSoldSource(candidate: ReconCandidate): boolean {
@@ -571,3 +646,10 @@ function candidateIsGradeScoped(candidate: ReconCandidate): boolean {
 function numbersMatch(actual: string, expected: string): boolean {
   return collectorNumbersEquivalent(actual, expected);
 }
+
+function positiveFinite(value: number | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+const GROSS_CHECKED_COMP_SPREAD_LIMIT = 4;
+const APPROX_SAMPLE_WEIGHT_CAP = 50;

@@ -38,6 +38,7 @@ src/lib/comps/
   prismaCompResultRepo.ts      Persists headline comps for audit/history.
   sources/
     pokemonPriceTracker.ts     Reference adapter. Missing key is unavailable; configured key fetches live.
+    checkedComps.ts            Traceable, condition-scoped eBay UK sold-item evidence.
     fixtures.ts                Messy sample sales used only by tests and the explicit CLI demo.
 src/lib/inventory/
   inventoryService.ts          comp → inventory → price spine. Repo INTERFACE.
@@ -83,6 +84,8 @@ The UI can run without these, but provider-backed features remain explicitly una
 
 **eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and seller OAuth connection (`EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` still works as the legacy flag). Until then the source stays out of comp aggregation and the manual UK sold link remains the reliable fallback.
 
+**Manual eBay UK sold evidence:** use the in-app checked-comp logger after opening eBay UK solds. For evidence to affect the headline, paste the individual `/itm/` page, select the exact RAW condition, and enter the item-only sold price. Buyer totals that include protection/postage and Best Offers whose accepted price is hidden remain visible as corroboration but cannot drive a trusted comp. Duplicate item IDs are rejected and price outliers stay in the receipt with an exclusion reason.
+
 **FX path:** the current owner-declared private, non-commercial deployment can use the active freecurrencyapi Free account. Set `FX_API_KEY` to fetch daily GBP-based rates into Neon. For freecurrencyapi endpoints the key is sent in the documented `apikey` header and removed from the URL; exchangeratesapi retains its provider-specific `access_key` query contract. If the provider is down, the app uses cached rates up to seven days old; if no usable cache exists, comps still work with a visible `static FX` note on converted evidence rows. Re-audit licensing before any commercial use.
 
 ---
@@ -119,5 +122,6 @@ Money is stored as **GBP pence (Int)** throughout to avoid float drift.
 - [x] RAW comps prefer provider smartMarketPrice when available
 - [x] Optional PokeTrace source for secondary raw/graded cross-checks
 - [x] eBay Marketplace Insights adapter wired behind approval gate
+- [x] Condition-scoped, traceable eBay UK checked comps with price-basis controls
 - [x] Repricing recommendations + Discord notifier interface
 - [ ] Everything in `CODEX_BACKLOG.md`

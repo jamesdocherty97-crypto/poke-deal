@@ -1,11 +1,13 @@
 import { normalizeCatalogCardSearchInput } from "../catalog/cardSearch.js";
-import type { CardRef, Grade } from "../domain/types.js";
+import type { CardRef, Grade, RawCondition } from "../domain/types.js";
 import { normalizeGradeLabel } from "./cleaning.js";
+import { normalizeRawCondition } from "./pricing.js";
 import { addRequestedPrintHints } from "./variants.js";
 
 export interface CompLookupRequest {
   card: CardRef;
   grade: Grade;
+  condition?: RawCondition;
 }
 
 /**
@@ -42,6 +44,9 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
   const explicitGrade = explicitGradeText ? normalizeGradeLabel(explicitGradeText) ?? undefined : undefined;
   const parsedFreeGrade = parseGradeFromText(readFirst(searchParams, "q", "query", "search") ?? readFirst(searchParams, "name", "cardName", "card"));
   const grade = explicitGrade ?? parsedFreeGrade ?? "RAW";
+  const condition = grade === "RAW"
+    ? normalizeRawCondition(readFirst(searchParams, "condition", "rawCondition"))
+    : null;
 
   return {
     card: {
@@ -61,6 +66,7 @@ export function readCompLookupRequest(searchParams: URLSearchParams): CompLookup
       language: requestedLanguage,
     },
     grade,
+    ...(condition ? { condition } : {}),
   };
 }
 

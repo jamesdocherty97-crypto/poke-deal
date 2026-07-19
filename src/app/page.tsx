@@ -12,11 +12,13 @@ import {
 } from "@/lib/photos/listingPhotoPolicy";
 import {
   conditionAdjustedPricePence,
+  compForAutomaticPricing,
+  normalizeRawCondition,
   rawConditionPriceFactor,
   suggestListPrice,
   type PricingStrategy,
 } from "@/lib/comps/pricing";
-import { GRADE_VALUES, type CardFinish, type CompResult as DomainCompResult, type Grade as DomainGrade, type Language, type PrintEdition } from "@/lib/domain/types";
+import { GRADE_VALUES, type CardFinish, type CompResult as DomainCompResult, type Grade as DomainGrade, type Language, type PrintEdition, type RawCondition } from "@/lib/domain/types";
 import {
   buildInventoryView,
   buildListingView,
@@ -231,6 +233,7 @@ type LookupInput = {
   finish?: CardFinish;
   language?: Language;
   psaCert?: string;
+  condition?: RawCondition;
 };
 
 type PendingLookup = {
@@ -238,6 +241,7 @@ type PendingLookup = {
   setName: string;
   number: string;
   grade: Grade;
+  condition?: RawCondition;
   startedAt: number;
 };
 
@@ -289,6 +293,7 @@ type OwnedSaleCompRow = {
 };
 
 type CheckedCompPlatform = "ebay-uk" | "cardmarket" | "vinted" | "other";
+type CheckedCompPriceBasis = "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN";
 
 type CheckedCompEntry = {
   id: string;
@@ -297,8 +302,14 @@ type CheckedCompEntry = {
   pricePence: number;
   soldDate: string;
   platform: CheckedCompPlatform;
+  condition?: RawCondition;
+  priceBasis: CheckedCompPriceBasis | "UNKNOWN";
   note?: string;
   sourceUrl?: string;
+  sourceListingId?: string;
+  traceable?: boolean;
+  evidenceStatus?: "used" | "corroboration" | "outlier";
+  exclusionReasons?: string[];
   createdAt: string;
 };
 
@@ -351,6 +362,12 @@ type ReconciliationView = {
     appliedPenalties: string[];
     spreadPence: number;
     spreadPct: number;
+    lowPence?: number;
+    highPence?: number;
+    crossSourceLowPence?: number;
+    crossSourceHighPence?: number;
+    reportedSampleSize?: number;
+    sampleSizeApproximate?: boolean;
     chosenBecause: string;
   };
 };
@@ -433,6 +450,13 @@ type CompResult = Omit<DomainCompResult, "raw"> & {
     signals?: PokeTraceSignalView[];
     gradeLadder?: { grade: Grade; medianPence: number; sampleSize: number; source?: string }[];
     reconciliation?: ReconciliationView;
+    approxSaleCount?: boolean;
+    condition?: RawCondition;
+    conditionMatched?: boolean;
+    traceableCount?: number;
+    corroborationCount?: number;
+    outlierCount?: number;
+    grossSpread?: number;
     fx?: { source?: string; provider?: string; asOf?: string; ageDays?: number | null; note?: string };
   };
 };
@@ -959,6 +983,7 @@ export default function Home() {
   const [checkedCompLogPrice, setCheckedCompLogPrice] = useState("");
   const [checkedCompLogSoldDate, setCheckedCompLogSoldDate] = useState(todayInputValue());
   const [checkedCompLogPlatform, setCheckedCompLogPlatform] = useState<CheckedCompPlatform>("ebay-uk");
+  const [checkedCompLogPriceBasis, setCheckedCompLogPriceBasis] = useState<CheckedCompPriceBasis>("ITEM_PRICE");
   const [checkedCompLogNote, setCheckedCompLogNote] = useState("");
   const [checkedCompLogSourceUrl, setCheckedCompLogSourceUrl] = useState("");
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
@@ -1713,6 +1738,8 @@ export default function Home() {
     ],
   );
   const headline = checkedComp ?? apiHeadline;
+  const headlineConditionAlreadyMatched = compMatchesRawCondition(headline, condition);
+  const headlineAdjustmentCondition = headlineConditionAlreadyMatched ? "NM" : condition;
   const isAmbiguousComp = Boolean(comp?.ambiguous && !checkedComp);
   const sourceMatchedCard = !catalogCard && apiHeadline?.card ? apiHeadline.card : null;
   const sourceMatchTypedMeta = [name.trim(), setNameValue.trim(), number.trim() ? `#${number.trim()}` : ""]
@@ -1720,8 +1747,8 @@ export default function Home() {
     .join(" · ");
   const sourceMatchSourceLabel = apiHeadline ? sourceLabel(apiHeadline.source, false) : "Source";
   const deal = useMemo(
-    () => (headline ? judgeDeal(headline, poundsToPence(cost), channel, grade, condition) : null),
-    [channel, condition, headline, cost, grade],
+    () => (headline ? judgeDeal(headline, poundsToPence(cost), channel, grade, headlineAdjustmentCondition) : null),
+    [channel, headline, headlineAdjustmentCondition, cost, grade],
   );
   const gradeEv = useMemo(
     () =>
@@ -1750,6 +1777,7 @@ export default function Home() {
       setName: pendingLookup.setName,
       number: pendingLookup.number,
       grade: pendingLookup.grade,
+      condition: pendingLookup.condition,
     });
     return recentComps.find((entry) => recentCompKey(entry) === key) ?? null;
   }, [pendingLookup, recentComps]);
@@ -1869,7 +1897,11 @@ export default function Home() {
     () => mergeCheckedCompEntries([...loggedCheckedComps, ...checkedCompsFromSource]),
     [checkedCompsFromSource, loggedCheckedComps],
   );
-  const checkedCompsSummary = useMemo(() => summarizeCheckedCompEntries(checkedCompEntries), [checkedCompEntries]);
+  const checkedLookupCondition = grade === "RAW" ? normalizeRawCondition(condition) ?? undefined : undefined;
+  const checkedCompsSummary = useMemo(
+    () => summarizeCheckedCompEntries(checkedCompEntries, grade, checkedLookupCondition),
+    [checkedCompEntries, checkedLookupCondition, grade],
+  );
   const pokeTraceSignals =
     comp?.all.find((result) => result.source === "poketrace" && result.raw?.signals?.length)?.raw?.signals ?? [];
   // Full RAW→PSA→BGS→CGC ladder, pulled from the same Price Tracker response
@@ -1896,6 +1928,7 @@ export default function Home() {
               game: "POKEMON",
             },
             grade,
+            checkedLookupCondition,
           )
         : null,
     [
@@ -1906,6 +1939,7 @@ export default function Home() {
       catalogCard?.tcgDexId,
       checkedCompEntries,
       checkedCompsSummary,
+      checkedLookupCondition,
       grade,
       name,
       number,
@@ -1951,14 +1985,20 @@ export default function Home() {
             comp: compForReceipt,
             grade,
             gradeLadder,
+            condition: headlineAdjustmentCondition,
           })
         : null,
-    [compForReceipt, grade, gradeLadder, headline, isAmbiguousComp],
+    [compForReceipt, grade, gradeLadder, headline, headlineAdjustmentCondition, isAmbiguousComp],
   );
   const offerCalc = useMemo(
     () => (dealCalcInput ? dealCalc(dealCalcInput, dealSettings) : null),
     [dealCalcInput, dealSettings],
   );
+  const headlineReconciliation = compForReceipt?.reconciliation ?? headline?.raw?.reconciliation ?? null;
+  const unverifiedHeadline = Boolean(!checkedComp && (headlineReconciliation?.manualCheck ?? compForReceipt?.sourcesDisagree));
+  const unverifiedRange = headlineReconciliation?.selection?.lowPence != null && headlineReconciliation.selection.highPence != null
+    ? formatCompRange(headlineReconciliation.selection.lowPence, headlineReconciliation.selection.highPence)
+    : headline ? gbp(headline.medianPence) : "No verified range";
   const needsManualComp = Boolean(
     apiHeadline &&
       !checkedComp &&
@@ -2009,27 +2049,27 @@ export default function Home() {
     () =>
       headline
         ? suggestListPrice({
-            comp: headline,
+            comp: compForAutomaticPricing(headline, unverifiedHeadline),
             strategy,
             costBasisPence: poundsToPence(cost),
-            condition,
+            condition: headlineAdjustmentCondition,
           })
         : null,
-    [condition, headline, strategy, cost],
+    [headline, headlineAdjustmentCondition, strategy, cost, unverifiedHeadline],
   );
   const stockCompSuggestion = useMemo(
     () =>
       headline && stockCompItem
         ? suggestListPrice({
-            comp: headline,
+            comp: compForAutomaticPricing(headline, unverifiedHeadline),
             strategy,
             costBasisPence: stockCompItem.costBasis,
-            condition: stockCompItem.condition,
+            condition: compMatchesRawCondition(headline, stockCompItem.condition) ? "NM" : stockCompItem.condition,
           })
         : null,
-    [headline, stockCompItem, strategy],
+    [headline, stockCompItem, strategy, unverifiedHeadline],
   );
-  const conditionAdjustmentActive = grade === "RAW" && rawConditionPriceFactor(grade, condition) < 1;
+  const conditionAdjustmentActive = !headlineConditionAlreadyMatched && grade === "RAW" && rawConditionPriceFactor(grade, condition) < 1;
   const conditionAdjustedHeadlinePence =
     headline && conditionAdjustmentActive ? conditionAdjustedPricePence(headline.medianPence, grade, condition) : null;
   const buyPlan = useMemo(() => {
@@ -2800,10 +2840,17 @@ export default function Home() {
 
   async function addReviewCheckedComp(
     review: ManualCompReview,
-    input: { pricePence: number; soldDate: string; note?: string },
+    input: { pricePence: number; soldDate: string; condition?: string; priceBasis: CheckedCompPriceBasis; sourceUrl: string; note?: string },
   ) {
     if (!navigator.onLine) {
       setError("Checked comp evidence needs a connection. The review is still open and nothing was recorded.");
+      return;
+    }
+    const reviewCondition = review.grade === "RAW"
+      ? review.condition ?? normalizeRawCondition(input.condition)
+      : null;
+    if (review.grade === "RAW" && !reviewCondition) {
+      setError("Choose the RAW condition before adding sold evidence.");
       return;
     }
     setManualReviewBusyId(review.id);
@@ -2823,12 +2870,26 @@ export default function Home() {
           pricePence: input.pricePence,
           soldDate: input.soldDate,
           platform: "ebay-uk",
+          condition: reviewCondition ?? undefined,
+          priceBasis: input.priceBasis,
+          sourceUrl: input.sourceUrl,
           ...(input.note ? { note: input.note } : {}),
         }),
       });
       const payload = await readJson(response);
       if (!response.ok) throw new Error(payload.error ?? "checked comp save failed");
-      await resolveManualReview(review, "CHECKED_COMP_ADDED", input.note ?? `Checked UK sold ${gbp(input.pricePence)}`);
+      const aggregate = payload.aggregate as CompResult | null | undefined;
+      const aggregateSpread = Number(aggregate?.raw?.grossSpread ?? Number.POSITIVE_INFINITY);
+      if ((aggregate?.sampleSize ?? 0) >= 2 && Number.isFinite(aggregateSpread) && aggregateSpread <= 4) {
+        await resolveManualReview(review, "CHECKED_COMP_ADDED", input.note ?? `Traceable UK sold evidence added; median ${gbp(aggregate!.medianPence)}`);
+      } else {
+        setNotice(
+          (aggregate?.sampleSize ?? 0) >= 2
+            ? "UK sold prices are still too wide to resolve this review. Add cleaner evidence."
+            : "First traceable UK sold saved. Add one more independent sold listing before resolving this review.",
+        );
+        setManualReviewBusyId(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "checked comp save failed");
       setManualReviewBusyId(null);
@@ -3496,6 +3557,7 @@ export default function Home() {
       setName: card.setName,
       number: card.number ?? "",
       grade: nextGrade,
+      condition: nextGrade === "RAW" ? normalizeRawCondition(condition) ?? undefined : undefined,
       ...(card.tcgApiId ? { tcgApiId: card.tcgApiId } : {}),
       ...(card.tcgDexId ? { tcgDexId: card.tcgDexId } : {}),
       ...(card.cardmarketId ? { cardmarketId: card.cardmarketId } : {}),
@@ -3631,6 +3693,7 @@ export default function Home() {
     setCheckedCompLogPrice("");
     setCheckedCompLogSoldDate(todayInputValue());
     setCheckedCompLogPlatform("ebay-uk");
+    setCheckedCompLogPriceBasis("ITEM_PRICE");
     setCheckedCompLogNote("");
     setCheckedCompLogSourceUrl("");
     setManualCompReturnArmed(false);
@@ -3644,6 +3707,12 @@ export default function Home() {
   function setManualBuyCost(value: string) {
     setCost(value);
     setSelectedQuickCostPence(null);
+  }
+
+  function updateRawCondition(value: string) {
+    const bucketChanged = normalizeRawCondition(condition) !== normalizeRawCondition(value);
+    setCondition(value);
+    if (bucketChanged) clearCompEvidence();
   }
 
   function clearCompEvidence() {
@@ -3712,6 +3781,7 @@ export default function Home() {
       setName: catalog?.setName ?? input.setName,
       ...(catalog?.number ?? input.number ? { number: catalog?.number ?? input.number } : {}),
       grade: result.grade ?? input.grade,
+      ...(result.grade === "RAW" && input.condition ? { condition: input.condition } : {}),
       pricePence: result.medianPence,
       lowPence: result.lowPence,
       highPence: result.highPence,
@@ -3776,6 +3846,7 @@ export default function Home() {
       setName: parsed.setName ?? setNameValue,
       number: parsed.number ?? (identityChanged ? "" : number),
       grade: parsed.grade ?? grade,
+      condition: normalizeRawCondition(parsed.condition ?? condition) ?? undefined,
       ...(parsed.graderCert ? { psaCert: parsed.graderCert } : {}),
     };
 
@@ -3881,17 +3952,17 @@ export default function Home() {
       applyQuickIntake({ lookupAfter: true });
       return;
     }
-    void lookupComp({ name, setName: setNameValue, number, grade });
+    void lookupComp({ name, setName: setNameValue, number, grade, condition: normalizeRawCondition(condition) ?? undefined });
   }
 
   function runFieldComp() {
     if (!name.trim() && !setNameValue.trim() && !number.trim()) return;
-    void lookupComp({ name, setName: setNameValue, number, grade });
+    void lookupComp({ name, setName: setNameValue, number, grade, condition: normalizeRawCondition(condition) ?? undefined });
   }
 
   async function lookup(event?: FormEvent) {
     event?.preventDefault();
-    await lookupComp({ name, setName: setNameValue, number, grade });
+    await lookupComp({ name, setName: setNameValue, number, grade, condition: normalizeRawCondition(condition) ?? undefined });
   }
 
   function normalizeLookupInput(input: LookupInput): LookupInput {
@@ -3907,6 +3978,7 @@ export default function Home() {
       setName: parsed.setName ?? input.setName,
       number: parsed.number ?? input.number,
       grade: input.grade,
+      condition: input.grade === "RAW" ? input.condition ?? normalizeRawCondition(condition) ?? undefined : undefined,
       ...(input.tcgApiId ? { tcgApiId: input.tcgApiId } : {}),
       ...(input.tcgDexId ? { tcgDexId: input.tcgDexId } : {}),
       ...(input.cardmarketId ? { cardmarketId: input.cardmarketId } : {}),
@@ -3934,7 +4006,7 @@ export default function Home() {
     const normalizedInput = normalizeLookupInput(input);
     const identityChanged =
       lookupIdentityKey(normalizedInput) !==
-      lookupIdentityKey({ name, setName: setNameValue, number, grade });
+      lookupIdentityKey({ name, setName: setNameValue, number, grade, condition: normalizeRawCondition(condition) ?? undefined });
     if (identityChanged && !options.preserveCost) resetBuyCost();
     if (identityChanged) {
       setComp(null);
@@ -3947,6 +4019,7 @@ export default function Home() {
       setName: normalizedInput.setName,
       number: normalizedInput.number,
       grade: normalizedInput.grade,
+      ...(normalizedInput.condition ? { condition: normalizedInput.condition } : {}),
       startedAt: Date.now(),
     });
     setBusy("lookup");
@@ -3969,6 +4042,7 @@ export default function Home() {
       if (normalizedInput.edition) qs.set("edition", normalizedInput.edition);
       if (normalizedInput.finish) qs.set("finish", normalizedInput.finish);
       if (normalizedInput.language) qs.set("language", normalizedInput.language);
+      if (normalizedInput.condition) qs.set("condition", normalizedInput.condition);
       if (normalizedInput.psaCert) qs.set("psaCert", normalizedInput.psaCert);
       const res = await fetch(`/api/comps/stream?${qs}`, { headers: { Accept: "application/x-ndjson" }, signal: controller.signal });
       if (!res.ok) {
@@ -4499,6 +4573,7 @@ export default function Home() {
               ),
             ].slice(0, 12).map(reviewedCompSnapshot),
             sourcesDisagree: comp.sourcesDisagree,
+            manualCheck: comp.reconciliation?.manualCheck ?? comp.sourcesDisagree,
           }
         : undefined,
     };
@@ -4550,7 +4625,13 @@ export default function Home() {
           cardImage: acquiredComps.cardImage ?? payload.cardImage ?? null,
         };
         setComp(rememberedComps);
-        rememberRecentComp(rememberedComps, { name, setName: setNameValue, number, grade });
+        rememberRecentComp(rememberedComps, {
+          name,
+          setName: setNameValue,
+          number,
+          grade,
+          condition: grade === "RAW" ? normalizeRawCondition(condition) ?? undefined : undefined,
+        });
       }
       setCardArtUrl(payloadDisplayImage(payload));
       pinRecentSetName(payload.catalog?.setName ?? setNameValue);
@@ -5357,6 +5438,7 @@ export default function Home() {
       edition: card.edition ?? detectCardPrintIdentity(typedPrintIdentity).edition,
       finish: card.finish ?? detectCardPrintIdentity(typedPrintIdentity).finish,
       language: card.language,
+      condition: nextGrade === "RAW" ? normalizeRawCondition(parsed?.condition ?? condition) ?? undefined : undefined,
     } satisfies LookupInput;
 
     clearCompEvidence();
@@ -5466,6 +5548,7 @@ export default function Home() {
       setName: item.card.setName,
       number: item.card.number ?? "",
       grade: nextGrade,
+      condition: nextGrade === "RAW" ? normalizeRawCondition(nextCondition) ?? undefined : undefined,
     };
 
     setView("acquire");
@@ -6886,6 +6969,11 @@ export default function Home() {
       setError("Choose or type a card before logging a checked comp.");
       return;
     }
+    const checkedCondition = grade === "RAW" ? normalizeRawCondition(condition) : null;
+    if (grade === "RAW" && !checkedCondition) {
+      setError("Choose NM, LP, MP, HP or DMG before logging RAW sold evidence.");
+      return;
+    }
 
     setBusy("checked-comp-log");
     setError(null);
@@ -6899,6 +6987,8 @@ export default function Home() {
           pricePence,
           soldDate: checkedCompLogSoldDate || todayInputValue(),
           platform: checkedCompLogPlatform,
+          priceBasis: checkedCompLogPriceBasis,
+          condition: checkedCondition ?? undefined,
           note: checkedCompLogNote.trim() || undefined,
           sourceUrl: checkedCompLogSourceUrl.trim() || undefined,
         }),
@@ -6912,9 +7002,12 @@ export default function Home() {
       setLoggedCheckedComps(nextLoggedEntries);
       setCheckedCompLogPrice("");
       setCheckedCompLogNote("");
+      setCheckedCompLogSourceUrl("");
+      setCheckedCompLogPriceBasis("ITEM_PRICE");
       setManualCompReturnArmed(false);
       const pinnedCheckedSource = pinCheckedCompEvidence(nextLoggedEntries, aggregate ?? null, card);
-      setNotice(`Logged ${gbp(pricePence)}. Add the next sold price, or close the logger.`);
+      const savedEntry = payload.entry as CheckedCompEntry | null | undefined;
+      setNotice(checkedCompLogNotice(savedEntry, pricePence));
       setScrollToComp(true);
       void refreshCurrentCompAfterCheckedComp(card, pinnedCheckedSource);
       window.requestAnimationFrame(() => checkedCompLogPriceRef.current?.focus());
@@ -6948,6 +7041,7 @@ export default function Home() {
               language: card.language ?? "EN",
             },
             grade,
+            grade === "RAW" ? normalizeRawCondition(condition) ?? undefined : undefined,
           );
     if (!checkedSource) return null;
 
@@ -6985,6 +7079,8 @@ export default function Home() {
       if (card.language) qs.set("language", card.language);
       if (card.edition) qs.set("edition", card.edition);
       if (card.finish) qs.set("finish", card.finish);
+      const checkedCondition = grade === "RAW" ? normalizeRawCondition(condition) : null;
+      if (checkedCondition) qs.set("condition", checkedCondition);
       const res = await fetch(`/api/comps?${qs}`);
       const payload = await readJson(res);
       if (!res.ok) return;
@@ -7019,7 +7115,13 @@ export default function Home() {
       });
       const nextImage = payloadDisplayImage(payload);
       if (nextImage) setCardArtUrl(nextImage);
-      rememberRecentComp(payload, { name: card.name, setName: card.setName ?? "", number: card.number ?? "", grade });
+      rememberRecentComp(payload, {
+        name: card.name,
+        setName: card.setName ?? "",
+        number: card.number ?? "",
+        grade,
+        condition: grade === "RAW" ? checkedCondition ?? undefined : undefined,
+      });
     } catch {
       // The checked comp is already stored. The next normal comp lookup will pick it up.
     }
@@ -7083,7 +7185,11 @@ export default function Home() {
       const res = await fetch("/api/comps/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ card, grade }),
+        body: JSON.stringify({
+          card,
+          grade,
+          ...(grade === "RAW" && normalizeRawCondition(condition) ? { condition: normalizeRawCondition(condition) } : {}),
+        }),
       });
       const payload = await readJson(res);
       if (!res.ok) throw new Error(payload.error ?? "review request failed");
@@ -7190,7 +7296,9 @@ export default function Home() {
               <span>Step 2 · optional evidence</span>
               <strong>
                 {summary
-                  ? `${summary.count} logged · median ${gbp(summary.medianPence)}`
+                  ? `${summary.count} traceable UK sold${summary.count === 1 ? "" : "s"} · median ${gbp(summary.medianPence)}`
+                  : hasLoggedEntries
+                    ? `${checkedCompEntries.length} logged · corroboration only`
                   : awaitingManualPrice
                     ? "Log the sold prices you saw"
                     : "Log your manual check"}
@@ -7236,6 +7344,7 @@ export default function Home() {
                 <input
                   type="date"
                   value={checkedCompLogSoldDate}
+                  max={todayInputValue()}
                   onChange={(event) => setCheckedCompLogSoldDate(event.target.value)}
                 />
               </label>
@@ -7253,6 +7362,14 @@ export default function Home() {
                 </select>
               </label>
               <label>
+                Price basis
+                <select value={checkedCompLogPriceBasis} onChange={(event) => setCheckedCompLogPriceBasis(event.target.value as CheckedCompPriceBasis)}>
+                  <option value="ITEM_PRICE">Exact item price · excludes fees/postage</option>
+                  <option value="BUYER_TOTAL">Buyer total · includes protection fee</option>
+                  <option value="BEST_OFFER_UNKNOWN">Best Offer · accepted price hidden</option>
+                </select>
+              </label>
+              <label>
                 Note
                 <input
                   value={checkedCompLogNote}
@@ -7260,14 +7377,24 @@ export default function Home() {
                   placeholder="NM, same language, no offer"
                 />
               </label>
+              {grade === "RAW" && (
+                <label>
+                  Condition
+                  <input value={normalizeRawCondition(condition) ?? ""} readOnly aria-describedby="checked-comp-condition-note" />
+                  <small id="checked-comp-condition-note">Locked to this lookup. Change condition above and run the comp again if needed.</small>
+                </label>
+              )}
             </div>
             <details className="checked-comp-source-url">
-              <summary>Source link</summary>
+              <summary>Individual sold-item link · needed for trusted evidence</summary>
               <input
                 value={checkedCompLogSourceUrl}
                 onChange={(event) => setCheckedCompLogSourceUrl(event.target.value)}
-                placeholder="Optional sold-search or listing URL"
+                placeholder="https://www.ebay.co.uk/itm/…"
+                type="url"
+                inputMode="url"
               />
+              <small>Paste the individual sold listing, not the sold-search page. Duplicate item IDs are rejected.</small>
             </details>
             <div className="checked-comp-log-actions">
               <button
@@ -7289,9 +7416,17 @@ export default function Home() {
               <div className="checked-comp-entry-row" key={entry.id}>
                 <div>
                   <strong>{gbp(entry.pricePence)}</strong>
-                  <span>{checkedCompPlatformLabel(entry.platform)} · {shortDate(entry.soldDate)}</span>
+                  <span>
+                    {checkedCompPlatformLabel(entry.platform)} · {shortDate(entry.soldDate)}
+                    {entry.condition ? ` · ${entry.condition}` : ""}
+                    {entry.priceBasis !== "ITEM_PRICE" ? " · inexact price" : ""}
+                    {entry.evidenceStatus === "used" ? " · used" : entry.evidenceStatus === "outlier" ? " · outlier removed" : " · corroboration"}
+                  </span>
                 </div>
                 {entry.note && <small>{entry.note}</small>}
+                {entry.sourceUrl && (
+                  <a href={entry.sourceUrl} target="_blank" rel="noreferrer">Open sold item</a>
+                )}
               </div>
             ))}
           </div>
@@ -7312,7 +7447,7 @@ export default function Home() {
         )}
         {summary && summary.count >= 2 && (
           <p className="hint">
-            These logged prices are now a real comp source. The headline refreshes through the normal engine.
+            Two or more traceable, condition-matched eBay UK solds can headline. Thin or wide evidence still blocks an automatic offer.
           </p>
         )}
         {!hasLoggedEntries && variant === "priority" && (
@@ -8742,7 +8877,7 @@ export default function Home() {
                   </p>
                   <h2>{offerCalc?.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}</h2>
                   <small>
-                    Market {gbp(headline.medianPence)} · {headline.sampleSize} sold / {headline.windowDays}d · {ageLabel(headline.asOf)}
+                    {unverifiedHeadline ? `Unverified evidence ${unverifiedRange}` : `Market ${gbp(headline.medianPence)}`} · {headlineEvidenceSummary(headline)} / {headline.windowDays}d · {ageLabel(headline.asOf)}
                     {comp?.cached ? ` · cached ${comp.cached.ageHours}h` : ""}
                     {compProgressPhase === "provisional" ? " · provisional" : ""}
                   </small>
@@ -8791,9 +8926,9 @@ export default function Home() {
                   <strong>{dealerVerdict?.title ?? (needsManualComp ? "Check solds" : "Priced")}</strong>
                 </button>
                 <div>
-                  <span>Market comp</span>
-                  <strong>{gbp(headline.medianPence)}</strong>
-                  <small>{headline.sampleSize} sold · {ageLabel(headline.asOf)} · {decisionBarOfferText}</small>
+                  <span>{unverifiedHeadline ? "Unverified range" : "Market comp"}</span>
+                  <strong>{unverifiedHeadline ? unverifiedRange : gbp(headline.medianPence)}</strong>
+                  <small>{headlineEvidenceSummary(headline)} · {ageLabel(headline.asOf)} · {decisionBarOfferText}</small>
                 </div>
               </div>
               <div className="buy-result-action-row" aria-label="Buy actions">
@@ -9654,7 +9789,7 @@ export default function Home() {
               <div className="form-grid">
                 <label>
                   Condition
-                  <input name="stock-condition" value={condition} onChange={(event) => setCondition(event.target.value)} placeholder="NM, LP, edgewear…" />
+                  <input name="stock-condition" value={condition} onChange={(event) => updateRawCondition(event.target.value)} placeholder="NM, LP, edgewear…" />
                 </label>
                 <label>
                   Cert
@@ -9696,7 +9831,7 @@ export default function Home() {
                     key={preset}
                     type="button"
                     className={condition === preset ? "selected" : ""}
-                    onClick={() => setCondition(preset)}
+                    onClick={() => updateRawCondition(preset)}
                   >
                     {preset}
                   </button>
@@ -12116,10 +12251,37 @@ function mergeCheckedCompEntries(entries: CheckedCompEntry[]): CheckedCompEntry[
   return [...byId.values()].sort((a, b) => new Date(b.soldDate).getTime() - new Date(a.soldDate).getTime());
 }
 
-function summarizeCheckedCompEntries(entries: CheckedCompEntry[]): { count: number; medianPence: number } | null {
+function checkedCompLogNotice(entry: CheckedCompEntry | null | undefined, pricePence: number): string {
+  if (entry?.evidenceStatus === "used") {
+    return `Logged traceable ${gbp(pricePence)} UK sold evidence. Add another independent sold listing.`;
+  }
+  const reasons = entry?.exclusionReasons ?? [];
+  if (reasons.includes("inexact-price-basis")) {
+    return `Logged ${gbp(pricePence)} as corroboration. Buyer totals and hidden Best Offers cannot prove the sold item price.`;
+  }
+  if (reasons.some((reason) => reason.startsWith("condition-mismatch") || reason === "entry-condition-missing")) {
+    return `Logged ${gbp(pricePence)} as corroboration because its RAW condition does not match this lookup.`;
+  }
+  if (reasons.includes("listing-id-mismatch")) {
+    return `Logged ${gbp(pricePence)} as corroboration because the sold-item link and stored item ID disagree.`;
+  }
+  if (entry?.evidenceStatus === "outlier" || reasons.includes("price-outlier")) {
+    return `Logged ${gbp(pricePence)}, but removed it from the aggregate as a price outlier.`;
+  }
+  return `Logged ${gbp(pricePence)} as corroboration. Add the individual eBay UK sold-item URL for headline-capable evidence.`;
+}
+
+function summarizeCheckedCompEntries(
+  entries: CheckedCompEntry[],
+  grade: Grade,
+  condition?: RawCondition,
+): { count: number; medianPence: number } | null {
   const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
   const prices = entries
     .filter((entry) => new Date(entry.soldDate).getTime() >= cutoff)
+    .filter((entry) => entry.grade === grade)
+    .filter((entry) => grade !== "RAW" || Boolean(condition && entry.condition === condition))
+    .filter((entry) => entry.evidenceStatus === "used")
     .map((entry) => entry.pricePence)
     .filter((price) => price > 0)
     .sort((a, b) => a - b);
@@ -12129,11 +12291,19 @@ function summarizeCheckedCompEntries(entries: CheckedCompEntry[]): { count: numb
   return { count: prices.length, medianPence };
 }
 
-function buildLocalCheckedCompResult(entries: CheckedCompEntry[], card: CompResult["card"], grade: Grade): CompResult | null {
-  const summary = summarizeCheckedCompEntries(entries);
+function buildLocalCheckedCompResult(
+  entries: CheckedCompEntry[],
+  card: CompResult["card"],
+  grade: Grade,
+  condition?: RawCondition,
+): CompResult | null {
+  const summary = summarizeCheckedCompEntries(entries, grade, condition);
   if (!summary) return null;
   const recentEntries = entries
     .filter((entry) => new Date(entry.soldDate).getTime() >= Date.now() - 90 * 24 * 60 * 60 * 1000)
+    .filter((entry) => entry.grade === grade)
+    .filter((entry) => grade !== "RAW" || Boolean(condition && entry.condition === condition))
+    .filter((entry) => entry.evidenceStatus === "used")
     .sort((a, b) => new Date(b.soldDate).getTime() - new Date(a.soldDate).getTime());
   const prices = recentEntries.map((entry) => entry.pricePence).filter((price) => price > 0);
   const latest = recentEntries[0];
@@ -12154,7 +12324,11 @@ function buildLocalCheckedCompResult(entries: CheckedCompEntry[], card: CompResu
     asOf: latest.soldDate,
     raw: {
       kind: "checked-comps",
-      caveat: "Dealer-logged sold prices for this exact card and grade.",
+      caveat: "Distinct dealer-checked eBay UK sold listings for this exact card, grade and RAW condition.",
+      region: "UK",
+      condition: grade === "RAW" ? condition : undefined,
+      conditionMatched: true,
+      traceableCount: summary.count,
       entries: recentEntries,
     },
   };
@@ -12257,10 +12431,14 @@ function humanReconciliationReason(reason: string): string {
   if (reason.includes("corroboration-stale")) return "One signal is too stale to headline.";
   if (reason.includes("corroboration-thin-owned")) return "Owned sales are too thin or old to headline.";
   if (reason.includes("corroboration-thin-checked")) return "One checked comp corroborates, but needs a second recent entry to headline.";
+  if (reason.includes("corroboration-wide-checked")) return "Checked sold prices are more than 4× apart, so they cannot headline without cleaner evidence.";
+  if (reason.includes("corroboration-unscoped-raw-condition")) return "Automated eBay UK solds were not verified to this RAW condition, so they are context only.";
   if (reason.includes("stale-checked-comps")) return "Your checked comps are older than 90 days.";
   if (reason.includes("penalty-raw-bucket-spread")) return "Raw eBay bucket is wide enough to suggest graded leakage.";
   if (reason.includes("penalty-graded-bucket-spread")) return "Graded bucket has a wide sale spread.";
   if (reason.includes("trend-suppressed")) return "Impossible trend was hidden.";
+  if (reason.includes("approximate-sample-capped")) return "An approximate provider count was capped so it cannot overpower direct sold evidence.";
+  if (reason.includes("high-value-without-uk-solds")) return "This £100+ value has no qualifying UK sold evidence and needs an eBay UK check.";
   if (reason.includes("corroboration-fallback") || reason.includes("corroboration-only")) return "Only fallback evidence was available.";
   if (reason.includes("no-eligible-candidates")) return "No source passed the quality gates.";
   return reason.replace(/[-:]/g, " ");
@@ -12315,8 +12493,8 @@ function freshnessVisualKind(value: string): "live" | "recent" | "aging" | "stal
   return "expired";
 }
 
-function lookupIdentityKey(input: Pick<LookupInput, "name" | "setName" | "number" | "grade">): string {
-  return [input.name, input.setName, input.number, input.grade]
+function lookupIdentityKey(input: Pick<LookupInput, "name" | "setName" | "number" | "grade" | "condition">): string {
+  return [input.name, input.setName, input.number, input.grade, input.condition ?? ""]
     .map((part) => String(part ?? "").trim().toLowerCase())
     .join("|");
 }
@@ -12376,10 +12554,39 @@ function compMeta(result: CompResult): string {
   const sample =
     result.source === "pokemon-tcg-market"
       ? "baseline"
+      : result.raw?.approxSaleCount
+        ? `~${result.sampleSize} provider observations`
       : `${result.sampleSize} sample${result.sampleSize === 1 ? "" : "s"}`;
   return [fxNote(result), `${sample} / ${result.windowDays}d · ${ageLabel(result.asOf)}`]
     .filter((part): part is string => Boolean(part))
     .join(" · ");
+}
+
+function headlineEvidenceSummary(result: CompResult): string {
+  if (result.source === "checked-comps") {
+    const count = result.raw?.traceableCount ?? result.sampleSize;
+    return `${count} traceable UK sold${count === 1 ? "" : "s"}`;
+  }
+  if (result.source === "pokemon-tcg-market" || result.raw?.kind === "catalog-market-baseline") {
+    return "market baseline";
+  }
+  if (result.raw?.approxSaleCount) {
+    return `~${result.sampleSize} provider observations`;
+  }
+  return `${result.sampleSize} sold${result.sampleSize === 1 ? "" : "s"}`;
+}
+
+function compMatchesRawCondition(result: CompResult | null, condition: string | null | undefined): boolean {
+  if (!result || result.grade !== "RAW") return false;
+  if (result.raw?.kind === "checked-comp") return true;
+  const requested = normalizeRawCondition(condition);
+  return Boolean(requested && result.raw?.conditionMatched && result.raw.condition === requested);
+}
+
+function formatCompRange(lowPence: number, highPence: number): string {
+  const low = Math.max(0, Math.round(lowPence));
+  const high = Math.max(low, Math.round(highPence));
+  return low === high ? gbp(low) : `${gbp(low)}–${gbp(high)}`;
 }
 
 function rawReason(result: CompResult): string | null {
@@ -12512,15 +12719,19 @@ function buildDealCalcInput({
   comp,
   grade,
   gradeLadder,
+  condition,
 }: {
   headline: CompResult;
   comp: Reconciled | null;
   grade: Grade;
   gradeLadder: Array<{ grade: Grade; medianPence: number; sampleSize: number }>;
+  condition: string | null | undefined;
 }): DealCalcCompInput {
   const reconciliation = comp?.reconciliation ?? headline.raw?.reconciliation ?? null;
   return {
-    headlinePence: headline.medianPence > 0 ? headline.medianPence : null,
+    headlinePence: headline.medianPence > 0
+      ? conditionAdjustedPricePence(headline.medianPence, grade, condition)
+      : null,
     confidence: reconciliation?.confidence ?? inferDealConfidence(headline, Boolean(comp?.sourcesDisagree)),
     manualCheck: reconciliation?.manualCheck ?? Boolean(comp?.sourcesDisagree || headline.sampleSize === 0),
     gradeBucket: grade,

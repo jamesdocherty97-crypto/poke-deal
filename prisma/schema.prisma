@@ -306,6 +306,7 @@ model CompResult {
   cardId String
 
   grade    Grade
+  condition String? // exact RAW condition bucket used for this lookup; null for legacy/graded rows
   source   String // adapter name, e.g. "pokemon-price-tracker"
   currency String @default("GBP")
 
@@ -335,6 +336,7 @@ model CompResult {
 
   @@index([cardId, grade, asOf])
   @@index([cardId, grade, createdAt])
+  @@index([cardId, grade, condition, createdAt])
   @@index([manualCheck, resolvedAt, createdAt])
   @@index([reviewRequestedAt, reviewExpiresAt])
 }
@@ -350,12 +352,16 @@ model CheckedComp {
   pricePence Int
   soldDate   DateTime
   platform   String   @default("ebay-uk")
+  condition  String?  // NM/LP/MP/HP/DMG for RAW; null for graded or legacy rows
+  priceBasis String   @default("UNKNOWN") // ITEM_PRICE qualifies; buyer totals/hidden offers do not
   note       String?
   sourceUrl  String?
+  sourceListingId String? @unique // platform-prefixed immutable listing id; search URLs never qualify
 
   createdAt DateTime @default(now())
 
   @@index([cardId, grade, soldDate])
+  @@index([cardId, grade, condition, soldDate])
   @@index([createdAt])
 }
 
