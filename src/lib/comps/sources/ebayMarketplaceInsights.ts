@@ -43,6 +43,8 @@ type EbayMiContext = {
   card: CardRef;
   grade: Grade;
   windowDays: number;
+  /** Evaluation time seam for deterministic cleaning and fixture tests. */
+  now?: Date;
 };
 
 export class EbayMarketplaceInsightsSource implements CompSource {
@@ -156,6 +158,7 @@ export function mapEbayMarketplaceInsightsToComp(json: unknown, ctx: EbayMiConte
     grade: ctx.grade,
     sales,
     windowDays: ctx.windowDays,
+    now: ctx.now,
   });
   return comp.sampleSize > 0
     ? comp
@@ -232,7 +235,7 @@ function emptyComp(ctx: EbayMiContext, reason: string): CompResult {
     windowDays: ctx.windowDays,
     trendPct: null,
     outliersRemoved: 0,
-    asOf: new Date().toISOString(),
+    asOf: (ctx.now ?? new Date()).toISOString(),
     raw: { kind: "uk-ebay-sold-comps", reason },
   };
 }
