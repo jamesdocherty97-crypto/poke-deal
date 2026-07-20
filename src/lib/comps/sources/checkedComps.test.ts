@@ -11,9 +11,11 @@ import {
   normalizeCheckedCompPlatform,
   normalizeCheckedCompPriceBasis,
   normalizeCheckedCompSource,
+  type CheckedCompDb,
   type CheckedCompPriceBasis,
   type CheckedCompRow,
 } from "./checkedComps.js";
+import { checkedCompConflictResponse } from "../checkedCompHttp.js";
 import type { CardRef, Grade, RawCondition } from "../../domain/types.js";
 
 const NOW = new Date("2026-07-19T12:00:00.000Z");
@@ -194,6 +196,111 @@ test("IQR cleaning removes a gross manual-entry outlier without deleting its aud
   assert.equal(entries.filter((entry) => entry.evidenceStatus === "outlier").length, 1);
 });
 
+test("voided evidence stays in the receipt but cannot affect the sample or traceable count", () => {
+  const rows = [
+    checkedComp("bad", 100_000, daysAgo(3), {
+      itemId: "100000000041",
+      voidedAt: daysAgo(1),
+      voidReason: "Wrong card condition",
+    }),
+    checkedComp("low", 45_000, daysAgo(2), { itemId: "100000000042" }),
+    checkedComp("high", 75_000, daysAgo(1), { itemId: "100000000043" }),
+  ];
+
+  const comp = mapCheckedCompsToComp(rows, context("NM"));
+  const raw = comp.raw as {
+    traceableCount?: number;
+    entries?: Array<{ id?: string; traceable?: boolean; voidedAt?: string; exclusionReasons?: string[] }>;
+  };
+  const voided = raw.entries?.find((entry) => entry.id === "bad");
+
+  assert.equal(comp.sampleSize, 2);
+  assert.equal(comp.medianPence, 60_000);
+  assert.equal(raw.traceableCount, 2);
+  assert.equal(raw.entries?.length, 3);
+  assert.equal(voided?.traceable, false);
+  assert.ok(voided?.voidedAt);
+  assert.ok(voided?.exclusionReasons?.includes("voided"));
+});
+
+test("a corrected re-log of the same listing qualifies after the old observation is voided", () => {
+  const itemId = "100000000045";
+  const old = checkedComp("old", 100_000, daysAgo(3), {
+    itemId,
+    voidedAt: daysAgo(2),
+    voidReason: "Price included postage",
+  });
+  const corrected = checkedComp("corrected", 60_000, daysAgo(1), { itemId });
+  const comp = mapCheckedCompsToComp([old, corrected], context("NM"));
+  const entries = (comp.raw as {
+    entries?: Array<{ id?: string; evidenceStatus?: string; exclusionReasons?: string[] }>;
+  }).entries ?? [];
+
+  assert.equal(comp.sampleSize, 1);
+  assert.equal(comp.medianPence, 60_000);
+  assert.equal(entries.find((entry) => entry.id === "corrected")?.evidenceStatus, "used");
+  assert.doesNotMatch(
+    (entries.find((entry) => entry.id === "corrected")?.exclusionReasons ?? []).join(" "),
+    /duplicate-listing/,
+  );
+});
+
+test("voiding is idempotent and preserves the first reason and timestamp", async () => {
+  let row = checkedComp("cc_void", 60_000, daysAgo(1), { itemId: "100000000044" });
+  let successfulTransitions = 0;
+  const db = {
+    card: {} as CheckedCompDb["card"],
+    checkedComp: {
+      async create() { throw new Error("not used"); },
+      async findMany() { return []; },
+      async updateMany(args: { where: { id: string; voidedAt: null }; data: { voidedAt: Date; voidReason: string } }) {
+        if (row.id === args.where.id && row.voidedAt === null) {
+          row = { ...row, ...args.data };
+          successfulTransitions += 1;
+          return { count: 1 };
+        }
+        return { count: 0 };
+      },
+      async findUnique() { return row; },
+    },
+  } as CheckedCompDb;
+  const repo = new PrismaCheckedCompRepo(db);
+
+  const first = await repo.void(row.id, "Wrong condition");
+  const retried = await repo.void(row.id, "A later retry must not overwrite this");
+
+  assert.equal(successfulTransitions, 1);
+  assert.equal(first.voidReason, "Wrong condition");
+  assert.equal(retried.voidReason, "Wrong condition");
+  assert.equal(retried.voidedAt?.toISOString(), first.voidedAt?.toISOString());
+});
+
+test("a duplicate active listing on another card maps to 409, while unrelated uniqueness failures do not", () => {
+  const crossCardConflict = checkedCompConflictResponse({
+    code: "P2002",
+    meta: { target: ["sourceListingId"] },
+  });
+  const catalogConflict = checkedCompConflictResponse({
+    code: "P2002",
+    meta: { target: ["tcgApiId"] },
+  });
+
+  assert.equal(crossCardConflict?.status, 409);
+  assert.equal(crossCardConflict?.body.code, "duplicate-listing");
+  assert.match(crossCardConflict?.body.error ?? "", /void it first/i);
+  assert.equal(catalogConflict, null);
+});
+
+test("the listing constraint is global across cards and releases only voided rows", () => {
+  const migration = readFileSync(
+    new URL("../../../../prisma/migrations/20260720120000_checked_comp_voids/migration.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(migration, /UNIQUE INDEX "CheckedComp_sourceListingId_key"[\s\S]*\("sourceListingId"\)/);
+  assert.match(migration, /WHERE "voidedAt" IS NULL/);
+  assert.doesNotMatch(migration, /UNIQUE INDEX[\s\S]{0,180}\("cardId",\s*"sourceListingId"\)/);
+});
+
 test("CheckedCompsSource degrades to explicit empty evidence when the database fails", async () => {
   const source = new CheckedCompsSource({
     card: {} as never,
@@ -204,6 +311,8 @@ test("CheckedCompsSource degrades to explicit empty evidence when the database f
       async findMany() {
         throw new Error("db offline");
       },
+      async updateMany() { return { count: 0 }; },
+      async findUnique() { return null; },
     },
   });
 
@@ -224,6 +333,8 @@ test("CheckedCompsSource keeps provider ids and exact print identity in the look
         seenWhere = args.where;
         return [checkedComp("cc_1", 52_000, daysAgo(1), { itemId: "100000000031", grade: "PSA_10", condition: null })];
       },
+      async updateMany() { return { count: 0 }; },
+      async findUnique() { return null; },
     },
   });
 
@@ -306,6 +417,8 @@ function checkedComp(
     grade?: Grade;
     condition?: RawCondition | null;
     priceBasis?: CheckedCompPriceBasis;
+    voidedAt?: Date | null;
+    voidReason?: string | null;
   } = {},
 ): CheckedCompRow {
   const itemId = options.itemId === undefined ? id.replace(/\D/g, "").padStart(12, "1").slice(-12) : options.itemId;
@@ -322,6 +435,8 @@ function checkedComp(
     note: null,
     sourceUrl,
     sourceListingId: options.sourceListingId === undefined && itemId ? `ebay-uk:${itemId}` : options.sourceListingId ?? null,
+    voidedAt: options.voidedAt ?? null,
+    voidReason: options.voidReason ?? null,
     createdAt: soldDate,
     card: {
       id: "card_1",

@@ -16,6 +16,7 @@ import {
   type CheckedCompDb,
 } from "@/lib/comps/sources/checkedComps";
 import { normalizeRawCondition } from "@/lib/comps/pricing";
+import { checkedCompConflictResponse } from "@/lib/comps/checkedCompHttp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -167,11 +168,9 @@ export async function POST(request: Request) {
     if (err instanceof CheckedCompEvidenceError) {
       return NextResponse.json({ error: err.message, code: err.code }, { status: 400 });
     }
-    if (isUniqueConstraintError(err)) {
-      return NextResponse.json(
-        { error: "That sold listing is already logged. Each eBay item can back the comp only once.", code: "duplicate-listing" },
-        { status: 409 },
-      );
+    const conflict = checkedCompConflictResponse(err);
+    if (conflict) {
+      return NextResponse.json(conflict.body, { status: conflict.status });
     }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "checked comp create failed" },
@@ -182,10 +181,6 @@ export async function POST(request: Request) {
 
 function readCondition(value: string | null): RawCondition | undefined {
   return normalizeRawCondition(value) ?? undefined;
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
 }
 
 function readEdition(value: string | null): CardRef["edition"] {

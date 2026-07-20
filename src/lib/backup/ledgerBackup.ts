@@ -94,7 +94,7 @@ const TABLES: readonly TableDefinition[] = [
     dateFields: ["createdAt", "updatedAt", "completedAt", "abandonedAt"],
   },
   { name: "dealSessionLines", delegate: "dealSessionLine", dateFields: ["addedAt", "compAsOf"] },
-  { name: "checkedComps", delegate: "checkedComp", dateFields: ["soldDate", "createdAt"] },
+  { name: "checkedComps", delegate: "checkedComp", dateFields: ["soldDate", "voidedAt", "createdAt"] },
   { name: "compResults", delegate: "compResult", dateFields: ["asOf", "createdAt"] },
   { name: "priceSnapshots", delegate: "priceSnapshot", dateFields: ["takenAt"] },
   { name: "scanEvents", delegate: "scanEvent", dateFields: ["createdAt"] },

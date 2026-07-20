@@ -70,7 +70,6 @@ import { buildBuyPlan, buildBuyTargetOptions, buildBuyTargetSuggestion } from "@
 import { buildQuickGradeOptions } from "@/lib/dealer/buyWorkspace";
 import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
 import {
-  buildCheckedComp,
   checkedCompSourceLabel,
   parseCheckedCompPriceText,
   type CheckedCompSource,
@@ -310,6 +309,8 @@ type CheckedCompEntry = {
   traceable?: boolean;
   evidenceStatus?: "used" | "corroboration" | "outlier";
   exclusionReasons?: string[];
+  voidedAt?: string;
+  voidReason?: string;
   createdAt: string;
 };
 
@@ -974,10 +975,6 @@ export default function Home() {
   const [strategy, setStrategy] = useState<PricingStrategy>(DEFAULT_INTAKE_PREFERENCES.strategy as PricingStrategy);
   const [channel, setChannel] = useState<Channel>(DEFAULT_INTAKE_PREFERENCES.channel as Channel);
   const [listPriceOverride, setListPriceOverride] = useState("");
-  const [checkedCompPrice, setCheckedCompPrice] = useState("");
-  const [checkedCompSample, setCheckedCompSample] = useState("1");
-  const [checkedCompSource, setCheckedCompSource] = useState<CheckedCompSource>("EBAY_SOLD");
-  const [checkedCompNote, setCheckedCompNote] = useState("");
   const [loggedCheckedComps, setLoggedCheckedComps] = useState<CheckedCompEntry[]>([]);
   const [checkedCompLogOpen, setCheckedCompLogOpen] = useState(false);
   const [checkedCompLogPrice, setCheckedCompLogPrice] = useState("");
@@ -986,6 +983,8 @@ export default function Home() {
   const [checkedCompLogPriceBasis, setCheckedCompLogPriceBasis] = useState<CheckedCompPriceBasis>("DISPLAYED_PRICE");
   const [checkedCompLogNote, setCheckedCompLogNote] = useState("");
   const [checkedCompLogSourceUrl, setCheckedCompLogSourceUrl] = useState("");
+  const [voidingCheckedCompId, setVoidingCheckedCompId] = useState<string | null>(null);
+  const [checkedCompVoidReason, setCheckedCompVoidReason] = useState("");
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
   const [buyResultSection, setBuyResultSection] = useState<BuyResultSection>(null);
   const [acquireListingState, setAcquireListingState] = useState<AcquireListingState>(DEFAULT_INTAKE_PREFERENCES.listingState);
@@ -1692,55 +1691,10 @@ export default function Home() {
   }, [saleChannel, salePrice, saleQuantity, sellingItem]);
   const apiHeadline = comp?.headline ?? null;
   const catalogCard = comp?.catalog ?? null;
-  const checkedComp = useMemo<CompResult | null>(
-    () => {
-      const built = buildCheckedComp({
-        card: {
-          name: catalogCard?.name ?? name,
-          setName: catalogCard?.setName ?? setNameValue,
-          number: catalogCard?.number ?? number,
-          tcgApiId: catalogCard?.tcgApiId,
-          tcgDexId: catalogCard?.tcgDexId,
-          cardmarketId: catalogCard?.cardmarketId,
-          edition: catalogCard?.edition,
-          finish: catalogCard?.finish,
-          game: "POKEMON",
-          language: catalogCard?.language ?? comp?.headline?.card.language ?? "EN",
-        },
-        grade,
-        pricePence: checkedCompPrice.trim() ? poundsToPence(checkedCompPrice) : 0,
-        sampleSize: Number(checkedCompSample),
-        windowDays: 30,
-        source: checkedCompSource,
-        note: checkedCompNote,
-      });
-      return built as CompResult | null;
-    },
-    [
-      catalogCard?.name,
-      catalogCard?.number,
-      catalogCard?.setName,
-      catalogCard?.tcgApiId,
-      catalogCard?.tcgDexId,
-      catalogCard?.cardmarketId,
-      catalogCard?.language,
-      catalogCard?.edition,
-      catalogCard?.finish,
-      comp?.headline?.card.language,
-      checkedCompNote,
-      checkedCompPrice,
-      checkedCompSample,
-      checkedCompSource,
-      grade,
-      name,
-      number,
-      setNameValue,
-    ],
-  );
-  const headline = checkedComp ?? apiHeadline;
+  const headline = apiHeadline;
   const headlineConditionAlreadyMatched = compMatchesRawCondition(headline, condition);
   const headlineAdjustmentCondition = headlineConditionAlreadyMatched ? "NM" : condition;
-  const isAmbiguousComp = Boolean(comp?.ambiguous && !checkedComp);
+  const isAmbiguousComp = Boolean(comp?.ambiguous);
   const sourceMatchedCard = !catalogCard && apiHeadline?.card ? apiHeadline.card : null;
   const sourceMatchTypedMeta = [name.trim(), setNameValue.trim(), number.trim() ? `#${number.trim()}` : ""]
     .filter(Boolean)
@@ -1850,14 +1804,13 @@ export default function Home() {
   );
   const hasNamedCardIdentity = Boolean(displayCardName.trim() || displayNumber);
   const hasActiveCardIdentity = Boolean(hasNamedCardIdentity || comp);
-  const hasBuyContext = Boolean(hasActiveCardIdentity || quickIntake.trim() || parsedQuickIntake?.name || checkedComp || loggedCheckedComps.length > 0);
+  const hasBuyContext = Boolean(hasActiveCardIdentity || quickIntake.trim() || parsedQuickIntake?.name || loggedCheckedComps.length > 0);
   const canClearCurrentComp = Boolean(
     hasActiveCardIdentity ||
       setNameValue.trim() ||
       quickIntake.trim() ||
       cost.trim() ||
       manualCompQuery.trim() ||
-      checkedCompPrice.trim() ||
       checkedCompLogPrice.trim() ||
       loggedCheckedComps.length > 0 ||
       graderCert.trim() ||
@@ -1894,7 +1847,9 @@ export default function Home() {
     [comp],
   );
   const checkedCompEntries = useMemo(
-    () => mergeCheckedCompEntries([...loggedCheckedComps, ...checkedCompsFromSource]),
+    // A just-written or just-voided API response is newer than the comp
+    // stream currently on screen, so local persisted entries win by ID.
+    () => mergeCheckedCompEntries([...checkedCompsFromSource, ...loggedCheckedComps]),
     [checkedCompsFromSource, loggedCheckedComps],
   );
   const checkedLookupCondition = grade === "RAW" ? normalizeRawCondition(condition) ?? undefined : undefined;
@@ -1947,30 +1902,11 @@ export default function Home() {
     ],
   );
   const compForReceipt = useMemo<Reconciled | null>(() => {
-    const baseComp =
-      comp ??
-      (checkedComp
-        ? {
-            headline: checkedComp,
-            all: [checkedComp],
-            sourcesDisagree: false,
-            catalog: catalogCard,
-            psaCert: psaResult,
-            cardImage: null,
-          }
-        : null);
-    if (!baseComp) return null;
-    const withLogged = localCheckedCompResult
-      ? { ...baseComp, all: upsertCompResult(baseComp.all, localCheckedCompResult) }
-      : baseComp;
-    if (!checkedComp) return withLogged;
-    return {
-      ...withLogged,
-      headline: checkedComp,
-      all: [checkedComp, ...withLogged.all.filter((result) => result.source !== checkedComp.source)],
-      sourcesDisagree: false,
-    };
-  }, [catalogCard, checkedComp, comp, localCheckedCompResult, psaResult]);
+    if (!comp) return null;
+    return localCheckedCompResult
+      ? { ...comp, all: upsertCompResult(comp.all, localCheckedCompResult) }
+      : comp;
+  }, [comp, localCheckedCompResult]);
   const compReceipt = useMemo(() => (compForReceipt ? buildCompReceipt(compForReceipt) : []), [compForReceipt]);
   const compLimitations = useMemo(() => (compForReceipt ? buildCompLimitations(compForReceipt) : []), [compForReceipt]);
   const reconciliationReasons = useMemo(
@@ -1995,13 +1931,12 @@ export default function Home() {
     [dealCalcInput, dealSettings],
   );
   const headlineReconciliation = compForReceipt?.reconciliation ?? headline?.raw?.reconciliation ?? null;
-  const unverifiedHeadline = Boolean(!checkedComp && (headlineReconciliation?.manualCheck ?? compForReceipt?.sourcesDisagree));
+  const unverifiedHeadline = Boolean(headlineReconciliation?.manualCheck ?? compForReceipt?.sourcesDisagree);
   const unverifiedRange = headlineReconciliation?.selection?.lowPence != null && headlineReconciliation.selection.highPence != null
     ? formatCompRange(headlineReconciliation.selection.lowPence, headlineReconciliation.selection.highPence)
     : headline ? gbp(headline.medianPence) : "No verified range";
   const needsManualComp = Boolean(
     apiHeadline &&
-      !checkedComp &&
       (apiHeadline.medianPence <= 0 || apiHeadline.sampleSize <= 0 || busy === "lookup" || compProgressPhase !== "receipt"),
   );
   const manualCompCard = useMemo(
@@ -2028,16 +1963,15 @@ export default function Home() {
   );
   const compSpreadPct = useMemo(() => (compForReceipt ? medianSpreadPct(compForReceipt.all) : null), [compForReceipt]);
   const dealerVerdict = useMemo(
-    () => (checkedComp || isAmbiguousComp || !compForReceipt?.headline ? null : buildDealerCompVerdict(compForReceipt as Reconciled & { headline: CompResult })),
-    [checkedComp, compForReceipt, isAmbiguousComp],
+    () => (isAmbiguousComp || !compForReceipt?.headline ? null : buildDealerCompVerdict(compForReceipt as Reconciled & { headline: CompResult })),
+    [compForReceipt, isAmbiguousComp],
   );
   const shouldOfferManualComp = Boolean(
-    headline &&
+      headline &&
       !isAmbiguousComp &&
-      !checkedComp &&
       (needsManualComp || !catalogCard || comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
   );
-  const requiresCheckedCompBeforeStock = Boolean(!checkedComp && dealerVerdict?.requiresCheckedComp);
+  const requiresCheckedCompBeforeStock = Boolean(dealerVerdict?.requiresCheckedComp);
   const confidenceLabel = dealerVerdict
     ? { label: dealerVerdict.label, tone: dealerVerdict.tone }
     : headline
@@ -2084,15 +2018,12 @@ export default function Home() {
       listPricePence,
       channel,
       grade,
-      cautious: checkedComp
-        ? checkedComp.sampleSize < 2
-        : Boolean(compForReceipt?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
+      cautious: Boolean(compForReceipt?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
     });
   }, [
     channel,
     compForReceipt?.sourcesDisagree,
     cost,
-    checkedComp,
     dealerVerdict,
     grade,
     headline?.medianPence,
@@ -3704,10 +3635,6 @@ export default function Home() {
   }
 
   function clearCheckedComp() {
-    setCheckedCompPrice("");
-    setCheckedCompSample("1");
-    setCheckedCompSource("EBAY_SOLD");
-    setCheckedCompNote("");
     setLoggedCheckedComps([]);
     setCheckedCompLogOpen(false);
     setCheckedCompLogPrice("");
@@ -3716,6 +3643,8 @@ export default function Home() {
     setCheckedCompLogPriceBasis("DISPLAYED_PRICE");
     setCheckedCompLogNote("");
     setCheckedCompLogSourceUrl("");
+    setVoidingCheckedCompId(null);
+    setCheckedCompVoidReason("");
     setManualCompReturnArmed(false);
   }
 
@@ -4569,16 +4498,7 @@ export default function Home() {
       listPricePence: effectiveDraftListPricePence ?? undefined,
       listingState: effectiveAcquireListingState,
       createListing: shouldCreateListing,
-      checkedComp: checkedComp
-        ? {
-            pricePence: checkedComp.medianPence,
-            sampleSize: checkedComp.sampleSize,
-            windowDays: checkedComp.windowDays,
-            source: checkedCompSource,
-            note: checkedCompNote.trim() || undefined,
-          }
-        : undefined,
-      reviewedComps: !checkedComp && comp && headline
+      reviewedComps: comp && headline
         ? {
             headline: reviewedCompSnapshot(headline),
             // Empty/unavailable source receipts can legitimately carry n=0.
@@ -7029,6 +6949,42 @@ export default function Home() {
     }
   }
 
+  async function voidCheckedCompEntry(entry: CheckedCompEntry) {
+    const reason = checkedCompVoidReason.trim();
+    if (!reason) {
+      setError("Say why this checked comp is wrong before voiding it.");
+      return;
+    }
+
+    setBusy(`checked-comp-void:${entry.id}`);
+    setError(null);
+    try {
+      const res = await fetch(`/api/checked-comps/${encodeURIComponent(entry.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) throw new Error(payload.error ?? "checked comp void failed");
+
+      const entries = Array.isArray(payload.entries) ? payload.entries as CheckedCompEntry[] : [];
+      const aggregate = payload.aggregate as CompResult | null | undefined;
+      const card = currentCheckedCompCard();
+      setLoggedCheckedComps(entries);
+      setVoidingCheckedCompId(null);
+      setCheckedCompVoidReason("");
+      setNotice("Checked comp voided. Its audit row is retained and the sold listing can now be logged correctly.");
+      // Keep even an n=0 aggregate: it is the authoritative receipt proving
+      // the old active checked source was voided and must replace stale UI.
+      const pinnedCheckedSource = aggregate ?? null;
+      void refreshCurrentCompAfterCheckedComp(card, pinnedCheckedSource);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "checked comp void failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function pinCheckedCompEvidence(
     entries: CheckedCompEntry[],
     aggregate: CompResult | null,
@@ -7096,7 +7052,7 @@ export default function Home() {
       const payload = await readJson(res);
       if (!res.ok) return;
       setComp((current) => {
-        const checkedSource = current?.all.find((result) => result.source === "checked-comps") ?? pinnedCheckedSource;
+        const checkedSource = pinnedCheckedSource ?? current?.all.find((result) => result.source === "checked-comps");
         if (!isUsefulCompPayload(payload)) {
           if (!checkedSource) return current;
           const base: Reconciled = current ?? {
@@ -7431,12 +7387,65 @@ export default function Home() {
                       : entry.priceBasis === "ITEM_PRICE"
                         ? " · seller item price"
                         : " · inexact price"}
-                    {entry.evidenceStatus === "used" ? " · used" : entry.evidenceStatus === "outlier" ? " · outlier removed" : " · corroboration"}
+                    {entry.voidedAt
+                      ? " · voided"
+                      : entry.evidenceStatus === "used"
+                        ? " · used"
+                        : entry.evidenceStatus === "outlier"
+                          ? " · outlier removed"
+                          : " · corroboration"}
                   </span>
                 </div>
                 {entry.note && <small>{entry.note}</small>}
+                {entry.voidedAt && <small>Voided: {entry.voidReason ?? "No reason recorded"}</small>}
                 {entry.sourceUrl && (
                   <a href={entry.sourceUrl} target="_blank" rel="noreferrer">Open sold item</a>
+                )}
+                {!entry.voidedAt && voidingCheckedCompId !== entry.id && (
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      setVoidingCheckedCompId(entry.id);
+                      setCheckedCompVoidReason("");
+                    }}
+                  >
+                    Void wrong entry
+                  </button>
+                )}
+                {!entry.voidedAt && voidingCheckedCompId === entry.id && (
+                  <div>
+                    <label>
+                      Why is this entry wrong?
+                      <input
+                        value={checkedCompVoidReason}
+                        maxLength={300}
+                        onChange={(event) => setCheckedCompVoidReason(event.target.value)}
+                        placeholder="e.g. wrong condition or sold price"
+                        autoFocus
+                      />
+                    </label>
+                    <div className="checked-comp-log-actions">
+                      <button
+                        type="button"
+                        onClick={() => void voidCheckedCompEntry(entry)}
+                        disabled={busy === `checked-comp-void:${entry.id}` || !checkedCompVoidReason.trim()}
+                      >
+                        {busy === `checked-comp-void:${entry.id}` ? "Voiding…" : "Confirm void"}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => {
+                          setVoidingCheckedCompId(null);
+                          setCheckedCompVoidReason("");
+                        }}
+                        disabled={busy === `checked-comp-void:${entry.id}`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             ))}
@@ -7974,7 +7983,7 @@ export default function Home() {
                   onChange={(event) => {
                     setQuickIntake(event.target.value);
                     setCardSuggestionsLoading(Boolean(event.target.value.trim()));
-                    if (comp || checkedCompPrice.trim()) {
+                    if (comp) {
                       clearCompEvidence();
                       resetBuyCost();
                     }
@@ -9095,7 +9104,7 @@ export default function Home() {
                     <span>{dealerVerdict.label}</span>
                     <strong>{dealerVerdict.title}</strong>
                     <small>{dealerVerdict.detail}</small>
-                    {dealerVerdict.tone !== "good" && !checkedComp && (
+                    {dealerVerdict.tone !== "good" && (
                       <div className="dealer-verdict-actions">
                         <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
                           Open UK
@@ -9420,7 +9429,7 @@ export default function Home() {
                       {sourceMatchedCard.number ? ` #${sourceMatchedCard.number}` : ""}
                     </small>
                     {sourceMatchTypedMeta && <small className="source-match-typed">Typed: {sourceMatchTypedMeta}</small>}
-                    {!catalogCard && headline.medianPence > 0 && !checkedComp && (
+                    {!catalogCard && headline.medianPence > 0 && (
                       <div className="source-match-actions" aria-label="Source match actions">
                         <button type="button" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
                           Open UK
@@ -9458,14 +9467,11 @@ export default function Home() {
                   {headline.raw.note ? ` · ${headline.raw.note}` : ""}.
                 </p>
               )}
-              {buyResultSection === "confidence" && comp?.sourcesDisagree && !checkedComp && (
+              {buyResultSection === "confidence" && comp?.sourcesDisagree && (
                 <p className="hint danger-text">
                   Sources disagree by {comp?.reconciliation?.selection ? `${gbp(comp.reconciliation.selection.spreadPence)} (${comp.reconciliation.selection.spreadPct.toFixed(1)}%)` : `${compSpreadPct ?? "15+"}%`}.
                   {" "}{sourceLabel(headline.source, false)} is selected; treat this as a check-before-buy price.
                 </p>
-              )}
-              {buyResultSection === "confidence" && comp?.sourcesDisagree && checkedComp && (
-                <p className="hint danger-text">API sources disagree; the checked comp is driving this buy.</p>
               )}
             </section>
           )}
@@ -10072,7 +10078,7 @@ export default function Home() {
               </div>
             </section>
           )}
-          {((headline && buyResultSection === "deal") || (!headline && (name.trim() || setNameValue.trim() || number.trim() || checkedComp))) && (
+          {((headline && buyResultSection === "deal") || (!headline && (name.trim() || setNameValue.trim() || number.trim()))) && (
             <div className="mobile-buy-spacer" aria-hidden="true" />
           )}
         </section>
@@ -10706,7 +10712,7 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && !headline && (name.trim() || number.trim() || checkedComp) && (
+      {view === "acquire" && !headline && (name.trim() || number.trim()) && (
         <section
           className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`}
           aria-label="Current buy action"
@@ -12583,7 +12589,6 @@ function headlineEvidenceSummary(result: CompResult): string {
 
 function compMatchesRawCondition(result: CompResult | null, condition: string | null | undefined): boolean {
   if (!result || result.grade !== "RAW") return false;
-  if (result.raw?.kind === "checked-comp") return true;
   const requested = normalizeRawCondition(condition);
   return Boolean(requested && result.raw?.conditionMatched && result.raw.condition === requested);
 }

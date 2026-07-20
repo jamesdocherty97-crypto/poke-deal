@@ -26,6 +26,8 @@ export type CheckedCompRow = {
   note: string | null;
   sourceUrl: string | null;
   sourceListingId: string | null;
+  voidedAt: Date | null;
+  voidReason: string | null;
   createdAt: Date;
   card: CheckedCompCard;
 };
@@ -65,6 +67,14 @@ export type CheckedCompDb = PrismaCardDb & {
       orderBy: { soldDate: "desc" };
       take: number;
     }): Promise<CheckedCompRow[]>;
+    updateMany(args: {
+      where: { id: string; voidedAt: null };
+      data: { voidedAt: Date; voidReason: string };
+    }): Promise<{ count: number }>;
+    findUnique(args: {
+      where: { id: string };
+      include: { card: true };
+    }): Promise<CheckedCompRow | null>;
   };
 };
 
@@ -92,6 +102,12 @@ const GROSS_SPREAD_LIMIT = 4;
 
 export class CheckedCompEvidenceError extends Error {
   constructor(message: string, readonly code: "invalid-source-url" | "invalid-condition" | "invalid-price" | "invalid-date") {
+    super(message);
+  }
+}
+
+export class CheckedCompVoidError extends Error {
+  constructor(message: string, readonly code: "invalid-reason" | "not-found") {
     super(message);
   }
 }
@@ -157,6 +173,29 @@ export class PrismaCheckedCompRepo {
       orderBy: { soldDate: "desc" },
       take: MAX_CHECKED_COMPS,
     });
+  }
+
+  async void(id: string, reason: string): Promise<CheckedCompRow> {
+    const cleanId = id.trim();
+    const cleanReason = reason.trim();
+    if (!cleanId) throw new CheckedCompVoidError("Checked comp ID is required.", "not-found");
+    if (!cleanReason || cleanReason.length > 300) {
+      throw new CheckedCompVoidError("Void reason must be between 1 and 300 characters.", "invalid-reason");
+    }
+
+    // updateMany makes the transition conditional without turning a retried
+    // PATCH into an error. The first request owns the timestamp and reason;
+    // later identical or concurrent requests return that durable result.
+    await this.db.checkedComp.updateMany({
+      where: { id: cleanId, voidedAt: null },
+      data: { voidedAt: new Date(), voidReason: cleanReason },
+    });
+    const row = await this.db.checkedComp.findUnique({
+      where: { id: cleanId },
+      include: { card: true },
+    });
+    if (!row) throw new CheckedCompVoidError("Checked comp not found.", "not-found");
+    return row;
   }
 }
 
@@ -282,7 +321,9 @@ export function checkedCompRowForRaw(row: CheckedCompRow) {
     note: row.note ?? undefined,
     sourceUrl: row.sourceUrl ?? undefined,
     sourceListingId: listingId ?? undefined,
-    traceable: Boolean(directListingId && normalizeCheckedCompPlatform(row.platform) === "ebay-uk"),
+    traceable: Boolean(!row.voidedAt && directListingId && normalizeCheckedCompPlatform(row.platform) === "ebay-uk"),
+    voidedAt: row.voidedAt?.toISOString(),
+    voidReason: row.voidReason ?? undefined,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -369,6 +410,7 @@ function qualifyEvidence(rows: CheckedCompRow[], ctx: CheckedCompsContext): Evid
   const seenListings = new Set<string>();
   return rows.map((row) => {
     const reasons: string[] = [];
+    if (row.voidedAt) reasons.push("voided");
     const platform = normalizeCheckedCompPlatform(row.platform);
     const listingId = checkedCompSourceListingId(platform, row.sourceUrl);
     const storedListingId = normalizeStoredListingId(row.sourceListingId);
@@ -388,8 +430,10 @@ function qualifyEvidence(rows: CheckedCompRow[], ctx: CheckedCompsContext): Evid
       else if (!rowCondition) reasons.push("entry-condition-missing");
       else if (rowCondition !== ctx.condition) reasons.push(`condition-mismatch:${rowCondition}`);
     }
-    if (listingId && seenListings.has(listingId)) reasons.push("duplicate-listing");
-    if (listingId) seenListings.add(listingId);
+    // A void releases the listing both in PostgreSQL and in this reducer. It
+    // must never cause the later corrected observation to look duplicated.
+    if (!row.voidedAt && listingId && seenListings.has(listingId)) reasons.push("duplicate-listing");
+    if (!row.voidedAt && listingId) seenListings.add(listingId);
     return {
       row,
       listingId,

@@ -356,7 +356,11 @@ model CheckedComp {
   priceBasis String   @default("UNKNOWN") // ITEM_PRICE qualifies; buyer totals/hidden offers do not
   note       String?
   sourceUrl  String?
-  sourceListingId String? @unique // platform-prefixed immutable listing id; search URLs never qualify
+  // Active listing IDs are unique through the partial index created by the
+  // checked-comp void migration. Prisma cannot express partial indexes.
+  sourceListingId String? // platform-prefixed immutable listing id; search URLs never qualify
+  voidedAt   DateTime?
+  voidReason String?
 
   createdAt DateTime @default(now())
 

@@ -87,6 +87,14 @@ test("old no-cost stock keeps purchase cost, market guidance and user list price
   expect(ledger.listPricePence).toBe(500);
   await expect(page.locator(".progress-source-rail")).toHaveCount(0);
 
+  const loggedEntry = page.locator(".checked-comp-entry-row").filter({ hasText: "£6.00" }).first();
+  await loggedEntry.getByRole("button", { name: "Void wrong entry" }).click();
+  await loggedEntry.getByLabel("Why is this entry wrong?").fill("Wrong condition selected");
+  await loggedEntry.getByRole("button", { name: "Confirm void" }).click();
+  await expect.poll(() => ledger.voidCompBodies.length).toBe(1);
+  expect(ledger.voidCompBodies[0]).toEqual({ reason: "Wrong condition selected" });
+  await expect(loggedEntry).toContainText("Voided: Wrong condition selected");
+
   await page.getByRole("button", { name: "List", exact: true }).click();
   const listingRow = page.locator(".listings-workspace .item-row").filter({ hasText: "Norman" });
   await listingRow.getByRole("button", { name: "Edit price", exact: true }).click();
@@ -198,6 +206,7 @@ class PricingLedger {
   inventoryPatches: Array<Record<string, unknown>> = [];
   listingPatches: Array<Record<string, unknown>> = [];
   manualCompBodies: Array<Record<string, unknown>> = [];
+  voidCompBodies: Array<Record<string, unknown>> = [];
   acquireBody: Record<string, unknown> | null = null;
   readonly createdAt = "2026-05-01T10:00:00.000Z";
 
@@ -542,6 +551,49 @@ async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
           raw: { kind: "checked-comps", region: "UK", condition: "NM", conditionMatched: true, traceableCount: 1, grossSpread: 1, entries: [entry] },
         },
       }, 201);
+    }
+
+    if (url.pathname === "/api/checked-comps/manual-comp-norman-1" && method === "PATCH") {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      ledger.voidCompBodies.push(body);
+      const entry = {
+        id: "manual-comp-norman-1",
+        cardId: CARD.id,
+        grade: "RAW",
+        pricePence: 600,
+        soldDate: "2026-07-01",
+        platform: "ebay-uk",
+        condition: "NM",
+        priceBasis: "DISPLAYED_PRICE",
+        sourceUrl: "https://www.ebay.co.uk/itm/157802426654",
+        sourceListingId: "ebay-uk:157802426654",
+        traceable: false,
+        evidenceStatus: "corroboration",
+        exclusionReasons: ["voided"],
+        voidedAt: "2026-07-13T20:06:00.000Z",
+        voidReason: String(body.reason),
+        createdAt: "2026-07-13T20:05:00.000Z",
+      };
+      return json({
+        entry,
+        entries: [entry],
+        aggregate: {
+          source: "checked-comps",
+          card: CARD,
+          grade: "RAW",
+          currency: "GBP",
+          medianPence: 0,
+          meanPence: 0,
+          lowPence: 0,
+          highPence: 0,
+          sampleSize: 0,
+          windowDays: 90,
+          trendPct: null,
+          outliersRemoved: 0,
+          asOf: "2026-07-13T20:06:00.000Z",
+          raw: { kind: "checked-comps", reason: "no traceable condition-matched eBay UK sold listings", entries: [entry] },
+        },
+      });
     }
 
     if (url.pathname === "/api/inventory") return json({ items: [ledger.item()] });

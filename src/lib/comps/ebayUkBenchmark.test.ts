@@ -44,6 +44,8 @@ function checkedRow(id: string, itemId: string, pricePence: number, soldDate: st
     note: null,
     sourceUrl: `https://www.ebay.co.uk/itm/${itemId}`,
     sourceListingId: `ebay-uk:${itemId}`,
+    voidedAt: null,
+    voidReason: null,
     createdAt: new Date(soldDate),
     card,
   };
@@ -156,6 +158,50 @@ test("Rayquaza benchmark: high-value foreign-only evidence never becomes an auto
   assert.equal(result.reconciliation.selection?.sampleSize, 50);
   assert.equal(result.reconciliation.selection?.reportedSampleSize, 64);
   assert.match(result.reconciliation.reasons.join(" "), /high-value-without-uk-solds/);
+});
+
+test("Rayquaza benchmark: two qualified £450/£750 UK solds with no provider still require a named manual check", () => {
+  const checkedOnly = mapCheckedCompsToComp([
+    checkedRow("uk-450", "100000000201", 45_000, "2026-06-20T12:00:00.000Z"),
+    checkedRow("uk-750", "100000000202", 75_000, "2026-06-30T12:00:00.000Z"),
+  ], {
+    source: "checked-comps",
+    card: cardRef,
+    grade: "RAW",
+    condition: "NM",
+    windowDays: 90,
+    now: new Date("2026-07-19T12:00:00.000Z"),
+  });
+  const result = pickHeadlineForQuery([checkedOnly], cardRef, { grade: "RAW", condition: "NM" });
+
+  assert.equal(checkedOnly.sampleSize, 2);
+  assert.equal(checkedOnly.medianPence, 60_000);
+  assert.equal(result.reconciliation.chosenSource, "checked-comps");
+  assert.equal(result.reconciliation.manualCheck, true);
+  assert.ok(result.reconciliation.reasons.length > 0);
+  assert.match(result.reconciliation.reasons.join(" "), /low-confidence-headline/);
+});
+
+test("intentional 4.0x boundary: checked evidence remains eligible but still requires a named manual check", () => {
+  const boundary = mapCheckedCompsToComp([
+    checkedRow("uk-low", "100000000211", 45_000, "2026-06-20T12:00:00.000Z"),
+    checkedRow("uk-high", "100000000212", 180_000, "2026-06-30T12:00:00.000Z"),
+  ], {
+    source: "checked-comps",
+    card: cardRef,
+    grade: "RAW",
+    condition: "NM",
+    windowDays: 90,
+    now: new Date("2026-07-19T12:00:00.000Z"),
+  });
+  const result = pickHeadlineForQuery([boundary], cardRef, { grade: "RAW", condition: "NM" });
+
+  assert.equal(boundary.highPence / boundary.lowPence, 4);
+  assert.equal(result.reconciliation.chosenSource, "checked-comps", "exactly 4.0x is the inclusive eligibility boundary");
+  assert.doesNotMatch(result.reconciliation.reasons.join(" "), /corroboration-wide-checked-comps/);
+  assert.equal(result.reconciliation.manualCheck, true);
+  assert.ok(result.reconciliation.reasons.length > 0);
+  assert.match(result.reconciliation.reasons.join(" "), /low-confidence-headline/);
 });
 
 test("Rayquaza benchmark: a four-times-wide checked range is corroboration-only", () => {
