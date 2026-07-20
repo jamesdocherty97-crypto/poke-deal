@@ -12,8 +12,12 @@ body {
   position: relative;
   min-height: 100%;
   margin: 0;
-  background: var(--brand-grid);
-  background-size: 32px 32px;
+  /* Two faint fixed glows give the black canvas depth without decoration. */
+  background:
+    radial-gradient(1100px 600px at 85% -10%, rgba(121, 189, 230, 0.05), transparent 60%),
+    radial-gradient(900px 620px at -10% 108%, rgba(233, 106, 116, 0.04), transparent 60%),
+    var(--brand-grid);
+  background-attachment: fixed, fixed, scroll;
   color: var(--ink);
   font-family: var(--font-ui);
   font-weight: var(--font-weight-regular);

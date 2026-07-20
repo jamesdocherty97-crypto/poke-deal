@@ -14,9 +14,8 @@ coverage/
 *.tsbuildinfo
 .vercel
 APP_LOGIN_PASSWORD.txt
-output/backups/
-output/playwright/
-output/lighthouse/
+.playwright-mcp/
+output/
 .playwright-cli/
 test-results/
 playwright-report/
