@@ -14,6 +14,7 @@ import { pickHeadlineForQuery } from "../compService.js";
 const fixture = JSON.parse(
   readFileSync(fileURLToPath(new URL("./__fixtures__/ebay-marketplace-insights-item-sales.json", import.meta.url)), "utf8"),
 );
+const NOW = new Date("2026-06-23T12:00:00.000Z");
 
 const victini: CardRef = {
   name: "Victini",
@@ -58,6 +59,7 @@ test("mapEbayMarketplaceInsightsToComp cleans UK item sales into GBP comps", () 
     card: victini,
     grade: "ACE_10",
     windowDays: 30,
+    now: NOW,
   });
 
   assert.equal(comp.source, "ebay-marketplace-insights");
@@ -91,6 +93,7 @@ test("mapEbayMarketplaceInsightsToComp also accepts itemSummaries payloads", () 
       card: { name: "Zapdos ex", setName: "151", number: "192/165" },
       grade: "BGS_9_5",
       windowDays: 30,
+      now: NOW,
     },
   );
 
@@ -116,10 +119,12 @@ test("mapEbayMarketplaceInsightsToComp drops wrong grade sales", () => {
       card: victini,
       grade: "ACE_10",
       windowDays: 30,
+      now: NOW,
     },
   );
 
   assert.equal(comp.sampleSize, 0);
+  assert.equal(comp.asOf, NOW.toISOString());
   assert.match(JSON.stringify(comp.raw), /none survived cleaning/);
 });
 
@@ -135,6 +140,7 @@ test("UK eBay Marketplace Insights headline beats an agreeing broad PokeTrace si
     card: victini,
     grade: "ACE_10",
     windowDays: 30,
+    now: NOW,
   });
   const broadPokeTrace = {
     ...ebay,

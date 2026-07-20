@@ -1,5 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { PrismaClient } from "@prisma/client";
+
+import {
+  CHECKED_COMP_ACTIVE_LISTING_INDEX,
+  inspectCheckedCompActiveListingIndex,
+} from "../src/lib/db/checkedCompIndexGuard.js";
 
 type DeepHealthSource = {
   id: string;
@@ -28,6 +34,7 @@ try {
 } catch {
   throw new Error(`Health endpoint returned non-JSON HTTP ${response.status}: ${text.slice(0, 500)}`);
 }
+report.sources.push(await checkedCompIndexHealth());
 
 console.log(`Poke Deal health: ${url.toString()}`);
 console.log(`Checked at: ${report.checkedAt}`);
@@ -66,6 +73,59 @@ function headers(): Record<string, string> {
   const basic = process.env.POKE_DEAL_BASIC_AUTH ?? process.env.VERIFY_PROD_BASIC_AUTH;
   if (basic) result.authorization = `Basic ${Buffer.from(basic).toString("base64")}`;
   return result;
+}
+
+async function checkedCompIndexHealth(): Promise<DeepHealthSource> {
+  const checkedAt = new Date().toISOString();
+  const databaseUrl = (process.env.DIRECT_URL ?? process.env.DATABASE_URL)?.trim();
+  if (!databaseUrl) {
+    return {
+      id: "checked-comp-partial-index",
+      label: "Checked-comp partial index",
+      role: "Preserves void then re-log semantics",
+      required: true,
+      status: "skipped",
+      latencyMs: 0,
+      detail: "DIRECT_URL/DATABASE_URL is not set; physical index guard skipped.",
+      checkedAt,
+    };
+  }
+
+  const started = Date.now();
+  const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+  try {
+    const rows = await prisma.$queryRaw<Array<{ indexdef: string }>>`
+      SELECT indexdef
+      FROM pg_indexes
+      WHERE schemaname = current_schema()
+        AND tablename = 'CheckedComp'
+        AND indexname = ${CHECKED_COMP_ACTIVE_LISTING_INDEX}
+    `;
+    const guard = inspectCheckedCompActiveListingIndex(rows[0]?.indexdef);
+    return {
+      id: "checked-comp-partial-index",
+      label: "Checked-comp partial index",
+      role: "Preserves void then re-log semantics",
+      required: true,
+      status: guard.ok ? "ok" : "fail",
+      latencyMs: Date.now() - started,
+      detail: guard.detail,
+      checkedAt,
+    };
+  } catch (error) {
+    return {
+      id: "checked-comp-partial-index",
+      label: "Checked-comp partial index",
+      role: "Preserves void then re-log semantics",
+      required: true,
+      status: "fail",
+      latencyMs: Date.now() - started,
+      detail: error instanceof Error ? error.message : "Physical index check failed.",
+      checkedAt,
+    };
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 function renderReport(report: DeepHealthReport, url: string, date: string): string {

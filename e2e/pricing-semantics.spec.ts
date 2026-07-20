@@ -200,6 +200,61 @@ test("one traceable Rayquaza sale leads the UI without becoming an automatic com
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 
+test("checked-comp logger keeps the eBay loop open and promotes the second qualified sold", async ({ context, page }) => {
+  const ledger = new EvidenceThroughputPricingLedger();
+  await mockPricingApis(context, ledger);
+  await page.setViewportSize({ width: 320, height: 800 });
+
+  await page.goto("/?view=buy");
+  await page.getByLabel("Smart comp search").fill("Rayquaza VMAX Evolving Skies 218/203 RAW NM");
+  await page.getByRole("button", { name: "Comp current card" }).click();
+  await page.getByRole("button", { name: "Manual sold comps", exact: true }).click();
+
+  const compPanel = page.locator(".comp-panel");
+  const manualCompCard = page.locator(".checked-comp-card.priority").first();
+  await manualCompCard.getByRole("button", { name: "Log what you saw", exact: true }).click();
+  await expect(manualCompCard.getByRole("link", { name: "Open eBay UK sold search", exact: true })).toBeVisible();
+  await expect(manualCompCard.getByText("0 of 2 qualified solds — add two to headline", { exact: true })).toBeVisible();
+
+  const logSheet = manualCompCard.locator(".checked-comp-log-sheet");
+  const soldPrice = logSheet.getByRole("textbox", { name: "Sold price", exact: true });
+  const soldDate = logSheet.getByLabel("Sold date");
+  await logSheet.getByText("Individual sold-item link · needed for trusted evidence").click();
+  const soldUrl = logSheet.getByPlaceholder("https://www.ebay.co.uk/itm/…");
+
+  await soldPrice.fill("450.00");
+  await soldDate.fill("2026-07-18");
+  await soldUrl.fill("https://www.ebay.co.uk/itm/257584212141");
+  await logSheet.getByRole("button", { name: "Log price", exact: true }).click();
+
+  await expect.poll(() => ledger.manualCompBodies.length).toBe(1);
+  await expect(manualCompCard.getByText("1 of 2 qualified solds — add one more to headline", { exact: true })).toBeVisible();
+  await expect(soldDate).toHaveValue("2026-07-18");
+  await expect(soldPrice).toBeFocused();
+
+  await soldPrice.fill("750.00");
+  await soldUrl.fill("https://www.ebay.co.uk/itm/358710939479");
+  await logSheet.getByRole("button", { name: "Log price", exact: true }).click();
+
+  await expect.poll(() => ledger.manualCompBodies.length).toBe(2);
+  await expect(manualCompCard.getByText("2 of 2 qualified solds — range can headline if spread checks pass", { exact: true })).toBeVisible();
+  await expect(compPanel.getByText("eBay UK sold range", { exact: true })).toBeVisible();
+  await expect(compPanel.getByText("£450.00–£750.00", { exact: true })).toBeVisible();
+  await expect(soldDate).toHaveValue("2026-07-18");
+  await expect(soldPrice).toBeFocused();
+
+  await soldPrice.fill("451.00");
+  await soldUrl.fill("https://www.ebay.co.uk/itm/Rayquaza-VMAX/257584212141?mkcid=1");
+  await logSheet.getByRole("button", { name: "Log price", exact: true }).click();
+
+  const duplicate = logSheet.locator(".checked-comp-duplicate");
+  await expect(duplicate).toContainText("£450.00");
+  await expect(duplicate).toContainText("used");
+  await expect(duplicate.getByRole("button", { name: "Void existing entry" })).toBeVisible();
+  await expect(duplicate.getByRole("button", { name: "Skip duplicate" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
 class PricingLedger {
   costBasisPence = 1;
   listPricePence = 500;
@@ -467,6 +522,128 @@ class RayquazaThinPricingLedger extends PricingLedger {
   }
 }
 
+class EvidenceThroughputPricingLedger extends PricingLedger {
+  private readonly checkedEntries: Array<Record<string, unknown>> = [];
+
+  override compEvents() {
+    const receipt = this.currentCompResponse();
+    const provider = receipt.headline;
+    const asOf = String(provider.asOf);
+    const base = { version: 1, lookupId: "lookup-fixture-rayquaza-throughput", emittedAt: asOf };
+    return [
+      { ...base, sequence: 1, type: "catalog", requested: RAYQUAZA, identity: RAYQUAZA, grade: "RAW", catalog: RAYQUAZA, ambiguity: false, sources: [{ name: provider.source, live: true }] },
+      { ...base, sequence: 2, type: "source", source: { name: provider.source, live: true }, status: "priced", latencyMs: 10, completed: 1, total: 1, result: provider, receipt },
+      { ...base, sequence: 3, type: "receipt", latencyMs: 12, receipt },
+    ];
+  }
+
+  logCheckedComp(body: Record<string, unknown>): { body: Record<string, unknown>; status: number } {
+    const itemId = String(body.sourceUrl ?? "").match(/\/itm\/(?:[^/]+\/)?(\d{9,15})/)?.[1] ?? "";
+    const sourceListingId = itemId ? `ebay-uk:${itemId}` : null;
+    if (sourceListingId && this.checkedEntries.some((entry) => entry.sourceListingId === sourceListingId)) {
+      return {
+        status: 409,
+        body: {
+          error: "That sold listing is already logged. Each active eBay item can back the comp only once. If the existing entry is wrong, void it first, then log corrected evidence.",
+          code: "duplicate-listing",
+        },
+      };
+    }
+
+    const entry = {
+      id: `rayquaza-throughput-${this.checkedEntries.length + 1}`,
+      cardId: RAYQUAZA.id,
+      grade: "RAW",
+      pricePence: Number(body.pricePence),
+      soldDate: String(body.soldDate),
+      platform: "ebay-uk",
+      condition: "NM",
+      priceBasis: "DISPLAYED_PRICE",
+      sourceUrl: `https://www.ebay.co.uk/itm/${itemId}`,
+      sourceListingId,
+      traceable: true,
+      evidenceStatus: "used",
+      createdAt: `2026-07-20T10:0${this.checkedEntries.length}:00.000Z`,
+    };
+    this.checkedEntries.push(entry);
+    return {
+      status: 201,
+      body: { entry, entries: [...this.checkedEntries], aggregate: this.checkedAggregate() },
+    };
+  }
+
+  currentCompResponse() {
+    const provider = {
+      source: "poketrace",
+      card: RAYQUAZA,
+      grade: "RAW",
+      currency: "GBP",
+      medianPence: 103_981,
+      meanPence: 103_981,
+      lowPence: 103_981,
+      highPence: 103_981,
+      sampleSize: 64,
+      windowDays: 90,
+      trendPct: null,
+      outliersRemoved: 0,
+      asOf: "2026-07-19T20:00:00.000Z",
+      raw: { kind: "sold-aggregate", market: "US", priceSource: "ebay", approxSaleCount: true },
+    };
+    const checked = this.checkedEntries.length > 0 ? this.checkedAggregate() : null;
+    const checkedCanHeadline = this.checkedEntries.length >= 2;
+    const headline = checkedCanHeadline ? checked! : provider;
+    return {
+      headline,
+      all: checked ? [checked, provider] : [provider],
+      sourcesDisagree: Boolean(checked),
+      reconciliation: {
+        headlinePence: headline.medianPence,
+        confidence: "low",
+        manualCheck: true,
+        reasons: checkedCanHeadline ? ["uk-solds-disagree", "low-confidence-headline"] : ["high-value-without-uk-solds"],
+        chosenSource: headline.source,
+        trendPct: null,
+      },
+      catalog: RAYQUAZA,
+      alternatives: [],
+      ambiguous: false,
+      psaCert: null,
+      cardImage: { imageUrl: RAYQUAZA.imageUrl, source: "catalog", listingSafe: true },
+    };
+  }
+
+  private checkedAggregate() {
+    const prices = this.checkedEntries.map((entry) => Number(entry.pricePence)).sort((a, b) => a - b);
+    const medianPence = prices.length % 2
+      ? prices[Math.floor(prices.length / 2)]!
+      : Math.round((prices[prices.length / 2 - 1]! + prices[prices.length / 2]!) / 2);
+    return {
+      source: "checked-comps",
+      card: RAYQUAZA,
+      grade: "RAW",
+      currency: "GBP",
+      medianPence,
+      meanPence: Math.round(prices.reduce((sum, price) => sum + price, 0) / prices.length),
+      lowPence: Math.min(...prices),
+      highPence: Math.max(...prices),
+      sampleSize: prices.length,
+      windowDays: 90,
+      trendPct: null,
+      outliersRemoved: 0,
+      asOf: String(this.checkedEntries.at(-1)?.soldDate),
+      raw: {
+        kind: "checked-comps",
+        region: "UK",
+        condition: "NM",
+        conditionMatched: true,
+        traceableCount: prices.length,
+        grossSpread: Math.max(...prices) / Math.min(...prices),
+        entries: [...this.checkedEntries],
+      },
+    };
+  }
+}
+
 async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
   await context.route("**/api/**", async (route) => {
     const request = route.request();
@@ -486,6 +663,10 @@ async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
         headers: { "Cache-Control": "no-store" },
         body: `${events.map((event) => JSON.stringify(event)).join("\n")}\n`,
       });
+    }
+
+    if (url.pathname === "/api/comps" && method === "GET" && ledger instanceof EvidenceThroughputPricingLedger) {
+      return json(ledger.currentCompResponse());
     }
 
     if (url.pathname === "/api/inventory/item-fixture-norman" && method === "PATCH") {
@@ -515,6 +696,10 @@ async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
     if (url.pathname === "/api/checked-comps" && method === "POST") {
       const body = request.postDataJSON() as Record<string, unknown>;
       ledger.manualCompBodies.push(body);
+      if (ledger instanceof EvidenceThroughputPricingLedger) {
+        const response = ledger.logCheckedComp(body);
+        return json(response.body, response.status);
+      }
       const entry = {
         id: "manual-comp-norman-1",
         cardId: CARD.id,

@@ -58,6 +58,21 @@ export function checkedCompSourceFromPlatform(platform: string | undefined): Che
   return "OTHER";
 }
 
+export function checkedCompListingIdFromUrl(sourceUrl: string | undefined): string | null {
+  if (!sourceUrl?.trim()) return null;
+  try {
+    const url = new URL(sourceUrl.trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, "").replace(/^m\./, "");
+    if (url.protocol !== "https:" || host !== "ebay.co.uk") return null;
+    const pathMatch = url.pathname.match(/\/itm\/(?:[^/]+\/)?(\d{9,15})(?:\/|$)/i);
+    const queryId = /^\/itm\/?$/i.test(url.pathname) ? url.searchParams.get("item") ?? url.searchParams.get("itemId") : null;
+    const itemId = pathMatch?.[1] ?? (queryId && /^\d{9,15}$/.test(queryId) ? queryId : null);
+    return itemId ? `ebay-uk:${itemId}` : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseCheckedCompPriceText(text: string | undefined): number | null {
   const normalized = text?.trim().replace(/\s+/g, " ");
   if (!normalized) return null;

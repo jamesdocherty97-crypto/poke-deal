@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildCheckedComp,
+  checkedCompListingIdFromUrl,
   checkedCompSourceFromPlatform,
   checkedCompSourceLabel,
   parseCheckedCompPriceText,
@@ -79,6 +80,16 @@ test("checkedCompSourceFromPlatform keeps logged comps in the active checked-com
   assert.equal(checkedCompSourceFromPlatform("cardmarket"), "CARDMARKET");
   assert.equal(checkedCompSourceFromPlatform("vinted"), "OTHER");
   assert.equal(checkedCompSourceFromPlatform(undefined), "OTHER");
+});
+
+test("checkedCompListingIdFromUrl identifies exact eBay UK item links for duplicate feedback", () => {
+  assert.equal(
+    checkedCompListingIdFromUrl("https://www.ebay.co.uk/itm/Rayquaza-VMAX/157802426654?mkcid=1"),
+    "ebay-uk:157802426654",
+  );
+  assert.equal(checkedCompListingIdFromUrl("https://m.ebay.co.uk/itm/157802426654"), "ebay-uk:157802426654");
+  assert.equal(checkedCompListingIdFromUrl("https://www.ebay.co.uk/sch/i.html?item=157802426654"), null);
+  assert.equal(checkedCompListingIdFromUrl("https://www.ebay.com/itm/157802426654"), null);
 });
 
 test("parseCheckedCompPriceText reads copied marketplace prices", () => {
