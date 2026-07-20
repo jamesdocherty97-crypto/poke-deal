@@ -21,6 +21,12 @@ import {
 } from "./lib/auth/accessSession";
 
 export async function middleware(req: NextRequest) {
+  // Crawlers must be able to read the exact disallow-all policy. No other
+  // document or API path becomes public through this exemption.
+  if (req.nextUrl.pathname === "/robots.txt") {
+    return NextResponse.next();
+  }
+
   // eBay must reach this provider callback without the operator's Basic auth.
   // The route performs its own challenge/signature validation.
   if (isEbayAccountDeletionCallbackPath(req.nextUrl.pathname)) {
