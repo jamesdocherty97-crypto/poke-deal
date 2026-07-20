@@ -253,10 +253,6 @@ async function writeReport(report: CheckedProviderDriftReport): Promise<void> {
   console.log(`Checked-vs-provider drift: ${report.generatedAt}`);
   console.log(`Read-only sources: ${report.readOnlyTables.join(", ")}; ${report.windowDays}-day window.`);
   console.log(`Wrote ${reportPath}`);
-  if (report.rows.length === 0) {
-    console.log(`No comparisons: ${report.emptyReason ?? "No exact identity overlap was found."}`);
-    return;
-  }
   console.table(report.rows.map((row) => ({
     identity: identityLabel(row.identity),
     provider: row.provider.source,
@@ -266,6 +262,9 @@ async function writeReport(report: CheckedProviderDriftReport): Promise<void> {
     checkedSample: row.checked.sampleSize,
     providerSample: row.provider.sampleSize,
   })));
+  if (report.rows.length === 0) {
+    console.log(`No comparisons: ${report.emptyReason ?? "No exact identity overlap was found."}`);
+  }
 }
 
 function emptyReason(checkedCount: number, qualifiedCount: number, rowCount: number): string | null {

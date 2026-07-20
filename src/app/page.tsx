@@ -7412,8 +7412,9 @@ export default function Home() {
                     onClick={() => {
                       setVoidingCheckedCompId(duplicateCheckedComp.id);
                       setCheckedCompVoidReason("");
+                      setError(null);
                       window.requestAnimationFrame(() => {
-                        document.getElementById(`checked-comp-entry-${duplicateCheckedComp.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        document.getElementById(`checked-comp-entry-${duplicateCheckedComp.id}`)?.scrollIntoView({ behavior: "auto", block: "center" });
                       });
                     }}
                   >
