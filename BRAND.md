@@ -75,8 +75,8 @@ The source of truth is [`src/app/styles/tokens.css`](src/app/styles/tokens.css).
 
 | Role | Dark | Light | Token / rule |
 | --- | --- | --- | --- |
-| Canvas | `#080B13` | `#F3F6FA` | `--color-canvas` |
-| Raised canvas | `#0D1424` | `#FFFFFF` | `--color-canvas-raised` |
+| Canvas | `#07090F` | `#F3F6FA` | `--color-canvas` |
+| Raised canvas | `#0B0E18` | `#FFFFFF` | `--color-canvas-raised` |
 | Primary ink | `#F8FBFF` | `#111827` | `--color-text-primary` |
 | Secondary ink | `#B8C3D7` | `#455166` | `--color-text-secondary` |
 | Brand red | `#EF3340` | same | Decoration and large marks; use semantic danger for text. |

@@ -61,8 +61,17 @@ body::before {
   border-radius: 16px;
   background: color-mix(in srgb, var(--color-canvas) 92%, var(--color-surface-1));
   color: var(--color-text-primary);
-  box-shadow: 0 18px 52px rgba(6, 8, 18, 0.42), inset 0 -1px var(--color-border-subtle);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.5), inset 0 -1px var(--color-border-subtle);
   backdrop-filter: none;
+}
+
+/* Frosted command deck: the bar floats over content instead of sitting on it. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .dealer-deck.topbar {
+    background: color-mix(in srgb, var(--color-canvas) 62%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    backdrop-filter: blur(18px) saturate(1.35);
+  }
 }
 
 .dealer-deck::after {
@@ -1021,7 +1030,7 @@ textarea:focus-visible {
 .inventory-filter-tabs::-webkit-scrollbar-thumb { border-radius:3px; background:var(--color-border-strong); }
 .inventory-filter-tabs button { display:flex; align-items:center; flex:0 0 auto; gap:7px; min-height:44px; padding:0 13px; border:0; border-radius:0; background:transparent; box-shadow:none; scroll-snap-align:start; white-space:nowrap; }
 .inventory-filter-tabs button strong { min-width:22px; padding:2px 5px; border-radius:3px; background:var(--color-surface-3); font:700 .7rem/1.2 var(--font-data); }
-.inventory-filter-tabs button.selected { border-bottom:3px solid var(--brand-red); color:var(--color-danger-text); }
+.inventory-filter-tabs button.selected { border-bottom:3px solid var(--brand-red); background:var(--color-danger-surface); color:var(--color-danger-text); }
 .inventory-filter-tabs button.selected strong { background:var(--color-danger-surface); }
 .vault-search { display:grid; grid-template-columns:minmax(0,1fr) minmax(120px,160px); align-items:flex-end; gap:8px; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
 .vault-search > label { width:auto; min-width:0; }

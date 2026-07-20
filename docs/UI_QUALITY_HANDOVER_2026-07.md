@@ -274,3 +274,38 @@ The resulting Vercel production deployment completed successfully. A final read-
 **Codex execution status: complete end to end.** The July audit, Phases 7–10, mechanical Tasks 1–4, both PR landings, CI gates, Vercel deployments, local/preview/production browser verification, accessibility scans, and handover documentation are complete. There is no pending Codex implementation or deployment phase.
 
 **Exact next action:** Fable 5 reviews the landed result and recommends any judgment-led follow-up. Suggested review queue (not incomplete UI-quality delivery): (1) whether a full List queue/listing merge is still worth the complexity after the rename/reorder, (2) deeper Setup row-level disclosure, (3) the today@768 spacing trade-off, (4) `page.tsx` decomposition with `next/dynamic`, and (5) Stock/List virtualization at scale.
+
+### Phase 11 — midnight luxury pass (authored 2026-07-19 by Claude Fable 5; revalidated 2026-07-20)
+
+Owner asked for a premium/sleek dark aesthetic with darker/black backgrounds. Notably, BRAND.md's core
+palette table always specified `#080B13` canvas — tokens.css had drifted lighter (`#12172d`); this pass
+restores and refines the documented intent.
+
+Changes (CSS-only):
+
+- **tokens.css** — "Midnight vault" surface ladder: canvas `#07090f`, raised `#0b0e18`, surface-1/2/3
+  `#0e1220`/`#151a2b`/`#1c2338`, sunken `#050609`. Borders thinned to hairline (.07/.13/.24 alpha),
+  scrim deepened, shadows re-tuned for black (`--shadow-1/2`, elevation raised/floating), brand-grid
+  gradient darkened, `--brand-ink`/`--color-text-inverse` deepened to `#0a0d16`. Light theme untouched.
+- **workbench.css** — frosted command deck: `.dealer-deck.topbar` becomes translucent
+  (`color-mix … 62% transparent`) with `backdrop-filter: blur(18px) saturate(1.35)` behind an
+  `@supports` guard (solid fallback preserved). Selected inventory filter tab background aligned to
+  `--color-danger-surface` (was a clashing yellow tint under red text).
+- **base.css** — two fixed sub-5%-alpha radial glows (brand blue top-right, brand red bottom-left)
+  behind the canvas gradient for depth without decoration.
+- **BRAND.md** — core palette table Dark column updated to the pass values.
+
+Initial verification (2026-07-19): typecheck ✅ · unit 865/865 ✅ · e2e 11/11 ✅ · build ✅ 267 kB ·
+axe 12/12 clean (text contrast improved on darker surfaces) · 0 console errors across capture runs.
+Screenshots: `output/ui-audit/midnight/{view}-{375,1280}.png`.
+
+Codex revalidation (2026-07-20): typecheck ✅ · `npm test` 910/910 (5 eBay UK benchmark +
+3 duplicate-identity + 902 unit) ✅ · UX 15/15 ✅ · overhaul 13/13 ✅ · pricing red-team 1/1 ✅ ·
+E2E 14/14 ✅ · production build ✅ 270 kB · `npm audit` 0 vulnerabilities. Today was inspected at
+375/768/1280/1920 px and every workspace at 375/1280 px with no horizontal overflow, failed API reads,
+or console errors. Keyboard entry exposes the skip link with a visible focus ring.
+
+Checkpoint: the pass is packaged on `codex/midnight-visual-tidy` above `main` @ `2c31064`. Next judgment items unchanged:
+page.tsx decomposition; optional polish — hover elevation audit on row cards, sheet/dialog entrance
+motion tune, and a pass over remaining hard-coded `rgba(3,8,20,…)` fills if any read muddy on the
+darker canvas.
