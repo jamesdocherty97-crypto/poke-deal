@@ -25,6 +25,8 @@ npm run db:generate
 
 For database-backed local workflows, start PostgreSQL as described in `README.md`, set `DATABASE_URL` and `DIRECT_URL`, then run `npm run db:migrate`. Provider keys are optional; missing providers must remain visibly unavailable. Never commit `.env` or print secrets in logs.
 
+Never run `prisma migrate dev` against a database that matters. The `20260720120000_checked_comp_voids` migration owns the partial unique index `CheckedComp_sourceListingId_key` with `WHERE ("voidedAt" IS NULL)`. Prisma cannot represent that predicate in `schema.prisma`, so drift reconciliation may incorrectly replace it with a full unique index and break void-then-re-log corrections.
+
 ## Development
 
 ```bash
