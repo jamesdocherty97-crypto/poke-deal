@@ -23,6 +23,28 @@ test("readCompLookupRequest accepts setName alias used by smoke tools", () => {
   });
 });
 
+test("readCompLookupRequest scopes RAW lookups to canonical condition buckets", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    name: "Rayquaza VMAX",
+    setName: "Evolving Skies",
+    number: "218/203",
+    grade: "RAW",
+    condition: "near mint",
+  }));
+
+  assert.equal("error" in parsed ? null : parsed.condition, "NM");
+});
+
+test("readCompLookupRequest ignores RAW condition labels for graded lookups", () => {
+  const parsed = readCompLookupRequest(new URLSearchParams({
+    name: "Rayquaza VMAX",
+    grade: "PSA_10",
+    condition: "LP",
+  }));
+
+  assert.equal("error" in parsed ? null : parsed.condition, undefined);
+});
+
 test("readCompLookupRequest accepts cardName alias used by smoke tools", () => {
   const parsed = readCompLookupRequest(new URLSearchParams({
     cardName: "Snivy",

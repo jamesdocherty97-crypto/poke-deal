@@ -12,8 +12,15 @@ import type { NextRequest } from "next/server";
 import { isAuthorizedCronRequest } from "./lib/automation/cronAuth";
 import { isEbayAccountDeletionCallbackPath } from "./lib/ebay/callbackPath";
 import { allowsPublicAppAccess, requiresAppPassword } from "./lib/auth/appAccess";
+import {
+  APP_ACCESS_COOKIE,
+  hasPasswordlessAccessConfig,
+  isValidAccessSession,
+  readPasswordlessAccessConfig,
+  timingSafeStringEqual,
+} from "./lib/auth/accessSession";
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   // eBay must reach this provider callback without the operator's Basic auth.
   // The route performs its own challenge/signature validation.
   if (isEbayAccountDeletionCallbackPath(req.nextUrl.pathname)) {
@@ -40,11 +47,32 @@ export function middleware(req: NextRequest) {
     });
   }
 
+  // The exact access endpoint exchanges a high-entropy URL-fragment token for
+  // a signed HttpOnly session. It is available only when the fallback password
+  // and two independent access secrets are all configured.
+  if (req.nextUrl.pathname === "/access" && hasPasswordlessAccessConfig()) {
+    return NextResponse.next();
+  }
+
+  const passwordlessConfig = readPasswordlessAccessConfig();
+  if (
+    passwordlessConfig
+    && await isValidAccessSession(
+      req.cookies.get(APP_ACCESS_COOKIE)?.value,
+      passwordlessConfig.sessionSecret,
+    )
+  ) {
+    return NextResponse.next();
+  }
+
   if (header?.startsWith("Basic ")) {
     try {
       const decoded = atob(header.slice(6)); // "user:pass"
-      const provided = decoded.slice(decoded.indexOf(":") + 1);
-      if (provided === password) return NextResponse.next();
+      const separator = decoded.indexOf(":");
+      if (separator >= 0) {
+        const provided = decoded.slice(separator + 1);
+        if (await timingSafeStringEqual(provided, password)) return NextResponse.next();
+      }
     } catch {
       // fall through to 401
     }

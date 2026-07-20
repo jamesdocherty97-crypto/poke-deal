@@ -420,6 +420,10 @@ export function mapCardAggregateToComp(
       displayImageUrl: readProviderImageUrl(card),
       providerCard: providerCardRef(card),
       chosenPriceSource: smartRawPrice ? "smartMarketPrice" : "medianPrice",
+      aggregateMedianPence: usdToPence(agg.medianPrice),
+      aggregateMeanPence: usdToPence(agg.averagePrice),
+      aggregateMinPence: usdToPence(agg.minPrice),
+      aggregateMaxPence: usdToPence(agg.maxPrice),
       // Full grade ladder from this same single response — no extra credits.
       gradeLadder: buildGradeLadder(json, rates),
     },

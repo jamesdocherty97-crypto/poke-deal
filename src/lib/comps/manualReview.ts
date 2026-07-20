@@ -1,4 +1,4 @@
-import type { Grade } from "../domain/types.js";
+import type { Grade, RawCondition } from "../domain/types.js";
 
 export const MANUAL_REVIEW_RESOLUTIONS = [
   "ACCEPT_HEADLINE",
@@ -20,6 +20,7 @@ export type ManualCompReview = {
     displayImageUrl: string | null;
   };
   grade: Grade;
+  condition: RawCondition | null;
   headlinePence: number;
   source: string;
   sampleSize: number;
@@ -41,6 +42,7 @@ type ManualReviewRow = {
   id: string;
   card: ManualCompReview["card"];
   grade: Grade;
+  condition: string | null;
   medianPence: number;
   source: string;
   sampleSize: number;
@@ -88,7 +90,9 @@ export async function listManualCompReviews(
     ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
   });
   const deduped = rows.filter((row, index, all) =>
-    all.findIndex((candidate) => candidate.card.id === row.card.id && candidate.grade === row.grade) === index,
+    all.findIndex((candidate) =>
+      candidate.card.id === row.card.id && candidate.grade === row.grade && candidate.condition === row.condition,
+    ) === index,
   );
   const hasMore = deduped.length > limit;
   const page = deduped.slice(0, limit);
@@ -100,10 +104,10 @@ export async function listManualCompReviews(
 
 export async function requestManualCompReview(
   db: ManualReviewDb,
-  input: { cardId: string; grade: Grade; now?: Date; ttlDays?: number },
+  input: { cardId: string; grade: Grade; condition?: RawCondition; now?: Date; ttlDays?: number },
 ): Promise<{ kind: "requested"; review: ManualCompReview } | { kind: "not-found" }> {
   const row = await db.compResult.findFirst({
-    where: { cardId: input.cardId, grade: input.grade },
+    where: { cardId: input.cardId, grade: input.grade, condition: input.condition ?? null },
     include: { card: true },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
@@ -114,6 +118,7 @@ export async function requestManualCompReview(
     where: {
       cardId: input.cardId,
       grade: input.grade,
+      condition: input.condition ?? null,
       reviewRequestedAt: { not: null },
       resolvedAt: null,
     },
@@ -173,6 +178,7 @@ function toManualCompReview(row: ManualReviewRow): ManualCompReview {
     id: row.id,
     card: row.card,
     grade: row.grade,
+    condition: normalizeReviewCondition(row.condition),
     headlinePence: row.medianPence,
     source: row.source,
     sampleSize: row.sampleSize,
@@ -189,4 +195,8 @@ function toManualCompReview(row: ManualReviewRow): ManualCompReview {
     reviewRequestedAt: row.reviewRequestedAt?.toISOString() ?? null,
     reviewExpiresAt: row.reviewExpiresAt?.toISOString() ?? null,
   };
+}
+
+function normalizeReviewCondition(value: string | null | undefined): RawCondition | null {
+  return ["NM", "LP", "MP", "HP", "DMG"].includes(value ?? "") ? value as RawCondition : null;
 }

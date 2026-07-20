@@ -37,6 +37,27 @@ export function collectorNumberCompareForms(value: string | null | undefined): S
   );
 }
 
+/**
+ * Database-friendly exact values and numerator prefixes for collector numbers.
+ * Providers commonly return `218` while printed/card-cache data stores
+ * `218/203`; both are the same number only inside an already-matched card name
+ * and set identity.
+ */
+export function collectorNumberLookupParts(value: string | null | undefined): {
+  exact: string[];
+  prefixes: string[];
+} {
+  const cleaned = value
+    ?.trim()
+    .toUpperCase()
+    .replace(/\s*\/\s*/g, "/")
+    .replace(/\s+/g, "");
+  if (!cleaned) return { exact: [], prefixes: [] };
+  const exact = [...new Set([cleaned, ...collectorNumberCompareForms(cleaned)])];
+  const prefixes = [...new Set(exact.map((form) => form.split("/")[0]).filter((form): form is string => Boolean(form)))];
+  return { exact, prefixes };
+}
+
 export function stripLeadingZerosFromNumericSegment(value: string | null | undefined): string | null {
   const cleaned = value?.trim();
   if (!cleaned || !/^\d+$/.test(cleaned)) return null;

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   collectorNumberCompareForms,
+  collectorNumberLookupParts,
   collectorNumbersEquivalent,
   normalizeCollectorNumberForCompare,
   stripProviderSetCodePrefix,
@@ -25,6 +26,21 @@ test("collectorNumbersEquivalent handles numeric padding without false positives
 test("collectorNumberCompareForms leaves gallery prefixes intact", () => {
   assert.deepEqual([...collectorNumberCompareForms("TG06/TG30")].sort(), ["TG06", "TG06/TG30"].sort());
   assert.deepEqual([...collectorNumberCompareForms("GG30/GG70")].sort(), ["GG30", "GG30/GG70"].sort());
+});
+
+test("collectorNumberLookupParts bridges provider numerators and printed totals", () => {
+  assert.deepEqual(collectorNumberLookupParts("218/203"), {
+    exact: ["218/203", "218"],
+    prefixes: ["218"],
+  });
+  assert.deepEqual(collectorNumberLookupParts("069/086"), {
+    exact: ["069/086", "69/86", "69"],
+    prefixes: ["069", "69"],
+  });
+  assert.deepEqual(collectorNumberLookupParts("218"), {
+    exact: ["218"],
+    prefixes: ["218"],
+  });
 });
 
 test("provider set prefixes are stripped for comparison only", () => {

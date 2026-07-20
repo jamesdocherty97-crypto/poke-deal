@@ -8,3 +8,7 @@ node_modules
 .vercel
 *.tsbuildinfo
 public/icon 2.svg
+output
+.playwright-mcp
+test-results
+playwright-report

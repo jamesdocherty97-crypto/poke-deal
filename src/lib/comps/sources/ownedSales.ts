@@ -1,9 +1,10 @@
-import type { CardRef, CompQuery, CompResult, Grade } from "../../domain/types.js";
-import { normalizeCollectorNumberForCompare } from "../../cards/identity.js";
+import type { CardRef, CompQuery, CompResult, Grade, RawCondition } from "../../domain/types.js";
+import { collectorNumberLookupParts } from "../../cards/identity.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { mean, median } from "../cleaning.js";
 import { saleItemSubtotalPence, type SaleChannel } from "../../dealer/saleFees.js";
+import { normalizeRawCondition } from "../pricing.js";
 
 type OwnedSaleCard = {
   id: string;
@@ -26,6 +27,7 @@ export type OwnedSaleRow = {
   item: {
     id: string;
     grade: Grade;
+    condition: string | null;
     costBasis: number;
     card: OwnedSaleCard;
   };
@@ -46,6 +48,7 @@ type OwnedSalesContext = {
   source: string;
   card: CardRef;
   grade: Grade;
+  condition?: RawCondition;
   windowDays: number;
 };
 
@@ -61,7 +64,11 @@ export class OwnedSalesSource implements CompSource {
   async lookup(card: CardRef, query: CompQuery = {}): Promise<CompResult> {
     const grade: Grade = query.grade ?? "RAW";
     const windowDays = query.windowDays ?? DEFAULT_WINDOW_DAYS;
-    const ctx = { source: this.name, card, grade, windowDays };
+    const ctx = { source: this.name, card, grade, condition: query.condition, windowDays };
+
+    if (grade === "RAW" && !query.condition) {
+      return emptyOwnedSalesComp(ctx, "RAW owned sales need an exact condition bucket");
+    }
 
     try {
       const sales = await this.db.sale.findMany({
@@ -80,6 +87,7 @@ export class OwnedSalesSource implements CompSource {
 export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext): CompResult {
   const matching = rows
     .filter((row) => row.item.grade === ctx.grade)
+    .filter((row) => ctx.grade !== "RAW" || Boolean(ctx.condition && normalizeRawCondition(row.item.condition) === ctx.condition))
     .filter((row) => row.salePrice > 0)
     .sort((a, b) => a.soldAt.getTime() - b.soldAt.getTime());
 
@@ -106,7 +114,9 @@ export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext
     asOf: matching[matching.length - 1]!.soldAt.toISOString(),
     raw: {
       kind: "owned-sales",
-      caveat: "Your own sold prices for this exact card and grade.",
+      caveat: "Your own sold prices for this exact card, grade and RAW condition.",
+      condition: ctx.grade === "RAW" ? ctx.condition : undefined,
+      conditionMatched: true,
       sales: matching.map((row) => ({
         id: row.id,
         itemId: row.item.id,
@@ -127,10 +137,13 @@ function ownedSaleCompPricePence(row: OwnedSaleRow): number {
 
 export function buildOwnedSalesWhere(card: CardRef, grade: Grade, windowDays: number): unknown {
   const soldAfter = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
-  const cardWhere =
-    card.tcgApiId
-      ? { tcgApiId: card.tcgApiId }
-      : ownedSalesCardWhere(card);
+  const identity = ownedSalesCardWhere(card);
+  const providerIds = [
+    card.tcgApiId ? { tcgApiId: card.tcgApiId } : null,
+    card.tcgDexId ? { tcgDexId: card.tcgDexId } : null,
+    card.cardmarketId ? { cardmarketId: card.cardmarketId } : null,
+  ].filter((candidate) => candidate != null);
+  const cardWhere = providerIds.length > 0 ? { OR: [...providerIds, identity] } : identity;
 
   return {
     soldAt: { gte: soldAfter },
@@ -149,9 +162,14 @@ function ownedSalesCardWhere(card: CardRef): unknown {
     ...(card.setName ? { setName: card.setName } : {}),
   };
   if (!card.number) return base;
-  const comparableNumber = normalizeCollectorNumberForCompare(card.number);
-  if (!comparableNumber || comparableNumber === card.number.trim()) return { ...base, number: card.number };
-  return { ...base, OR: [{ number: card.number }, { number: comparableNumber }] };
+  const parts = collectorNumberLookupParts(card.number);
+  return {
+    ...base,
+    OR: [
+      ...parts.exact.map((number) => ({ number })),
+      ...parts.prefixes.map((prefix) => ({ number: { startsWith: `${prefix}/` } })),
+    ],
+  };
 }
 
 function emptyOwnedSalesComp(ctx: OwnedSalesContext, reason: string): CompResult {
@@ -169,7 +187,12 @@ function emptyOwnedSalesComp(ctx: OwnedSalesContext, reason: string): CompResult
     trendPct: null,
     outliersRemoved: 0,
     asOf: new Date().toISOString(),
-    raw: { kind: "owned-sales", reason },
+    raw: {
+      kind: "owned-sales",
+      reason,
+      condition: ctx.grade === "RAW" ? ctx.condition : undefined,
+      conditionMatched: false,
+    },
   };
 }
 

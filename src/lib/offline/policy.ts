@@ -10,6 +10,7 @@ export type CompCacheIdentity = {
   setName?: string;
   number?: string;
   grade: string;
+  condition?: string;
   tcgApiId?: string;
   tcgDexId?: string;
   cardmarketId?: string;
@@ -24,7 +25,8 @@ export function canonicalCompCacheKey(identity: CompCacheIdentity): string {
   const card = lockedId || [normalize(identity.name), normalize(identity.setName), normalize(identity.number)].join(":");
   const print = [normalize(identity.language) || "en", normalize(identity.edition), normalize(identity.finish)].join(":");
   const fingerprint = normalize(identity.scanFingerprint);
-  return [card, print, normalize(identity.grade) || "raw", fingerprint].filter(Boolean).join("|");
+  const condition = normalize(identity.grade) === "raw" ? normalize(identity.condition) : "";
+  return [card, print, normalize(identity.grade) || "raw", condition, fingerprint].filter(Boolean).join("|");
 }
 
 export function offlineBootstrapFreshness(

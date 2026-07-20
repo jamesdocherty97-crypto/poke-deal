@@ -22,6 +22,7 @@ import { EbayMarketplaceInsightsSource, isEbayMarketplaceInsightsEnabled } from 
 import { CheckedCompsSource, type CheckedCompDb } from "./sources/checkedComps.js";
 import { addRequestedVariantHint } from "./variants.js";
 import { createAbortScope } from "../http/abortScope.js";
+import { collectorNumbersEquivalent } from "../cards/identity.js";
 
 export async function resolveCatalogCard(
   card: CardRef,
@@ -267,7 +268,7 @@ export function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardR
     ...fallback,
     name: addRequestedVariantHint(catalog.name, fallback.name),
     setName: catalog.setName,
-    number: catalog.number ?? fallback.number,
+    number: preferPrintedCollectorNumber(catalog.number, fallback.number),
     tcgApiId: catalog.tcgApiId,
     tcgDexId: catalog.tcgDexId,
     cardmarketId: catalog.cardmarketId,
@@ -276,6 +277,35 @@ export function catalogToCardRef(catalog: CatalogCard, fallback: CardRef): CardR
     game: catalog.game,
     language: catalog.language,
   };
+}
+
+export function preferPrintedCollectorNumber(
+  catalogNumber: string | null | undefined,
+  requestedNumber: string | null | undefined,
+): string | undefined {
+  const catalog = catalogNumber?.trim() || undefined;
+  const requested = requestedNumber?.trim() || undefined;
+  if (!catalog) return requested;
+  if (!requested) return catalog;
+  if (collectorNumbersEquivalent(catalog, requested) && requested.includes("/") && !catalog.includes("/")) {
+    return requested;
+  }
+  return catalog;
+}
+
+/**
+ * Preserve the full printed collector number in dealer-facing catalogue data.
+ * Some providers identify secret rares by numerator only (for example `218`),
+ * which is sufficient for their API but loses the printed `218/203` identity
+ * the dealer supplied and checked against sold listings.
+ */
+export function catalogWithPrintedCollectorNumber(
+  catalog: CatalogCard | null,
+  requestedNumber: string | null | undefined,
+): CatalogCard | null {
+  if (!catalog) return null;
+  const number = preferPrintedCollectorNumber(catalog.number, requestedNumber);
+  return number === catalog.number ? catalog : { ...catalog, number };
 }
 
 export function createAppCompService(

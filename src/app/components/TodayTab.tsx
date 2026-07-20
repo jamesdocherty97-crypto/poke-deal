@@ -98,7 +98,7 @@ type TodayProps = {
   manualReviews: ManualCompReview[];
   manualReviewBusyId: string | null;
   onAcceptManualReview: (review: ManualCompReview) => void;
-  onAddReviewCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; note?: string }) => void;
+  onAddReviewCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; condition?: string; priceBasis: "DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN"; sourceUrl: string; note?: string }) => void;
   loading?: boolean;
 };
 

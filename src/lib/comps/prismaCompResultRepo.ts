@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import type { CompResult, Grade } from "../domain/types.js";
+import type { CompQuery, CompResult, Grade, RawCondition } from "../domain/types.js";
 import { getPrisma } from "../db/prisma.js";
 import { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
 import {
@@ -14,6 +14,7 @@ type DbCompResult = {
   id: string;
   cardId: string;
   grade: Grade;
+  condition?: string | null;
   source: string;
   currency: string;
   medianPence: number;
@@ -35,6 +36,7 @@ type DbCompResult = {
 export interface CompResultAuditData {
   reconciliation?: ReconResult;
   receipt?: unknown;
+  condition?: RawCondition;
 }
 
 type CompResultDb = PrismaCardDb & {
@@ -43,6 +45,7 @@ type CompResultDb = PrismaCardDb & {
       data: {
         cardId: string;
         grade: Grade;
+        condition?: RawCondition;
         source: string;
         currency: "GBP";
         medianPence: number;
@@ -64,6 +67,7 @@ type CompResultDb = PrismaCardDb & {
       where: {
         cardId: string;
         grade: Grade;
+        condition: RawCondition | null;
       };
       orderBy: {
         createdAt: "desc";
@@ -76,6 +80,7 @@ export interface PersistedCompResultRecord {
   id: string;
   cardId: string;
   grade: Grade;
+  condition?: RawCondition;
   source: string;
   medianPence: number;
   sampleSize: number;
@@ -102,6 +107,7 @@ export class PrismaCompResultRepo {
       data: {
         cardId: card.id,
         grade: comp.grade,
+        ...(audit.condition ? { condition: audit.condition } : {}),
         source: comp.source,
         currency: comp.currency,
         medianPence: comp.medianPence,
@@ -128,6 +134,7 @@ export class PrismaCompResultRepo {
       id: row.id,
       cardId: row.cardId,
       grade: row.grade,
+      condition: normalizePersistedCondition(row.condition),
       source: row.source,
       medianPence: row.medianPence,
       sampleSize: row.sampleSize,
@@ -138,10 +145,10 @@ export class PrismaCompResultRepo {
     };
   }
 
-  async findLatest(cardRef: CompResult["card"], grade: Grade): Promise<CompResult | null> {
+  async findLatest(cardRef: CompResult["card"], grade: Grade, condition?: RawCondition): Promise<CompResult | null> {
     const card = await this.cardCache.resolve(cardRef);
     const row = await this.db.compResult.findFirst({
-      where: { cardId: card.id, grade },
+      where: { cardId: card.id, grade, condition: condition ?? null },
       orderBy: { createdAt: "desc" },
     });
     if (!row) return null;
@@ -170,6 +177,7 @@ export class PrismaCompResultRepo {
       raw: {
         kind: "last-known-comp",
         cachedAt: row.createdAt.toISOString(),
+        condition: normalizePersistedCondition(row.condition),
       },
     };
   }
@@ -178,8 +186,8 @@ export class PrismaCompResultRepo {
 export class PrismaLastKnownCompCache implements LastKnownCompCache {
   constructor(private readonly repo = new PrismaCompResultRepo()) {}
 
-  async get(card: CompResult["card"], query: { grade?: Grade }): Promise<CachedCompRecord | null> {
-    const headline = await this.repo.findLatest(card, query.grade ?? "RAW");
+  async get(card: CompResult["card"], query: CompQuery): Promise<CachedCompRecord | null> {
+    const headline = await this.repo.findLatest(card, query.grade ?? "RAW", query.condition);
     if (!headline) return null;
     const cachedAt =
       headline.raw && typeof headline.raw === "object" && "cachedAt" in headline.raw && typeof headline.raw.cachedAt === "string"
@@ -187,6 +195,10 @@ export class PrismaLastKnownCompCache implements LastKnownCompCache {
         : headline.asOf;
     return { headline, cachedAt };
   }
+}
+
+function normalizePersistedCondition(value: string | null | undefined): RawCondition | undefined {
+  return ["NM", "LP", "MP", "HP", "DMG"].includes(value ?? "") ? value as RawCondition : undefined;
 }
 
 function parseDate(value: string): Date {

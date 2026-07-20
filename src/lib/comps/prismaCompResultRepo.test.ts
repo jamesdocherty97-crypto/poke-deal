@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { CompResult, Grade } from "../domain/types.js";
+import type { CompResult, Grade, RawCondition } from "../domain/types.js";
 import { PrismaCompResultRepo, PrismaLastKnownCompCache } from "./prismaCompResultRepo.js";
 
 type FakeCard = {
@@ -33,6 +33,7 @@ type FakeCardData = {
 type FakeCompResultData = {
   cardId: string;
   grade: Grade;
+  condition?: RawCondition;
   source: string;
   currency: "GBP";
   medianPence: number;
@@ -149,12 +150,16 @@ function fakeDb(seedCards: FakeCard[] = []) {
           where,
           orderBy: _orderBy,
         }: {
-          where: { cardId: string; grade: Grade };
+          where: { cardId: string; grade: Grade; condition: RawCondition | null };
           orderBy: { createdAt: "desc" };
         }) {
           return (
             [...compResults]
-              .filter((row) => row.cardId === where.cardId && row.grade === where.grade)
+              .filter((row) =>
+                row.cardId === where.cardId &&
+                row.grade === where.grade &&
+                (row.condition ?? null) === where.condition,
+              )
               .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null
           );
         },
@@ -265,4 +270,38 @@ test("PrismaLastKnownCompCache reads the latest stored comp for card and grade",
   assert.equal(cached?.headline.medianPence, 3100);
   assert.equal(cached?.headline.card.tcgApiId, "sv3pt5-199");
   assert.equal(cached?.cachedAt, "2026-06-21T12:06:00.000Z");
+});
+
+test("Prisma comp persistence and warm cache isolate RAW condition buckets", async () => {
+  const db = fakeDb([
+    {
+      id: "card_existing",
+      game: "POKEMON",
+      language: "EN",
+      name: "Rayquaza VMAX",
+      setName: "Evolving Skies",
+      setCode: "swsh7",
+      number: "218/203",
+      rarity: "Secret Rare",
+      imageUrl: null,
+      displayImageUrl: null,
+      tcgApiId: "swsh7-218",
+    },
+  ]);
+  const repo = new PrismaCompResultRepo(db.client);
+  const base = comp({ id: "card_existing", name: "Rayquaza VMAX" });
+  await repo.create({ ...base, medianPence: 60_000 }, { condition: "NM" });
+  await repo.create({ ...base, medianPence: 45_000 }, { condition: "LP" });
+  db.compResults[1]!.createdAt = new Date("2026-06-21T12:06:00.000Z");
+
+  const cache = new PrismaLastKnownCompCache(repo);
+  const nm = await cache.get({ id: "card_existing", name: "Rayquaza VMAX" }, { grade: "RAW", condition: "NM" });
+  const lp = await cache.get({ id: "card_existing", name: "Rayquaza VMAX" }, { grade: "RAW", condition: "LP" });
+  const unscoped = await cache.get({ id: "card_existing", name: "Rayquaza VMAX" }, { grade: "RAW" });
+
+  assert.equal(db.compResults[0]?.condition, "NM");
+  assert.equal(db.compResults[1]?.condition, "LP");
+  assert.equal(nm?.headline.medianPence, 60_000);
+  assert.equal(lp?.headline.medianPence, 45_000);
+  assert.equal(unscoped, null);
 });

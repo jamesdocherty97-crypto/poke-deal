@@ -173,7 +173,7 @@ test("pickHeadline uses PokeTrace raw market baseline when ordinary raw buckets 
   assert.equal(pickHeadline([noisyRaw, pokeTraceBaseline]), pokeTraceBaseline);
 });
 
-test("PokeTrace agreeing internal signals can lift confidence without changing the headline", () => {
+test("PokeTrace internal signals cannot lend their sample size to the chosen eBay aggregate", () => {
   const pokeTraceSolds = comp({
     source: "poketrace",
     card: { name: "Victini", setName: "Scarlet & Violet Black Star Promos", number: "SVP208" },
@@ -210,9 +210,10 @@ test("PokeTrace agreeing internal signals can lift confidence without changing t
   assert.equal(result.headline?.source, "poketrace");
   assert.equal(result.headline?.sampleSize, 289);
   assert.equal(result.reconciliation.headlinePence, 1347);
-  assert.equal(result.reconciliation.confidence, "high");
+  assert.equal(result.reconciliation.confidence, "medium");
   assert.equal(result.reconciliation.manualCheck, false);
-  assert.match(result.reconciliation.reasons.join(" "), /n-boosted-by-agreeing-signals/);
+  assert.equal(result.reconciliation.selection?.sampleSize, 289);
+  assert.doesNotMatch(result.reconciliation.reasons.join(" "), /n-boosted-by-agreeing-signals/);
 });
 
 test("pickHeadline keeps confident graded comps on sample size", () => {

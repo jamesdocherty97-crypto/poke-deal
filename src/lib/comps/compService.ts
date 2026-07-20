@@ -1,7 +1,8 @@
 // Orchestration: query every configured source, then reconcile to one headline comp.
-// Reconciliation rule (v1): prefer the confident result with the largest sample;
-// if none are confident, take the largest sample anyway but flag low confidence.
-// All individual results are returned too, so the UI can show cross-source spread.
+// The pure reconciler owns the trust policy: exact owned/UK sold evidence leads,
+// correlated sample counts cannot reinforce each other, and unsupported high-value
+// foreign aggregates remain manual-check evidence rather than automatic offers.
+// All individual results are returned too, so the UI can show the full receipt.
 
 import { GRADE_VALUES, type CardRef, type CompQuery, type CompResult, type Grade } from "../domain/types.js";
 import { getSetById, resolveSetIdForCard } from "../catalog/setCatalog.js";
@@ -341,6 +342,7 @@ function cacheKey(card: CardRef, query: CompQuery): string {
     (card.setName ?? "").trim().toLowerCase(),
     (card.number ?? "").trim().toLowerCase(),
     query.grade ?? "RAW",
+    query.condition ?? "",
   ].join("|");
 }
 
@@ -379,7 +381,7 @@ export function reconcileCompReceipt(
   };
 }
 
-/** Largest confident sample wins; fall back to largest sample of any. */
+/** Legacy result-only selector retained for callers without card/query context. */
 export function pickHeadline(results: CompResult[]): CompResult {
   // Nothing is a better comp than what you actually sold the exact card+grade
   // for. When an owned-sales signal is present it anchors the headline ahead of
@@ -417,12 +419,12 @@ function resultToReconCandidate(result: CompResult): ReconCandidate | null {
   const providerCard = raw.providerCard && typeof raw.providerCard === "object" ? (raw.providerCard as CardRef) : null;
   const matchedCard = providerCard ?? result.card;
   const fields = source === "tcg-market" ? readTcgMarketFields(raw, result.medianPence) : undefined;
-  const sample = reconcilerSampleSize(result, raw);
   const fx = readFxMetadata(result, raw);
+  const sampleSizeApproximate = raw.approxSaleCount === true;
   return {
     source,
     valuePence: result.medianPence,
-    n: sample.n,
+    n: result.sampleSize,
     ageDays: ageDays(result.asOf),
     region: reconRegion(result),
     matchedSetId: resolveSetIdForCard(matchedCard.setName, matchedCard.number) ?? setIdFromTcgApiId(matchedCard.tcgApiId),
@@ -433,34 +435,14 @@ function resultToReconCandidate(result: CompResult): ReconCandidate | null {
     trendPct: result.trendPct,
     trendWindowDays: result.windowDays,
     candidateHasGradeScopedData: source === "poketrace" && raw.kind === "sold-aggregate",
-    nBoostedByAgreeingSignals: sample.boosted,
+    sampleSizeApproximate,
+    traceableUkSales: readPositiveRawNumber(raw, "traceableCount"),
+    conditionMatched: result.grade === "RAW" ? raw.conditionMatched === true : true,
+    evidenceFamily: reconEvidenceFamily(result, raw),
     adjacentLowerGradeMedianPence: adjacentLowerGradeMedianPence(result.grade, raw),
     convertedFromNonGbp: fx.convertedFromNonGbp,
     fxAgeDays: fx.ageDays,
   };
-}
-
-function reconcilerSampleSize(result: CompResult, raw: Record<string, unknown>): { n: number; boosted: boolean } {
-  if (result.source !== "poketrace") return { n: result.sampleSize, boosted: false };
-  const corroborating = corroboratingPokeTraceSignalSampleSize(raw, result.medianPence);
-  const n = Math.max(result.sampleSize, corroborating);
-  return { n, boosted: n > result.sampleSize };
-}
-
-function corroboratingPokeTraceSignalSampleSize(raw: Record<string, unknown>, headlinePence: number): number {
-  if (headlinePence <= 0 || !Array.isArray(raw.signals)) return 0;
-  const agreeingSamples = raw.signals
-    .map((signal) => {
-      if (!signal || typeof signal !== "object") return 0;
-      const medianPence = Number((signal as { medianPence?: unknown }).medianPence);
-      const sampleSize = Number((signal as { sampleSize?: unknown }).sampleSize);
-      if (!Number.isFinite(medianPence) || medianPence <= 0) return 0;
-      if (!Number.isInteger(sampleSize) || sampleSize <= 0) return 0;
-      const spread = Math.max(medianPence, headlinePence) / Math.min(medianPence, headlinePence);
-      return spread <= 1.15 ? sampleSize : 0;
-    })
-    .filter((sampleSize) => sampleSize > 0);
-  return agreeingSamples.length > 0 ? Math.max(...agreeingSamples) : 0;
 }
 
 function adjacentLowerGradeMedianPence(grade: Grade, raw: Record<string, unknown>): number | undefined {
@@ -534,12 +516,36 @@ function reconRegion(result: CompResult): "UK" | "EU" | "US" {
   return "US";
 }
 
+function reconEvidenceFamily(result: CompResult, raw: Record<string, unknown>): string {
+  if (result.source === "owned-sales") return "owned-sales";
+  if (result.source === "checked-comps" || result.source === "ebay-marketplace-insights") return "ebay-uk-solds";
+  if (result.source === "pokemon-price-tracker") return "provider-ebay-solds";
+  if (result.source === "pokemon-tcg-market") {
+    const chosen = raw.chosenSignal && typeof raw.chosenSignal === "object" ? raw.chosenSignal as Record<string, unknown> : null;
+    return chosen?.source === "cardmarket" ? "cardmarket-eu" : "tcgplayer-us";
+  }
+  if (result.source === "poketrace") {
+    const priceSource = typeof raw.priceSource === "string" ? raw.priceSource : "unknown";
+    const market = typeof raw.market === "string" ? raw.market.toLowerCase() : "unknown";
+    return `${priceSource}-${market}`;
+  }
+  return result.source;
+}
+
+function readPositiveRawNumber(raw: Record<string, unknown>, key: string): number | undefined {
+  const value = Number(raw[key]);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
 function readRawStats(result: CompResult): ReconCandidate["raw"] | undefined {
   if (result.source === "pokemon-price-tracker") {
+    const raw = result.raw && typeof result.raw === "object" ? result.raw as Record<string, unknown> : {};
     return {
       min: result.lowPence,
       max: result.highPence,
-      median: readRawString(result, "chosenPriceSource") === "smartMarketPrice" ? result.meanPence || result.medianPence : result.medianPence,
+      median: readRawString(result, "chosenPriceSource") === "smartMarketPrice"
+        ? readPositiveRawNumber(raw, "aggregateMedianPence") ?? (result.meanPence || result.medianPence)
+        : result.medianPence,
       count: result.sampleSize,
     };
   }

@@ -127,6 +127,10 @@ test("T5: strong unambiguous PokeTrace baseline can be high confidence", () => {
     appliedPenalties: ["penalty-region-us:poketrace"],
     spreadPence: 0,
     spreadPct: 0,
+    lowPence: 1282,
+    highPence: 1282,
+    crossSourceLowPence: 1282,
+    crossSourceHighPence: 1282,
     chosenBecause: "US PokeTrace · 24491 samples · 7d old · best eligible evidence",
   });
 });
@@ -176,9 +180,9 @@ test("T6: contaminated Moonbreon raw bucket loses to PokeTrace and stale corrobo
 });
 
 test("T7: UK eBay MI beats broad PokeTrace but disagreement makes it low confidence", () => {
-  const result = reconcileComps(baseQuery, [
-    candidate({ source: "ebay-insights", valuePence: 8000, n: 200, region: "UK" }),
-    candidate({ source: "poketrace", valuePence: 12000, n: 8000, region: "US" }),
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
+    candidate({ source: "ebay-insights", valuePence: 8000, n: 200, region: "UK", conditionMatched: true }),
+    candidate({ source: "poketrace", valuePence: 12000, n: 8000, region: "US", candidateHasGradeScopedData: true }),
   ]);
 
   assert.equal(result.headlinePence, 8000);
@@ -232,7 +236,7 @@ test("T9c: three recent owned sales can headline over external baselines", () =>
 
 test("T9d: two recent checked comps can headline over a thin US baseline", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "checked-comps", valuePence: 10000, n: 2, ageDays: 2, region: "UK" }),
+    candidate({ source: "checked-comps", valuePence: 10000, n: 2, ageDays: 2, region: "UK", traceableUkSales: 2, conditionMatched: true }),
     candidate({ source: "poketrace", valuePence: 8000, n: 5, ageDays: 2, region: "US" }),
   ]);
 
@@ -243,7 +247,7 @@ test("T9d: two recent checked comps can headline over a thin US baseline", () =>
 
 test("T9e: one checked comp corroborates but cannot headline", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "checked-comps", valuePence: 10000, n: 1, ageDays: 2, region: "UK" }),
+    candidate({ source: "checked-comps", valuePence: 10000, n: 1, ageDays: 2, region: "UK", traceableUkSales: 1, conditionMatched: true }),
     candidate({ source: "poketrace", valuePence: 8000, n: 6, ageDays: 2, region: "US" }),
   ]);
 
@@ -254,7 +258,7 @@ test("T9e: one checked comp corroborates but cannot headline", () => {
 
 test("T9f: stale checked comps decay out after 90 days", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "checked-comps", valuePence: 10000, n: 2, ageDays: 91, region: "UK" }),
+    candidate({ source: "checked-comps", valuePence: 10000, n: 2, ageDays: 91, region: "UK", traceableUkSales: 2, conditionMatched: true }),
     candidate({ source: "poketrace", valuePence: 8000, n: 6, ageDays: 2, region: "US" }),
   ]);
 
@@ -295,14 +299,35 @@ test("T11: agreeing sources are still low-confidence when every eligible source 
 });
 
 test("T12: UK eBay MI wins over a broad non-UK PokeTrace source when both agree", () => {
-  const result = reconcileComps(baseQuery, [
-    candidate({ source: "ebay-insights", valuePence: 10000, n: 60, region: "UK" }),
-    candidate({ source: "poketrace", valuePence: 9500, n: 5000, region: "US" }),
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
+    candidate({ source: "ebay-insights", valuePence: 10000, n: 60, region: "UK", conditionMatched: true }),
+    candidate({ source: "poketrace", valuePence: 9500, n: 5000, region: "US", candidateHasGradeScopedData: true }),
   ]);
 
   assert.equal(result.headlinePence, 10000);
   assert.equal(result.confidence, "high");
   assert.equal(result.manualCheck, false);
+});
+
+test("T12b: RAW eBay Insights without verified condition is corroboration only", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "ebay-insights", valuePence: 10000, n: 60, region: "UK", conditionMatched: false }),
+    candidate({ source: "poketrace", valuePence: 9500, n: 50, region: "US" }),
+  ]);
+
+  assert.equal(result.chosenSource, "poketrace");
+  assert.match(result.reasons.join(" "), /corroboration-unscoped-raw-condition:ebay-insights/);
+});
+
+test("T12c: disagreeing qualified UK sold sources force a manual check", () => {
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "PSA_10" }, [
+    candidate({ source: "ebay-insights", valuePence: 60_000, n: 6, region: "UK", conditionMatched: true }),
+    candidate({ source: "checked-comps", valuePence: 45_000, n: 3, region: "UK", traceableUkSales: 3, conditionMatched: true }),
+  ]);
+
+  assert.equal(result.chosenSource, "ebay-insights");
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /uk-solds-disagree/);
 });
 
 test("A2-1: high-confidence spread-only signal does not force manual check", () => {
@@ -410,12 +435,12 @@ test("R3-1: stale consensus cannot auto-quote when every eligible source is olde
 
 test("R3-1: stale consensus does not fire when one eligible source is fresh", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "pt-smart", valuePence: 20000, n: 100, ageDays: 60, raw: { min: 18000, max: 22000, median: 20000 } }),
-    candidate({ source: "tcg-market", valuePence: 20000, n: 10, ageDays: 45, region: "EU" }),
-    candidate({ source: "poketrace", valuePence: 20000, n: 70, ageDays: 70, region: "US" }),
+    candidate({ source: "pt-smart", valuePence: 9000, n: 100, ageDays: 60, raw: { min: 8000, max: 10000, median: 9000 } }),
+    candidate({ source: "tcg-market", valuePence: 9000, n: 10, ageDays: 45, region: "EU" }),
+    candidate({ source: "poketrace", valuePence: 9000, n: 70, ageDays: 70, region: "US" }),
   ]);
 
-  assert.equal(result.headlinePence, 20000);
+  assert.equal(result.headlinePence, 9000);
   assert.equal(result.manualCheck, false);
   assert.doesNotMatch(result.reasons.join(" "), /stale-consensus/);
 });
@@ -433,10 +458,11 @@ test("R3-2: dominant outlier still excludes a thin broad-source price when it ha
 test("R3-2: a huge US baseline cannot exclude a higher-trust UK eBay sold source", () => {
   const result = reconcileComps(baseQuery, [
     candidate({ source: "poketrace", valuePence: 2000, n: 5000, ageDays: 3, region: "US" }),
-    candidate({ source: "ebay-insights", valuePence: 10000, n: 8, ageDays: 2, region: "UK" }),
+    candidate({ source: "ebay-insights", valuePence: 10000, n: 8, ageDays: 2, region: "UK", conditionMatched: true }),
   ]);
 
   assert.doesNotMatch(result.reasons.join(" "), /dominant-source-outlier:ebay-insights/);
+  assert.equal(result.chosenSource, "ebay-insights");
   assert.equal(result.manualCheck, true);
   assert.match(result.reasons.join(" "), /uk-solds-disagree/);
 });
@@ -489,40 +515,43 @@ test("R3-4: aged FX is disclosed but does not block low-value converted headline
 
 test("R3-4: fresh FX leaves converted headlines unchanged", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "poketrace", valuePence: 100000, n: 500, convertedFromNonGbp: true, fxAgeDays: 1 }),
+    candidate({ source: "poketrace", valuePence: 8000, n: 500, convertedFromNonGbp: true, fxAgeDays: 1 }),
   ]);
 
   assert.equal(result.manualCheck, false);
   assert.doesNotMatch(result.reasons.join(" "), /fx-aged/);
 });
 
-test("R3-5: UK sold disagreement is surfaced when a US baseline wins", () => {
+test("R3-5: qualified UK sold evidence headlines and surfaces foreign-market disagreement", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "ebay-insights", valuePence: 7500, n: 8, ageDays: 2, region: "UK" }),
+    candidate({ source: "ebay-insights", valuePence: 7500, n: 8, ageDays: 2, region: "UK", conditionMatched: true }),
     candidate({ source: "poketrace", valuePence: 10000, n: 5000, ageDays: 2, region: "US" }),
   ]);
 
-  assert.equal(result.chosenSource, "poketrace");
+  assert.equal(result.chosenSource, "ebay-insights");
   assert.equal(result.manualCheck, true);
   assert.match(result.reasons.join(" "), /uk-solds-disagree/);
 });
 
 test("R3-5: nearby UK sold evidence does not force manual check", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "ebay-insights", valuePence: 9200, n: 8, ageDays: 2, region: "UK" }),
+    candidate({ source: "ebay-insights", valuePence: 9200, n: 8, ageDays: 2, region: "UK", conditionMatched: true }),
     candidate({ source: "poketrace", valuePence: 10000, n: 5000, ageDays: 2, region: "US" }),
   ]);
 
-  assert.equal(result.chosenSource, "poketrace");
+  assert.equal(result.chosenSource, "ebay-insights");
   assert.equal(result.manualCheck, false);
   assert.doesNotMatch(result.reasons.join(" "), /uk-solds-disagree/);
 });
 
-test("c95d8be disclosure: n boost from agreeing signals is visible in reconciliation reasons", () => {
+test("approximate provider counts are reliability-capped without changing the reported evidence", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "poketrace", valuePence: 1300, n: 24000, nBoostedByAgreeingSignals: true }),
+    candidate({ source: "poketrace", valuePence: 1300, n: 24000, sampleSizeApproximate: true }),
   ]);
 
   assert.equal(result.manualCheck, false);
-  assert.match(result.reasons.join(" "), /n-boosted-by-agreeing-signals/);
+  assert.equal(result.confidence, "medium");
+  assert.equal(result.selection?.sampleSize, 50);
+  assert.equal(result.selection?.reportedSampleSize, 24000);
+  assert.match(result.reasons.join(" "), /approximate-sample-capped:24000-to-50:poketrace/);
 });

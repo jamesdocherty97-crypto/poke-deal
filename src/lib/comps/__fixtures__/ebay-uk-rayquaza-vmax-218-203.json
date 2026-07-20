@@ -1,0 +1,131 @@
+{
+  "capturedAt": "2026-07-19T12:00:00.000Z",
+  "card": {
+    "name": "Rayquaza VMAX",
+    "setName": "Evolving Skies",
+    "number": "218/203",
+    "language": "EN"
+  },
+  "observations": [
+    {
+      "itemId": "257584212141",
+      "url": "https://www.ebay.co.uk/itm/257584212141",
+      "soldAt": "2026-07-01T12:00:00.000Z",
+      "displayedTotalPence": 66080,
+      "itemPricePence": null,
+      "priceBasis": "DISPLAYED_PRICE",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "AUCTION",
+      "notes": "eBay UK sold search says Sold 1 Jul 2026, 20 bids, Near Mint; £660.80 is the displayed sold price and delivery is separate."
+    },
+    {
+      "itemId": "358710939479",
+      "url": "https://www.ebay.co.uk/itm/358710939479",
+      "soldAt": "2026-06-26T12:00:00.000Z",
+      "displayedTotalPence": 85000,
+      "itemPricePence": null,
+      "priceBasis": "DISPLAYED_PRICE",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "FIXED_PRICE",
+      "notes": "eBay UK sold search says Sold 26 Jun 2026, Buy It Now, Near Mint To Mint; delivery is separate."
+    },
+    {
+      "itemId": "178211468741",
+      "url": "https://www.ebay.co.uk/itm/178211468741",
+      "soldAt": "2026-06-11T12:00:00.000Z",
+      "displayedTotalPence": 105000,
+      "itemPricePence": null,
+      "priceBasis": "DISPLAYED_PRICE",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "FIXED_PRICE",
+      "notes": "eBay UK sold search says Sold 11 Jun 2026, Buy It Now, Near Mint; delivery is separate."
+    },
+    {
+      "itemId": "168425460368",
+      "url": "https://www.ebay.co.uk/itm/168425460368",
+      "soldAt": "2026-06-03T12:00:00.000Z",
+      "displayedTotalPence": 56500,
+      "itemPricePence": null,
+      "priceBasis": "BEST_OFFER_UNKNOWN",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "BEST_OFFER",
+      "notes": "The sold result still says or Best Offer, so the accepted price cannot be proven from the displayed amount."
+    },
+    {
+      "itemId": "157802426654",
+      "url": "https://www.ebay.co.uk/itm/157802426654",
+      "soldAt": "2026-04-18T03:07:00.000Z",
+      "displayedTotalPence": 55000,
+      "itemPricePence": 55000,
+      "priceBasis": "ITEM_PRICE",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "FIXED_PRICE",
+      "notes": "Public sold page says Sold, Ungraded - Near mint or better, English, 218/203."
+    },
+    {
+      "itemId": "397832619985",
+      "url": "https://www.ebay.co.uk/itm/397832619985",
+      "soldAt": "2026-04-22T17:07:00.000Z",
+      "displayedTotalPence": 55458,
+      "itemPricePence": null,
+      "priceBasis": "BEST_OFFER_UNKNOWN",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "BEST_OFFER",
+      "notes": "Public sold page says Best Offer accepted; displayed buyer total varies with protection fee and is not the accepted item price."
+    },
+    {
+      "itemId": "389918978576",
+      "url": "https://www.ebay.co.uk/itm/389918978576",
+      "soldAt": "2026-04-23T22:25:00.000Z",
+      "displayedTotalPence": 57701,
+      "itemPricePence": null,
+      "priceBasis": "BEST_OFFER_UNKNOWN",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "BEST_OFFER",
+      "notes": "Public sold page identifies the exact English NM card but does not prove the accepted offer amount."
+    },
+    {
+      "itemId": "318208105044",
+      "url": "https://www.ebay.co.uk/itm/318208105044",
+      "soldAt": "2026-04-27T14:24:00.000Z",
+      "displayedTotalPence": 59525,
+      "itemPricePence": null,
+      "priceBasis": "BUYER_TOTAL",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "UNKNOWN",
+      "notes": "Displayed amount includes a buyer protection fee, so it is not comparable to an item-only provider price."
+    },
+    {
+      "itemId": "327163367010",
+      "url": "https://www.ebay.co.uk/itm/327163367010",
+      "soldAt": "2026-06-12T21:42:00.000Z",
+      "displayedTotalPence": 77098,
+      "itemPricePence": null,
+      "priceBasis": "BEST_OFFER_UNKNOWN",
+      "grade": "RAW",
+      "condition": "NM",
+      "saleType": "BEST_OFFER",
+      "notes": "Exact card and condition, but accepted Best Offer amount is hidden."
+    },
+    {
+      "itemId": "127474804929",
+      "url": "https://www.ebay.co.uk/itm/127474804929",
+      "soldAt": "2026-03-22T01:21:00.000Z",
+      "displayedTotalPence": 54711,
+      "itemPricePence": null,
+      "priceBasis": "BEST_OFFER_UNKNOWN",
+      "grade": "OTHER_8",
+      "condition": null,
+      "saleType": "BEST_OFFER",
+      "notes": "Wrong-grade control: item specifics say Graded - Other 8, so it must never enter RAW evidence."
+    }
+  ]
+}

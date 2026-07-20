@@ -65,8 +65,8 @@ test("fixture dealer loop: comp -> buy -> stock + eBay draft -> review -> sell -
 
   const compPanel = page.locator(".comp-panel");
   await expect(compPanel.getByText("Suggested maximum buy", { exact: true })).toBeVisible();
-  await expect(compPanel).toContainText("7 sold / 90d");
-  await expect(compPanel).toContainText(/7 sold \/ 90d · (?:now|today|\d+[mhd])/);
+  await expect(compPanel).toContainText("7 traceable UK solds / 90d");
+  await expect(compPanel).toContainText(/7 traceable UK solds \/ 90d · (?:now|today|\d+[mhd])/);
   await expect(compPanel).toContainText("Holo · Usable");
   await expect(compPanel).toContainText("Good daily comp");
   await expect(compPanel.getByRole("button", { name: "eBay UK", exact: true })).toBeVisible();

@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  catalogWithPrintedCollectorNumber,
   catalogToCardRef,
+  preferPrintedCollectorNumber,
   findAmbiguousCatalogCandidates,
   findCatalogAlternatives,
   findVariantSiblings,
@@ -13,6 +15,30 @@ import {
 import type { PokemonTcgApiCatalogSource } from "../catalog/pokemonTcgApi.js";
 import type { CatalogCard } from "../catalog/types.js";
 import type { CardRef } from "../domain/types.js";
+
+test("preferPrintedCollectorNumber keeps the requested printed total when providers return only the numerator", () => {
+  assert.equal(preferPrintedCollectorNumber("218", "218/203"), "218/203");
+  assert.equal(preferPrintedCollectorNumber("069", "069/086"), "069/086");
+  assert.equal(preferPrintedCollectorNumber("219", "218/203"), "219");
+  assert.equal(preferPrintedCollectorNumber(undefined, "TG06/TG30"), "TG06/TG30");
+});
+
+test("catalogWithPrintedCollectorNumber keeps dealer-facing identity stable across cached provider results", () => {
+  const catalog = catalogWithPrintedCollectorNumber(
+    {
+      game: "POKEMON",
+      language: "EN",
+      name: "Rayquaza VMAX",
+      setName: "Evolving Skies",
+      number: "218",
+    },
+    "218/203",
+  );
+
+  assert.equal(catalog?.number, "218/203");
+  assert.equal(catalogWithPrintedCollectorNumber(catalog, "219/203")?.number, "218/203");
+  assert.equal(catalogWithPrintedCollectorNumber(null, "218/203"), null);
+});
 
 test("resolveCatalogCard falls back through catalogue search and refreshes the chosen card by id", async () => {
   const searchedCard: CatalogCard = {

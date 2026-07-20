@@ -7,6 +7,7 @@ import { attachAskEvidence, fetchEbayAskEvidence } from "../ebay/browseAsks.js";
 import { buildPsaCompSearchParams, isPsaPokemonTcgCert } from "../psa/lookupFields.js";
 import { PsaCertLookup } from "../psa/psaCert.js";
 import {
+  catalogWithPrintedCollectorNumber,
   catalogToCardRef,
   createAppCompService,
   findAmbiguousCatalogCandidates,
@@ -79,11 +80,12 @@ export async function runAppCompLookup(
     : inputSearchParams;
   const lookup = readCompLookupRequest(effectiveSearchParams);
   if ("error" in lookup) throw new AppCompLookupError(lookup.error, 400);
-  const { card, grade } = lookup;
+  const { card, grade, condition } = lookup;
 
   const catalogSource = new PokemonTcgApiCatalogSource();
   const catalog = await resolveCatalogCard(card, catalogSource, { timeoutMs: CATALOG_RESOLVE_TIMEOUT_MS, signal: options.signal });
   const compCard = catalog ? catalogToCardRef(catalog, card) : card;
+  const displayCatalog = catalogWithPrintedCollectorNumber(catalog, compCard.number);
   const compService = createAppCompService(catalogSource, catalog);
   const explicitIdentity = requestHasExplicitCardNumber(card) || Boolean(card.tcgApiId);
   const identityConfidence = evaluateCatalogIdentity(card, catalog);
@@ -93,7 +95,7 @@ export async function runAppCompLookup(
     requested: card,
     identity: compCard,
     grade,
-    catalog,
+    catalog: displayCatalog,
     ambiguity: identityNeedsConfirmation ? true : explicitIdentity ? false : "pending",
     sources: compService.sourceSummaries,
     identityConfidence,
@@ -107,7 +109,7 @@ export async function runAppCompLookup(
     signal: options.signal,
     timeoutMs: EBAY_ASK_TIMEOUT_MS,
   });
-  const compPromise = compService.lookup(compCard, { grade }, {
+  const compPromise = compService.lookup(compCard, { grade, condition }, {
     ambiguous: !explicitIdentity || identityNeedsConfirmation,
     signal: options.signal,
     onProgress: options.onSource,
@@ -117,11 +119,11 @@ export async function runAppCompLookup(
     compPromise,
     askEvidencePromise,
   ]);
-  const result = reconcileCompReceipt(provisionalResult, compCard, { grade }, { ambiguous: ambiguous || identityNeedsConfirmation });
+  const result = reconcileCompReceipt(provisionalResult, compCard, { grade, condition }, { ambiguous: ambiguous || identityNeedsConfirmation });
 
   let alternatives: CatalogCard[] = [];
-  const cardImage = resolveCompCardImage({ catalog, headline: result.headline, all: result.all });
-  const responseCatalog = withResolvedDisplayImage(catalog, cardImage);
+  const cardImage = resolveCompCardImage({ catalog: displayCatalog, headline: result.headline, all: result.all });
+  const responseCatalog = withResolvedDisplayImage(displayCatalog, cardImage);
   const needsRecovery = !catalog || !result.headline || result.headline.sampleSize === 0 || result.headline.medianPence <= 0;
   if (needsRecovery) {
     const recovery = await findCatalogAlternatives(card, catalogSource, 4, {
@@ -158,6 +160,7 @@ export async function runAppCompLookup(
     if (process.env.DATABASE_URL && result.headline) {
       writes.push(new PrismaCompResultRepo().create(result.headline, {
         reconciliation: result.reconciliation,
+        condition,
         receipt: {
           all: result.all,
           unavailableSources: result.unavailableSources,

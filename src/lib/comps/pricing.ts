@@ -2,7 +2,7 @@
 // Valuing and pricing-to-sell are the SAME pipeline: a suggested price is just
 // a policy applied to the comp distribution, with a floor to protect margin.
 
-import type { CompResult } from "../domain/types.js";
+import type { CompResult, RawCondition } from "../domain/types.js";
 import { isConfident } from "./cleaning.js";
 
 export type PricingStrategy =
@@ -28,6 +28,23 @@ export interface PriceSuggestion {
   /** Set when the floor overrode the market-derived price. */
   flooredToMargin: boolean;
   rationale: string;
+}
+
+/** Manual-check evidence stays visible, but cannot enter automatic pricing. */
+export function compForAutomaticPricing(comp: CompResult | null, manualCheck: boolean): CompResult | null {
+  return manualCheck ? null : comp;
+}
+
+export function reviewedCompRequiresManualPricing(input: {
+  explicitManualCheck?: boolean;
+  sourcesDisagree: boolean;
+  grade: string;
+  source: string;
+  medianPence: number;
+}): boolean {
+  if (input.explicitManualCheck || input.sourcesDisagree) return true;
+  const trustedHighValueRawSource = input.source === "checked-comps" || input.source === "owned-sales";
+  return input.grade === "RAW" && input.medianPence >= 10_000 && !trustedHighValueRawSource;
 }
 
 const STRATEGY_FACTORS: Record<PricingStrategy, number> = {
@@ -113,7 +130,7 @@ export function rawConditionPriceFactor(
   return normalized ? RAW_CONDITION_FACTORS[normalized] ?? 1 : 1;
 }
 
-function normalizeRawCondition(condition: string | null | undefined): string | null {
+export function normalizeRawCondition(condition: string | null | undefined): RawCondition | null {
   const normalized = condition?.trim().toUpperCase();
   if (!normalized) return null;
   if (/\b(DMG|DAMAGED|DAMAGE)\b/.test(normalized)) return "DMG";

@@ -22,6 +22,7 @@ import { buildListingTitle } from "@/lib/dealer/listingDraft";
 import type { CardRef, CompResult } from "@/lib/domain/types";
 import type { ReconciledComp } from "@/lib/comps/compService";
 import { PrismaCheckedCompRepo, type CheckedCompDb, type CheckedCompPlatform } from "@/lib/comps/sources/checkedComps";
+import { compForAutomaticPricing, normalizeRawCondition, reviewedCompRequiresManualPricing } from "@/lib/comps/pricing";
 import { readClientMutationId } from "@/lib/offline/clientMutation";
 import { acquireRequestSchema } from "@/lib/inventory/apiSchemas";
 import { inventoryItemUiInclude } from "@/lib/inventory/apiRecord";
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
   }
 
   const d = parsed.data;
+  const compCondition = d.grade === "RAW" ? normalizeRawCondition(d.condition) ?? undefined : undefined;
   if (
     d.createListing &&
     d.channel === "EBAY" &&
@@ -93,8 +95,29 @@ export async function POST(request: Request) {
     // lookup remains the fallback for direct API callers without that receipt.
     const comps: ReconciledComp = reviewedComps ?? (checkedComp
       ? { headline: checkedComp, all: [checkedComp], sourcesDisagree: false }
-      : await createAppCompService(catalogSource, catalog).lookup(compCard, { grade: d.grade }));
-    const pricingComp = checkedComp ?? comps.headline;
+      : await createAppCompService(catalogSource, catalog).lookup(compCard, { grade: d.grade, condition: compCondition }));
+    // A client-supplied single checked price is not traceable evidence; run it
+    // through the same high-value RAW guard as reviewed receipts so a stale
+    // offline replay or direct API call cannot auto-price from one bare number.
+    const compNeedsManualCheck = checkedComp
+      ? reviewedCompRequiresManualPricing({
+          sourcesDisagree: false,
+          grade: d.grade,
+          source: checkedComp.source,
+          medianPence: checkedComp.medianPence,
+        })
+      : d.reviewedComps
+        ? reviewedCompRequiresManualPricing({
+            explicitManualCheck: d.reviewedComps.manualCheck,
+            sourcesDisagree: d.reviewedComps.sourcesDisagree,
+            grade: d.grade,
+            source: d.reviewedComps.headline.source,
+            medianPence: d.reviewedComps.headline.medianPence,
+          })
+        : Boolean(comps.reconciliation?.manualCheck);
+    // Keep the evidence receipt for audit/history, but never feed an explicitly
+    // cautious headline into automatic listing-price generation.
+    const pricingComp = compForAutomaticPricing(checkedComp ?? comps.headline, compNeedsManualCheck);
     const responseComps = checkedComp
       ? {
           ...comps,
@@ -120,12 +143,12 @@ export async function POST(request: Request) {
       }
       const compRepo = new PrismaCompResultRepo();
       if (comps.headline && comps.headline !== checkedComp) {
-        await compRepo.create(comps.headline).catch((err) =>
+        await compRepo.create(comps.headline, { condition: compCondition }).catch((err) =>
           console.warn("[acquire] comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
         );
       }
       if (checkedComp) {
-        await compRepo.create(checkedComp).catch((err) =>
+        await compRepo.create(checkedComp, { condition: compCondition }).catch((err) =>
           console.warn("[acquire] checked comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
         );
       }
@@ -138,6 +161,7 @@ export async function POST(request: Request) {
           grade: d.grade,
           pricePence: d.checkedComp.pricePence,
           platform: checkedCompPlatformFromLegacySource(d.checkedComp.source),
+          condition: compCondition,
           note: d.checkedComp.note,
         }).catch((err) =>
           console.warn("[acquire] checked comp row persistence skipped:", err instanceof Error ? err.message : "unknown"),

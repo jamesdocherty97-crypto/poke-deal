@@ -10,7 +10,7 @@ import {
 } from "@/lib/comps/manualReview";
 import { PrismaCardCache } from "@/lib/catalog/prismaCardCache";
 import { PokemonTcgApiCatalogSource } from "@/lib/catalog/pokemonTcgApi";
-import { GRADE_VALUES, type CardRef, type Grade } from "@/lib/domain/types";
+import { GRADE_VALUES, RAW_CONDITION_VALUES, type CardRef, type Grade } from "@/lib/domain/types";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -26,6 +26,11 @@ const requestSchema = z.object({
     tcgDexId: z.string().optional(),
   }),
   grade: z.enum(GRADE_VALUES),
+  condition: z.enum(RAW_CONDITION_VALUES).optional(),
+}).superRefine((data, ctx) => {
+  if (data.grade === "RAW" && !data.condition) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["condition"], message: "RAW reviews need an exact condition." });
+  }
 });
 
 export async function GET(request: Request) {
@@ -59,6 +64,7 @@ export async function POST(request: Request) {
     const result = await requestManualCompReview(prisma as unknown as ManualReviewDb, {
       cardId: card.id,
       grade: parsed.data.grade as Grade,
+      condition: parsed.data.condition,
     });
     if (result.kind === "not-found") {
       return NextResponse.json({ error: "Run an automatic comp before saving a review task." }, { status: 404 });

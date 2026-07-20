@@ -14,12 +14,15 @@ export function ManualReviewQueue({
   reviews: ManualCompReview[];
   busyId: string | null;
   onAccept: (review: ManualCompReview) => void;
-  onAddCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; note?: string }) => void;
+  onAddCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; condition?: string; priceBasis: "DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN"; sourceUrl: string; note?: string }) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [soldDate, setSoldDate] = useState(todayInputValue());
   const [note, setNote] = useState("");
+  const [condition, setCondition] = useState("NM");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [priceBasis, setPriceBasis] = useState<"DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN">("DISPLAYED_PRICE");
 
   if (reviews.length === 0) {
     return <EmptyState art="alerts" text="No manual checks waiting. Every cautious verdict has been reviewed." />;
@@ -40,7 +43,7 @@ export function ManualReviewQueue({
                 alt=""
               />
               <div>
-                <span>{review.grade.replace(/_/g, " ")} · {review.confidence ?? "low"} confidence</span>
+                <span>{review.grade.replace(/_/g, " ")}{review.condition ? ` · ${review.condition}` : ""} · {review.confidence ?? "low"} confidence</span>
                 <strong>{review.card.name}</strong>
                 <small>{review.card.setName}{review.card.number ? ` #${review.card.number}` : ""}</small>
               </div>
@@ -77,7 +80,33 @@ export function ManualReviewQueue({
                 </label>
                 <label>
                   Sold date
-                  <input type="date" value={soldDate} onChange={(event) => setSoldDate(event.target.value)} />
+                  <input type="date" value={soldDate} max={todayInputValue()} onChange={(event) => setSoldDate(event.target.value)} />
+                </label>
+                {review.grade === "RAW" && (
+                  <label>
+                    Condition
+                    <select
+                      value={review.condition ?? condition}
+                      disabled={Boolean(review.condition)}
+                      onChange={(event) => setCondition(event.target.value)}
+                    >
+                      {['NM', 'LP', 'MP', 'HP', 'DMG'].map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                    {review.condition && <small>Locked to the condition that created this review.</small>}
+                  </label>
+                )}
+                <label>
+                  Individual eBay sold-item URL
+                  <input type="url" inputMode="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://www.ebay.co.uk/itm/…" />
+                </label>
+                <label>
+                  Price basis
+                  <select value={priceBasis} onChange={(event) => setPriceBasis(event.target.value as typeof priceBasis)}>
+                    <option value="DISPLAYED_PRICE">Displayed sold price · excludes delivery</option>
+                    <option value="ITEM_PRICE">Seller item price · before Buyer Protection</option>
+                    <option value="BUYER_TOTAL">Checkout total · includes delivery/fees</option>
+                    <option value="BEST_OFFER_UNKNOWN">Best Offer · accepted price hidden</option>
+                  </select>
                 </label>
                 <label>
                   Note
@@ -88,10 +117,13 @@ export function ManualReviewQueue({
                   <button
                     type="button"
                     className="primary-action"
-                    disabled={busyId === review.id || poundsToPence(price) <= 0}
+                    disabled={busyId === review.id || poundsToPence(price) <= 0 || !sourceUrl.trim()}
                     onClick={() => onAddCheckedComp(review, {
                       pricePence: poundsToPence(price),
                       soldDate,
+                      ...(review.grade === "RAW" ? { condition: review.condition ?? condition } : {}),
+                      sourceUrl: sourceUrl.trim(),
+                      priceBasis,
                       ...(note.trim() ? { note: note.trim() } : {}),
                     })}
                   >
@@ -114,6 +146,9 @@ export function ManualReviewQueue({
                   setPrice(penceToPounds(review.headlinePence));
                   setSoldDate(todayInputValue());
                   setNote("");
+                  setCondition(review.condition ?? "NM");
+                  setSourceUrl("");
+                  setPriceBasis("DISPLAYED_PRICE");
                 }}>
                   Add checked comp
                 </button>
