@@ -539,23 +539,38 @@ Buttons:
 
 ### Your Checked Comps
 
-Your checked comps are a real source. Use them when you check eBay UK solds, Cardmarket, Vinted or another source yourself.
+Your checked comps are a real source. Only qualified eBay UK sold items can drive the headline; Cardmarket, Vinted and other manually checked sources remain visible as context.
 
 How to use:
 
-1. Tap eBay UK solds.
-2. Check the sold results yourself.
-3. Return to Poke Deal and tap Log what you saw.
-4. Enter the sold price. The date defaults to today and the platform defaults to eBay UK.
-5. Press Enter or tap Log price, then add the next price if you saw another good match.
+1. Tap eBay UK solds. The same sold-search link stays visible while the logger is open, so you can return to that search for the next match.
+2. Check that the card, grade and, for RAW cards, condition exactly match the lookup. Open the individual sold item and copy its `ebay.co.uk/itm/...` link; a sold-search link is not unique evidence.
+3. Return to Poke Deal, tap Log what you saw, paste the item link and enter the amount using the right price-basis choice below.
+4. Press Enter or tap Log price. After a successful log, the sold date stays on the date you just used, the price clears, and focus returns to the price field for the next sold item.
+5. Follow the live progress marker: `1 of 2 qualified solds — add one more to headline` means one more independent qualifying item is needed. At 2 of 2, the checked range can headline if the normal spread and confidence checks also pass.
+
+Use the price-basis wording shown in the logger:
+
+| Logger choice | Use |
+|---|---|
+| `Displayed sold price · excludes delivery` | Preferred. Enter the sold price eBay displays, with delivery kept separate. This can qualify. |
+| `Seller item price · before Buyer Protection` | Use when the seller item price is known separately from Buyer Protection. This can qualify. |
+| `Checkout total · includes delivery/fees` | Corroboration only. Do not treat a checkout total as the item price. |
+| `Best Offer · accepted price hidden` | Corroboration only. Do not guess the hidden accepted offer. |
 
 How the app treats them:
 
-- One logged price is shown prominently as corroboration, but cannot headline by itself.
-- Two or more checked comps for the same card and grade within 90 days can become the headline comp.
-- Checked comps never carry across to another card or grade.
+- One qualified sold price is shown prominently as corroboration, but cannot headline by itself.
+- Two or more distinct, active, qualified eBay UK sold items for the exact card, grade and RAW condition within 90 days can become the headline comp. The 4.0× gross-spread gate and outlier rules still apply.
+- Checked comps never carry across to another card, grade or RAW condition.
 - The receipt shows `Your checked comps: n · median £X`.
 - Buy plan, Deal Judge and stock pricing consume the refreshed headline through the normal comp engine.
+
+If the logger rejects a duplicate item link, it shows the existing entry's price, date and status inline:
+
+- Choose **Skip duplicate** when the existing row is correct. The new attempt is discarded; no second copy is created.
+- Choose **Void existing entry** only when the existing row is wrong. Confirm with a short reason. Voiding is not deletion: the original row, price, timestamp and reason stay in the audit receipt, but the row stops contributing to the sample.
+- After the void succeeds, log the corrected observation again. The active-item uniqueness guard releases that exact eBay item ID only after voiding, so the corrected re-log can qualify without erasing history.
 
 ### Deal Judge
 
