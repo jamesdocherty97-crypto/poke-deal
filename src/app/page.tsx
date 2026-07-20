@@ -70,6 +70,7 @@ import { buildBuyPlan, buildBuyTargetOptions, buildBuyTargetSuggestion } from "@
 import { buildQuickGradeOptions } from "@/lib/dealer/buyWorkspace";
 import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
 import {
+  checkedCompListingIdFromUrl,
   checkedCompSourceLabel,
   parseCheckedCompPriceText,
   type CheckedCompSource,
@@ -983,6 +984,7 @@ export default function Home() {
   const [checkedCompLogPriceBasis, setCheckedCompLogPriceBasis] = useState<CheckedCompPriceBasis>("DISPLAYED_PRICE");
   const [checkedCompLogNote, setCheckedCompLogNote] = useState("");
   const [checkedCompLogSourceUrl, setCheckedCompLogSourceUrl] = useState("");
+  const [duplicateCheckedComp, setDuplicateCheckedComp] = useState<CheckedCompEntry | null>(null);
   const [voidingCheckedCompId, setVoidingCheckedCompId] = useState<string | null>(null);
   const [checkedCompVoidReason, setCheckedCompVoidReason] = useState("");
   const [manualCompReturnArmed, setManualCompReturnArmed] = useState(false);
@@ -1857,6 +1859,10 @@ export default function Home() {
     () => summarizeCheckedCompEntries(checkedCompEntries, grade, checkedLookupCondition),
     [checkedCompEntries, checkedLookupCondition, grade],
   );
+  const checkedCompAggregate = comp?.all.find((result) => result.source === "checked-comps") ?? null;
+  const checkedCompQualifiedCount = Number.isFinite(Number(checkedCompAggregate?.raw?.traceableCount))
+    ? Math.max(0, Math.round(Number(checkedCompAggregate?.raw?.traceableCount)))
+    : checkedCompsSummary?.count ?? 0;
   const pokeTraceSignals =
     comp?.all.find((result) => result.source === "poketrace" && result.raw?.signals?.length)?.raw?.signals ?? [];
   // Full RAW→PSA→BGS→CGC ladder, pulled from the same Price Tracker response
@@ -3643,6 +3649,7 @@ export default function Home() {
     setCheckedCompLogPriceBasis("DISPLAYED_PRICE");
     setCheckedCompLogNote("");
     setCheckedCompLogSourceUrl("");
+    setDuplicateCheckedComp(null);
     setVoidingCheckedCompId(null);
     setCheckedCompVoidReason("");
     setManualCompReturnArmed(false);
@@ -6925,19 +6932,30 @@ export default function Home() {
         }),
       });
       const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "checked comp log failed");
+      if (!res.ok) {
+        if (res.status === 409 && payload.code === "duplicate-listing") {
+          const listingId = checkedCompListingIdFromUrl(checkedCompLogSourceUrl);
+          const existingEntry = listingId
+            ? checkedCompEntries.find((entry) => !entry.voidedAt && entry.sourceListingId === listingId) ?? null
+            : null;
+          setDuplicateCheckedComp(existingEntry);
+        }
+        throw new Error(payload.error ?? "checked comp log failed");
+      }
       const entries = Array.isArray(payload.entries) ? (payload.entries as CheckedCompEntry[]) : [];
       const nextLoggedEntries = entries.length > 0 ? entries : payload.entry ? [payload.entry as CheckedCompEntry] : [];
       const aggregate = payload.aggregate as CompResult | null | undefined;
+      const savedEntry = payload.entry as CheckedCompEntry | null | undefined;
 
       setLoggedCheckedComps(nextLoggedEntries);
       setCheckedCompLogPrice("");
+      setCheckedCompLogSoldDate(dateInputValue(savedEntry?.soldDate ?? checkedCompLogSoldDate));
       setCheckedCompLogNote("");
       setCheckedCompLogSourceUrl("");
+      setDuplicateCheckedComp(null);
       setCheckedCompLogPriceBasis("DISPLAYED_PRICE");
       setManualCompReturnArmed(false);
       const pinnedCheckedSource = pinCheckedCompEvidence(nextLoggedEntries, aggregate ?? null, card);
-      const savedEntry = payload.entry as CheckedCompEntry | null | undefined;
       setNotice(checkedCompLogNotice(savedEntry, pricePence));
       setScrollToComp(true);
       void refreshCurrentCompAfterCheckedComp(card, pinnedCheckedSource);
@@ -6971,6 +6989,7 @@ export default function Home() {
       const aggregate = payload.aggregate as CompResult | null | undefined;
       const card = currentCheckedCompCard();
       setLoggedCheckedComps(entries);
+      setDuplicateCheckedComp(null);
       setVoidingCheckedCompId(null);
       setCheckedCompVoidReason("");
       setNotice("Checked comp voided. Its audit row is retained and the sold listing can now be logged correctly.");
@@ -7245,6 +7264,7 @@ export default function Home() {
     const awaitingManualPrice = manualCompReturnArmed && checkedCompLogOpen;
     const hasLoggedEntries = checkedCompEntries.length > 0;
     const summary = checkedCompsSummary;
+    const ebaySoldLink = manualCompLinks.find((link) => link.kind === "EBAY_UK_SOLD") ?? null;
 
     return (
       <div
@@ -7288,6 +7308,22 @@ export default function Home() {
         </div>
         {checkedCompLogOpen && (
           <div className="checked-comp-log-sheet">
+            {ebaySoldLink?.url && (
+              <div className="checked-comp-search-pin">
+                <div>
+                  <strong>eBay UK sold search stays open</strong>
+                  <span>{ebaySoldLink.query}</span>
+                </div>
+                <a href={ebaySoldLink.url} target="_blank" rel="noreferrer">Open eBay UK sold search</a>
+              </div>
+            )}
+            <p className="checked-comp-progress" role="status" aria-live="polite">
+              {checkedCompQualifiedCount >= 2
+                ? "2 of 2 qualified solds — range can headline if spread checks pass"
+                : checkedCompQualifiedCount === 1
+                  ? "1 of 2 qualified solds — add one more to headline"
+                  : "0 of 2 qualified solds — add two to headline"}
+            </p>
             <div className="form-grid">
               <label>
                 Sold price
@@ -7352,13 +7388,54 @@ export default function Home() {
               <summary>Individual sold-item link · needed for trusted evidence</summary>
               <input
                 value={checkedCompLogSourceUrl}
-                onChange={(event) => setCheckedCompLogSourceUrl(event.target.value)}
+                onChange={(event) => {
+                  setCheckedCompLogSourceUrl(event.target.value);
+                  setDuplicateCheckedComp(null);
+                }}
                 placeholder="https://www.ebay.co.uk/itm/…"
                 type="url"
                 inputMode="url"
               />
               <small>Paste the individual sold listing, not the sold-search page. Duplicate item IDs are rejected.</small>
             </details>
+            {duplicateCheckedComp && (
+              <div className="checked-comp-duplicate" role="alert">
+                <div>
+                  <strong>Already logged — choose what happens next</strong>
+                  <span>
+                    {gbp(duplicateCheckedComp.pricePence)} · {shortDate(duplicateCheckedComp.soldDate)} · {checkedCompEntryStatus(duplicateCheckedComp)}
+                  </span>
+                </div>
+                <div className="checked-comp-log-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVoidingCheckedCompId(duplicateCheckedComp.id);
+                      setCheckedCompVoidReason("");
+                      window.requestAnimationFrame(() => {
+                        document.getElementById(`checked-comp-entry-${duplicateCheckedComp.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      });
+                    }}
+                  >
+                    Void existing entry
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      setDuplicateCheckedComp(null);
+                      setCheckedCompLogPrice("");
+                      setCheckedCompLogSourceUrl("");
+                      setError(null);
+                      setNotice("Duplicate skipped. Ready for the next sold listing.");
+                      window.requestAnimationFrame(() => checkedCompLogPriceRef.current?.focus());
+                    }}
+                  >
+                    Skip duplicate
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="checked-comp-log-actions">
               <button
                 type="button"
@@ -7376,7 +7453,7 @@ export default function Home() {
         {hasLoggedEntries && (
           <div className="checked-comp-entry-list">
             {checkedCompEntries.slice(0, 5).map((entry) => (
-              <div className="checked-comp-entry-row" key={entry.id}>
+              <div className="checked-comp-entry-row" id={`checked-comp-entry-${entry.id}`} key={entry.id}>
                 <div>
                   <strong>{gbp(entry.pricePence)}</strong>
                   <span>
@@ -12372,6 +12449,13 @@ function checkedCompPlatformLabel(platform: CheckedCompPlatform | string): strin
   return checkedCompPlatforms.find((candidate) => candidate.value === platform)?.label ?? "Checked";
 }
 
+function checkedCompEntryStatus(entry: CheckedCompEntry): string {
+  if (entry.voidedAt) return "voided";
+  if (entry.evidenceStatus === "used") return "used";
+  if (entry.evidenceStatus === "outlier") return "outlier removed";
+  return "corroboration";
+}
+
 function buildCompReceipt(comp: Reconciled): Array<{
   key: string;
   source: string;
@@ -12856,6 +12940,11 @@ function shortDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown";
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
+function dateInputValue(value: string): string {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? todayInputValue() : parsed.toISOString().slice(0, 10);
 }
 
 function todayInputValue(): string {
