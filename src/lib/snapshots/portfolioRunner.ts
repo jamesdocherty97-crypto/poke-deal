@@ -1,4 +1,5 @@
 import { createAppCompService } from "../comps/appCompLookup.js";
+import { compForAutomaticAction } from "../comps/pricing.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef, Grade } from "../domain/types.js";
 import {
@@ -41,11 +42,12 @@ export async function runPortfolioSnapshot({ limit = 25 }: { limit?: number } = 
 
   for (const group of groups) {
     const comps = await compService.lookup(group.card, { grade: group.grade });
-    if (!comps.headline || comps.headline.sampleSize === 0 || comps.headline.medianPence <= 0) {
+    const actionableComp = compForAutomaticAction(comps);
+    if (!actionableComp || actionableComp.sampleSize === 0 || actionableComp.medianPence <= 0) {
       skipped += 1;
       continue;
     }
-    const marketPence = comps.headline.medianPence;
+    const marketPence = actionableComp.medianPence;
 
     await prisma.priceSnapshot.upsert({
       where: {

@@ -216,6 +216,33 @@ test("PokeTrace internal signals cannot lend their sample size to the chosen eBa
   assert.doesNotMatch(result.reconciliation.reasons.join(" "), /n-boosted-by-agreeing-signals/);
 });
 
+test("a reconciler median correction remains inside the returned source range", () => {
+  const catalog = comp({
+    source: "pokemon-tcg-market",
+    card: { name: "Charizard ex", setName: "151", number: "199/165" },
+    medianPence: 357_600,
+    meanPence: 357_600,
+    lowPence: 357_600,
+    highPence: 357_600,
+    sampleSize: 1,
+    windowDays: 30,
+    raw: {
+      kind: "catalog-market-baseline",
+      chosenSignal: { source: "cardmarket" },
+      signals: [
+        { source: "cardmarket", kind: "trendPrice", pricePence: 357_600 },
+        { source: "cardmarket", kind: "avg30", pricePence: 207_500 },
+      ],
+    },
+  });
+
+  const result = pickHeadlineForQuery([catalog], catalog.card, { grade: "RAW" });
+
+  assert.equal(result.headline?.medianPence, 207_500);
+  assert.ok((result.headline?.lowPence ?? 0) <= 207_500);
+  assert.ok((result.headline?.highPence ?? 0) >= 207_500);
+});
+
 test("pickHeadline keeps confident graded comps on sample size", () => {
   const psaSmall = comp({ grade: "PSA_10", medianPence: 11000, sampleSize: 4 });
   const psaLarge = comp({ grade: "PSA_10", medianPence: 11500, sampleSize: 10 });
@@ -437,6 +464,42 @@ test("CompService serves a warm cached comp when every source fails", async () =
   assert.equal(result.cached?.ageHours, 3);
   assert.equal((result.headline.raw as { cached?: boolean }).cached, true);
   assert.equal(result.unavailableSources?.[0]?.name, "failing-source");
+});
+
+test("CompService preserves cached source disagreement independently of manual-check", async () => {
+  const failingSource: CompSource = {
+    name: "failing-source",
+    live: true,
+    lookup: async () => {
+      throw new Error("network down");
+    },
+  };
+  const cachedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const cachedHeadline = comp({
+    source: "pokemon-price-tracker",
+    card: { name: "Gengar", setName: "Lost Origin", number: "TG06/TG30" },
+    medianPence: 2_500,
+    sampleSize: 8,
+  });
+  const cache = new MemoryLastKnownCompCache([{
+    headline: cachedHeadline,
+    reconciliation: {
+      headlinePence: 2_500,
+      confidence: "medium",
+      manualCheck: false,
+      reasons: [],
+      trendPct: null,
+    },
+    sourcesDisagree: true,
+    cachedAt,
+  }]);
+  const result = await new CompService([failingSource], 5, cache).lookup(
+    cachedHeadline.card,
+    { grade: "RAW", windowDays: 30 },
+  );
+
+  assert.equal(result.reconciliation?.manualCheck, false);
+  assert.equal(result.sourcesDisagree, true);
 });
 
 test("CompService ignores a warm cached row with no price", async () => {

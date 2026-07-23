@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compForAutomaticPricing, conditionAdjustedPricePence, rawConditionPriceFactor, reviewedCompRequiresManualPricing, suggestListPrice, realizedProfit } from "./pricing.js";
+import { compForAutomaticAction, compForAutomaticPricing, conditionAdjustedPricePence, rawConditionPriceFactor, reviewedCompRequiresManualPricing, suggestListPrice, realizedProfit } from "./pricing.js";
 import type { CompResult } from "../domain/types.js";
 
 function comp(medianPence: number, sampleSize = 8): CompResult {
@@ -78,6 +78,29 @@ test("manual-check evidence cannot re-enter automatic list pricing", () => {
   assert.equal(suggestion.pricePence, 55_000);
   assert.equal(suggestion.confidence, "none");
   assert.match(suggestion.rationale, /No usable comps/);
+});
+
+test("automatic actions fail closed unless reconciliation explicitly approves the headline", () => {
+  const headline = comp(3_000);
+  const approved = {
+    headline,
+    sourcesDisagree: false,
+    reconciliation: {
+      headlinePence: headline.medianPence,
+      confidence: "medium" as const,
+      manualCheck: false,
+      reasons: [],
+      trendPct: null,
+    },
+  };
+
+  assert.equal(compForAutomaticAction(approved), headline);
+  assert.equal(compForAutomaticAction({ ...approved, reconciliation: undefined }), null);
+  assert.equal(compForAutomaticAction({
+    ...approved,
+    reconciliation: { ...approved.reconciliation, manualCheck: true },
+  }), null);
+  assert.equal(compForAutomaticAction({ ...approved, sourcesDisagree: true }), null);
 });
 
 test("reviewed high-value foreign RAW evidence stays manual even if a client omits the flag", () => {

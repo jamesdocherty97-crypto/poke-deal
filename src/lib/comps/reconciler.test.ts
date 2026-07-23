@@ -192,13 +192,121 @@ test("T7: UK eBay MI beats broad PokeTrace but disagreement makes it low confide
 
 test("T8: stale-only data does not headline", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "tcg-market", valuePence: 50000, n: 1, ageDays: 200, region: "EU" }),
+    candidate({ source: "tcg-market", valuePence: 50000, n: 1, ageDays: 366, region: "EU" }),
   ]);
 
   assert.equal(result.headlinePence, null);
   assert.equal(result.confidence, "low");
   assert.equal(result.manualCheck, true);
   assert.equal(result.chosenSource, undefined);
+});
+
+test("T8b: a fresh exact RAW catalog signal becomes an indicative guide instead of no comp", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "tcg-market", valuePence: 2400, n: 1, ageDays: 2, region: "EU" }),
+  ]);
+
+  assert.equal(result.headlinePence, 2400);
+  assert.equal(result.chosenSource, "tcg-market");
+  assert.equal(result.confidence, "low");
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /indicative-fallback:tcg-market/);
+  assert.match(result.selection?.chosenBecause ?? "", /best available guide/);
+});
+
+test("T8c: a one-sale exact graded bucket becomes an indicative guide instead of no comp", () => {
+  const result = reconcileComps({ ...baseQuery, gradeBucket: "CGC_10" }, [
+    candidate({ source: "pt-median", valuePence: 42000, n: 1, ageDays: 3, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 42000);
+  assert.equal(result.chosenSource, "pt-median");
+  assert.equal(result.confidence, "low");
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /indicative-fallback:pt-median/);
+});
+
+test("T8d: RAW fallback prefers catalog context over a thin provider sale", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "pt-smart", valuePence: 15000, n: 1, ageDays: 1, region: "US" }),
+    candidate({ source: "tcg-market", valuePence: 2200, n: 1, ageDays: 200, region: "EU" }),
+  ]);
+
+  assert.equal(result.headlinePence, 2200);
+  assert.equal(result.chosenSource, "tcg-market");
+  assert.equal(result.manualCheck, true);
+  assert.equal(result.selection?.crossSourceHighPence, 15000);
+});
+
+test("T8e: heavily penalised RAW evidence still cannot become an indicative guide", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({
+      source: "pt-smart",
+      valuePence: 15000,
+      n: 1,
+      ageDays: 1,
+      region: "US",
+      raw: { min: 1000, max: 10000, median: 5000 },
+    }),
+  ]);
+
+  assert.equal(result.headlinePence, null);
+  assert.equal(result.chosenSource, undefined);
+  assert.equal(result.manualCheck, true);
+});
+
+test("T8f: a stale-but-bounded exact RAW catalog guide does not need an unrelated thin signal", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "tcg-market", valuePence: 2200, n: 1, ageDays: 200, region: "EU" }),
+  ]);
+
+  assert.equal(result.headlinePence, 2200);
+  assert.equal(result.chosenSource, "tcg-market");
+  assert.equal(result.confidence, "low");
+  assert.equal(result.manualCheck, true);
+});
+
+test("T8g: fallback requires complete exact-card identity", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({
+      source: "pt-median",
+      valuePence: 4200,
+      n: 1,
+      ageDays: 3,
+      matchedSetId: undefined,
+      matchedCardNumber: undefined,
+    }),
+  ]);
+
+  assert.equal(result.headlinePence, null);
+  assert.equal(result.chosenSource, undefined);
+});
+
+test("T8h: pt-smart without enough normal evidence never becomes an indicative guide", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({
+      source: "pt-smart",
+      valuePence: 990000,
+      n: 1,
+      ageDays: 1,
+      raw: undefined,
+    }),
+  ]);
+
+  assert.equal(result.headlinePence, null);
+  assert.equal(result.chosenSource, undefined);
+});
+
+test("T8i: malformed non-finite samples and dates fail closed", () => {
+  const infiniteSamples = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 1200, n: Number.POSITIVE_INFINITY }),
+  ]);
+  const unknownDate = reconcileComps(baseQuery, [
+    candidate({ source: "pt-median", valuePence: 1200, n: 1, ageDays: Number.NaN }),
+  ]);
+
+  assert.equal(infiniteSamples.headlinePence, null);
+  assert.equal(unknownDate.headlinePence, null);
 });
 
 test("T9: non-thin owned sales anchor over external baselines", () => {
@@ -277,7 +385,7 @@ test("T10: no candidates returns no headline and a low-confidence manual check",
 
 test("T10b: stale corroboration-only data does not become a headline", () => {
   const result = reconcileComps(baseQuery, [
-    candidate({ source: "tcg-market", valuePence: 156, n: 1, ageDays: 220, region: "EU" }),
+    candidate({ source: "tcg-market", valuePence: 156, n: 1, ageDays: 400, region: "EU" }),
   ]);
 
   assert.equal(result.headlinePence, null);
@@ -296,6 +404,19 @@ test("T11: agreeing sources are still low-confidence when every eligible source 
   assert.equal(result.headlinePence, 10000);
   assert.equal(result.confidence, "low");
   assert.equal(result.manualCheck, true);
+});
+
+test("T11b: exact thin evidence that materially disagrees cannot be hidden below the weight threshold", () => {
+  const result = reconcileComps(baseQuery, [
+    candidate({ source: "poketrace", valuePence: 10_000, n: 60, ageDays: 2, region: "US" }),
+    candidate({ source: "pt-median", valuePence: 3_000, n: 1, ageDays: 2, region: "US" }),
+  ]);
+
+  assert.equal(result.headlinePence, 10_000);
+  assert.equal(result.manualCheck, true);
+  assert.match(result.reasons.join(" "), /subthreshold-evidence-disagrees/);
+  assert.equal(result.selection?.crossSourceLowPence, 3_000);
+  assert.equal(result.selection?.crossSourceHighPence, 10_000);
 });
 
 test("T12: UK eBay MI wins over a broad non-UK PokeTrace source when both agree", () => {

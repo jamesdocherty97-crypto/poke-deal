@@ -1697,26 +1697,34 @@ export default function Home() {
   const headlineConditionAlreadyMatched = compMatchesRawCondition(headline, condition);
   const headlineAdjustmentCondition = headlineConditionAlreadyMatched ? "NM" : condition;
   const isAmbiguousComp = Boolean(comp?.ambiguous);
+  const headlineReconciliation = comp?.reconciliation ?? headline?.raw?.reconciliation ?? null;
+  const unverifiedHeadline = Boolean(
+    headline &&
+      (headlineReconciliation?.manualCheck !== false || comp?.sourcesDisagree),
+  );
+  // Indicative/manual evidence stays visible as a guide, but every downstream
+  // offer, target, list default and grading calculation must fail closed.
+  const actionableHeadline = !isAmbiguousComp && !unverifiedHeadline ? headline : null;
   const sourceMatchedCard = !catalogCard && apiHeadline?.card ? apiHeadline.card : null;
   const sourceMatchTypedMeta = [name.trim(), setNameValue.trim(), number.trim() ? `#${number.trim()}` : ""]
     .filter(Boolean)
     .join(" · ");
   const sourceMatchSourceLabel = apiHeadline ? sourceLabel(apiHeadline.source, false) : "Source";
   const deal = useMemo(
-    () => (headline ? judgeDeal(headline, poundsToPence(cost), channel, grade, headlineAdjustmentCondition) : null),
-    [channel, headline, headlineAdjustmentCondition, cost, grade],
+    () => (actionableHeadline ? judgeDeal(actionableHeadline, poundsToPence(cost), channel, grade, headlineAdjustmentCondition) : null),
+    [actionableHeadline, channel, headlineAdjustmentCondition, cost, grade],
   );
   const gradeEv = useMemo(
     () =>
-      headline && gradeComp
+      actionableHeadline && gradeComp
         ? calculateGradeEv({
-            rawPence: headline.medianPence,
+            rawPence: actionableHeadline.medianPence,
             psa10Pence: gradeComp.medianPence,
             oddsPct: Number(gradeOdds),
             gradingCostPence: poundsToPence(gradingCost),
           })
         : null,
-    [headline, gradeComp, gradeOdds, gradingCost],
+    [actionableHeadline, gradeComp, gradeOdds, gradingCost],
   );
   const selectedSet = useMemo(() => findSelectedSet([...popularSets, ...setSuggestions, ...allSets], setNameValue), [
     allSets,
@@ -1837,7 +1845,7 @@ export default function Home() {
     scanMode === "ambiguous"
       ? scanAlternatives.map((card) => catalogDisplayImage(card)).find(Boolean) ?? selectedCardImage
       : selectedCardImage;
-  const scanCompReady = Boolean(scanIdentity && headline && scanMode === "identity");
+  const scanCompReady = Boolean(scanIdentity && actionableHeadline && scanMode === "identity");
   const askEvidence = comp?.askEvidence ?? null;
   const spotlightImage = selectedCardImage;
   const marketBaseline =
@@ -1921,29 +1929,34 @@ export default function Home() {
   );
   const dealCalcInput = useMemo<DealCalcCompInput | null>(
     () =>
-      headline && !isAmbiguousComp
+      actionableHeadline
         ? buildDealCalcInput({
-            headline,
+            headline: actionableHeadline,
             comp: compForReceipt,
             grade,
             gradeLadder,
             condition: headlineAdjustmentCondition,
           })
         : null,
-    [compForReceipt, grade, gradeLadder, headline, headlineAdjustmentCondition, isAmbiguousComp],
+    [actionableHeadline, compForReceipt, grade, gradeLadder, headlineAdjustmentCondition],
   );
   const offerCalc = useMemo(
     () => (dealCalcInput ? dealCalc(dealCalcInput, dealSettings) : null),
     [dealCalcInput, dealSettings],
   );
-  const headlineReconciliation = compForReceipt?.reconciliation ?? headline?.raw?.reconciliation ?? null;
-  const unverifiedHeadline = Boolean(headlineReconciliation?.manualCheck ?? compForReceipt?.sourcesDisagree);
   const unverifiedRange = headlineReconciliation?.selection?.lowPence != null && headlineReconciliation.selection.highPence != null
     ? formatCompRange(headlineReconciliation.selection.lowPence, headlineReconciliation.selection.highPence)
     : headline ? gbp(headline.medianPence) : "No verified range";
   const needsManualComp = Boolean(
     apiHeadline &&
-      (apiHeadline.medianPence <= 0 || apiHeadline.sampleSize <= 0 || busy === "lookup" || compProgressPhase !== "receipt"),
+      (
+        isAmbiguousComp ||
+        unverifiedHeadline ||
+        apiHeadline.medianPence <= 0 ||
+        apiHeadline.sampleSize <= 0 ||
+        busy === "lookup" ||
+        compProgressPhase !== "receipt"
+      ),
   );
   const manualCompCard = useMemo(
     () => ({
@@ -1969,8 +1982,8 @@ export default function Home() {
   );
   const compSpreadPct = useMemo(() => (compForReceipt ? medianSpreadPct(compForReceipt.all) : null), [compForReceipt]);
   const dealerVerdict = useMemo(
-    () => (isAmbiguousComp || !compForReceipt?.headline ? null : buildDealerCompVerdict(compForReceipt as Reconciled & { headline: CompResult })),
-    [compForReceipt, isAmbiguousComp],
+    () => (!actionableHeadline || !compForReceipt?.headline ? null : buildDealerCompVerdict(compForReceipt as Reconciled & { headline: CompResult })),
+    [actionableHeadline, compForReceipt],
   );
   const shouldOfferManualComp = Boolean(
       headline &&
@@ -1978,7 +1991,9 @@ export default function Home() {
       (needsManualComp || !catalogCard || comp?.sourcesDisagree || (dealerVerdict && dealerVerdict.tone !== "good")),
   );
   const requiresCheckedCompBeforeStock = Boolean(dealerVerdict?.requiresCheckedComp);
-  const confidenceLabel = dealerVerdict
+  const confidenceLabel = unverifiedHeadline
+    ? { label: "Guide only", tone: "warn" }
+    : dealerVerdict
     ? { label: dealerVerdict.label, tone: dealerVerdict.tone }
     : headline
       ? compConfidence(headline, compForReceipt?.sourcesDisagree ?? false)
@@ -2015,7 +2030,7 @@ export default function Home() {
   const buyPlan = useMemo(() => {
     const intakeQuantity = parseIntakeQuantity(quantity) ?? 1;
     const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
-    const listPricePence = overrideListPricePence ?? projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
+    const listPricePence = overrideListPricePence ?? projectedListSuggestion?.pricePence ?? actionableHeadline?.medianPence ?? 0;
     if (listPricePence <= 0) return null;
 
     return buildBuyPlan({
@@ -2032,7 +2047,7 @@ export default function Home() {
     cost,
     dealerVerdict,
     grade,
-    headline?.medianPence,
+    actionableHeadline?.medianPence,
     listPriceOverride,
     projectedListSuggestion?.pricePence,
     quantity,
@@ -2041,7 +2056,7 @@ export default function Home() {
   const quickStockCostPence = poundsToPence(cost);
   const quickStockListPence = listPriceOverride.trim()
     ? poundsToPence(listPriceOverride)
-    : projectedListSuggestion?.pricePence ?? headline?.medianPence ?? 0;
+    : projectedListSuggestion?.pricePence ?? actionableHeadline?.medianPence ?? 0;
   const effectiveAcquireListingState: AcquireListingState = channel === "EBAY" ? "DRAFT" : acquireListingState;
   const eBayDraftPriceNeedsReview = shouldCreateListing && channel === "EBAY" && quickStockListPence > 0 && quickStockListPence < 99;
   const effectiveDraftListPricePence = intakeDraftListPricePence(channel, shouldCreateListing, quickStockListPence);
@@ -2058,7 +2073,7 @@ export default function Home() {
   const dealSessionBudgetRemainingPence = dealSession
     ? dealSession.summary.totalMaxCashPence - dealSessionPaidPence
     : 0;
-  const quickStockReady = Boolean(headline && !isAmbiguousComp && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence >= 0 && quickStockListPence > 0);
+  const quickStockReady = Boolean(actionableHeadline && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence >= 0 && quickStockListPence > 0);
   const quickOfferOptions = useMemo(() => {
     const targetPence = deal?.targetBuyPence ?? 0;
     const options: Array<{ label: string; valuePence: number }> = [];
@@ -2078,33 +2093,35 @@ export default function Home() {
   }, [deal?.targetBuyPence, quickStockListPence]);
   const buyTargetSuggestion = useMemo(
     () =>
-      headline
+      actionableHeadline
         ? buildBuyTargetSuggestion({
             targetBuyPence: deal?.targetBuyPence ?? null,
-            compMedianPence: headline.medianPence,
-            compLowPence: headline.lowPence,
+            compMedianPence: actionableHeadline.medianPence,
+            compLowPence: actionableHeadline.lowPence,
             currentTargetPence: poundsToPence(watchTarget),
           })
         : null,
-    [deal?.targetBuyPence, headline, watchTarget],
+    [actionableHeadline, deal?.targetBuyPence, watchTarget],
   );
   const buyTargetOptions = useMemo(
     () =>
-      headline
+      actionableHeadline
         ? buildBuyTargetOptions({
             targetBuyPence: deal?.targetBuyPence ?? null,
-            compMedianPence: headline.medianPence,
-            compLowPence: headline.lowPence,
+            compMedianPence: actionableHeadline.medianPence,
+            compLowPence: actionableHeadline.lowPence,
             currentTargetPence: poundsToPence(watchTarget),
           })
         : [],
-    [deal?.targetBuyPence, headline, watchTarget],
+    [actionableHeadline, deal?.targetBuyPence, watchTarget],
   );
   const decisionBarWatchTargetPence =
-    buyTargetSuggestion?.targetPence ??
-    offerCalc?.maxCashOfferPence ??
-    deal?.targetBuyPence ??
-    (headline?.lowPence && headline.lowPence > 0 ? Math.max(1, Math.round(headline.lowPence * 0.85)) : 0);
+    actionableHeadline
+      ? buyTargetSuggestion?.targetPence ??
+        offerCalc?.maxCashOfferPence ??
+        deal?.targetBuyPence ??
+        (actionableHeadline.lowPence > 0 ? Math.max(1, Math.round(actionableHeadline.lowPence * 0.85)) : 0)
+      : 0;
   const decisionBarOfferText = offerCalc
     ? offerCalc.maxCashOfferPence == null
       ? dealCalcPrimaryReason(offerCalc)
@@ -7142,8 +7159,8 @@ export default function Home() {
   }
 
   function watchDecisionTarget() {
-    if (!headline || decisionBarWatchTargetPence <= 0) {
-      setError("Run a comp before creating a buy watch.");
+    if (!actionableHeadline || decisionBarWatchTargetPence <= 0) {
+      setError("Confirm the comp before creating an automatic buy watch.");
       return;
     }
     setWatchTarget(penceToPounds(decisionBarWatchTargetPence));
@@ -8973,7 +8990,9 @@ export default function Home() {
                 </div>
               </div>
               <div className="comp-identity-strip" aria-label="Comp card identity">
-                <span className="sleeve-tab" aria-hidden="true">Verified print</span>
+                <span className="sleeve-tab" aria-hidden="true">
+                  {isAmbiguousComp ? "Print to confirm" : "Verified print"}
+                </span>
                 <CardImage
                   src={selectedCardImages}
                   className="comp-identity-art"
@@ -9028,12 +9047,18 @@ export default function Home() {
                   onClick={runDecisionBarBuy}
                   disabled={busy === "acquire" || busy === "manual-stock"}
                 >
-                  {busy === "acquire" ? "Stocking…" : buyResultSection === "deal" ? "Add to stock" : "Just bought it"}
+                  {busy === "acquire"
+                    ? "Stocking…"
+                    : needsManualComp
+                      ? "Stock manually"
+                      : buyResultSection === "deal"
+                        ? "Add to stock"
+                        : "Just bought it"}
                 </button>
                 <button className="verdict-ebay-action" type="button" aria-label="eBay UK" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
                   eBay UK
                 </button>
-                <button className="verdict-watch-action" type="button" onClick={watchDecisionTarget} disabled={busy === "watch-create" || decisionBarWatchTargetPence <= 0}>
+                <button className="verdict-watch-action" type="button" onClick={watchDecisionTarget} disabled={needsManualComp || busy === "watch-create" || decisionBarWatchTargetPence <= 0}>
                   {busy === "watch-create" ? "Watching…" : "Watch"}
                 </button>
                 <button type="button" className="ghost-button verdict-pass-action" aria-label="Next card" onClick={skipCurrentComp} disabled={busy === "acquire" || busy === "manual-stock"}>
@@ -12535,6 +12560,7 @@ function humanReconciliationReason(reason: string): string {
   if (reason.includes("low-confidence-headline")) return "The chosen evidence is too thin or scattered to price automatically.";
   if (reason.includes("damaged-evidence-quality")) return "The chosen source carries heavy quality penalties, so check solds by hand.";
   if (reason.includes("cross-source-spread")) return "Sources are too far apart to trust a single number.";
+  if (reason.includes("indicative-fallback")) return "No source cleared the normal confidence threshold, so this is a guide price only.";
   if (reason.includes("corroboration-fallback") || reason.includes("corroboration-only")) return "Only fallback evidence was available.";
   if (reason.includes("no-eligible-candidates")) return "No source passed the quality gates.";
   return reason.replace(/[-:]/g, " ");
@@ -12828,7 +12854,7 @@ function buildDealCalcInput({
       ? conditionAdjustedPricePence(headline.medianPence, grade, condition)
       : null,
     confidence: reconciliation?.confidence ?? inferDealConfidence(headline, Boolean(comp?.sourcesDisagree)),
-    manualCheck: reconciliation?.manualCheck ?? Boolean(comp?.sourcesDisagree || headline.sampleSize === 0),
+    manualCheck: Boolean(reconciliation?.manualCheck || comp?.sourcesDisagree || headline.sampleSize === 0),
     gradeBucket: grade,
     sampleSizeOfChosen: headline.sampleSize,
     reasons: reconciliation?.reasons ?? [],

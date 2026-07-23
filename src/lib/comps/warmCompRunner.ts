@@ -1,6 +1,7 @@
 import { getPrisma } from "../db/prisma.js";
 import type { Grade } from "../domain/types.js";
 import { createAppCompService } from "./appCompLookup.js";
+import type { ReconciledComp } from "./compService.js";
 import { PrismaCompResultRepo } from "./prismaCompResultRepo.js";
 import { warmComps, type WarmCompOptions, type WarmCompSummary, type WarmCompItem } from "./warmComps.js";
 import { getPokeTraceHealth, resetPokeTraceRunStats } from "./sources/pokeTrace.js";
@@ -30,19 +31,34 @@ export async function runInventoryCompWarmup(options: WarmCompOptions = {}): Pro
   const warmItems = toWarmItems(items as WarmInventoryItem[]);
   const compService = createAppCompService();
   const compRepo = new PrismaCompResultRepo();
+  const receiptsByItemId = new Map<string, ReconciledComp>();
   resetPokeTraceRunStats();
 
   const summary = await warmComps(
     warmItems,
     async (item) => {
       const result = await compService.lookup(item.card, { grade: item.grade });
+      receiptsByItemId.set(item.id, result);
       return result.headline;
     },
     options,
   );
 
   for (const success of summary.successes) {
-    await compRepo.create(success.headline).catch((err) => {
+    const receipt = receiptsByItemId.get(success.itemId);
+    if (!receipt?.reconciliation) {
+      console.warn("[warm-comps] comp persistence skipped: reconciliation audit unavailable");
+      continue;
+    }
+    await compRepo.create(success.headline, {
+      reconciliation: receipt.reconciliation,
+      receipt: {
+        all: receipt.all,
+        unavailableSources: receipt.unavailableSources,
+        sourcesDisagree: receipt.sourcesDisagree,
+        cached: receipt.cached,
+      },
+    }).catch((err) => {
       console.warn("[warm-comps] comp persistence skipped:", err instanceof Error ? err.message : "unknown error");
     });
   }

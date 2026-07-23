@@ -225,22 +225,30 @@ test("PrismaCompResultRepo persists against an existing card id", async () => {
 test("PrismaCompResultRepo persists reconciliation evidence for the manual-check queue", async () => {
   const db = fakeDb();
   const repo = new PrismaCompResultRepo(db.client, null);
+  const reconciliation = {
+    headlinePence: 2778,
+    confidence: "low" as const,
+    manualCheck: true,
+    reasons: ["source-disagreement"],
+    chosenSource: "pt-smart" as const,
+    trendPct: null,
+  };
   const row = await repo.create(comp({ name: "Gengar" }), {
-    reconciliation: {
-      headlinePence: 2778,
-      confidence: "low",
-      manualCheck: true,
-      reasons: ["source-disagreement"],
-      chosenSource: "pt-smart",
-      trendPct: null,
+    reconciliation,
+    receipt: {
+      all: [{ source: "pokemon-price-tracker", sampleSize: 8 }],
+      sourcesDisagree: true,
     },
-    receipt: { all: [{ source: "pokemon-price-tracker", sampleSize: 8 }] },
   });
 
   assert.equal(row.manualCheck, true);
   assert.equal(row.confidence, "low");
   assert.deepEqual(db.compResults[0]?.reasons, ["source-disagreement"]);
-  assert.deepEqual(db.compResults[0]?.receipt, { all: [{ source: "pokemon-price-tracker", sampleSize: 8 }] });
+  assert.deepEqual(db.compResults[0]?.receipt, {
+    all: [{ source: "pokemon-price-tracker", sampleSize: 8 }],
+    sourcesDisagree: true,
+    reconciliation,
+  });
 });
 
 test("PrismaLastKnownCompCache reads the latest stored comp for card and grade", async () => {
@@ -270,6 +278,124 @@ test("PrismaLastKnownCompCache reads the latest stored comp for card and grade",
   assert.equal(cached?.headline.medianPence, 3100);
   assert.equal(cached?.headline.card.tcgApiId, "sv3pt5-199");
   assert.equal(cached?.cachedAt, "2026-06-21T12:06:00.000Z");
+});
+
+test("PrismaLastKnownCompCache retains a manual reconciliation verdict", async () => {
+  const db = fakeDb([
+    {
+      id: "card_existing",
+      game: "POKEMON",
+      language: "EN",
+      name: "Rayquaza VMAX",
+      setName: "Evolving Skies",
+      setCode: "swsh7",
+      number: "218/203",
+      rarity: "Secret Rare",
+      imageUrl: null,
+      displayImageUrl: null,
+      tcgApiId: "swsh7-218",
+    },
+  ]);
+  const repo = new PrismaCompResultRepo(db.client);
+  const reconciliation = {
+    headlinePence: 103_981,
+    confidence: "low" as const,
+    manualCheck: true,
+    reasons: ["high-value-without-traceable-uk-sales"],
+    chosenSource: "poketrace" as const,
+    trendPct: null,
+  };
+  await repo.create({
+    ...comp({ id: "card_existing", name: "Rayquaza VMAX" }),
+    medianPence: 103_981,
+  }, { reconciliation });
+
+  const cached = await new PrismaLastKnownCompCache(repo).get(
+    { id: "card_existing", name: "Rayquaza VMAX" },
+    { grade: "RAW" },
+  );
+
+  assert.deepEqual(cached?.reconciliation, reconciliation);
+  assert.equal(cached?.reconciliation?.manualCheck, true);
+});
+
+test("PrismaLastKnownCompCache retains source disagreement independently of manual-check", async () => {
+  const db = fakeDb([
+    {
+      id: "card_existing",
+      game: "POKEMON",
+      language: "EN",
+      name: "Gengar",
+      setName: "Lost Origin",
+      setCode: "swsh11",
+      number: "TG06/TG30",
+      rarity: "Trainer Gallery Rare Holo",
+      imageUrl: null,
+      displayImageUrl: null,
+      tcgApiId: "swsh11tg-TG06",
+    },
+  ]);
+  const repo = new PrismaCompResultRepo(db.client);
+  await repo.create(comp({ id: "card_existing", name: "Gengar" }), {
+    reconciliation: {
+      headlinePence: 2_778,
+      confidence: "medium",
+      manualCheck: false,
+      reasons: [],
+      trendPct: null,
+    },
+    receipt: { all: [], sourcesDisagree: true },
+  });
+
+  const cached = await new PrismaLastKnownCompCache(repo).get(
+    { id: "card_existing", name: "Gengar" },
+    { grade: "RAW" },
+  );
+
+  assert.equal(cached?.reconciliation?.manualCheck, false);
+  assert.equal(cached?.sourcesDisagree, true);
+});
+
+test("PrismaLastKnownCompCache recovers legacy reconciliation columns when the receipt lacks the verdict", async () => {
+  const db = fakeDb([
+    {
+      id: "card_existing",
+      game: "POKEMON",
+      language: "EN",
+      name: "Gengar",
+      setName: "Lost Origin",
+      setCode: "swsh11",
+      number: "TG06/TG30",
+      rarity: "Trainer Gallery Rare Holo",
+      imageUrl: null,
+      displayImageUrl: null,
+      tcgApiId: "swsh11tg-TG06",
+    },
+  ]);
+  const repo = new PrismaCompResultRepo(db.client);
+  await repo.create(comp({ id: "card_existing", name: "Gengar" }), {
+    reconciliation: {
+      headlinePence: 2_778,
+      confidence: "low",
+      manualCheck: true,
+      reasons: ["source-disagreement"],
+      trendPct: null,
+    },
+  });
+  db.compResults[0]!.receipt = { all: [] };
+
+  const cached = await new PrismaLastKnownCompCache(repo).get(
+    { id: "card_existing", name: "Gengar" },
+    { grade: "RAW" },
+  );
+
+  assert.deepEqual(cached?.reconciliation, {
+    headlinePence: 2_778,
+    confidence: "low",
+    manualCheck: true,
+    reasons: ["source-disagreement"],
+    trendPct: null,
+  });
 });
 
 test("Prisma comp persistence and warm cache isolate RAW condition buckets", async () => {
@@ -304,4 +430,13 @@ test("Prisma comp persistence and warm cache isolate RAW condition buckets", asy
   assert.equal(nm?.headline.medianPence, 60_000);
   assert.equal(lp?.headline.medianPence, 45_000);
   assert.equal(unscoped, null);
+});
+
+test("invalid provider timestamps persist as stale instead of becoming fresh now", async () => {
+  const db = fakeDb();
+  const repo = new PrismaCompResultRepo(db.client, null);
+
+  await repo.create({ ...comp({ name: "Unknown age card" }), asOf: "unknown" });
+
+  assert.equal(db.compResults[0]?.asOf.toISOString(), "1970-01-01T00:00:00.000Z");
 });
