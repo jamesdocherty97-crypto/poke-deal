@@ -47,9 +47,20 @@ test("RAW prefers smartMarketPrice from noisy ungraded aggregate, converted to G
   assert.equal(c.meanPence, usdToPence(443.9269124423963));
   assert.equal(c.lowPence, usdToPence(2));
   assert.equal(c.highPence, usdToPence(1100));
+  assert.equal(c.windowDays, 7);
   assert.equal(c.asOf, "2026-06-21T21:46:14.427Z");
   assert.equal((c.raw as { chosenPriceSource?: string; marketPrice7Day?: number }).chosenPriceSource, "smartMarketPrice");
   assert.equal((c.raw as { marketPrice7Day?: number }).marketPrice7Day, 453.7475);
+});
+
+test("Price Tracker evidence without a provider timestamp stays explicitly undated", () => {
+  const undated = structuredClone(fixture);
+  delete undated.data[0].ebay.updatedAt;
+  delete undated.data[0].ebay.salesByGrade.ungraded.lastMarketUpdate;
+
+  const c = mapCardAggregateToComp(undated, ctx("RAW"));
+
+  assert.equal(c.asOf, "unknown");
 });
 
 test("buildPokemonPriceTrackerSearch expands prefixed subset numbers for provider matching", () => {

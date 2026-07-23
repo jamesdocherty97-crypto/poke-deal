@@ -61,9 +61,13 @@ const probes: Probe[] = [
     label: "Charizard Base 4/102 RAW",
     params: { name: "Charizard", setName: "Base", number: "4/102", grade: "RAW" },
     assert: (json) => [
-      inBand(json.headline?.medianPence, 15_000, 40_000)
+      positivePence(json.headline?.medianPence) ? "" : "expected a positive headline guide",
+      json.reconciliation?.manualCheck === true
         ? ""
-        : `headline ${formatPence(json.headline?.medianPence)} outside £150-£400 band`,
+        : "vintage RAW evidence must remain manual-check",
+      hasNamedSafetyReason(json)
+        ? ""
+        : "expected a named vintage/high-value/disagreement safety reason",
       hasCardmarketTrendPriceBug(json) ? "evidence contains Cardmarket trendPrice around £3,576" : "",
       hasWrongPokeTraceCharizardRow(json) ? "evidence contains wrong-card PokeTrace row around £153" : "",
     ],
@@ -95,7 +99,10 @@ const probes: Probe[] = [
     params: { name: "Victini", setName: "Scarlet & Violet Promos", number: "SVP 208", grade: "RAW" },
     assert: (json) => {
       const primaryUnavailable = json.unavailableSources?.some((source) => source.name === "pokemon-price-tracker") === true;
-      const expectedConfidence = primaryUnavailable ? ["medium", "high"] : ["high"];
+      const identityNeedsReview = json.ambiguous === true;
+      const expectedConfidence = identityNeedsReview
+        ? ["low", "medium"]
+        : primaryUnavailable ? ["medium", "high"] : ["high"];
       return [
         normalizeIdentityPart(json.headline?.card?.name) === "victini" ? "" : "headline identity was not Victini",
         normalizeIdentityPart(json.headline?.card?.number) === "svp208" ? "" : "headline collector number was not SVP208",
@@ -106,7 +113,9 @@ const probes: Probe[] = [
         expectedConfidence.includes(json.reconciliation?.confidence ?? "")
           ? ""
           : `expected ${expectedConfidence.join("/")} confidence, got ${json.reconciliation?.confidence ?? "missing"}`,
-        json.reconciliation?.manualCheck === false ? "" : "expected manualCheck=false",
+        json.reconciliation?.manualCheck === identityNeedsReview
+          ? ""
+          : `expected manualCheck=${identityNeedsReview} for identity ambiguity=${identityNeedsReview}`,
       ];
     },
   },
@@ -130,10 +139,12 @@ printResults(results);
 
 const failed = results.filter((result) => !result.ok);
 if (failed.length > 0) {
-  console.error("\nRaw JSON for failed probes:");
-  for (const result of failed) {
-    console.error(`\n## ${result.label}`);
-    console.error(JSON.stringify(result.raw, null, 2));
+  if (process.env.VERIFY_PROD_VERBOSE === "1") {
+    console.error("\nRaw JSON for failed probes:");
+    for (const result of failed) {
+      console.error(`\n## ${result.label}`);
+      console.error(JSON.stringify(result.raw, null, 2));
+    }
   }
   process.exit(1);
 }
@@ -187,6 +198,16 @@ function formatPence(value: number | undefined): string {
 
 function inBand(value: number | undefined, low: number, high: number): boolean {
   return typeof value === "number" && value >= low && value <= high;
+}
+
+function positivePence(value: number | undefined): boolean {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function hasNamedSafetyReason(json: CompResponse): boolean {
+  return (json.reconciliation?.reasons ?? []).some((reason) =>
+    /vintage|high-value|spread|disagree|manual|low-confidence|uk-solds/i.test(reason),
+  );
 }
 
 function normalizeIdentityPart(value: string | undefined): string {

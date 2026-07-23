@@ -397,6 +397,13 @@ export function mapCardAggregateToComp(
       ? Number(agg.smartMarketPrice?.price)
       : null;
   const chosenMedianUsd = smartRawPrice && smartRawPrice > 0 ? smartRawPrice : agg.medianPrice;
+  const smartDaysUsed = Math.round(Number(agg.smartMarketPrice?.daysUsed));
+  const evidenceWindowDays =
+    smartRawPrice &&
+    Number.isFinite(smartDaysUsed) &&
+    smartDaysUsed > 0
+      ? smartDaysUsed
+      : ctx.windowDays;
   const trendPct = estimateTrendPct(card?.prices, agg);
 
   return {
@@ -409,10 +416,12 @@ export function mapCardAggregateToComp(
     lowPence: usdToPence(agg.minPrice),
     highPence: usdToPence(agg.maxPrice),
     sampleSize: Math.round(count),
-    windowDays: ctx.windowDays,
+    windowDays: evidenceWindowDays,
     trendPct,
     outliersRemoved: 0, // provider applies its own filtering (smartMarketPrice)
-    asOf: String(agg.lastMarketUpdate ?? card?.ebay?.updatedAt ?? new Date().toISOString()),
+    // Do not manufacture freshness when the provider omitted its market date.
+    // The reconciler treats this explicit sentinel as undated context.
+    asOf: String(agg.lastMarketUpdate ?? card?.ebay?.updatedAt ?? "unknown"),
     raw: {
       ...agg,
       fx: fxRateInfo(rates),

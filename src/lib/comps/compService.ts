@@ -34,6 +34,7 @@ export interface CachedCompBadge {
 export interface CachedCompRecord {
   headline: CompResult;
   reconciliation?: ReconResult;
+  sourcesDisagree?: boolean;
   cachedAt: string;
 }
 
@@ -144,7 +145,7 @@ export class CompService {
         return {
           headline: applyCachedFlag(applyReconciliation(cached.headline, reconciliation), cached.cachedAt),
           all: [applyCachedFlag(cached.headline, cached.cachedAt), ...all],
-          sourcesDisagree: false,
+          sourcesDisagree: cached.sourcesDisagree ?? false,
           reconciliation,
           unavailableSources,
           cached: { asOf: cached.cachedAt, ageHours },
@@ -261,7 +262,11 @@ function reconcileFreshResults(
   return {
     headline,
     all,
-    sourcesDisagree: detectDisagreement(all) || reconciliation.manualCheck,
+    // Disagreement is a statement about comparable exact-card evidence, not a
+    // synonym for every manual-review reason. The reconciler's diagnostics
+    // already omit hard-excluded/wrong-identity rows and include valid thin
+    // context, so use that bounded spread instead of raw provider medians.
+    sourcesDisagree: (reconciliation.selection?.spreadPct ?? 0) > 15,
     reconciliation,
     unavailableSources: unavailableFromResults(all),
   };
@@ -592,12 +597,17 @@ function pickCompForReconSource(
 
 function applyReconciliation(result: CompResult, reconciliation: ReconResult): CompResult {
   const medianPence = reconciliation.headlinePence ?? result.medianPence;
+  const meanPence = medianPence > 0 && result.meanPence <= 0 ? medianPence : result.meanPence;
+  const positiveRangeValues = [medianPence, meanPence, result.lowPence, result.highPence]
+    .filter((value) => Number.isFinite(value) && value > 0);
   return {
     ...result,
     medianPence,
-    meanPence: medianPence > 0 && result.meanPence <= 0 ? medianPence : result.meanPence,
-    lowPence: medianPence > 0 && result.lowPence <= 0 ? medianPence : result.lowPence,
-    highPence: medianPence > 0 && result.highPence <= 0 ? medianPence : result.highPence,
+    meanPence,
+    // A sanity correction (for example avg30 replacing a broken trendPrice)
+    // must not leave the displayed headline outside its own source range.
+    lowPence: positiveRangeValues.length > 0 ? Math.min(...positiveRangeValues) : 0,
+    highPence: positiveRangeValues.length > 0 ? Math.max(...positiveRangeValues) : 0,
     trendPct: reconciliation.chosenSource === reconSource(result) ? reconciliation.trendPct : result.trendPct,
     raw: {
       ...(result.raw && typeof result.raw === "object" ? result.raw : {}),

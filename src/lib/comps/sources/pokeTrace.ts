@@ -665,8 +665,9 @@ function readString(value: unknown): string | null {
 }
 
 function parseDate(value: unknown): string {
-  const date = new Date(typeof value === "string" ? value : Date.now());
-  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+  if (typeof value !== "string" || value.trim().length === 0) return "unknown";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "unknown" : date.toISOString();
 }
 
 function trendPct(tier: PokeTracePriceTier): number | null {

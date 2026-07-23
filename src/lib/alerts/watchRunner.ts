@@ -1,4 +1,5 @@
 import { createAppCompService } from "../comps/appCompLookup.js";
+import { compForAutomaticAction } from "../comps/pricing.js";
 import { getPrisma } from "../db/prisma.js";
 import type { CardRef } from "../domain/types.js";
 import { createInboxAlert } from "./inbox.js";
@@ -45,12 +46,13 @@ export async function runWatchCheck({ notify = false, limit = 10 }: { notify?: b
       language: watch.card.language,
     };
     const comps = await compService.lookup(card, { grade: watch.grade });
+    const actionableComp = compForAutomaticAction(comps);
     const hit = checkWatch({
       watchId: watch.id,
       cardName: watch.card.name,
       grade: watch.grade,
       targetPence: watch.targetPence,
-      comp: comps.headline,
+      comp: actionableComp,
     });
     if (!hit) continue;
     hits.push(hit);

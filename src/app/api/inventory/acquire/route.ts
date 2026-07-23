@@ -21,8 +21,14 @@ import { buildCheckedComp } from "@/lib/dealer/checkedComp";
 import { buildListingTitle } from "@/lib/dealer/listingDraft";
 import type { CardRef, CompResult } from "@/lib/domain/types";
 import type { ReconciledComp } from "@/lib/comps/compService";
+import type { ReconResult } from "@/lib/comps/reconciler";
 import { PrismaCheckedCompRepo, type CheckedCompDb, type CheckedCompPlatform } from "@/lib/comps/sources/checkedComps";
-import { compForAutomaticPricing, normalizeRawCondition, reviewedCompRequiresManualPricing } from "@/lib/comps/pricing";
+import {
+  compForAutomaticAction,
+  compForAutomaticPricing,
+  normalizeRawCondition,
+  reviewedCompRequiresManualPricing,
+} from "@/lib/comps/pricing";
 import { readClientMutationId } from "@/lib/offline/clientMutation";
 import { acquireRequestSchema } from "@/lib/inventory/apiSchemas";
 import { inventoryItemUiInclude } from "@/lib/inventory/apiRecord";
@@ -114,10 +120,19 @@ export async function POST(request: Request) {
             source: d.reviewedComps.headline.source,
             medianPence: d.reviewedComps.headline.medianPence,
           })
-        : Boolean(comps.reconciliation?.manualCheck);
+        : comps.reconciliation?.manualCheck !== false || comps.sourcesDisagree;
     // Keep the evidence receipt for audit/history, but never feed an explicitly
     // cautious headline into automatic listing-price generation.
-    const pricingComp = compForAutomaticPricing(checkedComp ?? comps.headline, compNeedsManualCheck);
+    const pricingComp = checkedComp || d.reviewedComps
+      ? compForAutomaticPricing(checkedComp ?? comps.headline, compNeedsManualCheck)
+      : compForAutomaticAction(comps);
+    const persistedReconciliation =
+      comps.reconciliation ??
+      receiptReconciliation(checkedComp ?? comps.headline, {
+        manualCheck: compNeedsManualCheck,
+        explicitManualCheck: d.reviewedComps?.manualCheck,
+        sourcesDisagree: checkedComp ? false : comps.sourcesDisagree,
+      });
     const responseComps = checkedComp
       ? {
           ...comps,
@@ -143,12 +158,29 @@ export async function POST(request: Request) {
       }
       const compRepo = new PrismaCompResultRepo();
       if (comps.headline && comps.headline !== checkedComp) {
-        await compRepo.create(comps.headline, { condition: compCondition }).catch((err) =>
+        await compRepo.create(comps.headline, {
+          condition: compCondition,
+          reconciliation: persistedReconciliation,
+          receipt: {
+            all: comps.all,
+            unavailableSources: comps.unavailableSources,
+            sourcesDisagree: comps.sourcesDisagree,
+            cached: comps.cached,
+          },
+        }).catch((err) =>
           console.warn("[acquire] comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
         );
       }
       if (checkedComp) {
-        await compRepo.create(checkedComp, { condition: compCondition }).catch((err) =>
+        await compRepo.create(checkedComp, {
+          condition: compCondition,
+          reconciliation: persistedReconciliation,
+          receipt: {
+            all: responseComps.all,
+            sourcesDisagree: responseComps.sourcesDisagree,
+            checkedComp: true,
+          },
+        }).catch((err) =>
           console.warn("[acquire] checked comp persistence skipped:", err instanceof Error ? err.message : "unknown"),
         );
       }
@@ -276,6 +308,28 @@ function reviewedCompResult(
   grade: CompResult["grade"],
 ): CompResult {
   return { ...result, card, grade, currency: "GBP" };
+}
+
+function receiptReconciliation(
+  headline: CompResult | null,
+  input: {
+    manualCheck: boolean;
+    explicitManualCheck?: boolean;
+    sourcesDisagree: boolean;
+  },
+): ReconResult | undefined {
+  if (!headline) return undefined;
+  const reasons: string[] = [];
+  if (input.explicitManualCheck) reasons.push("reviewed-receipt-manual-check");
+  if (input.sourcesDisagree) reasons.push("reviewed-receipt-source-disagreement");
+  if (input.manualCheck && reasons.length === 0) reasons.push("automatic-pricing-guard");
+  return {
+    headlinePence: headline.medianPence > 0 ? headline.medianPence : null,
+    confidence: "low",
+    manualCheck: input.manualCheck,
+    reasons,
+    trendPct: headline.trendPct,
+  };
 }
 
 async function replayAcquire(clientMutationId: string, strategy: "quick" | "market" | "patient") {

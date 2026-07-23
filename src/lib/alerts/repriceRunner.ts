@@ -1,5 +1,6 @@
 import { getPrisma } from "../db/prisma.js";
 import { createAppCompService } from "../comps/appCompLookup.js";
+import { compForAutomaticAction } from "../comps/pricing.js";
 import type { CardRef } from "../domain/types.js";
 import { formatRepriceDigest, recommendReprice, type RepriceRecommendation } from "./repricing.js";
 import { createInboxAlert } from "./inbox.js";
@@ -58,16 +59,17 @@ export async function runRepriceCheck({
       language: item.card.language,
     };
     const comps = await compService.lookup(card, { grade: item.grade });
+    const actionableComp = compForAutomaticAction(comps);
     const recommendation = recommendReprice({
       itemId: item.id,
       cardName: item.card.name,
       grade: item.grade,
       currentPricePence,
       costBasisPence: item.costBasis,
-      comp: comps.headline,
+      comp: actionableComp,
       condition: item.condition,
       thresholdPct,
-      sourcesDisagree: comps.sourcesDisagree,
+      sourcesDisagree: false,
     });
     if (recommendation) {
       recommendations.push(recommendation);

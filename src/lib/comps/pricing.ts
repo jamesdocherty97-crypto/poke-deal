@@ -4,6 +4,7 @@
 
 import type { CompResult, RawCondition } from "../domain/types.js";
 import { isConfident } from "./cleaning.js";
+import type { ReconciledComp } from "./compService.js";
 
 export type PricingStrategy =
   | "patient" // hold out for the top of the market (75th pct)
@@ -33,6 +34,18 @@ export interface PriceSuggestion {
 /** Manual-check evidence stays visible, but cannot enter automatic pricing. */
 export function compForAutomaticPricing(comp: CompResult | null, manualCheck: boolean): CompResult | null {
   return manualCheck ? null : comp;
+}
+
+/**
+ * Background actions must fail closed when a reconciliation verdict is absent,
+ * cautious, or internally inconsistent. The headline remains available on the
+ * receipt for human review; this helper only answers whether automation may use it.
+ */
+export function compForAutomaticAction(
+  receipt: Pick<ReconciledComp, "headline" | "reconciliation" | "sourcesDisagree">,
+): CompResult | null {
+  if (receipt.reconciliation?.manualCheck !== false || receipt.sourcesDisagree) return null;
+  return receipt.headline;
 }
 
 export function reviewedCompRequiresManualPricing(input: {

@@ -57,6 +57,15 @@ test("RAW maps the stable TCGPlayer near-mint baseline when present", () => {
   );
 });
 
+test("PokeTrace evidence without a provider timestamp stays explicitly undated", () => {
+  const undated = structuredClone(fixture);
+  delete undated.data[0].lastUpdated;
+
+  const comp = mapPokeTraceCardsToComp(undated, ctx("RAW"));
+
+  assert.equal(comp.asOf, "unknown");
+});
+
 test("RAW prefers a strong eBay sold aggregate over a higher US market baseline", () => {
   const comp = mapPokeTraceCardsToComp(
     {

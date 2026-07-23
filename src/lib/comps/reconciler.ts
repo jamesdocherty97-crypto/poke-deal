@@ -136,6 +136,20 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
 
   const eligible = states.filter((state) => !state.excluded && !state.corroborationOnly && state.weight >= 0.1);
   if (eligible.length === 0) {
+    const indicative = pickIndicativeFallback(states, query);
+    if (indicative) {
+      const fallbackReason = `indicative-fallback:${indicative.chosen.candidate.source}`;
+      indicative.chosen.reasons.push(fallbackReason);
+      return {
+        headlinePence: indicative.chosen.valuePence,
+        confidence: "low",
+        manualCheck: true,
+        reasons: [...reasons, fallbackReason, "low-confidence-headline"],
+        chosenSource: indicative.chosen.candidate.source,
+        trendPct: indicative.chosen.trendPct,
+        selection: buildSelectionDiagnostics(indicative.chosen, indicative.comparable),
+      };
+    }
     const corroboration = bestCorroborationOnly(states);
     return {
       headlinePence: null,
@@ -148,6 +162,13 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
 
   const chosen = pickEligibleHeadline(eligible);
   const peers = eligible.filter((state) => state.weight >= 0.3 * chosen.weight);
+  const comparable = states.filter(
+    (state) =>
+      !state.excluded &&
+      state.valuePence > 0 &&
+      state.n > 0 &&
+      candidateMatchesQueryExactly(state.candidate, query),
+  );
   const spreadPeer = spreadRatio(peers.map((state) => state.valuePence));
   const spreadAll = spreadRatio(eligible.map((state) => state.valuePence));
   const everyEligibleHeavyPenalty = eligible.every((state) => state.qualityPenaltyProduct < 0.5);
@@ -159,6 +180,15 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
       !state.excluded &&
       state.corroborationOnly &&
       state.valuePence > 0 &&
+      spreadRatio([state.valuePence, chosen.valuePence]) > 1.4,
+  );
+  const subthresholdEvidenceDisagrees = comparable.some(
+    (state) =>
+      !state.corroborationOnly &&
+      state.weight > 0 &&
+      state.weight < 0.1 &&
+      state.qualityPenaltyProduct > MIN_INDICATIVE_QUALITY &&
+      state.candidate.source !== "pt-smart" &&
       spreadRatio([state.valuePence, chosen.valuePence]) > 1.4,
   );
   const staleConsensusManualCheck = newestEligibleAgeDays(eligible) > 45;
@@ -201,6 +231,7 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     dominantOutlierExcluded ||
     ownedDeviation ||
     staleCorroborationDisagrees ||
+    subthresholdEvidenceDisagrees ||
     staleConsensusManualCheck ||
     gradeBleedManualCheck ||
     fxAgedManualCheck ||
@@ -224,6 +255,7 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     fxAged ? "fx-aged" : null,
     ukSoldsDisagree ? "uk-solds-disagree" : null,
     regionalHighValueManualCheck ? "high-value-without-uk-solds" : null,
+    subthresholdEvidenceDisagrees ? "subthreshold-evidence-disagrees" : null,
     shouldManualCheckForSpread ? "cross-source-spread" : null,
     // Every manual check must carry a nameable cause in the receipt.
     lowConfidenceManualCheck ? "low-confidence-headline" : null,
@@ -238,7 +270,7 @@ export function reconcileComps(query: ReconQuery, candidates: ReconCandidate[]):
     reasons: finalReasons.length > 0 ? finalReasons : ["reconciled-cleanly"],
     chosenSource: chosen.candidate.source,
     trendPct: chosen.trendPct,
-    selection: buildSelectionDiagnostics(chosen, eligible),
+    selection: buildSelectionDiagnostics(chosen, comparable),
   };
 }
 
@@ -266,7 +298,11 @@ function buildSelectionDiagnostics(chosen: CandidateState, eligible: CandidateSt
       ? `${chosen.n} weighted samples (${chosen.candidate.n} reported approx)`
       : `${chosen.n} sample${chosen.n === 1 ? "" : "s"}`,
     freshness,
-    corroboratingCount > 0 ? `${corroboratingCount} corroborating source${corroboratingCount === 1 ? "" : "s"}` : "best eligible evidence",
+    corroboratingCount > 0
+      ? `${corroboratingCount} corroborating source${corroboratingCount === 1 ? "" : "s"}`
+      : chosen.reasons.some((reason) => reason.startsWith("indicative-fallback:"))
+        ? "best available guide"
+        : "best eligible evidence",
   ].join(" · ");
   return {
     sourceTier: TIER_WEIGHT[chosen.candidate.source],
@@ -303,11 +339,19 @@ function humanReconSource(source: ReconSource): string {
 function initialState(candidate: ReconCandidate): CandidateState {
   const reportedN = Math.round(candidate.n);
   const effectiveN = candidate.sampleSizeApproximate ? Math.min(reportedN, APPROX_SAMPLE_WEIGHT_CAP) : Math.round(candidate.n);
+  const candidateAgeDays = candidate.ageDays;
   return {
     candidate,
     valuePence: Math.round(candidate.valuePence),
     n: effectiveN,
-    ageDays: candidate.ageDays ?? Number.POSITIVE_INFINITY,
+    // Unknown, negative and otherwise malformed provider dates are not fresh
+    // evidence. Treat them as undated so they can only provide context.
+    ageDays:
+      typeof candidateAgeDays === "number" &&
+      Number.isFinite(candidateAgeDays) &&
+      candidateAgeDays >= 0
+        ? candidateAgeDays
+        : Number.POSITIVE_INFINITY,
     excluded: false,
     corroborationOnly: false,
     reasons: [
@@ -344,7 +388,13 @@ function applyIdentityGate(state: CandidateState, query: ReconQuery): void {
 
 function applyValidityGate(state: CandidateState): void {
   if (state.excluded) return;
-  if (state.valuePence <= 0 || state.valuePence > 100_000_000 || state.n <= 0) {
+  if (
+    !Number.isFinite(state.valuePence) ||
+    !Number.isFinite(state.n) ||
+    state.valuePence <= 0 ||
+    state.valuePence > 100_000_000 ||
+    state.n <= 0
+  ) {
     exclude(state, `invalid-value:${state.candidate.source}`);
   }
 }
@@ -526,6 +576,75 @@ function bestCorroborationOnly(states: CandidateState[]): CandidateState | null 
   return pool.reduce((best, state) => (state.n > best.n ? state : best));
 }
 
+/**
+ * A valid but very thin signal is more useful than a blank result as long as
+ * it remains visibly low-confidence and cannot feed automatic offer maths.
+ * Hard exclusions and exact-identity requirements still win.
+ *
+ * RAW catalog data has its own deliberately wider freshness window: it is
+ * broad market context rather than a sold-comps claim. Other fallback signals
+ * must be recent, unpenalised enough, and eligible to headline in their own
+ * right. Keeping the policies separate avoids the old non-monotone behaviour
+ * where adding an unrelated thin sale could unlock an otherwise rejected
+ * catalog row.
+ */
+function pickIndicativeFallback(
+  states: CandidateState[],
+  query: ReconQuery,
+): { chosen: CandidateState; comparable: CandidateState[] } | null {
+  const comparable = states.filter(
+    (state) =>
+      !state.excluded &&
+      state.valuePence > 0 &&
+      state.n > 0 &&
+      candidateMatchesQueryExactly(state.candidate, query),
+  );
+
+  if (query.gradeBucket === "RAW") {
+    const catalogGuide = comparable
+      .filter(
+        (state) =>
+          state.candidate.source === "tcg-market" &&
+          Number.isFinite(state.ageDays) &&
+          state.ageDays <= MAX_INDICATIVE_CATALOG_AGE_DAYS,
+      )
+      .sort((a, b) => {
+        if (a.ageDays !== b.ageDays) return a.ageDays - b.ageDays;
+        return b.weight - a.weight;
+      })[0];
+    if (catalogGuide) return { chosen: catalogGuide, comparable };
+  }
+
+  const thin = comparable.filter(
+    (state) =>
+      !state.corroborationOnly &&
+      state.candidate.source !== "pt-smart" &&
+      state.candidate.source !== "tcg-market" &&
+      state.weight > 0 &&
+      state.qualityPenaltyProduct > MIN_INDICATIVE_QUALITY &&
+      Number.isFinite(state.ageDays) &&
+      state.ageDays <= MAX_INDICATIVE_NON_CATALOG_AGE_DAYS,
+  );
+  if (thin.length === 0) return null;
+
+  return { chosen: pickEligibleHeadline(thin), comparable };
+}
+
+function candidateMatchesQueryExactly(candidate: ReconCandidate, query: ReconQuery): boolean {
+  // Recon candidates intentionally omit names, so a fallback needs at least
+  // one stable card identifier before it can be called exact-card evidence.
+  if (!query.setId && !query.cardNumber) return false;
+  if (query.setId && candidate.matchedSetId !== query.setId) return false;
+  if (
+    query.cardNumber &&
+    (!candidate.matchedCardNumber || !numbersMatch(candidate.matchedCardNumber, query.cardNumber))
+  ) {
+    return false;
+  }
+  if (query.language && candidate.matchedLanguage !== query.language) return false;
+  return true;
+}
+
 function confidenceFor(input: {
   chosen: CandidateState;
   peers: CandidateState[];
@@ -656,3 +775,6 @@ function positiveFinite(value: number | undefined): number | null {
 
 const GROSS_CHECKED_COMP_SPREAD_LIMIT = 4;
 const APPROX_SAMPLE_WEIGHT_CAP = 50;
+const MAX_INDICATIVE_CATALOG_AGE_DAYS = 365;
+const MAX_INDICATIVE_NON_CATALOG_AGE_DAYS = 90;
+const MIN_INDICATIVE_QUALITY = 0.5;

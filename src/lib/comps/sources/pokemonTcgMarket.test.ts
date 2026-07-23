@@ -57,6 +57,22 @@ test("PokemonTcgMarketSource returns a low-confidence RAW market baseline", asyn
   assert.equal((comp.raw as { chosenSignal?: { source?: string } }).chosenSignal?.source, "cardmarket");
 });
 
+test("catalog market evidence without a provider date stays explicitly undated", () => {
+  const undated = {
+    ...catalogCard,
+    priceSignals: catalogCard.priceSignals.map(({ updatedAt: _updatedAt, ...signal }) => signal),
+  };
+
+  const comp = mapCatalogCardToMarketComp(undated, {
+    source: "pokemon-tcg-market",
+    card: inputCard,
+    grade: "RAW",
+    windowDays: 30,
+  });
+
+  assert.equal(comp.asOf, "unknown");
+});
+
 test("PokemonTcgMarketSource prefers first-edition catalog prices when requested", async () => {
   const catalog: CatalogSource = {
     name: "fake-catalog",

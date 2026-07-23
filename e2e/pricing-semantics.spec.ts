@@ -142,6 +142,28 @@ test("buy flow names what the dealer paid separately from suggested and chosen s
   });
 });
 
+test("indicative catalog evidence stays visible but cannot create prices, offers, targets or grading EV", async ({ context, page }) => {
+  const ledger = new IndicativePricingLedger();
+  await mockPricingApis(context, ledger);
+
+  await page.goto("/?view=buy");
+  await page.getByLabel("Smart comp search").fill("Norman Paradox Rift 237/182 RAW");
+  await page.getByRole("button", { name: "Comp current card" }).click();
+
+  const compPanel = page.locator(".comp-panel");
+  await expect(compPanel.getByRole("heading", { name: "No auto-offer" })).toBeVisible();
+  await expect(compPanel.getByText("Unverified provider range", { exact: true })).toBeVisible();
+  await expect(compPanel.getByText("£4.00", { exact: true }).first()).toBeVisible();
+  await expect(compPanel.getByText(/Guide only/).first()).toBeVisible();
+  await expect(compPanel.locator(".verdict-watch-action")).toBeDisabled();
+  await expect(page.locator(".quick-stock-card")).toHaveCount(0);
+  await expect(page.locator(".grade-lab")).toHaveCount(0);
+  await expect(page.locator(".watch-panel")).toHaveCount(0);
+  await expect(page.locator(".buy-target-presets")).toHaveCount(0);
+  await expect(page.locator(".fallback-stock-panel")).toContainText("price later");
+  expect(ledger.acquireBody).toBeNull();
+});
+
 test("high-value Rayquaza disagreement shows the traceable UK range and never auto-offers", async ({ context, page }) => {
   const ledger = new RayquazaPricingLedger();
   await mockPricingApis(context, ledger);
@@ -155,19 +177,17 @@ test("high-value Rayquaza disagreement shows the traceable UK range and never au
   await expect(compPanel.getByText("eBay UK sold range", { exact: true })).toBeVisible();
   await expect(compPanel.getByText("£450.00–£750.00", { exact: true })).toBeVisible();
   await expect(compPanel.getByText(/3 traceable UK solds/).first()).toBeVisible();
+  await expect(compPanel.locator(".verdict-watch-action")).toBeDisabled();
+  await expect(page.locator(".quick-stock-card")).toHaveCount(0);
+  await expect(page.locator(".grade-lab")).toHaveCount(0);
+  await expect(page.locator(".watch-panel")).toHaveCount(0);
+  await expect(page.locator(".buy-target-presets")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Just bought it" }).click();
-  const stockCard = page.locator(".quick-stock-card");
-  await stockCard.getByLabel(/^What I paid/).fill("500.00");
-  await expect(stockCard.getByText("Suggested list price", { exact: true }).locator("..")).toContainText("£550.00");
-  await expect(stockCard).not.toContainText("Suggested list price £1039.81");
-  await stockCard.getByText("Change listing plan", { exact: true }).click();
-  await stockCard.getByRole("button", { name: "Stock only", exact: true }).click();
-  await stockCard.getByRole("button", { name: "Confirm stock", exact: true }).click();
-
-  await expect.poll(() => ledger.acquireBody).not.toBeNull();
-  expect(ledger.acquireBody?.reviewedComps).toMatchObject({ manualCheck: true });
-  expect(ledger.acquireBody).not.toHaveProperty("listPricePence");
+  const manualStock = page.locator(".fallback-stock-panel");
+  await expect(manualStock).toBeVisible();
+  await expect(manualStock).toContainText("price later");
+  await expect(manualStock).not.toContainText("Suggested list price");
+  expect(ledger.acquireBody).toBeNull();
 });
 
 test("one traceable Rayquaza sale leads the UI without becoming an automatic comp", async ({ context, page }) => {
@@ -430,6 +450,67 @@ class RayquazaPricingLedger extends PricingLedger {
       { ...base, sequence: 2, type: "source", source: { name: checked.source, live: true }, status: "priced", latencyMs: 10, completed: 1, total: 2, result: checked, receipt },
       { ...base, sequence: 3, type: "source", source: { name: poketrace.source, live: true }, status: "priced", latencyMs: 12, completed: 2, total: 2, result: poketrace, receipt },
       { ...base, sequence: 4, type: "receipt", latencyMs: 14, receipt },
+    ];
+  }
+}
+
+class IndicativePricingLedger extends PricingLedger {
+  override compEvents() {
+    const asOf = "2026-07-13T20:00:00.000Z";
+    const guide = {
+      source: "pokemon-tcg-market",
+      card: CARD,
+      grade: "RAW",
+      currency: "GBP",
+      medianPence: 400,
+      meanPence: 400,
+      lowPence: 400,
+      highPence: 400,
+      sampleSize: 1,
+      windowDays: 30,
+      trendPct: null,
+      outliersRemoved: 0,
+      asOf,
+      raw: { kind: "catalog-market-baseline" },
+    };
+    const receipt = {
+      headline: guide,
+      all: [guide],
+      sourcesDisagree: false,
+      reconciliation: {
+        headlinePence: 400,
+        confidence: "low",
+        manualCheck: true,
+        reasons: ["indicative-fallback:tcg-market", "low-confidence-headline"],
+        chosenSource: "tcg-market",
+        trendPct: null,
+        selection: {
+          sourceTier: 0.65,
+          region: "EU",
+          sampleSize: 1,
+          ageDays: 30,
+          corroboratingCount: 0,
+          appliedPenalties: [],
+          spreadPence: 0,
+          spreadPct: 0,
+          lowPence: 400,
+          highPence: 400,
+          crossSourceLowPence: 400,
+          crossSourceHighPence: 400,
+          chosenBecause: "EU catalog market · 1 sample · 30d old · best available guide",
+        },
+      },
+      catalog: CARD,
+      alternatives: [],
+      ambiguous: false,
+      psaCert: null,
+      cardImage: { imageUrl: CARD.imageUrl, source: "catalog", listingSafe: true },
+    };
+    const base = { version: 1, lookupId: "lookup-fixture-indicative", emittedAt: asOf };
+    return [
+      { ...base, sequence: 1, type: "catalog", requested: CARD, identity: CARD, grade: "RAW", catalog: CARD, ambiguity: false, sources: [{ name: guide.source, live: true }] },
+      { ...base, sequence: 2, type: "source", source: { name: guide.source, live: true }, status: "priced", latencyMs: 10, completed: 1, total: 1, result: guide, receipt },
+      { ...base, sequence: 3, type: "receipt", latencyMs: 12, receipt },
     ];
   }
 }

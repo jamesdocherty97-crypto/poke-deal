@@ -103,6 +103,7 @@ export class PrismaCompResultRepo {
   async create(comp: CompResult, audit: CompResultAuditData = {}): Promise<PersistedCompResultRecord> {
     const card = await this.cardCache.resolve(comp.card);
     const reconciliation = audit.reconciliation;
+    const receipt = persistedReceipt(audit.receipt, reconciliation);
     const row = await this.db.compResult.create({
       data: {
         cardId: card.id,
@@ -126,7 +127,7 @@ export class PrismaCompResultRepo {
               reasons: toJsonValue(reconciliation.reasons),
             }
           : {}),
-        ...(audit.receipt === undefined ? {} : { receipt: toJsonValue(audit.receipt) }),
+        ...(receipt === undefined ? {} : { receipt: toJsonValue(receipt) }),
       },
     });
 
@@ -146,13 +147,21 @@ export class PrismaCompResultRepo {
   }
 
   async findLatest(cardRef: CompResult["card"], grade: Grade, condition?: RawCondition): Promise<CompResult | null> {
+    return (await this.findLatestRecord(cardRef, grade, condition))?.headline ?? null;
+  }
+
+  async findLatestRecord(
+    cardRef: CompResult["card"],
+    grade: Grade,
+    condition?: RawCondition,
+  ): Promise<CachedCompRecord | null> {
     const card = await this.cardCache.resolve(cardRef);
     const row = await this.db.compResult.findFirst({
       where: { cardId: card.id, grade, condition: condition ?? null },
       orderBy: { createdAt: "desc" },
     });
     if (!row) return null;
-    return {
+    const headline: CompResult = {
       source: row.source,
       card: {
         id: card.id,
@@ -180,6 +189,12 @@ export class PrismaCompResultRepo {
         condition: normalizePersistedCondition(row.condition),
       },
     };
+    return {
+      headline,
+      reconciliation: persistedReconciliation(row),
+      sourcesDisagree: persistedSourcesDisagree(row),
+      cachedAt: row.createdAt.toISOString(),
+    };
   }
 }
 
@@ -187,13 +202,7 @@ export class PrismaLastKnownCompCache implements LastKnownCompCache {
   constructor(private readonly repo = new PrismaCompResultRepo()) {}
 
   async get(card: CompResult["card"], query: CompQuery): Promise<CachedCompRecord | null> {
-    const headline = await this.repo.findLatest(card, query.grade ?? "RAW", query.condition);
-    if (!headline) return null;
-    const cachedAt =
-      headline.raw && typeof headline.raw === "object" && "cachedAt" in headline.raw && typeof headline.raw.cachedAt === "string"
-        ? headline.raw.cachedAt
-        : headline.asOf;
-    return { headline, cachedAt };
+    return this.repo.findLatestRecord(card, query.grade ?? "RAW", query.condition);
   }
 }
 
@@ -203,9 +212,53 @@ function normalizePersistedCondition(value: string | null | undefined): RawCondi
 
 function parseDate(value: string): Date {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? new Date() : date;
+  return Number.isNaN(date.getTime()) ? new Date(0) : date;
 }
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function persistedReceipt(receipt: unknown, reconciliation: ReconResult | undefined): unknown {
+  if (!reconciliation) return receipt;
+  if (isRecord(receipt)) return { ...receipt, reconciliation };
+  if (receipt === undefined) return { reconciliation };
+  return { evidence: receipt, reconciliation };
+}
+
+function persistedReconciliation(row: DbCompResult): ReconResult | undefined {
+  const exact = parseReconciliation(isRecord(row.receipt) ? row.receipt.reconciliation : undefined);
+  if (exact) return exact;
+  if (!isReconConfidence(row.confidence) || typeof row.manualCheck !== "boolean") return undefined;
+  return {
+    headlinePence: row.medianPence > 0 ? row.medianPence : null,
+    confidence: row.confidence,
+    manualCheck: row.manualCheck,
+    reasons: Array.isArray(row.reasons)
+      ? row.reasons.filter((reason): reason is string => typeof reason === "string")
+      : [],
+    trendPct: row.trendPct,
+  };
+}
+
+function persistedSourcesDisagree(row: DbCompResult): boolean | undefined {
+  const receipt = isRecord(row.receipt) ? row.receipt : undefined;
+  return typeof receipt?.sourcesDisagree === "boolean" ? receipt.sourcesDisagree : undefined;
+}
+
+function parseReconciliation(value: unknown): ReconResult | undefined {
+  if (!isRecord(value)) return undefined;
+  if (!isReconConfidence(value.confidence) || typeof value.manualCheck !== "boolean") return undefined;
+  if (!Array.isArray(value.reasons) || !value.reasons.every((reason) => typeof reason === "string")) return undefined;
+  if (value.headlinePence !== null && typeof value.headlinePence !== "number") return undefined;
+  if (value.trendPct !== null && typeof value.trendPct !== "number") return undefined;
+  return value as unknown as ReconResult;
+}
+
+function isReconConfidence(value: unknown): value is ReconResult["confidence"] {
+  return value === "high" || value === "medium" || value === "low";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
