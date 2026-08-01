@@ -23,7 +23,11 @@ export function evaluateScanBudget(
 }
 
 export function hashScanSession(token: string, secret = scanBudgetSecret()): string {
-  return createHmac("sha256", secret).update(token).digest("hex").slice(0, 40);
+  return createHmac("sha256", secret)
+    .update("poke-deal:scan-budget:v1\0")
+    .update(token)
+    .digest("hex")
+    .slice(0, 40);
 }
 
 export function scanSessionTokenFromRequest(request: Request): string {
@@ -141,7 +145,7 @@ function boundedEnvInt(name: string, fallback: number, min: number, max: number)
 function scanBudgetSecret(): string {
   return process.env.SCAN_BUDGET_SECRET?.trim()
     || process.env.CRON_SECRET?.trim()
-    || process.env.APP_PASSWORD?.trim()
+    || process.env.APP_SESSION_SECRET?.trim()
     || "poke-deal-local-scan-budget";
 }
 

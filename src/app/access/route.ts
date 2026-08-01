@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import {
   APP_ACCESS_COOKIE,
+  APP_ACCESS_COOKIE_ATTRIBUTES,
   APP_ACCESS_SESSION_TTL_SECONDS,
   createAccessSession,
   isValidAccessToken,
-  readPasswordlessAccessConfig,
+  readTrustedDeviceAccessConfig,
 } from "../../lib/auth/accessSession";
+import { readBoundedJson } from "../../lib/http/boundedJson";
+import { accessPage } from "../../lib/auth/accessPage";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +18,7 @@ function securityHeaders(nonce?: string): Record<string, string> {
   return {
     "Cache-Control": "no-store, max-age=0",
     "Content-Security-Policy": nonce
-      ? `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+      ? `default-src 'none'; img-src data:; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
       : "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
@@ -24,8 +27,8 @@ function securityHeaders(nonce?: string): Record<string, string> {
 }
 
 export function GET() {
-  if (!readPasswordlessAccessConfig()) {
-    return new NextResponse("Poke Deal access links are not configured.", {
+  if (!readTrustedDeviceAccessConfig()) {
+    return new NextResponse("Poke Deal trusted-device access is not configured.", {
       status: 503,
       headers: { ...securityHeaders(), "Content-Type": "text/plain; charset=UTF-8" },
     });
@@ -39,7 +42,7 @@ export function GET() {
 }
 
 export async function POST(request: Request) {
-  const config = readPasswordlessAccessConfig();
+  const config = readTrustedDeviceAccessConfig();
   if (!config) {
     return NextResponse.json(
       { ok: false },
@@ -47,8 +50,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const requestUrl = new URL(request.url);
-  if (request.headers.get("origin") !== requestUrl.origin) {
+  if (!isSameOrigin(request)) {
     return NextResponse.json(
       { ok: false },
       { status: 403, headers: securityHeaders() },
@@ -61,28 +63,20 @@ export async function POST(request: Request) {
     );
   }
 
-  const declaredLength = Number(request.headers.get("content-length") ?? "0");
-  if (!Number.isFinite(declaredLength) || declaredLength < 0 || declaredLength > MAX_BODY_BYTES) {
+  const body = await readBoundedJson<unknown>(request, MAX_BODY_BYTES);
+  if (!body.ok) {
     return NextResponse.json(
       { ok: false },
-      { status: 413, headers: securityHeaders() },
+      { status: body.status, headers: securityHeaders() },
     );
   }
-
-  const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
+  if (!body.value || typeof body.value !== "object" || Array.isArray(body.value)) {
     return NextResponse.json(
       { ok: false },
-      { status: 413, headers: securityHeaders() },
+      { status: 400, headers: securityHeaders() },
     );
   }
-
-  let token: unknown;
-  try {
-    token = (JSON.parse(rawBody) as { token?: unknown }).token;
-  } catch {
-    token = undefined;
-  }
+  const token = (body.value as Record<string, unknown>).token;
   if (!(await isValidAccessToken(token, config.accessToken))) {
     return NextResponse.json(
       { ok: false },
@@ -94,62 +88,58 @@ export async function POST(request: Request) {
   response.cookies.set({
     name: APP_ACCESS_COOKIE,
     value: await createAccessSession(config.sessionSecret),
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-    path: "/",
+    ...APP_ACCESS_COOKIE_ATTRIBUTES,
     maxAge: APP_ACCESS_SESSION_TTL_SECONDS,
   });
   return response;
 }
 
-function accessPage(nonce: string): string {
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <link rel="icon" href="data:," />
-  <title>Unlock Poke Deal</title>
-  <style nonce="${nonce}">
-    :root { color-scheme: dark; --bg: #080b13; --ink: #f8fbff; --muted: #aeb9cf; --yellow: #ffcb05; --red: #ef3340; --blue: #2a75bb; }
-    * { box-sizing: border-box; }
-    body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: radial-gradient(circle at 72% 18%, rgba(255,203,5,.2), transparent 24%), linear-gradient(140deg, rgba(239,51,64,.22), rgba(42,117,187,.18) 48%, var(--bg)); color: var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    main { display: grid; justify-items: center; gap: 16px; width: min(420px, calc(100vw - 32px)); padding: 28px 22px; text-align: center; }
-    .ball { position: relative; width: 96px; height: 96px; border: 5px solid #101827; border-radius: 999px; background: linear-gradient(#f8fbff 0 48%, #101827 48% 52%, var(--red) 52% 100%); box-shadow: inset 0 0 0 5px rgba(255,255,255,.78), 0 18px 48px rgba(0,0,0,.4); }
-    .ball::before { position: absolute; inset: 50% auto auto 50%; width: 28px; height: 28px; content: ""; border: 5px solid #101827; border-radius: inherit; background: #f8fbff; transform: translate(-50%, -50%); }
-    h1 { margin: 0; font-size: 36px; line-height: 1; }
-    p { max-width: 32ch; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
-  </style>
-</head>
-<body>
-  <main>
-    <span class="ball" aria-hidden="true"></span>
-    <h1>Unlocking Poke Deal</h1>
-    <p id="status" role="status" aria-live="polite">Securing this browser session…</p>
-  </main>
-  <script nonce="${nonce}">
-    (() => {
-      const status = document.getElementById("status");
-      const token = location.hash.slice(1);
-      history.replaceState(null, "", "/access");
-      if (!token) {
-        status.textContent = "This access link is incomplete.";
-        return;
-      }
-      fetch("/access", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token })
-      }).then((response) => {
-        if (!response.ok) throw new Error("Access denied");
-        location.replace("/");
-      }).catch(() => {
-        status.textContent = "This access link is invalid or expired.";
-      });
-    })();
-  </script>
-</body>
-</html>`;
+export function DELETE(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json(
+      { ok: false },
+      { status: 403, headers: securityHeaders() },
+    );
+  }
+  const response = NextResponse.json({ ok: true }, {
+    headers: {
+      ...securityHeaders(),
+      "Clear-Site-Data": '"cache", "cookies", "storage"',
+    },
+  });
+  response.cookies.set({
+    name: APP_ACCESS_COOKIE,
+    value: "",
+    ...APP_ACCESS_COOKIE_ATTRIBUTES,
+    maxAge: 0,
+    expires: new Date(0),
+  });
+  return response;
+}
+
+function isSameOrigin(request: Request): boolean {
+  const suppliedOrigin = request.headers.get("origin");
+  if (!suppliedOrigin) return false;
+
+  const requestUrl = new URL(request.url);
+  if (suppliedOrigin === requestUrl.origin) return true;
+
+  // Next can canonicalise localhost in request.url during local development,
+  // while the browser and Host header use 127.0.0.1. Production proxies also
+  // commonly expose the original host/protocol through forwarded headers.
+  const forwardedHost = firstForwardedValue(request.headers.get("x-forwarded-host"));
+  const forwardedProtocol = firstForwardedValue(request.headers.get("x-forwarded-proto"));
+  const host = forwardedHost ?? request.headers.get("host");
+  const protocol = forwardedProtocol ?? requestUrl.protocol.slice(0, -1);
+  if (!host || (protocol !== "http" && protocol !== "https")) return false;
+
+  try {
+    return suppliedOrigin === new URL(`${protocol}://${host}`).origin;
+  } catch {
+    return false;
+  }
+}
+
+function firstForwardedValue(value: string | null): string | null {
+  return value?.split(",", 1)[0]?.trim() || null;
 }

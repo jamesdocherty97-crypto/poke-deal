@@ -3,14 +3,26 @@ const ACCESS_TOKEN_MAX_LENGTH = 256;
 const SESSION_VERSION = "v1";
 
 export const APP_ACCESS_COOKIE = "__Host-poke-deal-access";
+export const APP_ACCESS_COOKIE_ATTRIBUTES = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "strict",
+  path: "/",
+} as const;
 export const APP_ACCESS_SESSION_TTL_SECONDS = 60 * 60 * 24 * 180;
+export const APP_ACCESS_SESSION_RENEWAL_WINDOW_SECONDS = 60 * 60 * 24 * 30;
+const APP_ACCESS_SESSION_CLOCK_SKEW_SECONDS = 5 * 60;
 
 type AccessEnvironment = Record<string, string | undefined>;
 
-export interface PasswordlessAccessConfig {
+export interface TrustedDeviceAccessConfig {
   accessToken: string;
   sessionSecret: string;
 }
+
+export type AccessSessionStatus =
+  | { valid: false; shouldRenew: false }
+  | { valid: true; shouldRenew: boolean; expiresAt: number };
 
 function readBoundedSecret(value: string | undefined): string | null {
   const secret = value?.trim() ?? "";
@@ -19,21 +31,17 @@ function readBoundedSecret(value: string | undefined): string | null {
   return secret;
 }
 
-export function readPasswordlessAccessConfig(
+export function readTrustedDeviceAccessConfig(
   env: AccessEnvironment = process.env,
-): PasswordlessAccessConfig | null {
-  // The access link is an alternative way through an already configured gate,
-  // never a replacement for production's fail-closed APP_PASSWORD invariant.
-  if (!env.APP_PASSWORD?.trim()) return null;
-
+): TrustedDeviceAccessConfig | null {
   const accessToken = readBoundedSecret(env.APP_ACCESS_TOKEN);
   const sessionSecret = readBoundedSecret(env.APP_SESSION_SECRET);
   if (!accessToken || !sessionSecret || accessToken === sessionSecret) return null;
   return { accessToken, sessionSecret };
 }
 
-export function hasPasswordlessAccessConfig(env: AccessEnvironment = process.env): boolean {
-  return readPasswordlessAccessConfig(env) !== null;
+export function hasTrustedDeviceAccessConfig(env: AccessEnvironment = process.env): boolean {
+  return readTrustedDeviceAccessConfig(env) !== null;
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {
@@ -88,7 +96,8 @@ export async function createAccessSession(
   nowMs = Date.now(),
 ): Promise<string> {
   const expiresAt = Math.floor(nowMs / 1000) + APP_ACCESS_SESSION_TTL_SECONDS;
-  const payload = `${SESSION_VERSION}.${expiresAt}`;
+  const sessionId = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(16)));
+  const payload = `${SESSION_VERSION}.${expiresAt}.${sessionId}`;
   return `${payload}.${await sessionSignature(payload, secret)}`;
 }
 
@@ -97,23 +106,46 @@ export async function isValidAccessSession(
   secret: string,
   nowMs = Date.now(),
 ): Promise<boolean> {
-  if (!value || value.length > 256) return false;
+  return (await inspectAccessSession(value, secret, nowMs)).valid;
+}
+
+export async function inspectAccessSession(
+  value: string | undefined,
+  secret: string,
+  nowMs = Date.now(),
+): Promise<AccessSessionStatus> {
+  const invalid = { valid: false, shouldRenew: false } as const;
+  if (!value || value.length > 256) return invalid;
   const parts = value.split(".");
-  if (parts.length !== 3 || parts[0] !== SESSION_VERSION || !/^\d{10}$/u.test(parts[1] ?? "")) {
-    return false;
+  if (
+    parts.length !== 4
+    || parts[0] !== SESSION_VERSION
+    || !/^\d{10}$/u.test(parts[1] ?? "")
+    || !/^[A-Za-z0-9_-]{22}$/u.test(parts[2] ?? "")
+  ) {
+    return invalid;
   }
 
   const expiresAt = Number(parts[1]);
   const now = Math.floor(nowMs / 1000);
-  if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) return false;
-  // Reject cookies claiming a lifetime beyond the server-issued maximum.
-  if (expiresAt > now + APP_ACCESS_SESSION_TTL_SECONDS) return false;
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) return invalid;
+  // Reject cookies claiming a lifetime beyond the server-issued maximum while
+  // tolerating small clock differences between deployment instances.
+  if (expiresAt > now + APP_ACCESS_SESSION_TTL_SECONDS + APP_ACCESS_SESSION_CLOCK_SKEW_SECONDS) {
+    return invalid;
+  }
 
-  const payload = `${parts[0]}.${parts[1]}`;
+  const payload = `${parts[0]}.${parts[1]}.${parts[2]}`;
   const expected = await sessionSignature(payload, secret);
   const [providedDigest, expectedDigest] = await Promise.all([
-    sha256(parts[2] ?? ""),
+    sha256(parts[3] ?? ""),
     sha256(expected),
   ]);
-  return constantTimeBytesEqual(providedDigest, expectedDigest);
+  if (!constantTimeBytesEqual(providedDigest, expectedDigest)) return invalid;
+
+  return {
+    valid: true,
+    shouldRenew: expiresAt - now <= APP_ACCESS_SESSION_RENEWAL_WINDOW_SECONDS,
+    expiresAt,
+  };
 }

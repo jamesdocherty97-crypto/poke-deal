@@ -10,7 +10,7 @@ import {
   scrubDeletedEbayAccountPayloads,
   verifyEbayNotificationPayload,
 } from "./accountDeletion.js";
-import { isEbayAccountDeletionCallbackPath } from "./callbackPath.js";
+import { isEbayAccountDeletionCallbackPath, isEbayOauthCallbackPath } from "./callbackPath.js";
 
 test("buildAccountDeletionChallengeResponse hashes challenge, token, endpoint in eBay order", () => {
   const challengeCode = "abc123";
@@ -29,10 +29,17 @@ test("buildAccountDeletionChallengeResponse hashes challenge, token, endpoint in
   );
 });
 
-test("account deletion callback is the only eBay path exempted from Basic auth", () => {
+test("account deletion callback exemption is exact", () => {
   assert.equal(isEbayAccountDeletionCallbackPath("/api/ebay/account-deletion"), true);
   assert.equal(isEbayAccountDeletionCallbackPath("/api/ebay/status"), false);
   assert.equal(isEbayAccountDeletionCallbackPath("/api/ebay/account-deletion/other"), false);
+});
+
+test("OAuth callback exemptions are exact and exclude other eBay routes", () => {
+  assert.equal(isEbayOauthCallbackPath("/api/ebay/oauth"), true);
+  assert.equal(isEbayOauthCallbackPath("/api/ebay/oauth/callback"), true);
+  assert.equal(isEbayOauthCallbackPath("/api/ebay/oauth/other"), false);
+  assert.equal(isEbayOauthCallbackPath("/api/ebay/status"), false);
 });
 
 test("eBay notification ECC signatures are decoded and verified before processing", () => {

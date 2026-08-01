@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { trustedDeviceHeaders } from "./lib/trustedAccess.mjs";
 
 type FixtureProbe = {
   slug: string;
@@ -17,6 +18,7 @@ const probes: FixtureProbe[] = [
 ];
 
 const baseUrl = process.env.POKE_DEAL_BASE_URL ?? "http://127.0.0.1:3000";
+const requestHeaders = await trustedDeviceHeaders(baseUrl, { accept: "application/json" });
 const outputDir =
   process.env.POKE_DEAL_COMP_FIXTURE_DIR ??
   path.join(process.cwd(), "src/lib/comps/__fixtures__/live-regression");
@@ -30,12 +32,7 @@ for (const probe of probes) {
   if (probe.card.number) url.searchParams.set("number", probe.card.number);
   url.searchParams.set("grade", probe.grade);
 
-  const headers: Record<string, string> = { accept: "application/json" };
-  if (process.env.POKE_DEAL_BASIC_AUTH) {
-    headers.authorization = `Basic ${Buffer.from(process.env.POKE_DEAL_BASIC_AUTH).toString("base64")}`;
-  }
-
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, { headers: requestHeaders });
   const json = await response.json();
   if (!response.ok) {
     throw new Error(`${probe.slug} failed with ${response.status}: ${JSON.stringify(json)}`);
