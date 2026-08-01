@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allowsPublicAppAccess, requiresAppPassword } from "../auth/appAccess.js";
+import { allowsPublicAppAccess, requiresTrustedDeviceAccess } from "../auth/appAccess.js";
 import { isAuthorizedCronRequest } from "./cronAuth.js";
 
 test("isAuthorizedCronRequest accepts the exact bearer secret", () => {
@@ -14,25 +14,36 @@ test("isAuthorizedCronRequest rejects missing, wrong, and unset secrets", () => 
   assert.equal(isAuthorizedCronRequest("Basic secret123", "secret123"), false);
 });
 
-test("production deployments require the private app password", () => {
-  assert.equal(requiresAppPassword({ VERCEL_ENV: "production", NODE_ENV: "production" }), true);
-  assert.equal(requiresAppPassword({ NODE_ENV: "production" }), true);
+test("production deployments require trusted-device access", () => {
+  assert.equal(requiresTrustedDeviceAccess({ VERCEL_ENV: "production", NODE_ENV: "production" }, "poke-deal.test"), true);
+  assert.equal(requiresTrustedDeviceAccess({ NODE_ENV: "production" }, "poke-deal.test"), true);
 });
 
-test("explicit public testing mode bypasses the app password gate", () => {
+test("explicit public testing mode bypasses the trusted-device gate only on loopback", () => {
+  const env = { APP_PUBLIC_ACCESS: "true", NODE_ENV: "production" };
+  assert.equal(allowsPublicAppAccess(env, "localhost"), true);
+  assert.equal(allowsPublicAppAccess(env, "127.0.0.1"), true);
+  assert.equal(requiresTrustedDeviceAccess(env, "localhost"), false);
+  assert.equal(allowsPublicAppAccess(env, "poke-deal.test"), false);
+  assert.equal(requiresTrustedDeviceAccess(env, "poke-deal.test"), true);
+});
+
+test("every hosted Vercel environment ignores the public testing escape hatch", () => {
   const env = { APP_PUBLIC_ACCESS: "true", VERCEL_ENV: "production", NODE_ENV: "production" };
-  assert.equal(allowsPublicAppAccess(env), true);
-  assert.equal(requiresAppPassword(env), false);
+  assert.equal(allowsPublicAppAccess(env, "localhost"), false);
+  assert.equal(requiresTrustedDeviceAccess(env, "localhost"), true);
+  assert.equal(allowsPublicAppAccess({ ...env, VERCEL_ENV: "preview" }, "localhost"), false);
+  assert.equal(requiresTrustedDeviceAccess({ ...env, VERCEL_ENV: "preview" }, "localhost"), true);
 });
 
 test("public testing mode must be explicitly true", () => {
-  assert.equal(allowsPublicAppAccess({ APP_PUBLIC_ACCESS: "false" }), false);
-  assert.equal(allowsPublicAppAccess({ APP_PUBLIC_ACCESS: "1" }), false);
-  assert.equal(allowsPublicAppAccess({}), false);
+  assert.equal(allowsPublicAppAccess({ APP_PUBLIC_ACCESS: "false" }, "localhost"), false);
+  assert.equal(allowsPublicAppAccess({ APP_PUBLIC_ACCESS: "1" }, "localhost"), false);
+  assert.equal(allowsPublicAppAccess({}, "localhost"), false);
 });
 
-test("development and Vercel previews may run without the production password", () => {
-  assert.equal(requiresAppPassword({ NODE_ENV: "development" }), false);
-  assert.equal(requiresAppPassword({ VERCEL_ENV: "preview", NODE_ENV: "production" }), false);
-  assert.equal(requiresAppPassword({ VERCEL_ENV: "development", NODE_ENV: "production" }), false);
+test("local development is open but hosted previews fail closed", () => {
+  assert.equal(requiresTrustedDeviceAccess({ NODE_ENV: "development" }, "localhost"), false);
+  assert.equal(requiresTrustedDeviceAccess({ VERCEL_ENV: "preview", NODE_ENV: "production" }, "preview.test"), true);
+  assert.equal(requiresTrustedDeviceAccess({ VERCEL_ENV: "development", NODE_ENV: "production" }, "localhost"), false);
 });

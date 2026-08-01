@@ -24,6 +24,27 @@ To run the app: `npm run dev` then open `/` — the mobile-first PWA shell cover
 
 ---
 
+## Private access without a password
+
+Production uses a trusted-browser link instead of an HTTP password prompt. Configure two independent random secrets, `APP_ACCESS_TOKEN` and `APP_SESSION_SECRET`, then open this once on each browser you own:
+
+```bash
+openssl rand -hex 32 # APP_ACCESS_TOKEN
+openssl rand -hex 32 # APP_SESSION_SECRET — run separately
+```
+
+```text
+https://your-poke-deal-host/access#<APP_ACCESS_TOKEN>
+```
+
+The fragment is removed before the token is submitted. A signed, host-only `Secure`/`HttpOnly` cookie then keeps that browser trusted for 180 days and renews during normal use in the final 30 days, so day-to-day use is simply opening the app. Keep the private link in a password manager; anyone holding it can trust another browser. `APP_PASSWORD` is retired.
+
+Production and hosted previews fail closed with `503` when either secret is missing, weak, or the same. Rotating `APP_ACCESS_TOKEN` disables old unlock links without signing out trusted browsers. Rotating `APP_SESSION_SECRET` signs out every browser immediately. Maintenance scripts that target a protected deployment can receive the unlock token as `POKE_DEAL_ACCESS_TOKEN`; for a non-default host, also set `POKE_DEAL_ACCESS_ORIGIN` to that exact HTTPS origin. The scripts refuse redirects, unapproved origins, and non-loopback HTTP before sending the token.
+
+The app deliberately remains local-first after a browser is trusted: its offline shell and recent dealer data may remain in browser storage even after a server session is revoked. Use a device passcode/full-disk encryption, and clear that site's browser data before selling or handing over a device.
+
+---
+
 ## Architecture (what to understand before touching it)
 
 ```

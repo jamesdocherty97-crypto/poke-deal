@@ -1,3 +1,5 @@
+import { trustedDeviceHeaders } from "./lib/trustedAccess.mjs";
+
 type Probe = {
   slug: string;
   label: string;
@@ -42,6 +44,7 @@ type Result = {
 };
 
 const baseUrl = process.env.BASE_URL ?? "https://poke-deal.vercel.app";
+const requestHeaders = await trustedDeviceHeaders(baseUrl, { accept: "application/json" });
 
 const probes: Probe[] = [
   {
@@ -152,7 +155,7 @@ if (failed.length > 0) {
 async function fetchComp(probe: Probe): Promise<CompResponse> {
   const url = new URL("/api/comps", baseUrl);
   for (const [key, value] of Object.entries(probe.params)) url.searchParams.set(key, value);
-  const response = await fetch(url, { headers: headers() });
+  const response = await fetch(url, { headers: requestHeaders });
   const text = await response.text();
   let json: unknown;
   try {
@@ -164,13 +167,6 @@ async function fetchComp(probe: Probe): Promise<CompResponse> {
     throw new Error(`${probe.label} returned HTTP ${response.status}: ${JSON.stringify(json).slice(0, 1_000)}`);
   }
   return json as CompResponse;
-}
-
-function headers(): Record<string, string> {
-  const result: Record<string, string> = { accept: "application/json" };
-  const basic = process.env.POKE_DEAL_BASIC_AUTH ?? process.env.VERIFY_PROD_BASIC_AUTH;
-  if (basic) result.authorization = `Basic ${Buffer.from(basic).toString("base64")}`;
-  return result;
 }
 
 function printResults(results: Result[]): void {

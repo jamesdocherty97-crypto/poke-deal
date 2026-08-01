@@ -11,7 +11,7 @@ Read `README.md`, `DECISIONS.md`, and the relevant domain module before changing
 - Keep `src/lib/comps/cleaning.ts` pure and free of database, network, and framework imports.
 - Provider failures degrade to explicit unavailable/empty results; never substitute fixture prices in the app.
 - Keep inventory, listing, and sale domain logic card-agnostic where it already is.
-- Do not weaken the production password gate or expose inventory, sales, costs, provider configuration, or secrets to indexing.
+- Do not weaken the production trusted-browser gate or expose inventory, sales, costs, provider configuration, or secrets to indexing.
 
 ## Setup
 
@@ -33,7 +33,7 @@ Never run `prisma migrate dev` against a database that matters. The `20260720120
 npm run dev
 ```
 
-The app is available at `http://localhost:3000`. Local development permits an unset `APP_PASSWORD`; production fails closed without it. `APP_PUBLIC_ACCESS=true` is an explicit test-only escape hatch used for local production-mode audits and must not be enabled for a real deployment.
+The app is available at `http://localhost:3000`. Local development permits unset access secrets. Production and hosted previews fail closed unless `APP_ACCESS_TOKEN` and `APP_SESSION_SECRET` are distinct, high-entropy values. `APP_PASSWORD` is retired. `APP_PUBLIC_ACCESS=true` is an explicit test-only escape hatch for loopback production-mode audits and is ignored in every Vercel environment.
 
 Useful commands:
 
@@ -64,7 +64,8 @@ Playwright E2E tests start a disposable dev server on port 3110 and mock applica
 - Support 320px reflow, 200% zoom equivalence, safe-area insets, and `prefers-reduced-motion`.
 - Give images intrinsic dimensions, responsive `sizes`, useful alternative text when informative, and empty alt text when decorative. Defer offscreen media.
 - Preserve the established Poke Deal visual system and CSS tokens instead of introducing a competing component style.
-- Treat the workspace as private: keep `robots` noindex/disallow behavior, security headers, the Basic auth middleware, and the narrowly exempted eBay deletion callback.
+- Treat the workspace as private: keep `robots` noindex/disallow behavior, security headers, and the trusted-browser middleware. Public paths must remain an exact allowlist: the crawler policy, non-sensitive PWA install artwork, the configured `/access` exchange, and eBay routes that perform their own signed verification. Cron routes remain bearer-only even for trusted browsers.
+- Keep unlock tokens in URL fragments (`/access#TOKEN`), never query strings or logs. Sessions must stay signed, `Secure`, `HttpOnly`, host-only, and `SameSite=Strict`; the exact eBay OAuth callback remains independently state-bound because Strict cookies are not sent on the cross-site return.
 
 ## Verification and safety
 
@@ -76,6 +77,7 @@ The repository may contain user-owned uncommitted work. Inspect `git status` and
 
 - Prisma errors: verify local PostgreSQL is running, both database URLs are correct, and `npm run db:generate` has completed.
 - Provider has no data: check setup/provider health and environment configuration; do not add a fixture fallback.
-- Production returns 503: configure `APP_PASSWORD`; use public access only for a local audit process.
+- Production or a hosted preview returns 503: configure distinct, high-entropy `APP_ACCESS_TOKEN` and `APP_SESSION_SECRET` values. Never enable public access on a real deployment.
+- A browser lost or sold: rotate `APP_SESSION_SECRET` to invalidate every trusted session, and clear browser site data to remove its cached offline shell/data. Rotating only `APP_ACCESS_TOKEN` invalidates old unlock links but does not revoke existing sessions.
 - E2E port conflict: stop the process on 3110 or override `PLAYWRIGHT_PORT` and keep `PLAYWRIGHT_BASE_URL` aligned.
 - Stale PWA behavior: unregister the local service worker and clear site storage before retesting a fresh shell.

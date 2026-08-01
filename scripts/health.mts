@@ -6,6 +6,7 @@ import {
   CHECKED_COMP_ACTIVE_LISTING_INDEX,
   inspectCheckedCompActiveListingIndex,
 } from "../src/lib/db/checkedCompIndexGuard.js";
+import { trustedDeviceHeaders } from "./lib/trustedAccess.mjs";
 
 type DeepHealthSource = {
   id: string;
@@ -25,7 +26,8 @@ type DeepHealthReport = {
 
 const baseUrl = process.env.BASE_URL ?? "https://poke-deal.vercel.app";
 const url = new URL("/api/system/health", baseUrl);
-const response = await fetch(url, { headers: headers() });
+const requestHeaders = await trustedDeviceHeaders(baseUrl, { accept: "application/json" });
+const response = await fetch(url, { headers: requestHeaders });
 const text = await response.text();
 
 let report: DeepHealthReport;
@@ -66,13 +68,6 @@ if (requiredFailures.length > 0) {
 if (!response.ok) {
   console.error(`\nHealth endpoint returned HTTP ${response.status}.`);
   process.exit(response.status);
-}
-
-function headers(): Record<string, string> {
-  const result: Record<string, string> = { accept: "application/json" };
-  const basic = process.env.POKE_DEAL_BASIC_AUTH ?? process.env.VERIFY_PROD_BASIC_AUTH;
-  if (basic) result.authorization = `Basic ${Buffer.from(basic).toString("base64")}`;
-  return result;
 }
 
 async function checkedCompIndexHealth(): Promise<DeepHealthSource> {

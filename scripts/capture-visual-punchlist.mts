@@ -1,6 +1,7 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { chromium, webkit, type Browser, type BrowserType, type Page } from "playwright";
+import { trustedDeviceCookie } from "./lib/trustedAccess.mjs";
 
 type Engine = { name: "chromium" | "webkit"; launcher: BrowserType };
 type ViewportSpec = { name: string; width: number; height: number; mobile: boolean; scale: number };
@@ -12,7 +13,7 @@ type CaptureState = {
 const phase = process.argv[2] ?? "after";
 const baseUrl = process.argv[3] ?? "http://localhost:3000";
 const outDir = path.join(process.cwd(), "docs/visual-audit/punch-list-2026-07-04", phase);
-const authorizationHeader = await readBasicAuthHeader();
+const accessCookie = await trustedDeviceCookie(baseUrl);
 const engines: Engine[] = [
   { name: "chromium", launcher: chromium },
   { name: "webkit", launcher: webkit },
@@ -137,8 +138,16 @@ async function captureState(browser: Browser, engine: Engine["name"], state: Cap
     deviceScaleFactor: viewport.scale,
     isMobile: viewport.mobile,
     hasTouch: viewport.mobile,
-    extraHTTPHeaders: authorizationHeader ? { Authorization: authorizationHeader } : undefined,
   });
+  if (accessCookie) {
+    await context.addCookies([{
+      ...accessCookie,
+      url: new URL(baseUrl).origin,
+      httpOnly: true,
+      secure: new URL(baseUrl).protocol === "https:",
+      sameSite: "Strict",
+    }]);
+  }
   const page = await context.newPage();
   try {
     await state.prepare(page);
@@ -153,16 +162,6 @@ async function captureState(browser: Browser, engine: Engine["name"], state: Cap
   } finally {
     await context.close();
   }
-}
-
-async function readBasicAuthHeader(): Promise<string | undefined> {
-  const password =
-    process.env.APP_BASIC_AUTH_PASSWORD ??
-    (process.env.APP_BASIC_AUTH_PASSWORD_FILE
-      ? await readFile(process.env.APP_BASIC_AUTH_PASSWORD_FILE, "utf8").then((value) => value.trim())
-      : "");
-  if (!password) return undefined;
-  return `Basic ${Buffer.from(`codex:${password}`).toString("base64")}`;
 }
 
 async function goto(page: Page) {

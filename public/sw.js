@@ -4,7 +4,7 @@ const QUEUE_STORE = "mutation-queue";
 const COMP_STORE = "comp-cache";
 const BOOTSTRAP_STORE = "bootstrap-cache";
 const SYNC_TAG = "poke-deal-mutations";
-const SHELL_CACHE = "poke-deal-shell-v2";
+const SHELL_CACHE = "poke-deal-shell-v3";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(["/", "/manifest.webmanifest"])).catch(() => undefined));
@@ -25,7 +25,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).then((response) => {
-      if (response.ok && (response.headers.get("content-type") || "").includes("text/html")) {
+      if (url.pathname === "/" && response.ok && (response.headers.get("content-type") || "").includes("text/html")) {
         const copy = response.clone();
         caches.open(SHELL_CACHE).then((cache) => cache.put("/", copy));
       }

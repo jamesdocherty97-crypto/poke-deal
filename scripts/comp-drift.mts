@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { trustedDeviceHeaders } from "./lib/trustedAccess.mjs";
 
 type Fixture = {
   capturedAt: string;
@@ -46,6 +47,7 @@ type DriftRow = {
 };
 
 const baseUrl = process.env.BASE_URL ?? "https://poke-deal.vercel.app";
+const requestHeaders = await trustedDeviceHeaders(baseUrl, { accept: "application/json" });
 const fixtureDir = path.join(process.cwd(), "src/lib/comps/__fixtures__/live-regression");
 const reportDate = new Date().toISOString().slice(0, 10);
 const outPath = path.join(process.cwd(), `docs/COMPS_DRIFT_${reportDate}.md`);
@@ -95,7 +97,7 @@ async function fetchComp(fixture: Fixture): Promise<CompResponse> {
   if (card.tcgApiId) url.searchParams.set("tcgApiId", card.tcgApiId);
   if (fixture.request.grade) url.searchParams.set("grade", fixture.request.grade);
 
-  const response = await fetch(url, { headers: headers() });
+  const response = await fetch(url, { headers: requestHeaders });
   const text = await response.text();
   let json: unknown;
   try {
@@ -195,11 +197,4 @@ function formatPence(value: number): string {
 
 function escapeCell(value: string): string {
   return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
-}
-
-function headers(): Record<string, string> {
-  const result: Record<string, string> = { accept: "application/json" };
-  const basic = process.env.POKE_DEAL_BASIC_AUTH ?? process.env.VERIFY_PROD_BASIC_AUTH;
-  if (basic) result.authorization = `Basic ${Buffer.from(basic).toString("base64")}`;
-  return result;
 }
