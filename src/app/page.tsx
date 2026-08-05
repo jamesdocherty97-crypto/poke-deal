@@ -7808,25 +7808,6 @@ export default function Home() {
           </div>
         </div>
 
-        <nav className="primary-nav bottom-nav" aria-label="Primary">
-          <TabButton active={view === "today"} label="Today" detail="Command" onClick={() => { setMobileMoreOpen(false); setView("today"); }} />
-          <TabButton active={view === "acquire"} label="Comp / Buy" detail="Decide" className="nav-acquire" onClick={() => { setMobileMoreOpen(false); setView("acquire"); }} />
-          <TabButton active={view === "inventory"} label="Stock" detail="Vault" onClick={() => { setMobileMoreOpen(false); setView("inventory"); }} />
-          <TabButton active={view === "listings"} label="List" detail="Market" onClick={() => { setMobileMoreOpen(false); setView("listings"); }} />
-          <TabButton active={view === "pnl"} label="Profit" detail="Ledger" className="nav-profit" onClick={() => { setMobileMoreOpen(false); setView("pnl"); }} />
-          <TabButton active={view === "settings"} label="Setup" detail="Systems" className="nav-setup" onClick={() => { setMobileMoreOpen(false); setView("settings"); }} />
-          <button
-            className={`mobile-more-trigger ${mobileMoreOpen || view === "pnl" || view === "settings" ? "active" : ""}`}
-            type="button"
-            onClick={() => setMobileMoreOpen((current) => !current)}
-            aria-expanded={mobileMoreOpen}
-            aria-controls="mobile-more-menu"
-          >
-            <TabIcon label="More" />
-            <span>More</span>
-          </button>
-        </nav>
-
         <div className="topbar-actions utility-nav">
           <button
             className={`sync-status ${offlineSync.online ? "online" : "offline"} ${offlineSync.failedCount > 0 ? "error" : ""}`}
@@ -7869,6 +7850,26 @@ export default function Home() {
           </button>
         </div>
       </header>
+
+      <nav className="primary-nav bottom-nav" aria-label="Primary">
+        <TabButton active={view === "today"} label="Today" detail="Command" onClick={() => { setMobileMoreOpen(false); setView("today"); }} />
+        <TabButton active={view === "acquire"} label="Comp / Buy" detail="Decide" className="nav-acquire" onClick={() => { setMobileMoreOpen(false); setView("acquire"); }} />
+        <TabButton active={view === "inventory"} label="Stock" detail="Vault" onClick={() => { setMobileMoreOpen(false); setView("inventory"); }} />
+        <TabButton active={view === "listings"} label="List" detail="Market" onClick={() => { setMobileMoreOpen(false); setView("listings"); }} />
+        <TabButton active={view === "pnl"} label="Profit" detail="Ledger" className="nav-profit" onClick={() => { setMobileMoreOpen(false); setView("pnl"); }} />
+        <TabButton active={view === "settings"} label="Setup" detail="Systems" className="nav-setup" onClick={() => { setMobileMoreOpen(false); setView("settings"); }} />
+        <button
+          className={`mobile-more-trigger ${mobileMoreOpen || view === "pnl" || view === "settings" ? "active" : ""}`}
+          type="button"
+          onClick={() => setMobileMoreOpen((current) => !current)}
+          aria-expanded={mobileMoreOpen}
+          aria-controls="mobile-more-menu"
+          aria-label={view === "pnl" ? "More workspaces, Profit selected" : view === "settings" ? "More workspaces, Setup selected" : "More workspaces"}
+        >
+          <TabIcon label="More" />
+          <span>More</span>
+        </button>
+      </nav>
 
       {mobileMoreOpen && (
         <section className="mobile-more-menu" id="mobile-more-menu" role="dialog" aria-modal="true" aria-label="More workspaces">
