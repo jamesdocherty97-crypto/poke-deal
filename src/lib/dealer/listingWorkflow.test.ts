@@ -8,6 +8,20 @@ import {
   nextSaleListingId,
 } from "./listingWorkflow.js";
 
+test("sold stock with another active marketplace listing retains an explicit removal action", () => {
+  assert.equal(buildListingNextAction({ channel: "EBAY", state: "ACTIVE", sellable: false }).id, "remove-listing");
+  assert.equal(buildListingNextAction({ channel: "VINTED", state: "ACTIVE", sellable: false }).id, "remove-listing");
+  assert.equal(buildListingNextAction({ channel: "EBAY", state: "SOLD", sellable: false }).id, "done");
+  assert.equal(buildListingSellFlow({ channel: "EBAY", state: "ACTIVE", sellable: false }).at(-1)?.state, "current");
+});
+
+test("an ended listing's saved URL is history and cannot imply it is still live", () => {
+  const ended = { channel: "EBAY" as const, state: "ENDED", externalRef: "123", externalUrl: "https://www.ebay.co.uk/itm/123", sellable: true };
+  assert.equal(buildListingNextAction({ ...ended, ebayReady: true }).id, "publish");
+  assert.equal(buildListingNextAction({ ...ended, ebayReady: false, hasVenueAction: true }).id, "copy-open");
+  assert.notEqual(buildListingSellFlow({ ...ended, ebayReady: true }).find((step) => step.id === "publish")?.state, "done");
+});
+
 test("nextDraftListingId advances through stocked draft listings", () => {
   const listings = [
     { id: "active", state: "ACTIVE", item: {} },

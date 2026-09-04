@@ -12,6 +12,7 @@ import { addTradingFixedPriceItem } from "@/lib/ebay/trading";
 import { buildEbayTitle, type ListingPackInput } from "@/lib/dealer/listingPack";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 import { photoRequirementMessage, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
+import { validateEbayRawCondition } from "@/lib/ebay/inventoryItem";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,8 @@ type PublishListing = {
       number: string | null;
       rarity: string | null;
       language: string;
+      edition: string | null;
+      finish: string | null;
     };
     photos: Array<{ url: string; origin?: "REAL" | "SCAN" | "CATALOG" | null; order?: number | null; createdAt?: Date | string | null }>;
   };
@@ -92,6 +95,8 @@ export async function POST(
   if (listing.item.status === "SOLD") {
     return NextResponse.json({ error: "Item is already sold." }, { status: 400 });
   }
+  const conditionError = validateEbayRawCondition(listing.item.grade, listing.item.condition);
+  if (conditionError) return NextResponse.json({ error: conditionError }, { status: 400 });
   if (listing.state === "ACTIVE" && listing.externalRef && !listing.externalRef.startsWith("offer:")) {
     return NextResponse.json(
       { error: "Listing is already published on eBay.", listingId: listing.externalRef },
@@ -155,6 +160,8 @@ export async function POST(
           number: listing.item.card.number,
           rarity: listing.item.card.rarity,
           language: listing.item.card.language,
+          edition: listing.item.card.edition,
+          finish: listing.item.card.finish,
         },
         grade: listing.item.grade,
         listPricePence,
@@ -275,6 +282,8 @@ async function publishViaTradingApiFallback({
       number: listing.item.card.number,
       rarity: listing.item.card.rarity,
       language: listing.item.card.language,
+      edition: listing.item.card.edition,
+      finish: listing.item.card.finish,
     },
     grade: listing.item.grade,
     listPricePence,

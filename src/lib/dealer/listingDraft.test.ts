@@ -6,13 +6,13 @@ import { buildListingDraftDefaults, buildListingTitle, defaultManualListPricePen
 test("buildListingTitle creates descriptive marketplace-ready defaults", () => {
   assert.equal(
     buildListingTitle({ name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30", language: "EN" }, "RAW"),
-    "Pokemon TCG Gengar Lost Origin Trainer Gallery TG06/TG30 Near Mint Raw English",
+    "Pokemon TCG Gengar Lost Origin Trainer Gallery TG06/TG30 Raw English",
   );
   assert.equal(
     buildListingTitle({ name: "Gengar", setName: "Lost Origin Trainer Gallery", number: "TG06/TG30" }, "PSA_10"),
     "Pokemon TCG Gengar Lost Origin Trainer Gallery TG06/TG30 PSA 10 GEM MINT English",
   );
-  assert.equal(buildListingTitle({ name: "Bulk Pikachu" }, "RAW"), "Pokemon TCG Bulk Pikachu Near Mint Raw English");
+  assert.equal(buildListingTitle({ name: "Bulk Pikachu" }, "RAW"), "Pokemon TCG Bulk Pikachu Raw English");
 });
 
 test("defaultManualListPricePence protects a practical gross margin for manually stocked cards", () => {
@@ -30,8 +30,19 @@ test("buildListingDraftDefaults produces title and price from stock context", ()
       costBasis: 12000,
     }),
     {
-      title: "Pokemon TCG Greninja ex 214/167 Near Mint Raw English",
+      title: "Pokemon TCG Greninja ex 214/167 Raw English",
       listPricePence: 16200,
     },
   );
+});
+
+test("stock condition and printing survive draft creation", () => {
+  const draft = buildListingDraftDefaults({
+    card: { name: "Pikachu", number: "60/64", edition: "FIRST_EDITION", finish: "NORMAL" },
+    grade: "RAW",
+    condition: "DMG",
+    costBasis: 200,
+  });
+  assert.match(draft.title, /1st Edition Non-Holo DMG Raw/);
+  assert.doesNotMatch(draft.title, /Near Mint/);
 });

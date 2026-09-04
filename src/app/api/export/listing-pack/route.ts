@@ -73,6 +73,8 @@ export async function GET(request: Request) {
           number: (card.number as string | null) ?? null,
           rarity: (card.rarity as string | null) ?? null,
           language: (card.language as string | null) ?? "EN",
+          edition: (card.edition as string | null) ?? null,
+          finish: (card.finish as string | null) ?? null,
         },
         grade,
         listPricePence: listingPricePence(listing),

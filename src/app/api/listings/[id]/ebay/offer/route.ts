@@ -7,6 +7,7 @@ import { buildEbayOfferPreflight } from "@/lib/ebay/preflight";
 import { synchronizeEbayOffer, validateEbayListPricePence } from "@/lib/ebay/offerSync";
 import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
 import { photoRequirementMessage, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
+import { validateEbayRawCondition } from "@/lib/ebay/inventoryItem";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,8 @@ export async function POST(
   if (listing.item.status === "SOLD") {
     return NextResponse.json({ error: "Item is already sold." }, { status: 400 });
   }
+  const conditionError = validateEbayRawCondition(listing.item.grade, listing.item.condition);
+  if (conditionError) return NextResponse.json({ error: conditionError }, { status: 400 });
   if (listing.state === "ACTIVE" && listing.externalRef && !listing.externalRef.startsWith("offer:")) {
     return NextResponse.json(
       { error: "Listing is already published on eBay.", listingId: listing.externalRef },
@@ -67,6 +70,8 @@ export async function POST(
         number: listing.item.card.number,
         rarity: listing.item.card.rarity,
         language: listing.item.card.language,
+        edition: listing.item.card.edition,
+        finish: listing.item.card.finish,
       },
       grade: listing.item.grade,
       listPricePence,
