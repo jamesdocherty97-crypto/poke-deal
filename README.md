@@ -2,7 +2,7 @@
 
 Command centre for running a Pokémon card dealing business: **value → buy → stock → price → list → sell → book profit → reprice**. UK-relevant, GBP-native, built to be extended for months.
 
-This repo is the **frame** — the architecture and one working vertical slice, built by Claude Opus 4.8 as senior engineer. Breadth is handed to Codex (see `CODEX_BACKLOG.md`). Decisions already made are in `DECISIONS.md`. Full rationale is in the project brief.
+Poke Deal is a private, Pokémon-branded dealer workspace. The current priority is getting existing singles ready, live and sold, with reliable stock and sale records. Older briefs and backlogs record prior intent; they do not override current behaviour or the owner’s direction. See [the September reliability work](docs/DEALER_RELIABILITY_2026-09-04.md) for implemented changes, verification and deliberate deferrals.
 
 For a non-technical walkthrough of the product, daily workflows, future features and outstanding actions, see [`USER_GUIDE.md`](USER_GUIDE.md).
 
@@ -20,7 +20,7 @@ npm test               # unit tests on cleaning, currency, pricing, comps, inven
 
 `npm run demo` output (fixture data) proves the core: a Charizard ex is valued from messy mixed-currency sales (lots dropped, wrong grades excluded, outliers stripped), priced for sale, added to inventory, and its margin projected.
 
-To run the app: `npm run dev` then open `/` — the mobile-first PWA shell covers acquire, stock, listings and P&L.
+To run the app: `npm run dev` then open `/`. Today starts with existing stock and selling work; Buy, Stock, List, Profit and Setup remain available.
 
 ---
 
@@ -121,6 +121,10 @@ npm run db:studio      # browse data
 ```
 
 Money is stored as **GBP pence (Int)** throughout to avoid float drift.
+
+The September sale-ledger changes require `20260904120000_sale_ledger_snapshots` before the updated app serves a database. Back up first, then use `prisma migrate deploy` in the deployment workflow. The migration adds nullable evidence fields and a unique listing import identifier; it deliberately leaves historical amounts unconfirmed. Do not use `prisma migrate dev` on a database that matters: it can replace the hand-written partial index used for checked-comp corrections.
+
+After updating the app, reload all its open tabs. Offline storage upgrades from version 2 to 3 without deleting queued work. Retained sale receipts prevent an old cached stock row becoming available again after a successful sync.
 
 ---
 

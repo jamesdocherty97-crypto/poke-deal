@@ -1,6 +1,6 @@
 # Resolved Decisions
 
-The six open decisions from the brief (§11), settled so the build can proceed without re-litigating them. Change here if you disagree — but treat this as the source of truth Codex builds against.
+The historical decisions below record earlier intent. Current owner direction and verified behaviour take precedence when they conflict.
 
 | # | Decision | Choice | Rationale |
 |---|----------|--------|-----------|
@@ -11,12 +11,23 @@ The six open decisions from the brief (§11), settled so the build can proceed w
 | 5 | History backfill | **Accumulate forward + daily snapshots. No paid backfill day one.** | Keeps API credit burn near zero. Trend/portfolio history builds itself from the daily snapshot job. |
 | 6 | Books export | **Plain CSV v1** | Imports into anything (Xero, QuickBooks, a spreadsheet, an accountant's inbox). A targeted integration can come later if needed. |
 
+## 2026-09-04 — existing singles to paid sales
+
+- Keep the private Pokémon identity, Trainer language, artwork and glass navigation. No general inventory rebrand or framework rewrite.
+- Today leads with stock preparation, prepared drafts, live listings and removal of sold stock from other channels. Watching cards and provider setup are optional tools, not selling milestones.
+- A draft/export does not prove a live listing. Keep its preparation tasks visible until marketplace publication or explicit in-person availability.
+- Save per-copy acquisition cost at sale. Historical costs and imported fees stay provisional until checked. Amount corrections retain before/after evidence and a reason; confirmed costs do not establish payment settlement.
+- Preserve active listings for remaining copies. A sale on one channel leaves other external listings visible until withdrawn or explicitly confirmed removed.
+- Opening-stock imports use durable row/draft identifiers and resume saved progress. Original acquisition dates and known printing details are preserved.
+- Queued sales reserve stock on their device; retained acknowledgements protect stale tabs after sync. This does not promise offline coordination across different devices or marketplaces.
+- Fulfilment, refunds and marketplace payments remain in their channels. A show checkout and event reconciliation need a separate, tested workflow before vending.
+
 ## Engineering stances taken in the frame
 
 - **GBP is the only currency below the adapter boundary.** Every source converts at ingestion via `toGBP()`. No EUR/USD leaks downstream.
 - **No comp is ever a bare number.** A `CompResult` always carries `sampleSize`, `windowDays`, and outlier count. The UI must surface confidence.
 - **The cleaning engine is pure and dependency-free.** No DB, no network, no framework imports — so it's fast to test and impossible to break by accident. This is the app's core IP.
-- **Sources are swappable and degrade gracefully.** Missing API key → the adapter runs in fixture mode rather than throwing, so the whole spine is demoable offline.
+- **Sources are swappable and degrade gracefully.** Missing API key → explicit unavailable result in the app. Fixtures belong only to tests and the explicit CLI demo.
 - **The domain is card-agnostic.** Inventory/Listing/Sale reference a generic `Card`, so sports cards (§9) slot in without touching the dealer loop.
 
 ## Comp source stance
