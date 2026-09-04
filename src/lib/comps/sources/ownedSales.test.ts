@@ -52,11 +52,11 @@ test("mapOwnedSalesToComp ignores rows for the wrong grade", () => {
   assert.equal(comp.highPence, 250000);
 });
 
-test("mapOwnedSalesToComp removes buyer-paid postage from posted marketplace sales", () => {
+test("mapOwnedSalesToComp uses recorded item revenue for posted marketplace sales", () => {
   const comp = mapOwnedSalesToComp(
     [
-      ownedSale("sale_1", 5175, "2026-06-01T12:00:00.000Z", "RAW", "EBAY"),
-      ownedSale("sale_2", 6175, "2026-06-02T12:00:00.000Z", "RAW", "CARDMARKET"),
+      { ...ownedSale("sale_1", 5175, "2026-06-01T12:00:00.000Z", "RAW", "EBAY"), itemRevenue: 5000 },
+      { ...ownedSale("sale_2", 6175, "2026-06-02T12:00:00.000Z", "RAW", "CARDMARKET"), itemRevenue: 6000 },
       ownedSale("sale_3", 7000, "2026-06-03T12:00:00.000Z", "RAW", "IN_PERSON"),
     ],
     { source: "owned-sales", card, grade: "RAW", condition: "NM", windowDays: 90 },
@@ -71,11 +71,11 @@ test("mapOwnedSalesToComp removes buyer-paid postage from posted marketplace sal
   assert.equal(rawSales[0]?.itemSubtotalPence, 5000);
 });
 
-test("mapOwnedSalesToComp removes slab postage before calculating owned comps", () => {
+test("mapOwnedSalesToComp uses recorded item revenue for slab comps", () => {
   const comp = mapOwnedSalesToComp(
     [
-      ownedSale("sale_1", 10499, "2026-06-01T12:00:00.000Z", "PSA_10", "EBAY"),
-      ownedSale("sale_2", 12499, "2026-06-02T12:00:00.000Z", "PSA_10", "CARDMARKET"),
+      { ...ownedSale("sale_1", 10499, "2026-06-01T12:00:00.000Z", "PSA_10", "EBAY"), itemRevenue: 10000 },
+      { ...ownedSale("sale_2", 12499, "2026-06-02T12:00:00.000Z", "PSA_10", "CARDMARKET"), itemRevenue: 12000 },
     ],
     { source: "owned-sales", card, grade: "PSA_10", windowDays: 90 },
   );
@@ -165,6 +165,7 @@ function ownedSale(
     id,
     channel,
     salePrice,
+    itemRevenue: salePrice,
     fees: 0,
     postage: 0,
     soldAt: new Date(soldAt),
@@ -186,3 +187,25 @@ function ownedSale(
     },
   };
 }
+
+
+test("unknown shipping and invalid item revenue cannot become exact owned price evidence", () => {
+  const candidates = [
+    { ...rows[0]!, itemRevenue: null },
+    { ...rows[1]!, itemRevenue: undefined },
+    { ...rows[2]!, itemRevenue: rows[2]!.salePrice + 1 },
+  ];
+  const comp = mapOwnedSalesToComp(candidates, { source: "owned-sales", card, grade: "RAW", condition: "NM", windowDays: 90 });
+  assert.equal(comp.sampleSize, 0);
+  assert.match(String((comp.raw as { reason: string }).reason), /known item-only revenue/);
+});
+
+test("combined-shipping units use their exact recorded item revenue without repeated default postage deductions", () => {
+  const comp = mapOwnedSalesToComp([
+    { ...ownedSale("unit_1", 2588, "2026-06-01T12:00:00.000Z", "RAW", "EBAY"), itemRevenue: 2500 },
+    { ...ownedSale("unit_2", 2587, "2026-06-01T12:00:00.000Z", "RAW", "EBAY"), itemRevenue: 2500 },
+  ], { source: "owned-sales", card, grade: "RAW", condition: "NM", windowDays: 90 });
+  assert.equal(comp.sampleSize, 2);
+  assert.equal(comp.medianPence, 2500);
+  assert.equal(comp.lowPence, 2500);
+});

@@ -113,6 +113,7 @@ model CardPhoto {
 // ─────────────────────────────────────────────────────────────
 
 model Listing {
+  clientMutationId String? @unique
   id     String        @id @default(cuid())
   item   InventoryItem @relation(fields: [itemId], references: [id])
   itemId String
@@ -152,14 +153,18 @@ model Sale {
   itemId String
 
   channel          Channel
-  salePrice        Int // GBP pence — gross
+  salePrice        Int // GBP pence — gross buyer payment, including buyer-paid postage
   fees             Int      @default(0) // GBP pence — channel + payment fees
-  postage          Int      @default(0) // GBP pence — cost to me, net of what buyer paid
+  postage          Int      @default(0) // GBP pence — seller's full postage/packing cost
+  costBasis        Int? // Per-unit acquisition cost at sale; null means legacy cost is unverified
+  itemRevenue      Int? // Exact item-only revenue, excluding buyer-paid postage; null means unknown
+  costsEstimated   Boolean? // true = estimated, false = explicitly confirmed, null = legacy unknown
+  amountRevisions  Json? // Append-only before/after snapshots for confirmed financial corrections
   soldAt           DateTime @default(now())
   clientMutationId String?
   mutationIndex    Int      @default(0)
 
-  // realized profit = salePrice - fees - postage - (item.costBasis) ; computed in service layer
+  // realized profit = salePrice - fees - postage - costBasis; legacy fallback is explicitly provisional
   createdAt       DateTime         @default(now())
   ebayOrderImport EbayOrderImport?
 

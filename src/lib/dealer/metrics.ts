@@ -10,6 +10,7 @@ export interface DealerInventoryMetricItem {
   quantity: number;
   costBasisPence: number;
   createdAt: string;
+  acquiredAt?: string | null;
 }
 
 export interface DealerSaleMetricItem {
@@ -22,6 +23,11 @@ export interface DealerSaleMetricItem {
   feesPence: number;
   postagePence: number;
   costBasisPence: number;
+  costBasisEstimated?: boolean;
+  costsEstimated?: boolean;
+  itemRevenuePence?: number | null;
+  amountRevisionCount?: number;
+  undoable?: boolean;
   soldAt: string;
 }
 
@@ -37,6 +43,7 @@ export interface DealerMetrics {
   stockCount: number;
   listedCount: number;
   soldCount: number;
+  provisionalSaleCount: number;
   reservedCount: number;
   activeCostPence: number;
   soldCostPence: number;
@@ -82,6 +89,11 @@ export interface DealerSaleSummary {
   feesPence: number;
   postagePence: number;
   costBasisPence: number;
+  costBasisEstimated: boolean;
+  costsEstimated: boolean;
+  itemRevenuePence: number | null;
+  amountRevisionCount: number;
+  undoable: boolean;
   profitPence: number;
   marginPct: number | null;
   soldAt: string;
@@ -142,7 +154,7 @@ export function computeDealerMetrics(
   const unitDenominator = activeUnits + soldCount;
   const sellThroughPct = unitDenominator > 0 ? roundPct(soldCount / unitDenominator) : 0;
 
-  const ages = activeItems.map((item) => ageDays(item.createdAt, now));
+  const ages = activeItems.map((item) => ageDays(item.acquiredAt ?? item.createdAt, now));
   const averageAgeDays =
     ages.length > 0 ? Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length) : 0;
   const agedStockCount = ages.filter((age) => age >= AGED_STOCK_DAYS).length;
@@ -154,6 +166,7 @@ export function computeDealerMetrics(
     stockCount,
     listedCount,
     soldCount,
+    provisionalSaleCount: saleSummaries.filter((sale) => sale.costsEstimated || sale.costBasisEstimated).length,
     reservedCount,
     activeCostPence,
     soldCostPence,
@@ -195,6 +208,11 @@ export function summarizeSale(sale: DealerSaleMetricItem): DealerSaleSummary {
     feesPence: sale.feesPence,
     postagePence: sale.postagePence,
     costBasisPence: sale.costBasisPence,
+    costBasisEstimated: sale.costBasisEstimated ?? false,
+    costsEstimated: sale.costsEstimated !== false,
+    itemRevenuePence: sale.itemRevenuePence ?? null,
+    amountRevisionCount: sale.amountRevisionCount ?? 0,
+    undoable: sale.undoable ?? false,
     profitPence,
     marginPct: sale.salePricePence > 0 ? roundPct(profitPence / sale.salePricePence) : null,
     soldAt: sale.soldAt,

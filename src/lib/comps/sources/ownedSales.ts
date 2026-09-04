@@ -3,7 +3,7 @@ import { collectorNumberLookupParts } from "../../cards/identity.js";
 import type { CompSource } from "../CompSource.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
 import { mean, median } from "../cleaning.js";
-import { saleItemSubtotalPence, type SaleChannel } from "../../dealer/saleFees.js";
+import type { SaleChannel } from "../../dealer/saleFees.js";
 import { normalizeRawCondition } from "../pricing.js";
 
 type OwnedSaleCard = {
@@ -21,6 +21,8 @@ export type OwnedSaleRow = {
   id: string;
   channel: SaleChannel;
   salePrice: number;
+  itemRevenue?: number | null;
+  costBasis?: number | null;
   fees: number;
   postage: number;
   soldAt: Date;
@@ -88,11 +90,11 @@ export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext
   const matching = rows
     .filter((row) => row.item.grade === ctx.grade)
     .filter((row) => ctx.grade !== "RAW" || Boolean(ctx.condition && normalizeRawCondition(row.item.condition) === ctx.condition))
-    .filter((row) => row.salePrice > 0)
+    .filter((row) => row.itemRevenue != null && Number.isInteger(row.itemRevenue) && row.itemRevenue > 0 && row.itemRevenue <= row.salePrice)
     .sort((a, b) => a.soldAt.getTime() - b.soldAt.getTime());
 
   if (matching.length === 0) {
-    return emptyOwnedSalesComp(ctx, "no matching owned sales");
+    return emptyOwnedSalesComp(ctx, "no matching owned sales with known item-only revenue");
   }
 
   const prices = matching.map(ownedSaleCompPricePence);
@@ -114,7 +116,7 @@ export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext
     asOf: matching[matching.length - 1]!.soldAt.toISOString(),
     raw: {
       kind: "owned-sales",
-      caveat: "Your own sold prices for this exact card, grade and RAW condition.",
+      caveat: "Your own recorded item-only sold prices for this exact card, grade and RAW condition. Sales with unknown buyer-paid postage are excluded.",
       condition: ctx.grade === "RAW" ? ctx.condition : undefined,
       conditionMatched: true,
       sales: matching.map((row) => ({
@@ -124,7 +126,7 @@ export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext
         itemSubtotalPence: ownedSaleCompPricePence(row),
         feesPence: row.fees,
         postagePence: row.postage,
-        costBasisPence: row.item.costBasis,
+        costBasisPence: row.costBasis ?? null,
         soldAt: row.soldAt.toISOString(),
       })),
     },
@@ -132,7 +134,7 @@ export function mapOwnedSalesToComp(rows: OwnedSaleRow[], ctx: OwnedSalesContext
 }
 
 function ownedSaleCompPricePence(row: OwnedSaleRow): number {
-  return saleItemSubtotalPence(row.channel, row.salePrice, { grade: row.item.grade });
+  return row.itemRevenue!; // Only rows with explicit valid item revenue pass the evidence filter.
 }
 
 export function buildOwnedSalesWhere(card: CardRef, grade: Grade, windowDays: number): unknown {
@@ -147,6 +149,7 @@ export function buildOwnedSalesWhere(card: CardRef, grade: Grade, windowDays: nu
 
   return {
     soldAt: { gte: soldAfter },
+    itemRevenue: { gt: 0 },
     item: {
       grade,
       card: cardWhere,

@@ -96,3 +96,15 @@ test("expensesToCsv exports operating costs in GBP", () => {
   assert.match(csv, /^spent_at,category,description,currency,amount_gbp/);
   assert.match(csv, /2026-06-23T08:30:00\.000Z,TABLE_FEE,Card fair table,GBP,15\.00,IN_PERSON,Local fair,Sunday pitch/);
 });
+
+
+test("book export uses immutable sale cost and labels provisional legacy records", () => {
+  const item = { id: "item", grade: "RAW", quantity: 1, costBasis: 9900, acquiredFrom: null, acquiredAt: new Date("2026-01-01T00:00:00Z"), card: { name: "Pikachu", setName: "Base", number: "58/102", rarity: null, tcgApiId: null } };
+  const sale = { id: "sale", channel: "EBAY", salePrice: 5000, fees: 500, postage: 200, costBasis: 1800, itemRevenue: 4800, costsEstimated: true, soldAt: new Date("2026-09-04T00:00:00Z"), item };
+  const csv = booksToCsv([sale]);
+  assert.match(csv, /50\.00,5\.00,2\.00,18\.00,25\.00,50/);
+  assert.match(csv, /48\.00,SNAPSHOT,ESTIMATED,0/);
+  assert.doesNotMatch(csv, /99\.00/);
+  const legacy = booksToCsv([{ ...sale, costBasis: null, costsEstimated: null, itemRevenue: null }]);
+  assert.match(legacy, /UNVERIFIED_LEGACY,UNVERIFIED_LEGACY,0/);
+});

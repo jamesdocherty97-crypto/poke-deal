@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
+import { saleLedgerEvidence, type SaleAmounts } from "@/lib/dealer/saleLedger";
 import { buildMonthlyPnl, computeDealerMetrics, summarizeSale, type DealerStatus } from "@/lib/dealer/metrics";
 
 export const runtime = "nodejs";
@@ -18,8 +19,9 @@ type DashboardInventoryItem = {
   quantity: number;
   costBasis: number;
   createdAt: Date;
+  acquiredAt: Date;
   listings: { state: string }[];
-  sales: { id: string; channel: string; salePrice: number; fees: number; postage: number; soldAt: Date }[];
+  sales: (SaleAmounts & { id: string; channel: string; soldAt: Date })[];
 };
 
 type DashboardExpense = {
@@ -57,6 +59,7 @@ export async function GET() {
       quantity: item.quantity,
       costBasisPence: item.costBasis,
       createdAt: item.createdAt.toISOString(),
+      acquiredAt: item.acquiredAt.toISOString(),
     }));
     const metricSales = items.flatMap((item) =>
       item.sales.map((sale) => ({
@@ -68,7 +71,7 @@ export async function GET() {
         salePricePence: sale.salePrice,
         feesPence: sale.fees,
         postagePence: sale.postage,
-        costBasisPence: item.costBasis,
+        ...saleLedgerEvidence(sale, item.costBasis),
         soldAt: sale.soldAt.toISOString(),
       })),
     );
@@ -90,18 +93,23 @@ export async function GET() {
     const saleSummaries = metricSales
         .map(summarizeSale)
         .sort((a, b) => Date.parse(b.soldAt) - Date.parse(a.soldAt));
+    const salesToReconcile = saleSummaries
+      .filter((sale) => sale.costsEstimated || sale.costBasisEstimated)
+      .sort((a, b) => Date.parse(a.soldAt) - Date.parse(b.soldAt));
 
     return NextResponse.json({
       metrics: computeDealerMetrics(metricItems, metricSales, new Date(), metricExpenses),
       monthlyPnl: buildMonthlyPnl(saleSummaries, metricExpenses),
       recentSales: saleSummaries.slice(0, 8),
+      salesToReconcile: salesToReconcile.slice(0, 50),
+      salesToReconcileCount: salesToReconcile.length,
       recentExpenses: expenses.slice(0, 8).map((expense) => ({
         ...expense,
         spentAt: expense.spentAt.toISOString(),
       })),
       staleStock: metricItems
         .filter((item) => item.status !== "SOLD")
-        .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+        .sort((a, b) => Date.parse(a.acquiredAt ?? a.createdAt) - Date.parse(b.acquiredAt ?? b.createdAt))
         .slice(0, 8),
       listingsByState,
     });

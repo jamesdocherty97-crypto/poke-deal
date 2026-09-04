@@ -115,8 +115,10 @@ const RESTORE_ORDER: readonly BackupTableName[] = [
   "dealSessionLines",
   "checkedComps",
   "cardPhotos",
-  "listings",
+  // The Listing_sold_requires_sale database trigger checks each committed
+  // listing batch. Book sales first so restored SOLD listings retain history.
   "sales",
+  "listings",
   "ebayOrderImports",
   "compResults",
   "priceSnapshots",
