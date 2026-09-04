@@ -5,6 +5,8 @@ import type { TodayAction, TodayActionTarget } from "@/lib/dealer/today";
 import type { ManualCompReview } from "@/lib/comps/manualReview";
 import type { OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
 import type { LaunchPlanItem, LaunchProgress, LaunchPlanTarget } from "@/lib/dealer/launchPlan";
+import { buildSellingMission, summarizeSellingStock } from "@/lib/dealer/launchPlan";
+import type { StockReadinessItem } from "@/lib/dealer/stockReadiness";
 import type { LaunchReadinessItem, LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { ManualReviewQueue } from "./ManualReviewQueue";
@@ -64,6 +66,7 @@ type TodayProps = {
   onOpenTodayAction: (target: TodayActionTarget) => void;
   onNewBuy: () => void;
   dashboard: TodayDashboard | null;
+  stockItems?: readonly StockReadinessItem[];
   operatingSnapshot: OperatingSnapshotRow[];
   onProfit: () => void;
   firstSaleListingTarget: TodayListing | null;
@@ -104,10 +107,10 @@ type TodayProps = {
 
 export function TodayTab({
   todayActions,
-  primaryTodayAction,
   onOpenTodayAction,
   onNewBuy,
   dashboard,
+  stockItems,
   operatingSnapshot,
   onProfit,
   firstSaleListingTarget,
@@ -151,15 +154,27 @@ export function TodayTab({
   const yesterdayProfitPence = (dashboard?.recentSales ?? [])
     .filter((sale) => dateKey(new Date(sale.soldAt)) === yesterdayKey)
     .reduce((sum, sale) => sum + sale.profitPence, 0);
-  const missionIsReview = manualReviews.length > 0;
-  const missionTitle = missionIsReview
-    ? `Resolve ${manualReviews.length} cautious comp${manualReviews.length === 1 ? "" : "s"}`
-    : primaryTodayAction?.title ?? "Comp your next card";
-  const missionDetail = missionIsReview
-    ? "Compare disagreeing sources before the next buying decision."
-    : primaryTodayAction?.detail ?? "Open a clean comparison and set your maximum buy price.";
+  const sellingStock = useMemo(() => stockItems ? summarizeSellingStock(stockItems) : {
+    totalRows: dashboard?.metrics.stockCount ?? 0,
+    availableRows: (dashboard?.metrics.stockCount ?? 0) + activeListingCount,
+    preparationRows: dashboard?.metrics.stockCount ?? 0,
+    preparedDrafts: 0,
+    liveRows: activeListingCount,
+    heldRows: 0,
+    removalListings: 0,
+  }, [stockItems, dashboard?.metrics.stockCount, activeListingCount]);
+  const mission = buildSellingMission(sellingStock, dashboard?.metrics.soldCount ?? 0);
+  const missionTitle = mission.title;
+  const missionDetail = mission.detail;
+  const hasManualReviews = manualReviews.length > 0;
   const secondaryActions = todayActions
-    .filter((action) => action.id !== primaryTodayAction?.id)
+    .filter((action) => action.target !== "buy" && action.target !== "watches" && action.target !== "opening-stock")
+    .filter((action) => action.target !== mission.target && (action.id !== "first-sale" || sellingStock.liveRows > 0))
+    .map((action) => action.id === "first-sale" || action.id === "active-sales"
+      ? { ...action, title: "Record a paid sale", detail: "Only after the buyer pays; confirm actual fees and postage." }
+      : action.id === "draft-listings"
+        ? { ...action, detail: "Review condition, photos and price, then publish." }
+        : action)
     .slice(0, 4);
   const nextLaunchStep = launchPlan.find((item) => item.state !== "done") ?? launchPlan[0] ?? null;
   const readinessAttention = launchReadiness.filter((item) => item.state !== "done").slice(0, 2);
@@ -175,16 +190,11 @@ export function TodayTab({
   const saleCardImage = saleCard ? listingCardImage(saleCard) : null;
 
   function openMission() {
-    if (missionIsReview) {
-      setReviewOpen(true);
-      window.requestAnimationFrame(() => document.getElementById("manual-review-queue")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-      return;
-    }
-    if (primaryTodayAction) {
-      onOpenTodayAction(primaryTodayAction.target);
-      return;
-    }
-    onNewBuy();
+    if (mission.target === "opening-stock") onOpeningStockImport();
+    else if (mission.target === "drafts") onListingDesk();
+    else if (mission.target === "listings") onActiveListings();
+    else if (mission.target === "profit") onProfit();
+    else onInventory();
   }
 
   if (loading) return <section className="workspace today-workspace"><WorkspaceSkeleton label="Loading today's work" rows={3} /></section>;
@@ -194,33 +204,33 @@ export function TodayTab({
       <header className="workspace-masthead today-command" aria-labelledby="today-command-title">
         <div className="today-command-copy">
           <span className="workspace-eyebrow">{greeting}, Trainer · dealer command centre</span>
-          <span className={`today-command-priority ${missionIsReview ? "warn" : primaryTodayAction?.tone ?? "good"}`}>Priority one</span>
+          <span className={`today-command-priority ${sellingStock.removalListings > 0 ? "warn" : "good"}`}>Priority one</span>
           <h2 id="today-command-title">{missionTitle}</h2>
           <p>{missionDetail}</p>
           <div className="today-command-actions">
             <button type="button" className="primary-button" onClick={openMission}>
-              {missionIsReview ? "Review comps" : primaryTodayAction ? primaryActionLabel(primaryTodayAction.target) : "Comp / buy"}
+              {mission.action}
             </button>
-            <button type="button" className="ghost-button" onClick={onNewBuy}>New comp / buy</button>
+            <button type="button" className="ghost-button" onClick={onInventory}>Open stock vault</button>
           </div>
         </div>
 
-        <div className="today-command-progress" aria-label={`Dealer readiness: ${launchProgress.label}`}>
+        <div className="today-command-progress" aria-label={`First-sale quest: ${launchProgress.label}`}>
           <div className="today-command-progress-heading">
-            <span>Dealer readiness</span>
+            <span>First-sale quest</span>
             <strong>{launchProgress.label}</strong>
           </div>
           <div
             className="today-progress-track"
             role="progressbar"
-            aria-label="Dealer readiness"
+            aria-label="First-sale quest"
             aria-valuemin={0}
             aria-valuemax={launchProgress.totalCount}
             aria-valuenow={launchProgress.doneCount}
           >
             <span style={{ width: `${readinessPercent}%` }} />
           </div>
-          <p>{launchProgress.nextLabel.replace(/^Next:/, "Setup gap:")}</p>
+          <p>{launchProgress.nextLabel}</p>
           {nextLaunchStep && (
             <button type="button" className="text-button" onClick={() => onOpenLaunchPlan(nextLaunchStep.target)}>
               Next work · {nextLaunchStep.action}: {nextLaunchStep.title}
@@ -237,11 +247,20 @@ export function TodayTab({
               <h2 id="priority-queue-title">Next moves</h2>
               <p>Highest-impact work first. Clear the queue without hunting through menus.</p>
             </div>
-            <span className="pill good">{secondaryActions.length + (missionIsReview ? 1 : 0)} queued</span>
+            <span className="pill good">{secondaryActions.length} selling moves</span>
           </div>
 
           <ol className="today-action-list">
-            {missionIsReview && (
+            {secondaryActions.map((action, index) => (
+              <li key={action.id}>
+                <button className={`today-action ${action.tone}`} type="button" onClick={() => onOpenTodayAction(action.target)}>
+                  <span className="today-action-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  <span><strong>{action.title}</strong><small>{action.detail}</small></span>
+                  <b aria-hidden="true">›</b>
+                </button>
+              </li>
+            ))}
+            {hasManualReviews && (
               <li>
                 <button
                   className="today-action warn manual-review-action"
@@ -250,24 +269,15 @@ export function TodayTab({
                   aria-controls="manual-review-queue"
                   onClick={() => setReviewOpen((current) => !current)}
                 >
-                  <span className="today-action-index" aria-hidden="true">01</span>
+                  <span className="today-action-index" aria-hidden="true">＋</span>
                   <span>
-                    <strong>Professor&apos;s review</strong>
-                    <small>{manualReviews.length} cautious comp{manualReviews.length === 1 ? "" : "s"} waiting for a source check</small>
+                    <strong>Professor&apos;s review · optional research</strong>
+                    <small>{manualReviews.length} cautious comp{manualReviews.length === 1 ? "" : "s"}. Open when a buying or pricing decision needs evidence.</small>
                   </span>
                   <b aria-hidden="true">›</b>
                 </button>
               </li>
             )}
-            {secondaryActions.map((action, index) => (
-              <li key={action.id}>
-                <button className={`today-action ${action.tone}`} type="button" onClick={() => onOpenTodayAction(action.target)}>
-                  <span className="today-action-index" aria-hidden="true">{String(index + (missionIsReview ? 2 : 1)).padStart(2, "0")}</span>
-                  <span><strong>{action.title}</strong><small>{action.detail}</small></span>
-                  <b aria-hidden="true">›</b>
-                </button>
-              </li>
-            ))}
           </ol>
 
           {firstSaleListingTarget && saleCard && (
@@ -282,14 +292,15 @@ export function TodayTab({
                 />
               </div>
               <div className="deal-sleeve-ticket">
-                <span className="workspace-eyebrow">Sale ready</span>
+                <span className="workspace-eyebrow">Listed · waiting for a buyer</span>
                 <h3>{saleCard.card.name}</h3>
                 <p>{[saleCard.card.setName, saleCard.card.number, saleCard.grade].filter(Boolean).join(" · ")}</p>
                 <dl>
                   <div><dt>Channel</dt><dd>{channelLabel(firstSaleListingTarget.channel)}</dd></div>
                   <div><dt>Ask</dt><dd>{gbp(firstSaleListingTarget.listPrice ?? firstSaleListingTarget.suggestedPrice ?? 0)}</dd></div>
                 </dl>
-                <button type="button" onClick={() => onRecordSale(firstSaleListingTarget)}>Book sale</button>
+                <p>Record this sale only after payment. Complete dispatch in the marketplace.</p>
+                <button type="button" onClick={() => onRecordSale(firstSaleListingTarget)}>Record a paid sale</button>
               </div>
             </article>
           )}
@@ -302,8 +313,8 @@ export function TodayTab({
                 <span className="workspace-eyebrow">Live desk</span>
                 <h2 id="dealer-pulse-title">Dealer pulse</h2>
               </div>
-              <span className={`system-indicator ${systemStatus ? "good" : "warn"}`}>
-                {systemStatus ? `${readySourceCount}/${setupSources.length} sources` : "Checking systems"}
+              <span className="system-indicator good">
+                {sellingStock.liveRows} live stock row{sellingStock.liveRows === 1 ? "" : "s"}
               </span>
             </div>
 
@@ -318,28 +329,15 @@ export function TodayTab({
 
             <div className="dealer-pulse-status" aria-label="Current work counts">
               <button type="button" onClick={onActiveListings} disabled={activeListingCount === 0}>
-                <strong>{activeListingCount}</strong><span>live</span>
+                <strong>{sellingStock.liveRows}</strong><span>live stock</span>
               </button>
               <button type="button" onClick={onListingDesk} disabled={draftListingCount === 0 && listingsLength === 0}>
                 <strong>{draftListingCount}</strong><span>draft</span>
               </button>
-              <button type="button" onClick={onBuyWatchesPanel}>
-                <strong>{activeWatchCount}</strong><span>targets</span>
+              <button type="button" onClick={onProfit}>
+                <strong>{dashboard?.metrics.soldCount ?? 0}</strong><span>sold</span>
               </button>
             </div>
-
-            {readinessAttention.length > 0 && (
-              <div className="readiness-brief" aria-label="Readiness attention">
-                {readinessAttention.map((item) => (
-                  <div className={`readiness-brief-row ${item.state}`} key={item.id}>
-                    <span><strong>{item.title}</strong><small>{item.detail}</small></span>
-                    {item.target && item.target !== "external" && (
-                      <button type="button" onClick={() => onOpenLaunchReadiness(item.target)}>{item.action ?? "Open"}</button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
 
             {latestUnreadAlert && (
               <div className="dealer-alert">
@@ -351,7 +349,7 @@ export function TodayTab({
             <div className="dealer-pulse-actions">
               <button type="button" onClick={onProfit}>Open profit ledger</button>
               <button type="button" onClick={activeListingCount > 0 ? onSalesDesk : onInventory}>
-                {activeListingCount > 0 ? "Book a sale" : "Open stock vault"}
+                {activeListingCount > 0 ? "Record a paid sale" : "Open stock vault"}
               </button>
             </div>
 
@@ -360,12 +358,29 @@ export function TodayTab({
               <div>
                 <button type="button" onClick={onOpeningStockImport}>Import opening stock</button>
                 <button type="button" onClick={onCostsPanel}>Log a cost</button>
-                <button type="button" onClick={onCheckWatches} disabled={Boolean(busy)}>Check buy targets</button>
                 <button type="button" onClick={onCheckReprices} disabled={Boolean(busy)}>Check repricing</button>
-                <button type="button" onClick={onTakePortfolioSnapshot} disabled={Boolean(busy)}>Snapshot portfolio</button>
                 <button type="button" onClick={onDownloadBackup} disabled={Boolean(busy)}>Download backup</button>
+              </div>
+            </details>
+
+            <details className="dealer-tools">
+              <summary>Optional research &amp; setup</summary>
+              <p>{systemStatus ? `${readySourceCount}/${setupSources.length} sources available.` : "Source status is loading."} Research tools support your decisions; they do not complete a selling milestone.</p>
+              <div>
+                <button type="button" onClick={onNewBuy}>New comp / buy</button>
+                <button type="button" onClick={onBuyWatchesPanel}>{activeWatchCount} buy targets</button>
+                <button type="button" onClick={onCheckWatches} disabled={Boolean(busy)}>Check buy targets</button>
+                <button type="button" onClick={onTakePortfolioSnapshot} disabled={Boolean(busy)}>Snapshot portfolio</button>
                 <button type="button" onClick={onDeepCheck} disabled={Boolean(busy)}>Check systems</button>
               </div>
+              {readinessAttention.map((item) => (
+                <div className={`readiness-brief-row ${item.state}`} key={item.id}>
+                  <span><strong>{item.title}</strong><small>{item.detail}</small></span>
+                  {item.target && item.target !== "external" && (
+                    <button type="button" onClick={() => onOpenLaunchReadiness(item.target)}>{item.action ?? "Open"}</button>
+                  )}
+                </div>
+              ))}
             </details>
 
             <footer className="dealer-pulse-footer">
@@ -407,17 +422,6 @@ function useTodayGreeting(): string {
 function dateKey(value: Date): string {
   if (Number.isNaN(value.getTime())) return "invalid";
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
-}
-
-function primaryActionLabel(target: TodayActionTarget): string {
-  if (target === "opening-stock") return "Import stock";
-  if (target === "buy") return "Start comp";
-  if (target === "sales") return "Book sale";
-  if (target === "drafts") return "Open listing desk";
-  if (target === "watches") return "Open buy targets";
-  if (target === "reprice") return "Check repricing";
-  if (target === "profit") return "Open profit ledger";
-  return "Open stock vault";
 }
 
 function listingCardImage(item: NonNullable<TodayListing["item"]>): string | null {

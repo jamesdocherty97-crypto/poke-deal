@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { before, after, mock } from "node:test";
+
+// This benchmark evaluates July evidence; calendar ageing has separate tests.
+before(() => mock.timers.enable({ apis: ["Date"], now: new Date("2026-07-19T12:00:00.000Z") }));
+after(() => mock.timers.reset());
 
 import type { CardRef, CompResult } from "../domain/types.js";
 import { pickHeadlineForQuery } from "./compService.js";

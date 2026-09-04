@@ -107,18 +107,18 @@ test("fixture dealer loop: comp -> buy -> stock + eBay draft -> review -> sell -
   await expect(page.getByRole("heading", { name: "Listing pack" })).toBeVisible();
   await page.locator(".listing-pack-sheet").getByRole("button", { name: "Close" }).click();
 
-  // Re-enter List through the primary navigation, then sell from the draft row.
+  // Confirm the draft remains preparation, then record the paid sale from Stock.
   await page.getByRole("button", { name: "List", exact: true }).click();
   const listingRow = page.locator(".listings-workspace .item-row").filter({ hasText: "Gengar" });
   await expect(listingRow).toContainText("draft");
-  await listingRow.getByText("More", { exact: true }).click();
-  await listingRow.getByRole("button", { name: "Sell", exact: true }).click();
+  await page.getByRole("button", { name: "Stock", exact: true }).click();
+  await page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" }).getByRole("button", { name: "Sell", exact: true }).click();
 
   const saleSheet = page.locator(".sell-sheet").filter({ has: page.getByRole("heading", { name: "Mark sold" }) });
   await expect(saleSheet).toBeVisible();
-  await saleSheet.getByLabel("Buyer total").fill("50.00");
-  await saleSheet.getByLabel("Fees").fill("0");
-  await saleSheet.getByLabel("My postage cost").fill("0");
+  await saleSheet.getByRole("textbox", { name: /^Actual sale price/ }).fill("50.00");
+  await saleSheet.getByRole("textbox", { name: "Fees", exact: true }).fill("0");
+  await saleSheet.getByRole("textbox", { name: "My postage cost", exact: true }).fill("0");
   await saleSheet.getByRole("button", { name: "Create sale" }).click();
 
   await expect.poll(() => ledger.sold).toBe(true);

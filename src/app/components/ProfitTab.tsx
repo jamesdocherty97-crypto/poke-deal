@@ -1,11 +1,12 @@
 "use client";
 
-import { type FormEvent, useMemo } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { buildProfitTrend, type ProfitTrendPoint } from "@/lib/dealer/metrics";
 import type { RepriceRecommendation } from "@/lib/alerts/repricing";
 import type { WatchHit } from "@/lib/alerts/watchlist";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { CardImage, EmptyState, Metric, MoneyInput } from "./UiBits";
+import { SaleLedgerRow, type SaleLedgerSummary } from "./SaleLedgerRow";
 
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ExpenseCategory = "SUPPLIES" | "POSTAGE" | "GRADING" | "TABLE_FEE" | "TRAVEL" | "PLATFORM" | "OTHER";
@@ -54,7 +55,7 @@ type PortfolioHistory = {
 
 type Dashboard = any;
 type InventoryItem = any;
-type SaleSummary = any;
+type SaleSummary = SaleLedgerSummary;
 type ExpensePreset = { category: ExpenseCategory; description: string; amount?: string; channel?: Channel };
 
 const channels: Channel[] = ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"];
@@ -109,6 +110,7 @@ export function ProfitTab({
   checkReprices,
   applyReprice,
   requestUndoSale,
+  onSaleCorrected,
 }: {
   dashboard: Dashboard | null;
   dashboardLoading: boolean;
@@ -151,7 +153,16 @@ export function ProfitTab({
   checkReprices: () => void;
   applyReprice: (recommendation: RepriceRecommendation) => void;
   requestUndoSale: (sale: SaleSummary) => void;
+  onSaleCorrected: () => Promise<void>;
 }) {
+  const [ledgerMessage, setLedgerMessage] = useState<string | null>(null);
+  const reconciliationSales: SaleSummary[] = dashboard?.salesToReconcile ?? [];
+  const reconciliationCount = dashboard?.salesToReconcileCount ?? reconciliationSales.length;
+  const provisionalCount = dashboard?.metrics.provisionalSaleCount ?? reconciliationCount;
+  async function refreshAfterCorrection() {
+    await onSaleCorrected();
+    setLedgerMessage("Sale costs confirmed. Previous amounts and the correction reason are retained in Sales CSV.");
+  }
   const noBookedSales = !dashboardLoading && (dashboard?.metrics.soldCount ?? 0) === 0;
   const netProfitPence = dashboard?.metrics.netProfitPence ?? dashboard?.metrics.realizedProfitPence ?? 0;
   const netProfitTone = netProfitPence >= 0 ? "good" : "warn";
@@ -165,7 +176,7 @@ export function ProfitTab({
         <div className="workspace-masthead-copy">
           <span className="workspace-kicker">Dealer ledger</span>
           <h2>Know what the collection is earning.</h2>
-          <p>Sales, costs, cash recovery and stock value in one accountable view.</p>
+          <p>Sales, confirmed costs and Pokémon stock value in one dealer ledger.</p>
         </div>
         <div className="export-actions" aria-label="Books export">
           <a className="export-link" href="/api/export/books" download>
@@ -222,8 +233,27 @@ export function ProfitTab({
         </div>
       </section>
 
+      {provisionalCount > 0 && <p className="hint" role="status">Totals include {provisionalCount} sale{provisionalCount === 1 ? "" : "s"} with estimated costs or an unverified historical acquisition cost. Confirm the amounts below before relying on profit.</p>}
+      {ledgerMessage && <p className="hint" role="status">{ledgerMessage}</p>}
+
       <div className="profit-ledger-layout">
         <div className="profit-ledger-main">
+          {reconciliationCount > 0 && (
+            <section className="panel profit-ledger-section" aria-labelledby="sales-to-reconcile-heading">
+              <div className="panel-heading">
+                <div>
+                  <h2 id="sales-to-reconcile-heading">Confirm sale costs</h2>
+                  <span className="muted">Oldest first · {reconciliationCount} sale{reconciliationCount === 1 ? "" : "s"} to reconcile</span>
+                </div>
+                <span className="pill warn">Provisional</span>
+              </div>
+              <p className="hint">Check the marketplace record and your receipts. Confirming actual fees, postage and acquisition cost clears each copy from this queue.</p>
+              {reconciliationSales.map((sale) => (
+                <SaleLedgerRow key={sale.id} sale={sale} busy={busy === `sale-${sale.id}`} onSaleCorrected={refreshAfterCorrection} />
+              ))}
+              {reconciliationCount > reconciliationSales.length && <p className="hint">Showing the oldest {reconciliationSales.length} of {reconciliationCount}. More sales appear as you confirm these costs.</p>}
+            </section>
+          )}
           {dashboard?.monthlyPnl?.length ? (
             <section className="panel monthly-pnl-panel profit-ledger-section">
               <div className="panel-heading">
@@ -297,31 +327,7 @@ export function ProfitTab({
             </div>
             {dashboard?.recentSales.length ? (
               dashboard.recentSales.map((sale: SaleSummary) => (
-                <article className="mini-row sale-mini-row" key={sale.id}>
-                  <div>
-                    <strong>
-                      {sale.name} {sale.grade.replace(/_/g, " ")}
-                    </strong>
-                    <span>
-                      {shortDate(sale.soldAt)} · {channelLabel(sale.channel)} · sale {gbp(sale.salePricePence)}
-                    </span>
-                    <small>
-                      fees {gbp(sale.feesPence)} · postage {gbp(sale.postagePence)} · cost {gbp(sale.costBasisPence)}
-                    </small>
-                  </div>
-                  <div className="sale-result">
-                    <strong>{gbp(sale.profitPence)}</strong>
-                    <span>{sale.marginPct == null ? "n/a" : `${sale.marginPct}%`}</span>
-                    <button
-                      className="ghost-button sale-undo-button"
-                      type="button"
-                      onClick={() => requestUndoSale(sale)}
-                      disabled={busy === `sale-${sale.id}`}
-                    >
-                      {busy === `sale-${sale.id}` ? "Undoing…" : "Undo"}
-                    </button>
-                  </div>
-                </article>
+                <SaleLedgerRow key={sale.id} sale={sale} busy={busy === `sale-${sale.id}`} onSaleCorrected={refreshAfterCorrection} onUndo={requestUndoSale} />
               ))
             ) : (
               <EmptyState art="sales" text="No sales booked yet. Mark an item sold from Stock." />
@@ -329,18 +335,18 @@ export function ProfitTab({
           </section>
         </div>
 
-        <aside className="profit-ledger-sidebar" aria-label="Cash and stock position">
+        <aside className="profit-ledger-sidebar" aria-label="Calculated recovery and stock position">
           <section className="panel cash-panel">
             <div className="panel-heading">
               <div>
-                <span className="panel-kicker">Cash position</span>
-                <h2>Money recovered</h2>
+                <span className="panel-kicker">Calculated recovery</span>
+                <h2>Sales against outlay</h2>
               </div>
               <span className={`pill ${cashNetTone}`}>{gbp(cashNetPence)}</span>
             </div>
             <div className="detail-grid">
-              <Metric label="Cash in" value={gbp(dashboard?.metrics.cashInPence ?? 0)} loading={dashboardLoading} />
-              <Metric label="Cash out" value={gbp(dashboard?.metrics.cashOutPence ?? 0)} tone="warn" loading={dashboardLoading} />
+              <Metric label="Buyer payments" value={gbp(dashboard?.metrics.cashInPence ?? 0)} loading={dashboardLoading} />
+              <Metric label="Recorded outlay" value={gbp(dashboard?.metrics.cashOutPence ?? 0)} tone="warn" loading={dashboardLoading} />
               <Metric label="In stock" value={gbp(dashboard?.metrics.activeCostPence ?? 0)} loading={dashboardLoading} />
               <Metric
                 label="Recovered"
@@ -349,6 +355,7 @@ export function ProfitTab({
                 loading={dashboardLoading}
               />
             </div>
+            <p className="hint">Calculated from recorded buyer payments and stock, fees, postage and operating costs. This is not a confirmed marketplace payout or bank balance. Check settlement in your sales channel.</p>
             <div className="cash-breakdown">
               <span>sold stock {gbp(dashboard?.metrics.soldCostPence ?? 0)}</span>
               <span>fees {gbp(dashboard?.metrics.realizedFeesPence ?? 0)}</span>
