@@ -59,7 +59,11 @@ test("untrusted pages and APIs are denied without a Basic challenge", { concurre
     const page = await middleware(request("/", { authorization: basic("anything:legacy-password") }));
     assert.equal(page.status, 403);
     assert.equal(page.headers.get("www-authenticate"), null);
-    assert.match(await page.text(), /Open your private unlock link once/i);
+    assert.equal(page.headers.get("x-robots-tag"), "noindex, nofollow, noarchive");
+    const html = await page.text();
+    assert.match(html, /<meta name="robots" content="noindex, nofollow, noarchive"/);
+    assert.match(html, /Open your private unlock link once/i);
+    assert.match(html, /<a class="unlock-link" href="\/access">Unlock this browser<\/a>/);
 
     const api = await middleware(request("/api/comps"));
     assert.equal(api.status, 401);
@@ -106,6 +110,7 @@ test("public and self-authenticated route exceptions are exact", { concurrency: 
 
     const accessPage = await middleware(request("/access"));
     assert.equal(accessPage.status, 200);
+    assert.equal(accessPage.headers.get("x-robots-tag"), "noindex, nofollow, noarchive");
     assert.match(accessPage.headers.get("content-security-policy") ?? "", /script-src 'nonce-/);
     assert.match(await accessPage.text(), /Trusting this browser/i);
 

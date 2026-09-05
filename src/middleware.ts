@@ -131,6 +131,7 @@ function lockedResponseHeaders(nonce?: string): Record<string, string> {
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
+    "X-Robots-Tag": "noindex, nofollow, noarchive",
   };
 }
 
@@ -155,6 +156,7 @@ function untrustedDevicePage(nonce: string): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
   <link rel="icon" href="data:," />
   <title>Private device · Poke Deal</title>
   <style nonce="${nonce}">
@@ -167,14 +169,17 @@ function untrustedDevicePage(nonce: string): string {
     h1 { margin: 0; font-size: clamp(32px, 10vw, 42px); line-height: 1; }
     p { max-width: 34ch; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
     strong { color: #fff4b0; }
+    .unlock-link { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 20px; border: 2px solid var(--yellow); border-radius: 12px; background: var(--yellow); color: #101827; font-weight: 800; text-decoration: none; }
+    .unlock-link:focus-visible { outline: 3px solid #f8fbff; outline-offset: 4px; }
   </style>
 </head>
 <body>
-  <main>
+  <main id="main-content">
     <span class="ball" aria-hidden="true"></span>
     <h1>Private device</h1>
     <p>This browser has not been trusted for Poke Deal yet.</p>
     <p><strong>Open your private unlock link once.</strong> After that, the app opens normally with no password.</p>
+    <a class="unlock-link" href="/access">Unlock this browser</a>
   </main>
 </body>
 </html>`;
