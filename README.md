@@ -4,6 +4,8 @@ Command centre for running a Pokémon card dealing business: **value → buy →
 
 Poke Deal is a private, Pokémon-branded dealer workspace. The current priority is getting existing singles ready, live and sold, with reliable stock and sale records. Older briefs and backlogs record prior intent; they do not override current behaviour or the owner’s direction. See [the September reliability work](docs/DEALER_RELIABILITY_2026-09-04.md) for implemented changes, verification and deliberate deferrals.
 
+Live listing editing is designed for phone use: List → Live → Edit live listing loads the current eBay price and copy, then saves only the fields the dealer changes. Verified Inventory API offers support title, description and price edits; unlinked/Trading listings retain an explicit eBay fallback. See [the iPhone editing work](docs/IPHONE_LISTING_EDITING_2026-09-05.md) for boundaries and verification.
+
 For a non-technical walkthrough of the product, daily workflows, future features and outstanding actions, see [`USER_GUIDE.md`](USER_GUIDE.md).
 
 ---

@@ -373,14 +373,18 @@ test("an uncertain queued sale blocks stale listing activation but still permits
   await prepareOfflineStockPage(page, true);
   const listingTab = await context.newPage();
   try {
-    // The editor already permits activation before another tab reserves stock.
+    // This listing row is already open before another tab reserves its stock.
+    // Activation now lives in Paste URL, separate from the details editor.
+    await listingTab.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { readText: async () => "https://www.ebay.co.uk/itm/123456789012" },
+      });
+    });
     await listingTab.goto("/?view=listings");
     const draftRow = listingTab.locator(".listing-select-row").filter({ has: listingTab.locator('input[name="select-listing-draft-offline-1"]') });
     await draftRow.getByText("More", { exact: true }).click();
-    await draftRow.getByRole("button", { name: "Edit listing details", exact: true }).click();
-    const editor = listingTab.locator(".sell-sheet");
-    await editor.getByRole("combobox", { name: "State", exact: true }).selectOption("ACTIVE");
-    await editor.getByRole("textbox", { name: "Listing URL", exact: true }).fill("https://www.ebay.co.uk/itm/123456789012");
+    await expect(draftRow.getByRole("button", { name: "Paste URL", exact: true })).toBeVisible();
 
     await context.setOffline(true);
     await openOfflineSale(page);
@@ -397,12 +401,11 @@ test("an uncertain queued sale blocks stale listing activation but still permits
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
     await expect.poll(() => saleRequests).toBeGreaterThan(0);
     await expect.poll(() => pendingSales(page)).toBe(1);
-    await editor.getByRole("button", { name: "Save listing", exact: true }).click();
+    await draftRow.getByRole("button", { name: "Paste URL", exact: true }).click();
     await expect(listingTab.getByText(/Sync and refresh this card/)).toBeVisible();
     expect(listingWrites).toEqual([]);
 
     // Removing an existing marketplace listing reduces exposure and remains allowed.
-    await editor.getByRole("button", { name: "Close", exact: true }).click();
     await listingTab.locator('select[name="listing-state"]').selectOption("ACTIVE");
     const liveRow = listingTab.locator(".listing-select-row").filter({ has: listingTab.locator('input[name="select-listing-live-offline-1"]') });
     await liveRow.getByText("More", { exact: true }).click();

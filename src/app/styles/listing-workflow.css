@@ -1,0 +1,90 @@
+/* The daily phone loop: find the card, edit it, return to the same queue. */
+.app-shell .listings-workspace > .listing-queue-filters {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.listing-queue-filters button {
+  min-height: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+  color: var(--color-text-secondary);
+}
+
+.listing-queue-filters button[aria-pressed="true"] {
+  border-color: var(--workspace-listings);
+  background: var(--color-info-surface);
+  color: var(--color-text-primary);
+}
+
+.listing-queue-filters span {
+  font-family: var(--font-data);
+  font-size: 0.85em;
+}
+
+.listings-workspace .listing-live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.listings-workspace .listing-live-actions > :is(button, a),
+.listings-workspace .row-more-actions > summary,
+.listings-workspace .listing-price-summary button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.listings-workspace .bulk-row-checkbox {
+  width: 44px;
+  height: 44px;
+}
+
+@media (max-width: 719px) {
+  .listings-workspace .market-masthead {
+    min-height: 0;
+    padding: 18px 16px;
+  }
+
+  .listings-workspace .market-masthead h2 {
+    font-size: 1.8rem;
+  }
+
+  .listings-workspace .market-pipeline { display: none; }
+  .listings-workspace .market-masthead .workspace-masthead-copy > p { display: none; }
+  .listings-workspace .market-toolbar.dex-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .listings-workspace .market-list .item-row {
+    grid-template-columns: 88px minmax(0, 1fr);
+    background: linear-gradient(90deg, var(--color-surface-2) 0 87px, var(--color-border) 87px 88px, var(--color-surface-1) 88px);
+  }
+
+  .listings-workspace .market-list .card-thumb { width: 64px; }
+  .listings-workspace .market-list .item-main { padding: 14px 12px; }
+  .listings-workspace .market-list .item-title-line { display: grid; gap: 7px; }
+  .listings-workspace .market-list .bulk-row-checkbox { top: 126px; right: auto; left: 22px; }
+
+  .listings-workspace .market-toolbar input,
+  .listings-workspace .market-toolbar select {
+    font-size: 16px;
+    min-height: 48px;
+    height: 48px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .listings-workspace .listing-live-actions > .next-action-button:first-child {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .listings-workspace .listing-price-summary button { grid-column: 1 / -1; }
+}
