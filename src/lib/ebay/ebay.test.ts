@@ -26,6 +26,7 @@ import { isEbayConfigured, EBAY_UK_CATEGORY_POKEMON } from "./config.js";
 import type { EbayConfig } from "./config.js";
 import type { EbayPolicies } from "./policies.js";
 import { buildListingPack } from "../dealer/listingPack.js";
+import { editLiveEbayOffer, readLiveEbayOfferSnapshot, LiveEbayEditError } from "./liveOfferEdit.js";
 import { checkEbayReadiness } from "./readiness.js";
 import {
   buildInventoryLocationPayload,
@@ -774,6 +775,7 @@ test("buildEbayOfferPreflight preserves user-edited listing copy during a price 
     preflight.inventoryItem.product.description,
     "My saved condition notes and description.",
   );
+  assert.equal(preflight.offer.listingDescription, "My saved condition notes and description.");
 });
 
 test("buildEbayOfferPreflight replaces a legacy short Kofu draft label with the rich generated title", () => {
@@ -827,6 +829,133 @@ test("live eBay offer presentation changes include generated-title source change
     hasEbayOfferPresentationChanged(before, { ...before, titleCustomized: true }),
     true,
   );
+  assert.equal(hasEbayOfferPresentationChanged(before, { ...before, description: "Condition notes" }), true);
+});
+
+const liveEditIdentity = {
+  config: TEST_CONFIG, accessToken: "synthetic-access-token", offerId: "linked-offer",
+  listingId: "123456789012", sku: "pdos-owned-card",
+};
+const liveRemoteOffer = {
+  offerId: "linked-offer", sku: "pdos-owned-card", status: "PUBLISHED", format: "FIXED_PRICE", marketplaceId: "EBAY_GB",
+  listing: { listingId: "123456789012", listingStatus: "ACTIVE" },
+  availableQuantity: 1, listingDescription: "Actual live condition notes", categoryId: "183454",
+  listingPolicies: { paymentPolicyId: "pay-live", returnPolicyId: "return-live", fulfillmentPolicyId: "ship-live", bestOfferTerms: { bestOfferEnabled: true } },
+  pricingSummary: { price: { value: "25.00", currency: "GBP" }, originalRetailPrice: { value: "30.00", currency: "GBP" } },
+  merchantLocationKey: "actual-location", tax: { vatPercentage: 20 }, storeCategoryNames: ["Pokemon singles"],
+};
+const liveRemoteInventory = {
+  sku: "pdos-owned-card", locale: "en_GB", inventoryItemGroupKeys: [],
+  availability: { shipToLocationAvailability: { quantity: 1, allocationByFormat: { fixedPrice: 1 }, availabilityDistributions: [{ merchantLocationKey: "actual-location", quantity: 1 }] } },
+  condition: "USED_VERY_GOOD", conditionDescription: "Small nick", conditionDescriptors: [{ name: "40001", values: ["400011"] }],
+  product: { title: "Actual live title", description: "Product fallback description", imageUrls: ["https://example.test/actual-card.jpg"], aspects: { Language: ["English"] }, videoIds: ["video-kept"] },
+  packageWeightAndSize: { packageType: "LETTER", weight: { value: 50, unit: "GRAM" } },
+};
+function liveEditFetch(options: { offer?: Record<string, unknown>; inventory?: Record<string, unknown>; failPath?: string; bulkResult?: unknown } = {}) {
+  const writes: Array<{ path: string; body: Record<string, unknown> }> = [];
+  const reads: string[] = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (!init?.method || init.method === "GET") {
+      reads.push(path);
+      return Response.json(path.includes("inventory_item/") ? options.inventory ?? liveRemoteInventory : options.offer ?? liveRemoteOffer);
+    }
+    writes.push({ path, body: JSON.parse(String(init.body)) });
+    if (path === options.failPath) return Response.json({ errors: [{ errorId: 25001, message: "Synthetic eBay rejection" }] }, { status: 400 });
+    if (path.endsWith("bulk_update_price_quantity")) return Response.json(options.bulkResult ?? { responses: [{ offerId: "linked-offer", statusCode: 200 }] });
+    return new Response(null, { status: 204 });
+  };
+  return { fetchImpl, writes, reads };
+}
+
+test("live snapshot reads current title, offer description and price without writes", async () => {
+  const mock = liveEditFetch();
+  assert.deepEqual(await readLiveEbayOfferSnapshot(liveEditIdentity, mock.fetchImpl), { title: "Actual live title", description: "Actual live condition notes", listPricePence: 2500 });
+  assert.equal(mock.writes.length, 0);
+  const fallback = liveEditFetch({ offer: { ...liveRemoteOffer, listingDescription: undefined } });
+  assert.equal((await readLiveEbayOfferSnapshot(liveEditIdentity, fallback.fetchImpl)).description, "Product fallback description");
+});
+
+test("live description and price edits preserve eBay policies, quantity and untouched fields", async () => {
+  const mock = liveEditFetch();
+  const result = await editLiveEbayOffer({ ...liveEditIdentity, changes: { description: "Reviewed corner whitening", listPricePence: 2900 } }, mock.fetchImpl);
+  assert.deepEqual(result, { fields: ["description", "price"], snapshot: { title: "Actual live title", description: "Reviewed corner whitening", listPricePence: 2900 } });
+  assert.equal(mock.writes.length, 1);
+  const update = mock.writes[0]!;
+  assert.equal(update.path, "/sell/inventory/v1/offer/linked-offer");
+  assert.equal(update.body.listingDescription, "Reviewed corner whitening");
+  assert.equal(update.body.availableQuantity, 1);
+  assert.deepEqual(update.body.listingPolicies, liveRemoteOffer.listingPolicies);
+  assert.deepEqual(update.body.tax, liveRemoteOffer.tax);
+  assert.deepEqual(update.body.storeCategoryNames, liveRemoteOffer.storeCategoryNames);
+  assert.deepEqual(update.body.pricingSummary, { ...liveRemoteOffer.pricingSummary, price: { value: "29.00", currency: "GBP" } });
+  for (const key of ["sku", "marketplaceId", "format", "listing", "status", "offerId"]) assert.equal(key in update.body, false);
+});
+
+test("live price-only edit sends no quantity, inventory or offer replacement", async () => {
+  const mock = liveEditFetch();
+  const result = await editLiveEbayOffer({ ...liveEditIdentity, changes: { listPricePence: 9900 } }, mock.fetchImpl);
+  assert.deepEqual(mock.writes, [{ path: "/sell/inventory/v1/bulk_update_price_quantity", body: { requests: [{ sku: "pdos-owned-card", offers: [{ offerId: "linked-offer", price: { value: "99.00", currency: "GBP" } }] }] } }]);
+  assert.deepEqual(result.fields, ["price"]);
+  assert.equal(result.snapshot.listPricePence, 9900);
+});
+
+test("live title-only edit preserves eBay photos, description, condition and availability", async () => {
+  const mock = liveEditFetch();
+  const result = await editLiveEbayOffer({ ...liveEditIdentity, changes: { title: "A reviewed title" } }, mock.fetchImpl);
+  assert.deepEqual(result.fields, ["title"]);
+  assert.equal(mock.writes.length, 1);
+  const update = mock.writes[0]!;
+  assert.equal(update.path, "/sell/inventory/v1/inventory_item/pdos-owned-card");
+  assert.deepEqual(update.body.product, { ...liveRemoteInventory.product, title: "A reviewed title" });
+  assert.deepEqual(update.body.conditionDescriptors, liveRemoteInventory.conditionDescriptors);
+  assert.deepEqual(update.body.packageWeightAndSize, liveRemoteInventory.packageWeightAndSize);
+  assert.deepEqual(update.body.availability, { shipToLocationAvailability: { quantity: 1, availabilityDistributions: liveRemoteInventory.availability.shipToLocationAvailability.availabilityDistributions } });
+  for (const key of ["sku", "locale", "inventoryItemGroupKeys"]) assert.equal(key in update.body, false);
+});
+
+test("live edit rejects mismatched offer ownership, inactive status, currency and grouped cards before writes", async () => {
+  for (const offer of [
+    { ...liveRemoteOffer, sku: "other-stock" },
+    { ...liveRemoteOffer, listing: { ...liveRemoteOffer.listing, listingId: "987654321098" } },
+    { ...liveRemoteOffer, status: "UNPUBLISHED" },
+    { ...liveRemoteOffer, listing: { ...liveRemoteOffer.listing, listingStatus: "ENDED" } },
+    { ...liveRemoteOffer, marketplaceId: "EBAY_US" },
+    { ...liveRemoteOffer, pricingSummary: { price: { value: "25", currency: "USD" } } },
+    { ...liveRemoteOffer, pricingSummary: { price: { value: "25.001", currency: "GBP" } } },
+    { ...liveRemoteOffer, pricingSummary: { price: { value: true, currency: "GBP" } } },
+  ]) {
+    const mock = liveEditFetch({ offer });
+    await assert.rejects(editLiveEbayOffer({ ...liveEditIdentity, changes: { listPricePence: 2800 } }, mock.fetchImpl), (error: unknown) => error instanceof LiveEbayEditError && error.status === 409);
+    assert.equal(mock.writes.length, 0);
+  }
+  const grouped = liveEditFetch({ inventory: { ...liveRemoteInventory, inventoryItemGroupKeys: ["shared-group"] } });
+  await assert.rejects(editLiveEbayOffer({ ...liveEditIdentity, changes: { title: "New title" } }, grouped.fetchImpl), /single card/);
+  assert.equal(grouped.writes.length, 0);
+});
+
+test("live combined edits report accepted title when offer update fails without attempting rollback", async () => {
+  const mock = liveEditFetch({ failPath: "/sell/inventory/v1/offer/linked-offer" });
+  await assert.rejects(editLiveEbayOffer({ ...liveEditIdentity, changes: { title: "New title", description: "New details" } }, mock.fetchImpl), (error: unknown) => {
+    assert.ok(error instanceof LiveEbayEditError);
+    assert.deepEqual(error.confirmedFields, ["title"]);
+    assert.deepEqual(error.attemptedFields, ["description"]);
+    assert.match(error.message, /accepted the title.*did not confirm/);
+    return true;
+  });
+  assert.equal(mock.writes.length, 2);
+});
+
+test("bulk price responses must confirm this offer, including failure inside a successful envelope", async () => {
+  for (const bulkResult of [{}, { responses: [] }, { responses: [{ offerId: "other-offer", statusCode: 200 }] }, { responses: [{ offerId: "linked-offer", statusCode: 207 }] }, { responses: [{ offerId: "linked-offer", statusCode: 400, errors: [{ message: "Price rejected" }] }] }]) {
+    const mock = liveEditFetch({ bulkResult });
+    await assert.rejects(editLiveEbayOffer({ ...liveEditIdentity, changes: { listPricePence: 2900 } }, mock.fetchImpl), (error: unknown) => {
+      assert.ok(error instanceof LiveEbayEditError);
+      assert.deepEqual(error.confirmedFields, []);
+      assert.deepEqual(error.attemptedFields, ["price"]);
+      return true;
+    });
+  }
 });
 
 test("synchronizeEbayOffer refreshes a stale pending offer with the exact chosen price", async () => {

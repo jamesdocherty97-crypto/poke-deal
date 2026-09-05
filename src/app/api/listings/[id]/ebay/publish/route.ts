@@ -335,6 +335,11 @@ async function publishViaTradingApiFallback({
         state: "ACTIVE",
         externalRef: ebayItemId,
         externalUrl: listingUrl,
+        // Trading listings are not owned by a previously prepared Inventory
+        // API offer. Never allow later edits/removal to target that old offer.
+        ebayOfferId: null,
+        offerSyncedAt: null,
+        offerSyncedPrice: null,
         listedAt: new Date(),
         listPrice: listPricePence,
         title: effectiveTitle,

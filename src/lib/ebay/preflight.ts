@@ -61,6 +61,8 @@ export function buildEbayOfferPreflight(input: EbayOfferPreflightInput): EbayOff
   if (input.titleCustomized && input.title?.trim()) inventoryItem.product.title = input.title.trim();
   if (input.description?.trim()) inventoryItem.product.description = input.description.trim();
   const offer = buildOfferPayload(sku, pack, input.policies, input.config, quantity);
+  // The offer-specific description takes precedence over product.description.
+  offer.listingDescription = inventoryItem.product.description;
 
   return {
     sku,
