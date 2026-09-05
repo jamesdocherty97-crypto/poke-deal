@@ -12,8 +12,14 @@ test("the enrollment page is configured, private, and non-cacheable", { concurre
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("cache-control"), "no-store, max-age=0");
     assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow, noarchive");
     assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'none'/);
-    assert.match(await response.text(), /Trusting this browser/i);
+    const html = await response.text();
+    assert.match(html, /<meta name="robots" content="noindex, nofollow, noarchive"/);
+    assert.match(html, /<h1>Unlock Poke Deal<\/h1>/);
+    assert.match(html, /<label for="access-token">Private unlock link or token<\/label>/);
+    assert.match(html, /id="access-token" type="password"/);
+    assert.match(html, /<form id="access-form" method="post" action="\/access">/);
   });
 });
 

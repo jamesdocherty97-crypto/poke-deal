@@ -39,6 +39,10 @@ https://your-poke-deal-host/access#<APP_ACCESS_TOKEN>
 
 The fragment is removed before the token is submitted. A signed, host-only `Secure`/`HttpOnly` cookie then keeps that browser trusted for 180 days and renews during normal use in the final 30 days, so day-to-day use is simply opening the app. Keep the private link in a password manager; anyone holding it can trust another browser. `APP_PASSWORD` is retired.
 
+For an existing phone Home Screen app, choose **Unlock this browser** and paste the full private unlock link there. This trusts that installed app without clearing its pending offline work. The same form at `/access` can accept the link or its token; failed connection attempts can be retried without reopening the original link. Unlocking requires an internet connection.
+
+For a new iPhone installation, first open the complete private link in Safari and wait for the main app. Then use Share → Add to Home Screen and open the new icon while online. An older installed copy has separate browser storage: signing into Safari later does not repair its session, so use its own unlock form. Do not delete an old copy until its pending offline work has synced.
+
 Production and hosted previews fail closed with `503` when either secret is missing, weak, or the same. Rotating `APP_ACCESS_TOKEN` disables old unlock links without signing out trusted browsers. Rotating `APP_SESSION_SECRET` signs out every browser immediately. Maintenance scripts that target a protected deployment can receive the unlock token as `POKE_DEAL_ACCESS_TOKEN`; for a non-default host, also set `POKE_DEAL_ACCESS_ORIGIN` to that exact HTTPS origin. The scripts refuse redirects, unapproved origins, and non-loopback HTTP before sending the token.
 
 The app deliberately remains local-first after a browser is trusted: its offline shell and recent dealer data may remain in browser storage even after a server session is revoked. Use a device passcode/full-disk encryption, and clear that site's browser data before selling or handing over a device.
