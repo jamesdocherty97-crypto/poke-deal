@@ -196,7 +196,7 @@ test("camera scan hands the reviewed comp and photo into the stock form", async 
   await expect(page.getByRole("heading", { name: "Listing pack" })).toBeVisible();
 });
 
-test("listing workspace starts with unfinished drafts and keeps the sale transition visible", async ({ context, page }) => {
+test("listing workspace shows live stock on arrival and keeps draft and sale actions available", async ({ context, page }) => {
   const ledger = new FixtureDealerLedger();
   ledger.acquired = true;
   ledger.listingState = "ACTIVE";
@@ -204,12 +204,15 @@ test("listing workspace starts with unfinished drafts and keeps the sale transit
 
   await page.goto("/?view=list");
   const stateFilter = page.locator('select[name="listing-state"]');
+  await expect(stateFilter).toHaveValue("ALL");
+  await expect(page.getByRole("button", { name: "Edit live listing", exact: true })).toBeVisible();
+  await page.getByRole("group", { name: "Listing queues" }).getByRole("button", { name: /^Drafts/ }).click();
   await expect(stateFilter).toHaveValue("DRAFT");
   await expect(page.getByText("No matching listings. Clear the search or change the state filter.")).toBeVisible();
 
-  await stateFilter.selectOption("ACTIVE");
+  await page.getByRole("group", { name: "Listing queues" }).getByRole("button", { name: /^Live/ }).click();
   const listingRow = page.locator(".market-list .item-row").filter({ hasText: "Gengar" });
-  await expect(listingRow.getByRole("link", { name: "View live listing" })).toBeVisible();
+  await expect(listingRow.getByRole("link", { name: "View on eBay", exact: true })).toBeVisible();
   await expect(listingRow.getByRole("button", { name: "Record sale" })).toBeVisible();
 });
 

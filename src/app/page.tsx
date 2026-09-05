@@ -179,6 +179,7 @@ import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from ".
 import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
 import { CardImage, EmptyState, Metric, MoneyInput } from "./components/UiBits";
 import { PriceHistorySheet, StockHistorySparkline } from "./components/PriceHistory";
+import { ListingEditor, type ListingEditorPatch } from "./components/ListingEditor";
 
 const InventoryTab = dynamic(() => import("./components/InventoryTab").then((mod) => mod.InventoryTab));
 const ListingsTab = dynamic(() => import("./components/ListingsTab").then((mod) => mod.ListingsTab));
@@ -594,6 +595,8 @@ type InventoryItem = {
 
 type Listing = {
   id: string;
+  description?: string | null;
+  ebayOfferId?: string | null;
   channel: Channel;
   state: ListingState;
   title: string | null;
@@ -1132,7 +1135,7 @@ export default function Home() {
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("needs-action");
   const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
   const [listingQuery, setListingQuery] = useState("");
-  const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("DRAFT");
+  const [listingStateFilter, setListingStateFilter] = useState<ListingStateFilter>("ALL");
   const [listingSort, setListingSort] = useState<ListingSort>("newest");
   const [quickHunts, setQuickHunts] = useState<QuickHuntCard[]>(DEFAULT_QUICK_HUNTS);
   const [recentSetIds, setRecentSetIds] = useState<string[]>([]);
@@ -5656,7 +5659,7 @@ export default function Home() {
     const reservations = offlineStorageSupported() ? await listOfflineSaleReservations() : [];
     const current = latestWorkspaceRef.current.inventory.find((row) => row.id === item?.id);
     if (!current || current.status === "SOLD" || current.status === "RESERVED" || current.quantity < 1 || availableOfflineSaleQuantity(current, reservations) !== current.quantity) {
-      throw new Error("Sync and refresh this card before publishing or marking it live; a sale is reserved or its stock has changed on this device.");
+      throw new Error("Sync and refresh this card before editing, publishing or marking it live; a sale is reserved or its stock has changed on this device.");
     }
   }
 
@@ -6420,9 +6423,10 @@ export default function Home() {
 
   function openListingEditor(listing: Listing) {
     setView("listings");
-    setListingStateFilter(
-      listing.state === "ACTIVE" || listing.state === "DRAFT" ? listing.state : "ALL",
-    );
+    if (view !== "listings") {
+      setListingStateFilter(listing.state === "ACTIVE" || listing.state === "DRAFT" ? listing.state : "ALL");
+      setListingQuery("");
+    }
     setEditingListingId(listing.id);
     setCreatingListingItemId(null);
     setListingPackId(null);
@@ -6773,21 +6777,40 @@ export default function Home() {
     }
   }
 
-  async function saveListing(event: FormEvent) {
-    event.preventDefault();
-    const listing = listings.find((row) => row.id === editingListingId);
-    if (!listing) return;
-    const saved = await patchListing(
-      listing,
-      {
-        channel: listingChannel,
-        state: listingState,
-        listPricePence: listingPrice.trim() ? poundsToPence(listingPrice) : null,
-        externalUrl: listingExternalUrl.trim() || null,
-      },
-      "Listing saved.",
-    );
-    if (saved) setEditingListingId(null);
+  async function saveListing(listing: Listing, patch: ListingEditorPatch): Promise<{ ok: boolean; error?: string }> {
+    const liveEbay = listing.channel === "EBAY" && listing.state === "ACTIVE";
+    setBusy(`listing-${listing.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      if (!navigator.onLine) return { ok: false, error: "Reconnect to save this listing. Your edits are still here." };
+      if (listing.state === "ACTIVE") await assertListingStockAvailable(listing.item);
+      const res = await fetch(`/api/listings/${listing.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const payload = await readJson(res);
+      if (!res.ok) return { ok: false, error: payload.error ?? "Could not save this listing. Your edits are still here." };
+      if (payload.listing?.id !== listing.id || (liveEbay && payload.remoteUpdate?.status !== "confirmed")) {
+        return { ok: false, error: "The update was not confirmed. Check the live listing before trying again; your edits are still here." };
+      }
+      // Apply the acknowledgement immediately. The full workspace refresh must
+      // not keep the phone editor waiting on unrelated provider/ledger reads.
+      setListings((rows) => rows.map((row) => row.id === listing.id ? payload.listing : row));
+      setNotice(liveEbay ? "Live eBay listing updated." : "Listing saved.");
+      void refreshAll();
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof TypeError
+          ? "Connection lost before the update was confirmed. Check the live listing before retrying; your edits are still here."
+          : err instanceof Error ? err.message : "The update was not confirmed. Your edits are still here.",
+      };
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function checkReprices() {
@@ -9431,7 +9454,7 @@ export default function Home() {
                       >
                         {busy === `listing-${stockCompListing.id}` ? "Updating…" : "Use suggestion"}
                       </button>
-                      <button type="button" className="ghost-button" onClick={() => openListingEditor(stockCompListing)}>
+                      <button type="button" className="ghost-button" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); openListingEditor(stockCompListing); }}>
                         Enter another
                       </button>
                     </div>
@@ -10432,6 +10455,30 @@ export default function Home() {
         />
       )}
 
+      {/* Keep edits and pending saves mounted when browser history changes the workspace. */}
+      {(() => {
+        const listing = listings.find((row) => row.id === editingListingId);
+        return listing ? (
+          <ListingEditor
+            key={listing.id}
+            listing={listing}
+            online={offlineSync.online}
+            loadLiveDetails={async () => {
+              const response = await fetch(`/api/listings/${listing.id}/ebay/edit`, { cache: "no-store" });
+              const payload = await readJson(response);
+              if (!response.ok) throw new Error(payload.error ?? "Could not read the live listing. Try again.");
+              if (typeof payload.title !== "string" || typeof payload.description !== "string" ||
+                  !Number.isSafeInteger(payload.listPricePence) || payload.listPricePence < 99) {
+                throw new Error("The live listing details could not be verified. Try again or open the listing on eBay.");
+              }
+              return { title: payload.title, description: payload.description, listPricePence: payload.listPricePence };
+            }}
+            onSave={(patch) => saveListing(listing, patch)}
+            onClose={() => setEditingListingId(null)}
+          />
+        ) : null;
+      })()}
+
       {view === "listings" && (
         <ListingsTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
@@ -10491,60 +10538,6 @@ export default function Home() {
           pasteListingUrlForListing={(listing) => void pasteListingUrlForListing(listing)}
           patchListing={(listing, patch, message) => void patchListing(listing, patch, message)}
           setEbayPublishTarget={setEbayPublishTarget}
-          editListingSheet={
-            editingListingId ? (
-              <form className="sell-sheet" onSubmit={saveListing}>
-                <div className="panel-heading">
-                  <div>
-                    <h2>Edit your list price</h2>
-                    <span className="muted">Comps suggest. You decide what price goes to the marketplace.</span>
-                  </div>
-                  <button className="ghost-button" type="button" onClick={() => setEditingListingId(null)}>Close</button>
-                </div>
-                <div className="pricing-context-grid">
-                  <div>
-                    <span>What I paid</span>
-                    <strong>{gbp(listings.find((row) => row.id === editingListingId)?.item?.costBasis ?? 0)}</strong>
-                  </div>
-                  <div>
-                    <span>Suggested list price</span>
-                    <strong>{gbp(listings.find((row) => row.id === editingListingId)?.suggestedPrice ?? 0)}</strong>
-                  </div>
-                </div>
-                <div className="form-grid">
-                  <label>
-                    Your list price
-                    <MoneyInput value={listingPrice} onChange={setListingPrice} />
-                    <small>You choose this price. Comps are guidance, not a gate.</small>
-                  </label>
-                  <label>
-                    Channel
-                    <select value={listingChannel} onChange={(event) => setListingChannel(event.target.value as Channel)}>
-                      {channels.map((c) => <option key={c} value={c}>{channelLabel(c)}</option>)}
-                    </select>
-                  </label>
-                </div>
-                {listingChannel === "EBAY" && poundsToPence(listingPrice) < 99 && (
-                  <p className="price-rule-warning">eBay requires Your list price to be at least £0.99. What you paid can still be £0.00.</p>
-                )}
-                <label>
-                  State
-                  <select value={listingState} onChange={(event) => setListingState(event.target.value as Exclude<ListingState, "SOLD">)}>
-                    <option value="DRAFT">draft</option>
-                    <option value="ACTIVE">active</option>
-                    <option value="ENDED">ended</option>
-                  </select>
-                </label>
-                <label>
-                  Listing URL
-                  <input name="listing-url" type="url" inputMode="url" value={listingExternalUrl} onChange={(event) => setListingExternalUrl(event.target.value)} placeholder="https://example.com/item…" />
-                </label>
-                <button className="primary-action" type="submit" disabled={busy === `listing-${editingListingId}` || (listingChannel === "EBAY" && poundsToPence(listingPrice) < 99)}>
-                  {busy === `listing-${editingListingId}` ? "Saving…" : "Save listing"}
-                </button>
-              </form>
-            ) : null
-          }
           onBulkPack={(selected, targetChannel, mode) => void buildBulkListingPack(selected as Listing[], targetChannel, mode)}
           listingPackSheet={
             listingPackTarget && listingPack ? (

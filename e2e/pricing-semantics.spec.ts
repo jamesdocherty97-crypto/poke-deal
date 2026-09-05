@@ -98,11 +98,9 @@ test("old no-cost stock keeps purchase cost, market guidance and user list price
   await page.getByRole("button", { name: "List", exact: true }).click();
   const listingRow = page.locator(".listings-workspace .item-row").filter({ hasText: "Norman" });
   await listingRow.getByRole("button", { name: "Edit price", exact: true }).click();
-  const listingEditor = page.locator(".sell-sheet").filter({
-    has: page.getByRole("heading", { name: /Edit (your )?list price/i }),
-  });
+  const listingEditor = page.getByRole("dialog", { name: "Edit listing", exact: true });
   await expect(listingEditor.getByLabel(/^Your list price/)).toHaveValue("5.00");
-  await expect(listingEditor).toContainText("Comps are guidance, not a gate");
+  await expect(listingEditor).toContainText("guidance only");
   await listingEditor.getByLabel(/^Your list price/).fill("6.25");
   await listingEditor.getByRole("button", { name: "Save listing" }).click();
 

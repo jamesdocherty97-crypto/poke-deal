@@ -5,25 +5,24 @@ import { ebayListingIdFromUrl } from "@/lib/dealer/listingUrl";
 import { getPrisma } from "@/lib/db/prisma";
 import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
-import { fetchEbayPolicies } from "@/lib/ebay/policies";
 import { withdrawEbayOffer } from "@/lib/ebay/offer";
 import { activeListingEditError, planListingEnd } from "@/lib/dealer/listingEnd";
-import { validateEbayRawCondition } from "@/lib/ebay/inventoryItem";
-import { buildEbayOfferPreflight, toEbaySku } from "@/lib/ebay/preflight";
+import { toEbaySku } from "@/lib/ebay/preflight";
+import { buildListingPack } from "@/lib/dealer/listingPack";
+import { editLiveEbayOffer, LiveEbayEditError, type LiveEbayEditField } from "@/lib/ebay/liveOfferEdit";
+import { readBoundedJson } from "@/lib/http/boundedJson";
 import {
   hasEbayOfferPresentationChanged,
-  synchronizeEbayOffer,
   validateEbayListPricePence,
 } from "@/lib/ebay/offerSync";
-import { ebayApiErrorLogBody, ebayApiErrorResponseBody, isEbayApiError } from "@/lib/ebay/errors";
-import { photoRequirementMessage, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
+import { ebayApiErrorResponseBody } from "@/lib/ebay/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const nullableText = z.preprocess(
+const nullableText = (maxLength: number) => z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? null : value),
-  z.string().trim().min(1).nullable().optional(),
+  z.string().trim().min(1).max(maxLength).nullable().optional(),
 );
 
 const nullableUrl = z.preprocess(
@@ -34,12 +33,12 @@ const nullableUrl = z.preprocess(
 const listingPatchSchema = z.object({
   channel: z.enum(["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"]).optional(),
   state: z.enum(["DRAFT", "ACTIVE", "ENDED"]).optional(),
-  title: nullableText,
+  title: nullableText(200),
   titleCustomized: z.boolean().optional(),
-  description: nullableText,
-  suggestedPricePence: z.coerce.number().int().nonnegative().nullable().optional(),
-  listPricePence: z.coerce.number().int().nonnegative().nullable().optional(),
-  externalRef: nullableText,
+  description: nullableText(50_000),
+  suggestedPricePence: z.coerce.number().int().nonnegative().max(2_147_483_647).nullable().optional(),
+  listPricePence: z.coerce.number().int().nonnegative().max(2_147_483_647).nullable().optional(),
+  externalRef: nullableText(200),
   externalUrl: nullableUrl,
   externalRemovalConfirmed: z.boolean().optional(),
 });
@@ -49,8 +48,9 @@ export async function PATCH(
   props: { params: Promise<{ id: string }> },
 ) {
   const params = await props.params;
-  const body = await request.json().catch(() => null);
-  const parsed = listingPatchSchema.safeParse(body);
+  const body = await readBoundedJson(request, 256 * 1024);
+  if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.status });
+  const parsed = listingPatchSchema.safeParse(body.value);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -64,6 +64,15 @@ export async function PATCH(
     );
   }
 
+  let liveEbaySync: {
+    offerId: string;
+    pricePence: number;
+    syncedAt: Date;
+    title?: string;
+    description?: string;
+    titleCustomized: boolean;
+    fields: LiveEbayEditField[];
+  } | null = null;
   try {
     const d = parsed.data;
     const prisma = getPrisma();
@@ -106,6 +115,9 @@ export async function PATCH(
       }
     }
     const effectiveChannel = d.channel ?? existing.channel;
+    if (effectiveChannel === "EBAY" && d.title && d.title.length > 80) {
+      return NextResponse.json({ error: "The eBay title must be 80 characters or fewer." }, { status: 400 });
+    }
     if (effectiveChannel === "EBAY" && d.externalUrl && existing.state !== "ACTIVE") {
       const itemReference = ebayListingIdFromUrl(d.externalUrl);
       if (!itemReference) return NextResponse.json({ error: "Paste the individual live eBay item URL, not a search or seller page." }, { status: 400 });
@@ -117,16 +129,19 @@ export async function PATCH(
     const effectiveTitle = d.title !== undefined ? d.title : existing.title;
     const effectiveTitleCustomized =
       d.titleCustomized ?? (d.title !== undefined ? Boolean(d.title) : existing.titleCustomized);
+    const effectiveDescription = d.description !== undefined ? d.description : existing.description;
     const ebayOfferPresentationChanged = hasEbayOfferPresentationChanged(
       {
         listPricePence: existing.listPrice,
         title: existing.title,
         titleCustomized: existing.titleCustomized,
+        description: existing.description,
       },
       {
         listPricePence: effectiveListPrice,
         title: effectiveTitle,
         titleCustomized: effectiveTitleCustomized,
+        description: effectiveDescription,
       },
     );
 
@@ -180,26 +195,24 @@ export async function PATCH(
       }
     }
 
-    // Buyer-visible edits to a live eBay offer are remote-first: eBay must
-    // accept the rebuilt offer before the local title or price can change.
-    // This prevents the app claiming copy that buyers cannot actually see.
-    let liveEbaySync: {
-      offerId: string;
-      pricePence: number;
-      syncedAt: Date;
-      title: string;
-      titleCustomized: boolean;
-    } | null = null;
+    // Keep live changes narrow, preserving eBay's current photos, quantity,
+    // condition and policies. Only persist buyer-facing edits after acceptance.
     const editingLiveEbayOffer =
       effectiveChannel === "EBAY" &&
       existing.channel === "EBAY" &&
       existing.state === "ACTIVE" &&
-      ebayOfferPresentationChanged;
+      (ebayOfferPresentationChanged || d.title !== undefined || d.titleCustomized !== undefined || d.description !== undefined || d.listPricePence !== undefined);
 
     if (editingLiveEbayOffer) {
-      const priceError = validateEbayListPricePence(effectiveListPrice);
-      if (priceError) {
-        return NextResponse.json({ error: priceError }, { status: 400 });
+      if (d.listPricePence !== undefined) {
+        const priceError = validateEbayListPricePence(d.listPricePence);
+        if (priceError) return NextResponse.json({ error: priceError }, { status: 400 });
+      }
+      if (d.description === null) {
+        return NextResponse.json({ error: "Enter the description you want buyers to see. A live eBay description cannot be cleared without reviewed replacement text." }, { status: 400 });
+      }
+      if (d.title === null && d.titleCustomized !== false) {
+        return NextResponse.json({ error: "Enter the title you want buyers to see. A live eBay title cannot be blank." }, { status: 400 });
       }
       const current = await prisma.listing.findUnique({
         where: { id: params.id },
@@ -214,6 +227,9 @@ export async function PATCH(
       });
       if (!current) {
         return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+      }
+      if (current.state !== "ACTIVE" || current.channel !== "EBAY" || current.item.status === "SOLD" || current.item.quantity <= 0) {
+        return NextResponse.json({ error: "This listing no longer has available stock to edit. Refresh Listings before continuing." }, { status: 409 });
       }
       // A pasted live URL does not prove that an old offer for this SKU owns it.
       // Require the stored association instead of inferring one from the SKU.
@@ -231,37 +247,11 @@ export async function PATCH(
         );
       }
 
-      const conditionError = validateEbayRawCondition(current.item.grade, current.item.condition);
-      if (conditionError) return NextResponse.json({ error: conditionError }, { status: 400 });
-
-      const listPricePence = effectiveListPrice!;
-      const photoSummary = summarizeListingPhotos({
-        photos: current.item.photos,
-        grade: current.item.grade,
-        pricePence: listPricePence,
-      });
-      if (!photoSummary.satisfiesEbayPhotoRequirement) {
-        return NextResponse.json(
-          {
-            error: `${photoRequirementMessage(photoSummary)} The live listing was not changed.`,
-            canUseCatalogArt: photoSummary.catalogPhotoAllowed,
-          },
-          { status: 400 },
-        );
-      }
-
       const config = getEbayConfig()!;
       try {
         const accessToken = await getAccessToken(config);
-        const policies = await fetchEbayPolicies(config, accessToken);
         const sku = toEbaySku(current.id, current.itemId);
-        const preflight = buildEbayOfferPreflight({
-          listingId: current.id,
-          itemId: current.itemId,
-          title: effectiveTitle,
-          titleCustomized: effectiveTitleCustomized,
-          description: current.description,
-          packInput: {
+        const pack = buildListingPack({
             card: {
               name: current.item.card.name,
               setName: current.item.card.setName,
@@ -272,36 +262,48 @@ export async function PATCH(
               finish: current.item.card.finish,
             },
             grade: current.item.grade,
-            listPricePence,
             condition: current.item.condition ?? undefined,
             certNumber: current.item.graderCert ?? undefined,
-            usesCatalogOnlyImages: photoSummary.catalogOnly,
-          },
-          quantity: current.item.quantity ?? 1,
-          imageUrls: photoSummary.imageUrls,
-          policies,
-          config,
         });
-        const synced = await synchronizeEbayOffer({
+        // Explicit fields are intentional even when they equal stale local
+        // values: the editor starts from the current remote snapshot.
+        const titleChanged = d.title !== undefined || d.titleCustomized !== undefined;
+        const descriptionChanged = d.description !== undefined;
+        const changes = {
+          ...(titleChanged ? { title: effectiveTitleCustomized && effectiveTitle ? effectiveTitle : pack.title } : {}),
+          ...(descriptionChanged ? { description: d.description! } : {}),
+          ...(d.listPricePence !== undefined ? { listPricePence: d.listPricePence! } : {}),
+        };
+        if (!current.externalRef || ebayListingIdFromUrl(current.externalUrl ?? "") !== current.externalRef) {
+          return NextResponse.json({ error: "The saved eBay item reference and URL do not match. No update was sent; check the listing on eBay." }, { status: 409 });
+        }
+        const synced = await editLiveEbayOffer({
           config,
           accessToken,
-          preflight,
-          listPricePence,
           offerId,
+          listingId: current.externalRef,
+          sku,
+          changes,
         });
         liveEbaySync = {
-          offerId: synced.offerId,
-          pricePence: synced.syncedPricePence,
+          offerId,
+          pricePence: synced.snapshot.listPricePence,
           syncedAt: new Date(),
-          title: preflight.title,
-          titleCustomized: effectiveTitleCustomized,
+          title: synced.snapshot.title,
+          description: synced.snapshot.description,
+          titleCustomized: titleChanged ? effectiveTitleCustomized : existing.titleCustomized || synced.snapshot.title !== existing.title,
+          fields: synced.fields,
         };
       } catch (err) {
-        if (isEbayApiError(err)) {
-          console.error("[ebay] live listing sync failed", ebayApiErrorLogBody(err));
+        if (err instanceof LiveEbayEditError) {
+          return NextResponse.json({ error: err.message, remoteUpdate: {
+            status: err.confirmedFields.length ? "partial" : "unconfirmed",
+            confirmedFields: err.confirmedFields,
+            attemptedFields: err.attemptedFields,
+          } }, { status: err.status });
         }
         return NextResponse.json(
-          ebayApiErrorResponseBody(err, "eBay rejected the live listing update; the app was not changed"),
+          { ...ebayApiErrorResponseBody(err, "Could not read the current eBay listing; no update was sent."), remoteUpdate: { status: "unconfirmed", confirmedFields: [], attemptedFields: [] } },
           { status: 502 },
         );
       }
@@ -313,6 +315,13 @@ export async function PATCH(
         include: { item: true },
       });
       if (!current) return null;
+      if (liveEbaySync && (current.state !== "ACTIVE" || current.channel !== "EBAY" ||
+          current.item.status === "SOLD" || current.item.quantity <= 0 ||
+          current.ebayOfferId !== existing.ebayOfferId || current.externalRef !== existing.externalRef ||
+          current.title !== existing.title || current.titleCustomized !== existing.titleCustomized ||
+          current.description !== existing.description || current.listPrice !== existing.listPrice)) {
+        throw new Error("This listing changed while eBay was updating. Refresh Listings and check the live item before continuing.");
+      }
       if (d.state === "ACTIVE" && current.item.status === "SOLD") {
         throw new Error("Sold stock cannot be activated on a marketplace.");
       }
@@ -341,8 +350,12 @@ export async function PATCH(
         data.ebayOfferId = liveEbaySync.offerId;
         data.offerSyncedAt = liveEbaySync.syncedAt;
         data.offerSyncedPrice = liveEbaySync.pricePence;
-        data.title = liveEbaySync.title;
-        data.titleCustomized = liveEbaySync.titleCustomized;
+        data.listPrice = liveEbaySync.pricePence;
+        if (liveEbaySync.title !== undefined) {
+          data.title = liveEbaySync.title;
+          data.titleCustomized = liveEbaySync.titleCustomized;
+        }
+        if (liveEbaySync.description !== undefined) data.description = liveEbaySync.description;
       }
 
       const pendingEbayOffer =
@@ -404,11 +417,16 @@ export async function PATCH(
     });
 
     if (!listing) {
+      if (liveEbaySync) throw new Error("The app listing was removed while eBay was updating.");
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ listing });
+    return NextResponse.json({ listing, ...(liveEbaySync ? { remoteUpdate: { status: "confirmed", fields: liveEbaySync.fields } } : {}) });
   } catch (err) {
+    if (liveEbaySync) return NextResponse.json({
+      error: `eBay accepted the changes, but the app could not save them. Refresh Listings and check the live item before retrying. ${err instanceof Error ? err.message : ""}`,
+      remoteUpdate: { status: "partial", confirmedFields: liveEbaySync.fields, attemptedFields: [], localSaved: false },
+    }, { status: 502 });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "listing update failed" },
       { status: 500 },

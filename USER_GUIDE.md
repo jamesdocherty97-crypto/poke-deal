@@ -115,6 +115,12 @@ Use this to manage listing records.
 
 It tracks draft, active, ended and sold listings inside the business ledger. For eBay, it can also create the inventory item/offer and publish when the connected seller account, policies, location and photos are ready. Cardmarket and Vinted are still manual copy/export flows.
 
+On your iPhone, tap **List → Live**, search for the card, then **Edit live listing**. For a linked eBay offer, the editor first loads the current eBay title, description and price. Change the fields you need and tap **Update live eBay listing**. The summary above the button shows what will change; a suggested price is guidance and is never applied automatically. The save button stays visible above the keyboard.
+
+The app confirms success only after eBay accepts the update and the saved record is refreshed. A failed or uncertain update keeps your typed changes in the editor; use **Check live listing on eBay** before retrying an uncertain result. **Cancel** asks before discarding unsaved changes. Keep the editor open if you lose your connection.
+
+Listings without a verified editable eBay offer open a clear eBay fallback. This includes manually tracked links and listings published through the Trading fallback, which the app still uses for some seller accounts. Photos, condition, quantity, delivery and returns are outside this editor; changing a stock record alone does not prove those fields changed on a live marketplace. Ending a listing and recording a sale remain separate actions. Editing Cardmarket or Vinted saves the local record, so update those marketplaces separately.
+
 ### Profit
 
 Use this to understand whether the side hustle is actually making money.

@@ -13,6 +13,7 @@ export interface EbayOfferPresentation {
   listPricePence: number | null;
   title: string | null;
   titleCustomized: boolean;
+  description?: string | null;
 }
 
 /**
@@ -26,7 +27,8 @@ export function hasEbayOfferPresentationChanged(
 ): boolean {
   return before.listPricePence !== after.listPricePence
     || before.title !== after.title
-    || before.titleCustomized !== after.titleCustomized;
+    || before.titleCustomized !== after.titleCustomized
+    || before.description !== after.description;
 }
 
 /**

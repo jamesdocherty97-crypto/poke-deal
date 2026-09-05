@@ -1,0 +1,94 @@
+/* One scroll surface and an always-visible action bar, including the iOS keyboard. */
+.listing-editor {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  width: min(640px, calc(100vw - 48px));
+  height: min(860px, calc(100dvh - 48px));
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-1);
+  color: var(--color-text-primary);
+  box-shadow: var(--elevation-floating);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.listing-editor::backdrop { background: var(--color-scrim); }
+body:has(.listing-editor[open]) { overflow: hidden; }
+body:has(.listing-editor[open]) :is(.primary-nav, .mobile-nav, .mobile-buy-action) { visibility: hidden; }
+.listing-editor-form { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.listing-editor :is(input, textarea, select, button, a, summary) { scroll-margin: 24px 0; }
+.listing-editor :is(input, textarea, select) { font-size: 16px; }
+.listing-editor :is(button, a, summary) { min-height: 44px; }
+.listing-editor :is(button, a, summary):focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.listing-editor :is(p, h2, dl) { margin: 0; }
+.listing-editor a { display: inline-flex; align-items: center; color: var(--color-info); text-underline-offset: 3px; }
+.listing-editor-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px 16px; border-bottom: 1px solid var(--color-border); background: var(--brand-hero-gradient), var(--color-surface-1); }
+.listing-editor-header h2 { margin-top: 7px; font-family: var(--font-display); font-size: 26px; line-height: 1.1; letter-spacing: -.025em; }
+.listing-editor-header h2:focus { outline: none; }
+.listing-editor-kicker { display: flex; align-items: center; gap: 8px; color: var(--color-text-secondary); font-size: 13px; font-weight: var(--font-weight-bold); }
+.listing-editor-pokeball { position: relative; display: inline-block; width: 18px; height: 18px; flex: 0 0 18px; border: 2px solid var(--brand-cream); border-radius: 50%; background: linear-gradient(to bottom, var(--brand-red) 0 42%, var(--brand-ink) 42% 58%, var(--brand-cream) 58%); }
+.listing-editor-pokeball::after { content: ""; position: absolute; inset: 4px; border: 2px solid var(--brand-ink); border-radius: 50%; background: var(--brand-cream); }
+.listing-editor-close { flex: 0 0 44px; width: 44px; padding: 0; font-size: 30px; line-height: 1; background: var(--color-surface-2); }
+.listing-editor-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 20px 24px 28px; scroll-padding: 20px; }
+.listing-editor-card-name { font-size: 17px; font-weight: var(--font-weight-bold); overflow-wrap: anywhere; }
+.listing-editor-context { color: var(--color-text-secondary); font-size: 14px; line-height: 1.5; margin-top: 8px !important; }
+.listing-editor-notice { margin-top: 14px !important; border: 1px solid var(--color-warning-border); border-radius: var(--radius-sm); background: var(--color-warning-surface); padding: 12px; font-size: 14px; line-height: 1.5; }
+.listing-editor-notice p { margin-top: 6px; }
+.listing-editor-fields { min-width: 0; display: grid; gap: 22px; border: 0; padding: 0; margin: 24px 0 0; }
+.listing-editor-fields:disabled { opacity: .7; }
+.listing-editor-price-section { padding: 16px; border: 1px solid var(--color-info-border); border-radius: var(--radius-md); background: var(--color-info-surface); }
+.listing-editor label { color: var(--color-text-primary); font-size: 14px; font-weight: var(--font-weight-bold); }
+.listing-editor-money { display: block; position: relative; margin-top: 8px; }
+.listing-editor-money > span { position: absolute; top: 50%; left: 14px; transform: translateY(-50%); font-size: 28px; font-weight: var(--font-weight-bold); color: var(--color-info); }
+.listing-editor-money input { height: 64px; padding: 8px 14px 8px 40px; border-color: var(--color-info-border); font-size: 30px; font-weight: var(--font-weight-bold); letter-spacing: -.02em; }
+.listing-editor-price-context { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; color: var(--color-text-secondary); font-size: 13px; line-height: 1.5; }
+.listing-editor-price-context strong { color: var(--color-text-primary); }
+.listing-editor-field { display: grid; gap: 8px; min-width: 0; }
+.listing-editor-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.listing-editor-label-row > span { font-size: 13px; color: var(--color-text-secondary); }
+.listing-editor textarea { resize: vertical; line-height: 1.5; }
+.listing-editor .listing-editor-title-input { min-height: 78px; }
+.listing-editor .listing-editor-field-error { color: var(--color-danger-text); font-size: 13px; margin-top: 6px; }
+.listing-editor-help { color: var(--color-text-secondary); font-size: 13px; line-height: 1.5; }
+.listing-editor :is(.listing-editor-destination, .listing-editor-stock) { border-top: 1px solid var(--color-border); }
+.listing-editor :is(.listing-editor-destination, .listing-editor-stock) summary { padding: 14px 0; cursor: pointer; font-size: 14px; font-weight: var(--font-weight-bold); }
+.listing-editor-destination .listing-editor-field { margin-top: 12px; }
+.listing-editor-stock { margin-top: 24px; color: var(--color-text-secondary); font-size: 13px; line-height: 1.5; }
+.listing-editor-stock summary { color: var(--color-text-primary); }
+.listing-editor-stock dl { display: grid; gap: 10px; margin-bottom: 14px; }
+.listing-editor-stock dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.listing-editor-stock dd { color: var(--color-text-primary); margin: 0; }
+.listing-editor-stock p + p { margin-top: 8px; }
+.listing-editor-footer { flex: 0 0 auto; padding: 12px 24px 18px; border-top: 1px solid var(--color-border-strong); background: var(--color-surface-2); box-shadow: 0 -10px 24px rgba(0, 0, 0, .12); }
+.listing-editor-change-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 10px; color: var(--color-text-secondary); font-size: 13px; line-height: 1.4; }
+.listing-editor-change-summary strong { font-weight: var(--font-weight-medium); color: var(--color-text-primary); }
+.listing-editor-change-summary > span { white-space: nowrap; }
+.listing-editor-actions { display: flex; gap: 10px; }
+.listing-editor-actions button { flex: 1; min-width: 0; min-height: 52px; padding: 10px 12px; font-size: 15px; line-height: 1.3; font-weight: var(--font-weight-bold); }
+.listing-editor-actions .listing-editor-save { flex: 2.2; color: var(--brand-ink); background: var(--brand-yellow); border-color: var(--brand-yellow); }
+.listing-editor-actions .listing-editor-discard { color: var(--color-danger-text); border-color: var(--color-danger-border); background: var(--color-danger-surface); }
+.listing-editor-error { max-height: 100px; overflow: auto; margin-bottom: 10px !important; color: var(--color-danger-text); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.listing-editor-error:focus { outline: 2px solid var(--color-danger-border); outline-offset: 3px; }
+.listing-editor-check-live { margin: -4px 0 8px; font-size: 14px; }
+.listing-editor-offline { margin-bottom: 8px !important; color: var(--color-warning); font-size: 13px; line-height: 1.4; }
+.listing-editor-discard-heading { margin-bottom: 12px !important; font-size: 15px; font-weight: var(--font-weight-bold); }
+
+@media (max-width: 680px) {
+  .listing-editor { inset: var(--listing-editor-viewport-top, 0px) 0 auto; width: 100%; height: min(var(--listing-editor-viewport-height, 100dvh), 100dvh); transform: none; border: 0; border-radius: 0; }
+  .listing-editor-header { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); }
+  .listing-editor-scroll { padding: 16px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left)); }
+  .listing-editor-footer { padding: 12px max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+}
+
+@media (max-height: 520px) {
+  .listing-editor-header { padding-top: 10px; padding-bottom: 10px; }
+  .listing-editor-header h2 { font-size: 22px; }
+  .listing-editor-kicker { font-size: 12px; }
+  .listing-editor-footer { padding-top: 8px; }
+}

@@ -101,7 +101,6 @@ export function ListingsTab({
   patchListing,
   setEbayPublishTarget,
   listingPackSheet,
-  editListingSheet,
   onBulkPack,
   loading = false,
 }: {
@@ -162,7 +161,6 @@ export function ListingsTab({
   patchListing: (listing: Listing, patch: Partial<{ state: Exclude<ListingState, "SOLD">; externalRemovalConfirmed: boolean }>, message: string) => void;
   setEbayPublishTarget: (id: string | null) => void;
   listingPackSheet: ReactNode;
-  editListingSheet: ReactNode;
   onBulkPack: (listings: Listing[], channel: Channel, mode: "download" | "copy") => void;
   loading?: boolean;
 }) {
@@ -195,7 +193,7 @@ export function ListingsTab({
     <section className="workspace listings-workspace">
       <section className="workspace-masthead market-masthead" aria-labelledby="listings-loading-title">
         <div className="workspace-masthead-copy">
-          <span className="workspace-kicker">Marketplace operations</span>
+          <span className="workspace-kicker">Trainer’s marketplace</span>
           <h2 id="listings-loading-title">Listings</h2>
           <p>Loading the live draft, active, and sold queues.</p>
         </div>
@@ -213,9 +211,9 @@ export function ListingsTab({
     <section className="workspace listings-workspace">
       <section className="workspace-masthead market-masthead" aria-labelledby="listings-title">
         <div className="workspace-masthead-copy">
-          <span className="workspace-kicker">Marketplace operations</span>
+          <span className="workspace-kicker">Trainer’s marketplace</span>
           <h2 id="listings-title">Listings</h2>
-          <p>Move each card from draft to live listing to booked sale with the next action always in view.</p>
+          <p>Find a card, improve its listing, and keep your sales moving.</p>
         </div>
         <div className="market-pipeline" aria-label="Listing pipeline">
           <Metric label="Draft" value={String(dashboard?.listingsByState.DRAFT ?? 0)} />
@@ -238,152 +236,16 @@ export function ListingsTab({
           </div>
         </section>
       )}
-      <div className="market-command-grid" aria-label="Next marketplace actions">
-      {(firstDraftListingTarget || unlistedStock.length > 0) && (
-        <section className="panel listing-desk-panel market-next-action">
-          <div className="panel-heading">
-            <div>
-              <h2>Listing desk</h2>
-              <span className="muted">
-                {firstDraftListingTarget
-                  ? `${draftListingCount} draft${draftListingCount === 1 ? "" : "s"} ready`
-                  : `${unlistedStock.length} unlisted stock row${unlistedStock.length === 1 ? "" : "s"}`}
-              </span>
-            </div>
-            <button className="ghost-button" type="button" onClick={onAddBuy}>
-              Add buy
-            </button>
-          </div>
-          {firstDraftListingTarget?.item ? (
-            <div className="listing-desk-card">
-              <CardImage
-                src={inventoryDisplayImage(firstDraftListingTarget.item)}
-                className="mini-card-art"
-                fallbackClassName="mini-card-art blank"
-                alt=""
-              />
-              <div>
-                <span>Next draft</span>
-                <strong>{listingQueueLabel(firstDraftListingTarget)}</strong>
-                <small>
-                  {channelLabel(firstDraftListingTarget.channel)} ·{" "}
-                  {gbp(firstDraftListingTarget.listPrice ?? firstDraftListingTarget.suggestedPrice ?? 0)}
-                </small>
-              </div>
-              <button type="button" onClick={startListingDesk}>
-                {firstDraftListingTarget.channel === "EBAY" ? "Review & publish" : "Open pack"}
-              </button>
-            </div>
-          ) : (
-            <div className="listing-desk-card">
-              <CardImage
-                src={inventoryDisplayImage(unlistedStock[0])}
-                className="mini-card-art"
-                fallbackClassName="mini-card-art blank"
-                alt=""
-              />
-              <div>
-                <span>Next stock</span>
-                <strong>{unlistedStock[0]?.card.name ?? "No stock"}</strong>
-                <small>
-                  {unlistedStock[0]
-                    ? `${unlistedStock[0].card.setName} · ${unlistedStock[0].grade.replace(/_/g, " ")}`
-                    : "Buy or import stock first"}
-                </small>
-              </div>
-              <button type="button" onClick={startListingDesk} disabled={!unlistedStock[0]}>
-                Draft listing
-              </button>
-            </div>
-          )}
-        </section>
-      )}
-      {firstSaleListingTarget?.item && (
-        <section className="panel listing-desk-panel sales-desk-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Sales desk</h2>
-              <span className="muted">
-                {activeListingCount} active listing{activeListingCount === 1 ? "" : "s"}
-              </span>
-            </div>
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => {
-                setListingStateFilter("ACTIVE");
-                setListingSort("newest");
-              }}
-            >
-              Active
-            </button>
-          </div>
-          <div className="listing-desk-card">
-            <CardImage
-              src={inventoryDisplayImage(firstSaleListingTarget.item)}
-              className="mini-card-art"
-              fallbackClassName="mini-card-art blank"
-              alt=""
-            />
-            <div>
-              <span>Active · awaiting payment</span>
-              <strong>{listingQueueLabel(firstSaleListingTarget)}</strong>
-              <small>
-                {channelLabel(firstSaleListingTarget.channel)} ·{" "}
-                {gbp(firstSaleListingTarget.listPrice ?? firstSaleListingTarget.suggestedPrice ?? 0)}
-              </small>
-            </div>
-            <button type="button" onClick={() => openSellFromListing(firstSaleListingTarget)}>
-              Record sale
-            </button>
-          </div>
-        </section>
-      )}
-      {ebayStatus?.configured && (
-        <section className="panel ebay-sales-sync-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>eBay sales</h2>
-              <span className="muted">
-                {ebaySalesSync
-                  ? ebaySalesSync.skipped
-                    ? ebaySalesSync.reason ?? "Sync skipped"
-                    : `${ebaySalesSync.matchedCount} matched · ${ebaySalesSync.unmatchedCount} unmatched`
-                  : "Pull paid orders into stock and P&L"}
-              </span>
-            </div>
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={syncEbaySales}
-              disabled={busy === "ebay-sales-sync" || !ebayStatus.connected}
-            >
-              {busy === "ebay-sales-sync" ? "Syncing…" : "Sync eBay sales"}
-            </button>
-          </div>
-          {ebaySalesSync && !ebaySalesSync.skipped && (
-            <div className="ebay-sales-sync-summary">
-              <span>{ebaySalesSync.fetchedOrders} orders checked</span>
-              <span>{ebaySalesSync.matchedCount} sales booked</span>
-              <span>{ebaySalesSync.skippedCount} already imported</span>
-              {ebaySalesSync.unmatchedCount > 0 && <span className="warn">{ebaySalesSync.unmatchedCount} need matching</span>}
-            </div>
-          )}
-          {ebaySalesSync?.imports.some((row) => row.status === "UNMATCHED") && (
-            <div className="ebay-unmatched-list">
-              {ebaySalesSync.imports
-                .filter((row) => row.status === "UNMATCHED")
-                .slice(0, 3)
-                .map((row) => (
-                  <div key={row.importKey}>
-                    <strong>{row.title ?? row.sku ?? "Unmatched eBay order"}</strong>
-                    <small>{row.reason ?? "Needs manual stock match"}</small>
-                  </div>
-                ))}
-            </div>
-          )}
-        </section>
-      )}
+      <div className="listing-queue-filters" role="group" aria-label="Listing queues">
+        {([
+          ["ACTIVE", "Live", activeListingCount],
+          ["DRAFT", "Drafts", draftListingCount],
+          ["ALL", "All", listings.length],
+        ] as const).map(([state, label, count]) => (
+          <button key={state} type="button" aria-pressed={listingStateFilter === state} onClick={() => setListingStateFilter(state)}>
+            {label} <span>{count}</span>
+          </button>
+        ))}
       </div>
       <div className="dex-controls listings-controls market-toolbar" aria-label="Listing search and sort">
         <label className="search-control">
@@ -392,7 +254,9 @@ export function ListingsTab({
             value={listingQuery}
             onChange={(event) => setListingQuery(event.target.value)}
             name="listing-search"
-            placeholder="Card, channel, grade…"
+            placeholder="Find a card, set or listing…"
+            type="search"
+            enterKeyHint="search"
             autoComplete="off"
           />
         </label>
@@ -602,6 +466,153 @@ export function ListingsTab({
         <EmptyState art="search" text="No matching listings. Clear the search or change the state filter." />
       ) : null}
       </div>
+      <div className="market-command-grid" aria-label="Next marketplace actions">
+      {(firstDraftListingTarget || unlistedStock.length > 0) && (
+        <section className="panel listing-desk-panel market-next-action">
+          <div className="panel-heading">
+            <div>
+              <h2>Listing desk</h2>
+              <span className="muted">
+                {firstDraftListingTarget
+                  ? `${draftListingCount} draft${draftListingCount === 1 ? "" : "s"} ready`
+                  : `${unlistedStock.length} unlisted stock row${unlistedStock.length === 1 ? "" : "s"}`}
+              </span>
+            </div>
+            <button className="ghost-button" type="button" onClick={onAddBuy}>
+              Add buy
+            </button>
+          </div>
+          {firstDraftListingTarget?.item ? (
+            <div className="listing-desk-card">
+              <CardImage
+                src={inventoryDisplayImage(firstDraftListingTarget.item)}
+                className="mini-card-art"
+                fallbackClassName="mini-card-art blank"
+                alt=""
+              />
+              <div>
+                <span>Next draft</span>
+                <strong>{listingQueueLabel(firstDraftListingTarget)}</strong>
+                <small>
+                  {channelLabel(firstDraftListingTarget.channel)} ·{" "}
+                  {gbp(firstDraftListingTarget.listPrice ?? firstDraftListingTarget.suggestedPrice ?? 0)}
+                </small>
+              </div>
+              <button type="button" onClick={startListingDesk}>
+                {firstDraftListingTarget.channel === "EBAY" ? "Review & publish" : "Open pack"}
+              </button>
+            </div>
+          ) : (
+            <div className="listing-desk-card">
+              <CardImage
+                src={inventoryDisplayImage(unlistedStock[0])}
+                className="mini-card-art"
+                fallbackClassName="mini-card-art blank"
+                alt=""
+              />
+              <div>
+                <span>Next stock</span>
+                <strong>{unlistedStock[0]?.card.name ?? "No stock"}</strong>
+                <small>
+                  {unlistedStock[0]
+                    ? `${unlistedStock[0].card.setName} · ${unlistedStock[0].grade.replace(/_/g, " ")}`
+                    : "Buy or import stock first"}
+                </small>
+              </div>
+              <button type="button" onClick={startListingDesk} disabled={!unlistedStock[0]}>
+                Draft listing
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+      {firstSaleListingTarget?.item && (
+        <section className="panel listing-desk-panel sales-desk-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Sales desk</h2>
+              <span className="muted">
+                {activeListingCount} active listing{activeListingCount === 1 ? "" : "s"}
+              </span>
+            </div>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => {
+                setListingStateFilter("ACTIVE");
+                setListingSort("newest");
+              }}
+            >
+              Active
+            </button>
+          </div>
+          <div className="listing-desk-card">
+            <CardImage
+              src={inventoryDisplayImage(firstSaleListingTarget.item)}
+              className="mini-card-art"
+              fallbackClassName="mini-card-art blank"
+              alt=""
+            />
+            <div>
+              <span>Live · available to buyers</span>
+              <strong>{listingQueueLabel(firstSaleListingTarget)}</strong>
+              <small>
+                {channelLabel(firstSaleListingTarget.channel)} ·{" "}
+                {gbp(firstSaleListingTarget.listPrice ?? firstSaleListingTarget.suggestedPrice ?? 0)}
+              </small>
+            </div>
+            <button type="button" onClick={() => openSellFromListing(firstSaleListingTarget)}>
+              Record sale
+            </button>
+          </div>
+        </section>
+      )}
+      {ebayStatus?.configured && (
+        <section className="panel ebay-sales-sync-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>eBay sales</h2>
+              <span className="muted">
+                {ebaySalesSync
+                  ? ebaySalesSync.skipped
+                    ? ebaySalesSync.reason ?? "Sync skipped"
+                    : `${ebaySalesSync.matchedCount} matched · ${ebaySalesSync.unmatchedCount} unmatched`
+                  : "Pull paid orders into stock and P&L"}
+              </span>
+            </div>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={syncEbaySales}
+              disabled={busy === "ebay-sales-sync" || !ebayStatus.connected}
+            >
+              {busy === "ebay-sales-sync" ? "Syncing…" : "Sync eBay sales"}
+            </button>
+          </div>
+          {ebaySalesSync && !ebaySalesSync.skipped && (
+            <div className="ebay-sales-sync-summary">
+              <span>{ebaySalesSync.fetchedOrders} orders checked</span>
+              <span>{ebaySalesSync.matchedCount} sales booked</span>
+              <span>{ebaySalesSync.skippedCount} already imported</span>
+              {ebaySalesSync.unmatchedCount > 0 && <span className="warn">{ebaySalesSync.unmatchedCount} need matching</span>}
+            </div>
+          )}
+          {ebaySalesSync?.imports.some((row) => row.status === "UNMATCHED") && (
+            <div className="ebay-unmatched-list">
+              {ebaySalesSync.imports
+                .filter((row) => row.status === "UNMATCHED")
+                .slice(0, 3)
+                .map((row) => (
+                  <div key={row.importKey}>
+                    <strong>{row.title ?? row.sku ?? "Unmatched eBay order"}</strong>
+                    <small>{row.reason ?? "Needs manual stock match"}</small>
+                  </div>
+                ))}
+            </div>
+          )}
+        </section>
+      )}
+      </div>
       <section className="panel listing-workhorse market-pack-tools" aria-label="Build selected listing pack">
         <div className="panel-heading">
           <div>
@@ -637,7 +648,6 @@ export function ListingsTab({
           eBay pack CSV
         </a>
       </div>
-      {editListingSheet}
       {listingPackSheet}
     </section>
   );
@@ -853,8 +863,8 @@ function ListingRow({
           {listing.suggestedPrice != null && (
             <small>Suggested list price {gbp(listing.suggestedPrice)}</small>
           )}
-          {listing.state !== "SOLD" && (
-            <button type="button" onClick={() => onEdit(listing)} disabled={isBusy}>
+          {listing.state !== "SOLD" && !needsRemoval && !(isEbay && isPublished) && (
+            <button type="button" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onEdit(listing); }} disabled={isBusy}>
               Edit price
             </button>
           )}
@@ -898,8 +908,11 @@ function ListingRow({
               </button>
             ) : isEbay && isPublished ? (
               <div className="listing-live-actions">
-                <a className="next-action-button good" href={listing.externalUrl!} target="_blank" rel="noreferrer">
-                  View live listing
+                <button className="next-action-button" type="button" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onEdit(listing); }} disabled={isBusy}>
+                  Edit live listing
+                </button>
+                <a className="ghost-button" href={listing.externalUrl!} target="_blank" rel="noreferrer">
+                  View on eBay
                 </a>
                 {canSell && (
                   <button className="next-action-button" type="button" onClick={() => onSell(listing)} disabled={Boolean(busy?.startsWith("sell-"))}>
@@ -970,7 +983,7 @@ function ListingRow({
               Use catalog art
             </button>
           )}
-          <button type="button" onClick={() => onEdit(listing)} disabled={isBusy || listing.state === "SOLD"}>
+          <button type="button" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onEdit(listing); }} disabled={isBusy || listing.state === "SOLD" || needsRemoval}>
             Edit listing details
           </button>
           {listing.item && (
