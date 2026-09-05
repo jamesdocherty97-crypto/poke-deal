@@ -172,6 +172,94 @@ test("dirty close offers stay or discard without accidentally saving", async ({ 
   assertClean(fixture);
 });
 
+test("same-document Back and Forward preserve the entered listing draft", async ({ page, context }) => {
+  const fixture = await installFixture(context, page);
+  await page.goto("/?view=today");
+  await page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("button", { name: "List", exact: true }).click();
+  await expect(page).toHaveURL(/[?&]view=list(?:&|$)/);
+  await page.locator('input[name="listing-search"]').fill("Gengar");
+  await page.locator('select[name="listing-sort"]').selectOption("highest-price");
+  const { dialog } = await openEditor(page, fixture, false);
+  await dialog.getByRole("textbox", { name: "Listing title", exact: true }).fill(UPDATED_TITLE);
+  await dialog.getByRole("textbox", { name: "Description", exact: true }).fill(UPDATED_DESCRIPTION);
+  await dialog.getByRole("textbox", { name: "Your list price (£)", exact: true }).fill("42.75");
+  const readsBeforeNavigation = fixture.reads;
+
+  await page.goBack();
+  await expect(page).toHaveURL(/[?&]view=today(?:&|$)/);
+  await expect(page.locator(".today-workspace")).toBeAttached();
+  await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate((node) => node.matches(":modal"))).toBe(true);
+  await expect(dialog.getByRole("textbox", { name: "Listing title", exact: true })).toHaveValue(UPDATED_TITLE);
+  await expect(dialog.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(UPDATED_DESCRIPTION);
+  await expect(dialog.getByRole("textbox", { name: "Your list price (£)", exact: true })).toHaveValue("42.75");
+
+  await page.goForward();
+  await expect(page).toHaveURL(/[?&]view=list(?:&|$)/);
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("textbox", { name: "Listing title", exact: true })).toHaveValue(UPDATED_TITLE);
+  await expect(dialog.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(UPDATED_DESCRIPTION);
+  await expect(dialog.getByRole("textbox", { name: "Your list price (£)", exact: true })).toHaveValue("42.75");
+  expect(fixture.reads, "History navigation does not replace the editor's remote baseline").toBe(readsBeforeNavigation);
+  expect(fixture.patches).toEqual([]);
+
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Keep editing", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Keep editing", exact: true }).click();
+  await expect(dialog.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(UPDATED_DESCRIPTION);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await dialog.getByRole("button", { name: "Discard changes", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.locator('input[name="listing-search"]')).toHaveValue("Gengar");
+  await expect(page.locator('select[name="listing-state"]')).toHaveValue("ACTIVE");
+  await expect(page.locator('select[name="listing-sort"]')).toHaveValue("highest-price");
+  await expect(page.getByRole("button", { name: "Edit live listing", exact: true })).toBeVisible();
+  expect(fixture.patches).toEqual([]);
+  assertClean(fixture);
+});
+
+test("same-document Back preserves an in-flight save until confirmation and Forward returns its updated queue", async ({ page, context }) => {
+  const fixture = await installFixture(context, page);
+  let release!: () => void;
+  fixture.patchGate = new Promise<void>((resolve) => { release = resolve; });
+  await page.goto("/?view=today");
+  await page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("button", { name: "List", exact: true }).click();
+  await expect(page).toHaveURL(/[?&]view=list(?:&|$)/);
+  const { dialog } = await openEditor(page, fixture, false);
+  await dialog.getByRole("textbox", { name: "Description", exact: true }).fill(UPDATED_DESCRIPTION);
+  await dialog.getByRole("textbox", { name: "Your list price (£)", exact: true }).fill("42.75");
+  const readsBeforeSave = fixture.reads;
+  await dialog.getByRole("button", { name: "Update live eBay listing", exact: true }).click();
+  await expect.poll(() => fixture.patches.length).toBe(1);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/[?&]view=today(?:&|$)/);
+  await expect(page.locator(".today-workspace")).toBeAttached();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(UPDATED_DESCRIPTION);
+  await expect(dialog.getByRole("textbox", { name: "Your list price (£)", exact: true })).toHaveValue("42.75");
+  await expect(dialog.locator('button[type="submit"]')).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Close listing editor", exact: true })).toBeDisabled();
+  await expect(page.getByText("Live eBay listing updated.", { exact: true })).toHaveCount(0);
+  expect(fixture.listing.listPrice).toBe(4500);
+  expect(fixture.reads).toBe(readsBeforeSave);
+  expect(fixture.patches).toEqual([{ description: UPDATED_DESCRIPTION, listPricePence: 4275 }]);
+
+  release();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByText("Live eBay listing updated.", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/[?&]view=today(?:&|$)/);
+  await page.goForward();
+  await expect(page).toHaveURL(/[?&]view=list(?:&|$)/);
+  await expect(dialog).toHaveCount(0);
+  const row = page.locator(".market-list .item-row").filter({ has: page.getByRole("heading", { name: TITLE, exact: true }) });
+  await expect(row).toContainText("£42.75");
+  await expect(row.getByRole("button", { name: "Edit live listing", exact: true })).toBeVisible();
+  expect(fixture.patches).toEqual([{ description: UPDATED_DESCRIPTION, listPricePence: 4275 }]);
+  expect(fixture.listing.description).toBe(UPDATED_DESCRIPTION);
+  assertClean(fixture);
+});
+
 test("a manually tracked live eBay listing gives a truthful marketplace fallback", async ({ page, context }) => {
   const fixture = await installFixture(context, page, { manuallyTracked: true });
   const { dialog } = await openEditor(page, fixture);

@@ -101,7 +101,6 @@ export function ListingsTab({
   patchListing,
   setEbayPublishTarget,
   listingPackSheet,
-  editListingSheet,
   onBulkPack,
   loading = false,
 }: {
@@ -162,7 +161,6 @@ export function ListingsTab({
   patchListing: (listing: Listing, patch: Partial<{ state: Exclude<ListingState, "SOLD">; externalRemovalConfirmed: boolean }>, message: string) => void;
   setEbayPublishTarget: (id: string | null) => void;
   listingPackSheet: ReactNode;
-  editListingSheet: ReactNode;
   onBulkPack: (listings: Listing[], channel: Channel, mode: "download" | "copy") => void;
   loading?: boolean;
 }) {
@@ -650,7 +648,6 @@ export function ListingsTab({
           eBay pack CSV
         </a>
       </div>
-      {editListingSheet}
       {listingPackSheet}
     </section>
   );

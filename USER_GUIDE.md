@@ -119,7 +119,7 @@ On your iPhone, tap **List → Live**, search for the card, then **Edit live lis
 
 The app confirms success only after eBay accepts the update and the saved record is refreshed. A failed or uncertain update keeps your typed changes in the editor; use **Check live listing on eBay** before retrying an uncertain result. **Cancel** asks before discarding unsaved changes. Keep the editor open if you lose your connection.
 
-Listings without a verified editable eBay offer open a clear eBay fallback. This includes manually tracked links and listings published through the older Trading fallback. Photos, condition, quantity, delivery and returns are outside this editor; changing a stock record alone does not prove those fields changed on a live marketplace. Ending a listing and recording a sale remain separate actions. Editing Cardmarket or Vinted saves the local record, so update those marketplaces separately.
+Listings without a verified editable eBay offer open a clear eBay fallback. This includes manually tracked links and listings published through the Trading fallback, which the app still uses for some seller accounts. Photos, condition, quantity, delivery and returns are outside this editor; changing a stock record alone does not prove those fields changed on a live marketplace. Ending a listing and recording a sale remain separate actions. Editing Cardmarket or Vinted saves the local record, so update those marketplaces separately.
 
 ### Profit
 

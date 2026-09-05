@@ -10455,6 +10455,30 @@ export default function Home() {
         />
       )}
 
+      {/* Keep edits and pending saves mounted when browser history changes the workspace. */}
+      {(() => {
+        const listing = listings.find((row) => row.id === editingListingId);
+        return listing ? (
+          <ListingEditor
+            key={listing.id}
+            listing={listing}
+            online={offlineSync.online}
+            loadLiveDetails={async () => {
+              const response = await fetch(`/api/listings/${listing.id}/ebay/edit`, { cache: "no-store" });
+              const payload = await readJson(response);
+              if (!response.ok) throw new Error(payload.error ?? "Could not read the live listing. Try again.");
+              if (typeof payload.title !== "string" || typeof payload.description !== "string" ||
+                  !Number.isSafeInteger(payload.listPricePence) || payload.listPricePence < 99) {
+                throw new Error("The live listing details could not be verified. Try again or open the listing on eBay.");
+              }
+              return { title: payload.title, description: payload.description, listPricePence: payload.listPricePence };
+            }}
+            onSave={(patch) => saveListing(listing, patch)}
+            onClose={() => setEditingListingId(null)}
+          />
+        ) : null;
+      })()}
+
       {view === "listings" && (
         <ListingsTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
@@ -10514,28 +10538,6 @@ export default function Home() {
           pasteListingUrlForListing={(listing) => void pasteListingUrlForListing(listing)}
           patchListing={(listing, patch, message) => void patchListing(listing, patch, message)}
           setEbayPublishTarget={setEbayPublishTarget}
-          editListingSheet={(() => {
-            const listing = listings.find((row) => row.id === editingListingId);
-            return listing ? (
-              <ListingEditor
-                key={listing.id}
-                listing={listing}
-                online={offlineSync.online}
-                loadLiveDetails={async () => {
-                  const response = await fetch(`/api/listings/${listing.id}/ebay/edit`, { cache: "no-store" });
-                  const payload = await readJson(response);
-                  if (!response.ok) throw new Error(payload.error ?? "Could not read the live listing. Try again.");
-                  if (typeof payload.title !== "string" || typeof payload.description !== "string" ||
-                      !Number.isSafeInteger(payload.listPricePence) || payload.listPricePence < 99) {
-                    throw new Error("The live listing details could not be verified. Try again or open the listing on eBay.");
-                  }
-                  return { title: payload.title, description: payload.description, listPricePence: payload.listPricePence };
-                }}
-                onSave={(patch) => saveListing(listing, patch)}
-                onClose={() => setEditingListingId(null)}
-              />
-            ) : null;
-          })()}
           onBulkPack={(selected, targetChannel, mode) => void buildBulkListingPack(selected as Listing[], targetChannel, mode)}
           listingPackSheet={
             listingPackTarget && listingPack ? (
