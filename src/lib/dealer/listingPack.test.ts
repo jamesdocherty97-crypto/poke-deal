@@ -11,6 +11,7 @@ import {
   ebayCondition,
   listingPackCsvHeader,
   listingPackCopyFields,
+  normalizeListingRawCondition,
   suggestListPricePence,
   suggestPostage,
 } from "./listingPack.js";
@@ -141,6 +142,66 @@ test("raw item specifics carry the condition, not a grader", () => {
   const specifics = buildItemSpecifics(moonbreon);
   assert.equal(specifics["Card Condition"], "Near Mint");
   assert.equal(specifics["Professional Grader"], undefined);
+  assert.equal(specifics.Features, undefined);
+  assert.equal(specifics.Finish, undefined);
+});
+
+test("listing copy never invents a condition for uninspected raw stock", () => {
+  for (const channel of ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"] as const) {
+    const input = { ...moonbreon, condition: undefined, channel };
+    const pack = buildListingPack(input);
+    assert.doesNotMatch(pack.copyReady, /Near Mint|\bNM\b/);
+    assert.match(pack.copyReady, /Condition not recorded/);
+    assert.doesNotMatch(buildListingPackCsv([input]), /Near Mint|\bNM\b/);
+  }
+});
+
+test("all listing channels preserve the recorded edition and finish", () => {
+  for (const channel of ["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"] as const) {
+    const input = {
+      ...moonbreon,
+      card: { name: "Pikachu", setName: "Jungle", number: "60/64", edition: "FIRST_EDITION", finish: "NORMAL" },
+      channel,
+    };
+    const pack = buildListingPack(input);
+    assert.match(pack.title, /1st Edition Non-Holo/);
+    assert.match(pack.description, /Printing: 1st Edition · Non-Holo/);
+    assert.equal(pack.itemSpecifics.Edition, "1st Edition");
+    assert.equal(pack.itemSpecifics.Finish, "Non-Holo");
+    assert.match(buildListingPackCsv([input]), /1st Edition.*Non-Holo/);
+  }
+});
+
+test("finish is explicit for raw cards and slabs, with no foil fallback", () => {
+  for (const [finish, expected] of [["NORMAL", "Non-Holo"], ["HOLO", "Holo"], ["REVERSE_HOLO", "Reverse Holo"]]) {
+    for (const input of [moonbreon, slab]) {
+      const pack = buildListingPack({ ...input, card: { ...input.card, finish } });
+      assert.equal(pack.itemSpecifics.Finish, expected);
+      assert.match(pack.description, new RegExp(`Printing: ${expected}`));
+      assert.equal(pack.itemSpecifics.Features, undefined);
+    }
+  }
+});
+
+test("long eBay titles retain recorded printing and canonical half grades", () => {
+  const pack = buildListingPack({
+    ...slab,
+    grade: "BGS_9_5",
+    card: { ...slab.card, name: "Charizard Very Long Collector Card Name", edition: "FIRST_EDITION", finish: "REVERSE_HOLO" },
+  });
+  assert.ok(pack.title.length <= 80);
+  assert.match(pack.title, /199\/165 1st Edition Reverse Holo BGS 9\.5 GEM MINT/);
+  assert.equal(pack.itemSpecifics.Grade, "9.5");
+  assert.doesNotMatch(pack.copyReady, /not reholdered/i);
+});
+
+test("raw condition classification requires an unambiguous recorded bucket", () => {
+  assert.equal(normalizeListingRawCondition(" dmg "), "DMG");
+  assert.equal(normalizeListingRawCondition("Near Mint"), "NM");
+  assert.equal(normalizeListingRawCondition("Lightly Played"), "LP");
+  for (const condition of [undefined, null, "", "unknown", "not near mint", "NM / LP", "NM with a crease"]) {
+    assert.equal(normalizeListingRawCondition(condition), null, String(condition));
+  }
 });
 
 test("suggested price anchors on comp but never lists below cost+margin", () => {
@@ -305,6 +366,10 @@ test("Cardmarket condition mapping normalises common raw grades", () => {
   assert.equal(cardmarketConditionCode("Near Mint"), "NM");
   assert.equal(cardmarketConditionCode("LP"), "EX");
   assert.equal(cardmarketConditionCode("Moderately Played"), "GD");
+  assert.equal(cardmarketConditionCode("HP"), "PL");
+  assert.equal(cardmarketConditionCode("DMG"), "PO");
+  assert.equal(cardmarketConditionCode(undefined), "Review required");
+  assert.equal(cardmarketConditionCode("not near mint"), "Review required");
 });
 
 test("listing pack produces a copy-ready block", () => {

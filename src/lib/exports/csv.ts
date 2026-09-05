@@ -1,4 +1,5 @@
 import { realizedProfit } from "../comps/pricing.js";
+import { saleLedgerEvidence } from "../dealer/saleLedger.js";
 
 export type CsvCell = string | number | boolean | null | undefined | Date;
 
@@ -40,6 +41,10 @@ export type BookSaleExportRecord = {
   fees: number;
   postage: number;
   soldAt: Date;
+  costBasis?: number | null;
+  itemRevenue?: number | null;
+  costsEstimated?: boolean | null;
+  amountRevisions?: unknown;
   item: {
     id: string;
     grade: string;
@@ -116,6 +121,11 @@ const BOOK_COLUMNS = [
   "item_id",
   "sale_id",
   "tcg_api_id",
+  "item_revenue_gbp",
+  "cost_basis_status",
+  "costs_status",
+  "amount_revision_count",
+  "amount_revisions",
 ] as const;
 
 const EXPENSE_COLUMNS = [
@@ -171,11 +181,12 @@ export function booksToCsv(sales: BookSaleExportRecord[]): string {
     sales.map((sale) => {
       const item = sale.item;
       const card = item.card;
+      const evidence = saleLedgerEvidence(sale, item.costBasis);
       const profit = realizedProfit({
         salePrice: sale.salePrice,
         fees: sale.fees,
         postage: sale.postage,
-        costBasis: item.costBasis,
+        costBasis: evidence.costBasisPence,
       });
       const marginPct = sale.salePrice > 0 ? Math.round((profit / sale.salePrice) * 1000) / 10 : null;
 
@@ -191,7 +202,12 @@ export function booksToCsv(sales: BookSaleExportRecord[]): string {
         sale_price_gbp: formatGbpDecimal(sale.salePrice),
         fees_gbp: formatGbpDecimal(sale.fees),
         postage_gbp: formatGbpDecimal(sale.postage),
-        cost_basis_gbp: formatGbpDecimal(item.costBasis),
+        cost_basis_gbp: formatGbpDecimal(evidence.costBasisPence),
+        item_revenue_gbp: formatGbpDecimal(evidence.itemRevenuePence),
+        cost_basis_status: evidence.costBasisEstimated ? "UNVERIFIED_LEGACY" : "SNAPSHOT",
+        costs_status: sale.costsEstimated == null ? "UNVERIFIED_LEGACY" : sale.costsEstimated ? "ESTIMATED" : "CONFIRMED",
+        amount_revision_count: evidence.amountRevisionCount,
+        amount_revisions: Array.isArray(sale.amountRevisions) ? JSON.stringify(sale.amountRevisions) : "",
         profit_gbp: formatGbpDecimal(profit),
         margin_pct: marginPct,
         acquired_at: isoDate(item.acquiredAt),

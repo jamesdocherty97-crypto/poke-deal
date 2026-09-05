@@ -25,7 +25,7 @@ function comp(overrides: Partial<CompResult>): CompResult {
     windowDays: 90,
     trendPct: null,
     outliersRemoved: 0,
-    asOf: "2026-06-22T00:00:00.000Z",
+    asOf: new Date().toISOString(),
     ...overrides,
   };
 }

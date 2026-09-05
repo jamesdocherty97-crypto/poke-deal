@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ebayListingIdFromUrl } from "@/lib/dealer/listingUrl";
 import { buildListingTitle } from "@/lib/dealer/listingDraft";
+import { readClientMutationId } from "@/lib/offline/clientMutation";
+import { readBoundedJson } from "@/lib/http/boundedJson";
 import { getPrisma } from "@/lib/db/prisma";
 
 export const runtime = "nodejs";
@@ -44,8 +47,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
-  const parsed = listingCreateSchema.safeParse(body);
+  const mutation = readClientMutationId(request);
+  if (!mutation.ok) return NextResponse.json({ error: mutation.error }, { status: 400 });
+  const body = await readBoundedJson(request, 16_384);
+  if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.status });
+  const parsed = listingCreateSchema.safeParse(body.value);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -60,6 +66,21 @@ export async function POST(request: Request) {
   }
 
   const d = parsed.data;
+  const clientMutationId = mutation.value;
+  const replay = async () => {
+    if (!clientMutationId) return null;
+    const existing = await getPrisma().listing.findUnique({
+      where: { clientMutationId },
+      include: { item: { include: { card: true, sales: true, photos: true } } },
+    });
+    if (!existing) return null;
+    if (existing.itemId !== d.itemId || existing.channel !== d.channel) {
+      return NextResponse.json({ error: "This import identifier already belongs to a different stock row or channel." }, { status: 409 });
+    }
+    return NextResponse.json({ listing: existing, idempotent: true });
+  };
+  try { const previous = await replay(); if (previous) return previous; }
+  catch { return NextResponse.json({ error: "Could not check saved listing progress. Retry with the same import." }, { status: 503 }); }
 
   if (d.state === "ACTIVE" && (!d.listPricePence || d.listPricePence <= 0)) {
     return NextResponse.json(
@@ -85,7 +106,7 @@ export async function POST(request: Request) {
   // live eBay URL is supplied with it (e.g. tracking a listing made outside
   // the app). Otherwise it must start as DRAFT and go through the real
   // reviewed publish flow before it can become ACTIVE.
-  if (d.state === "ACTIVE" && d.channel === "EBAY" && !d.externalUrl) {
+  if (d.state === "ACTIVE" && d.channel === "EBAY" && !ebayListingIdFromUrl(d.externalUrl)) {
     return NextResponse.json(
       {
         error:
@@ -109,6 +130,7 @@ export async function POST(request: Request) {
       const created = await tx.listing.create({
         data: {
           itemId: item.id,
+          clientMutationId,
           channel: d.channel,
           state: d.state,
           title: buildListingTitle(item.card, item.grade, item.condition),
@@ -116,6 +138,7 @@ export async function POST(request: Request) {
           suggestedPrice: d.suggestedPricePence ?? null,
           listPrice: d.listPricePence ?? null,
           externalUrl: d.externalUrl ?? null,
+          externalRef: d.channel === "EBAY" ? ebayListingIdFromUrl(d.externalUrl) : null,
           listedAt: d.state === "ACTIVE" ? new Date() : null,
         },
         include: {
@@ -145,6 +168,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ listing }, { status: 201 });
   } catch (err) {
+    // Concurrent or lost-response retry: the unique ID owns the committed draft.
+    try { const previous = await replay(); if (previous) return previous; } catch { /* Return the original write failure. */ }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "listing create failed" },
       { status: 500 },

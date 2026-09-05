@@ -38,7 +38,7 @@ test("old no-cost stock keeps purchase cost, market guidance and user list price
   await page.getByRole("button", { name: /Edit stock details/ }).click();
   const stockEditor = page.locator(".sell-sheet").filter({ has: page.getByRole("heading", { name: "Edit stock" }) });
   await expect(stockEditor.getByLabel(/^What I paid/)).toHaveValue("0.01");
-  await stockEditor.getByRole("button", { name: "No tracked cost · £0.00" }).click();
+  await stockEditor.getByRole("button", { name: "No purchase cost · £0.00" }).click();
   await expect(stockEditor.getByLabel(/^What I paid/)).toHaveValue("0.00");
   await stockEditor.getByRole("button", { name: "Save stock" }).click();
 
@@ -127,7 +127,7 @@ test("buy flow names what the dealer paid separately from suggested and chosen s
   const stockCard = page.locator(".quick-stock-card");
   await expect(stockCard.getByLabel(/^What I paid/)).toBeVisible();
   await expect(stockCard).toContainText("Your purchase cost—not the market comp or listing price.");
-  await stockCard.getByRole("button", { name: "No tracked cost · £0.00" }).click();
+  await stockCard.getByRole("button", { name: "No purchase cost · £0.00" }).click();
   await stockCard.getByText("Change listing plan", { exact: true }).click();
   await expect(stockCard.getByLabel(/^Your list price/)).toBeVisible();
   await stockCard.getByLabel(/^Your list price/).fill("5.00");

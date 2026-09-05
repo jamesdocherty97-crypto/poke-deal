@@ -13,6 +13,7 @@ export interface InventoryTableItem {
   status: string;
   createdAt: string;
   acquiredFrom?: string | null;
+  acquiredAt?: string | null;
   location?: string | null;
   condition?: string | null;
   graderCert?: string | null;
@@ -79,7 +80,7 @@ function filterListingRows<T extends ListingTableRow>(rows: readonly T[], query:
 
 function sortInventoryRows<T extends InventoryTableItem>(rows: T[], sort: InventorySort): T[] {
   return [...rows].sort((a, b) => {
-    if (sort === "oldest") return byDateAsc(a.createdAt, b.createdAt);
+    if (sort === "oldest") return byDateAsc(a.acquiredAt ?? a.createdAt, b.acquiredAt ?? b.createdAt);
     if (sort === "highest-cost") return b.costBasis - a.costBasis || byDateDesc(a.createdAt, b.createdAt);
     if (sort === "lowest-cost") return a.costBasis - b.costBasis || byDateDesc(a.createdAt, b.createdAt);
     if (sort === "name") return byText(a.card.name, b.card.name) || byDateDesc(a.createdAt, b.createdAt);

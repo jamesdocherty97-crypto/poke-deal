@@ -343,3 +343,19 @@ test("buildProfitTrend limits to the latest points without losing cumulative his
     { date: "2026-06-20", profitPence: 300, cumulativeProfitPence: 600 },
   ]);
 });
+
+
+test("metrics expose provisional cost counts and prefer original acquisition date for age", () => {
+  const base = { id: "sale", itemId: "item", name: "Pikachu", grade: "RAW", channel: "EBAY", salePricePence: 2000, feesPence: 100, postagePence: 200, costBasisPence: 500, soldAt: NOW.toISOString() };
+  const metrics = computeDealerMetrics([
+    { id: "item", name: "Pikachu", grade: "RAW", status: "IN_STOCK", quantity: 1, costBasisPence: 500, createdAt: NOW.toISOString(), acquiredAt: "2026-04-01T12:00:00.000Z" },
+  ], [
+    { ...base, id: "confirmed", costsEstimated: false, costBasisEstimated: false },
+    { ...base, id: "estimated", costsEstimated: true },
+    { ...base, id: "legacy", costsEstimated: false, costBasisEstimated: true },
+  ], NOW);
+  assert.equal(metrics.provisionalSaleCount, 2);
+  assert.equal(metrics.averageAgeDays, 81);
+  assert.equal(metrics.agedStockCount, 1);
+  assert.equal(metrics.realizedProfitPence, 3600);
+});

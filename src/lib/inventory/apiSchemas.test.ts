@@ -50,6 +50,12 @@ test("request schemas still reject a blank required card name", () => {
   assert.equal(inventoryDraftRequestSchema.safeParse(input).success, false);
 });
 
+test("inventory intake cannot create sold stock without recording a sale", () => {
+  const input = { card: { name: "Pikachu" }, costBasisPence: 500, status: "SOLD" };
+  assert.equal(inventoryDraftRequestSchema.safeParse(input).success, false);
+  assert.equal(inventoryDraftRequestSchema.safeParse({ ...input, status: "RESERVED" }).success, true);
+});
+
 test("acquire accepts a reviewed comp receipt without another lookup", () => {
   const result = acquireRequestSchema.parse({
     card: { name: "Umbreon", setName: "Neo Discovery", number: "13" },

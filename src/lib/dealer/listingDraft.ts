@@ -5,12 +5,15 @@ export interface ListingDraftCard {
   setName?: string | null;
   number?: string | null;
   language?: string | null;
+  edition?: string | null;
+  finish?: string | null;
 }
 
 export interface ListingDraftItem {
   card: ListingDraftCard;
   grade: ListingDraftGrade;
   costBasis: number;
+  condition?: string | null;
 }
 
 export function buildListingTitle(
@@ -32,7 +35,7 @@ export function buildListingDraftDefaults(item: ListingDraftItem): {
   listPricePence: number;
 } {
   return {
-    title: buildListingTitle(item.card, item.grade),
+    title: buildListingTitle(item.card, item.grade, item.condition),
     listPricePence: defaultManualListPricePence(item.costBasis),
   };
 }

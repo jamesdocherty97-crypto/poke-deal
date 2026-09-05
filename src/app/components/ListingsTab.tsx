@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { ListingSort, ListingStateFilter } from "@/lib/dealer/tableControls";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
+import { listingStockAttention } from "@/lib/dealer/saleListingUpdates";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { orderListingPhotos, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { InventoryPhotoTools } from "./InventoryPhotoTools";
@@ -158,7 +159,7 @@ export function ListingsTab({
   openListingEditor: (listing: Listing) => void;
   openListingPack: (listing: Listing) => void;
   pasteListingUrlForListing: (listing: Listing) => void;
-  patchListing: (listing: Listing, patch: Partial<{ state: Exclude<ListingState, "SOLD"> }>, message: string) => void;
+  patchListing: (listing: Listing, patch: Partial<{ state: Exclude<ListingState, "SOLD">; externalRemovalConfirmed: boolean }>, message: string) => void;
   setEbayPublishTarget: (id: string | null) => void;
   listingPackSheet: ReactNode;
   editListingSheet: ReactNode;
@@ -168,6 +169,7 @@ export function ListingsTab({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [packChannel, setPackChannel] = useState<Channel>("EBAY");
   const selectedListings = useMemo(() => visibleListings.filter((listing) => selectedIds.has(listing.id)), [selectedIds, visibleListings]);
+  const removalCount = listings.filter(listingStockAttention).length;
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem("poke-deal.listing-pack-channel");
@@ -223,6 +225,19 @@ export function ListingsTab({
           <Metric label="Sold" value={String(dashboard?.listingsByState.SOLD ?? 0)} />
         </div>
       </section>
+      {removalCount > 0 && (
+        <section className="panel" aria-label="Listings needing removal">
+          <div className="panel-heading">
+            <div>
+              <h2>{removalCount} listing{removalCount === 1 ? " needs" : "s need"} removal</h2>
+              <p className="warn">These cards are sold, but another marketplace listing may still be live. Remove it before it sells again.</p>
+            </div>
+            <button type="button" onClick={() => { setListingStateFilter("ACTIVE"); setListingQuery(""); }}>
+              Review active listings
+            </button>
+          </div>
+        </section>
+      )}
       <div className="market-command-grid" aria-label="Next marketplace actions">
       {(firstDraftListingTarget || unlistedStock.length > 0) && (
         <section className="panel listing-desk-panel market-next-action">
@@ -311,7 +326,7 @@ export function ListingsTab({
               alt=""
             />
             <div>
-              <span>Ready to book</span>
+              <span>Active · awaiting payment</span>
               <strong>{listingQueueLabel(firstSaleListingTarget)}</strong>
               <small>
                 {channelLabel(firstSaleListingTarget.channel)} ·{" "}
@@ -565,11 +580,11 @@ export function ListingsTab({
           onCopy={copyListingCopy}
           onSell={openSellFromListing}
           onPasteUrl={() => pasteListingUrlForListing(listing)}
-          onState={(state) =>
+          onState={(state, externalRemovalConfirmed) =>
             patchListing(
               listing,
-              { state },
-              state === "ACTIVE" ? "Listing activated." : "Listing ended.",
+              { state, ...(externalRemovalConfirmed ? { externalRemovalConfirmed } : {}) },
+              state === "ACTIVE" ? "Listing activated." : "Listing removal recorded.",
             )
           }
           onPhotos={addPhotosToInventory}
@@ -754,11 +769,12 @@ function ListingRow({
   onCopy: (listing: Listing, channel: Channel) => void;
   onSell: (listing: Listing) => void;
   onPasteUrl: () => void;
-  onState: (state: Exclude<ListingState, "SOLD">) => void;
+  onState: (state: Exclude<ListingState, "SOLD">, externalRemovalConfirmed?: boolean) => void;
   onPhotos: (item: InventoryItem, files: FileList | File[]) => void;
   onCatalogArt: (item: InventoryItem) => void;
   onEbayPublish: () => void;
 }) {
+  const [endConfirmationOpen, setEndConfirmationOpen] = useState(false);
   const card = listing.item?.card;
   const title = listing.title ?? card?.name ?? "Untitled listing";
   const price = listing.listPrice ?? 0;
@@ -772,15 +788,17 @@ function ListingRow({
     : null;
   const isBusy = busy === `listing-${listing.id}`;
   const isEbayPublishBusy = busy === `ebay-publish-${listing.id}`;
-  const canSell = Boolean(listing.item && listing.item.status !== "SOLD" && listing.state !== "SOLD");
+  const canSell = Boolean(listing.item && listing.item.status !== "SOLD" && listing.state === "ACTIVE");
+  const needsRemoval = listingStockAttention(listing);
   const stockNotes = [
     listing.item?.condition,
     listing.item?.graderCert ? `cert ${listing.item.graderCert}` : null,
   ].filter(Boolean).join(" · ");
 
   const isEbay = listing.channel === "EBAY";
-  const hasOffer = listing.externalRef?.startsWith("offer:");
-  const isPublished = listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl;
+  const hasOffer = listing.externalRef?.startsWith("offer:") || Boolean(listing.ebayOfferId && listing.state !== "ACTIVE" && listing.state !== "SOLD");
+  const isPublished = listing.state === "ACTIVE" && listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl;
+  const canWithdrawEbay = isEbay && ebayConnected && Boolean(listing.ebayOfferId);
   const canPasteUrl = listing.state !== "SOLD" && !listing.externalUrl;
   const belowEbayMinimum = isEbay && price < 99;
   const photoCount = listing.item?.photos?.length ?? 0;
@@ -820,7 +838,7 @@ function ListingRow({
           <h3>{title}</h3>
           <span className="item-badges">
             {listing.item && <GradeBadge grade={listing.item.grade} />}
-            <span className={`pill ${listingTone(listing.state)}`}>{listing.state.toLowerCase()}</span>
+            <span className={`pill ${needsRemoval ? "warn" : listingTone(listing.state)}`}>{needsRemoval ? "remove listing" : listing.state.toLowerCase()}</span>
           </span>
         </div>
         <p>
@@ -852,7 +870,11 @@ function ListingRow({
         )}
         {listing.state !== "SOLD" && (
           <div className="next-action-strip listing-next-action">
-            {needsEbayPhotos && listing.item ? (
+            {needsRemoval ? (
+              <button className="next-action-button" type="button" onClick={() => setEndConfirmationOpen(true)} disabled={isBusy}>
+                Remove listing
+              </button>
+            ) : needsEbayPhotos && listing.item ? (
               <>
                 <label className={`next-action-button row-file-action ${busy === `photo-${listing.item.id}` ? "disabled" : ""}`}>
                   {busy === `photo-${listing.item.id}` ? "Uploading…" : "Add photos"}
@@ -899,7 +921,9 @@ function ListingRow({
               </button>
             )}
             <span>
-              {needsEbayPhotos
+              {needsRemoval
+                ? "Stock sold. This marketplace listing stays visible until removal is confirmed."
+                : needsEbayPhotos
                 ? canUseCatalogArt
                   ? "eBay needs images. Low-value raw stock can use catalog art."
                   : "eBay needs real photos before publish."
@@ -915,6 +939,27 @@ function ListingRow({
                       ? "active listing, ready to sell"
                       : listing.state.toLowerCase()}
             </span>
+          </div>
+        )}
+        {endConfirmationOpen && listing.state === "ACTIVE" && (
+          <div className="panel" role="region" aria-label={`Remove ${title} listing`}>
+            <p>
+              {listing.channel === "IN_PERSON"
+                ? "End this in-person listing in your stock ledger."
+                : `Remove this listing from ${channelLabel(listing.channel)}. Confirm only after it is no longer available to buyers.`}
+            </p>
+            <div className="row-actions">
+              {listing.externalUrl && <a href={listing.externalUrl} target="_blank" rel="noreferrer">Open marketplace listing</a>}
+              {canWithdrawEbay && (
+                <button type="button" onClick={() => onState("ENDED")} disabled={isBusy}>
+                  {isBusy ? "Removing…" : "Withdraw from eBay"}
+                </button>
+              )}
+              <button type="button" onClick={() => onState("ENDED", listing.channel !== "IN_PERSON")} disabled={isBusy}>
+                {listing.channel === "IN_PERSON" ? "End listing" : "Confirm removed"}
+              </button>
+              <button className="ghost-button" type="button" onClick={() => setEndConfirmationOpen(false)} disabled={isBusy}>Cancel</button>
+            </div>
           </div>
         )}
         <details className="row-more-actions">
@@ -946,7 +991,7 @@ function ListingRow({
               </button>
             </>
           )}
-          {listing.state !== "ACTIVE" && listing.state !== "SOLD" && !(isEbay && !isPublished) && (
+          {listing.state !== "ACTIVE" && listing.state !== "SOLD" && listing.item?.status !== "SOLD" && !(isEbay && !isPublished) && (
             <button type="button" onClick={() => onState("ACTIVE")} disabled={isBusy}>
               Activate
             </button>
@@ -957,8 +1002,8 @@ function ListingRow({
             </button>
           )}
           {listing.state === "ACTIVE" && (
-            <button type="button" onClick={() => onState("ENDED")} disabled={isBusy}>
-              End
+            <button type="button" onClick={() => setEndConfirmationOpen(true)} disabled={isBusy}>
+              End listing
             </button>
           )}
           {canSell && (

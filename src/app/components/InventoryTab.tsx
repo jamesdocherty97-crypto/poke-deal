@@ -5,7 +5,7 @@ import type { InventorySort } from "@/lib/dealer/tableControls";
 import { EmptyState, MoneyInput, WorkspaceSkeleton } from "./UiBits";
 import { groupInventoryHoldings } from "@/lib/dealer/inventoryGroups";
 
-type InventoryFilter = "needs-action" | "all" | "needs-listing" | "listed" | "needs-photos" | "held" | "sold";
+type InventoryFilter = import("@/lib/dealer/stockReadiness").InventoryFilter;
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
@@ -49,6 +49,8 @@ export function InventoryTab({
   saveInventoryItem,
   closeInventoryEditor,
   itemCost,
+  itemAcquiredDate,
+  setItemAcquiredDate,
   setItemCost,
   itemQuantity,
   setItemQuantity,
@@ -103,6 +105,8 @@ export function InventoryTab({
   saveInventoryItem: (event: FormEvent<HTMLFormElement>) => void;
   closeInventoryEditor: () => void;
   itemCost: string;
+  itemAcquiredDate: string;
+  setItemAcquiredDate: (value: string) => void;
   setItemCost: (value: string) => void;
   itemQuantity: string;
   setItemQuantity: (value: string) => void;
@@ -295,8 +299,13 @@ export function InventoryTab({
               />
             </label>
           </div>
+          <label>
+            Acquired date
+            <input type="date" value={itemAcquiredDate} onChange={(event) => setItemAcquiredDate(event.target.value)} disabled={busy === `edit-${editingItemId}`} />
+            <small>When you bought this card, rather than when you entered it.</small>
+          </label>
           <button className="no-cost-button" type="button" onClick={() => setItemCost("0.00")} disabled={busy === `edit-${editingItemId}`}>
-            No tracked cost · £0.00
+            No purchase cost · £0.00
           </button>
           <div className="form-grid">
             <label>

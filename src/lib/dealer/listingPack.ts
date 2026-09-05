@@ -10,6 +10,7 @@
 
 import { STOCK_IMAGE_DISCLOSURE } from "../photos/listingPhotoPolicy.js";
 import { formatGbp } from "../format/money.js";
+import type { RawCondition } from "../domain/types.js";
 
 export interface ListingPackCard {
   name: string;
@@ -17,6 +18,8 @@ export interface ListingPackCard {
   number?: string | null;
   rarity?: string | null;
   language?: string | null;
+  edition?: string | null;
+  finish?: string | null;
 }
 
 /**
@@ -94,7 +97,7 @@ export const DEFAULT_LISTING_COPY_SETTINGS: ListingCopySettings = {
 const EBAY_TITLE_MAX = 80;
 
 export function gradeDisplay(grade: string): string {
-  return grade === "RAW" ? "" : grade.replace(/_/g, " ");
+  return grade === "RAW" ? "" : grade.replace(/^([A-Z]+)_(\d+)_(\d+)$/, "$1_$2.$3").replace(/_/g, " ");
 }
 
 export function gradeListingPhrase(grade: string): string {
@@ -120,32 +123,33 @@ export function buildEbayTitle(input: ListingPackInput): string {
   const identity = ["Pokemon TCG", card.name];
   const setName = card.setName?.trim() ?? "";
   const number = card.number?.trim() ?? "";
+  const printing = printingLabels(card).join(" ");
   const gradeOrCondition = graded
     ? gradeListingPhrase(grade)
-    : `${input.condition || "Near Mint"} Raw`;
+    : joinTitleParts([input.condition?.trim(), "Raw"]);
   const language = card.language && card.language !== "EN" ? card.language : "English";
 
   const candidates = [
-    [...identity, setName, number, gradeOrCondition, language],
-    [...identity, setName, number, gradeOrCondition],
-    [...identity, number, gradeOrCondition, language],
-    [...identity, number, gradeOrCondition],
+    [...identity, setName, number, printing, gradeOrCondition, language],
+    [...identity, setName, number, printing, gradeOrCondition],
+    [...identity, number, printing, gradeOrCondition, language],
+    [...identity, number, printing, gradeOrCondition],
   ].map(joinTitleParts);
   const fitting = candidates.find((candidate) => candidate.length <= EBAY_TITLE_MAX);
   if (fitting) return fitting;
 
   // Keep identity, collector number and grade/condition intact. A long set is
   // shortened before the search-critical tail is touched.
-  const withoutSet = joinTitleParts([...identity, number, gradeOrCondition]);
+  const withoutSet = joinTitleParts([...identity, number, printing, gradeOrCondition]);
   const setBudget = EBAY_TITLE_MAX - withoutSet.length - 1;
   if (setName && setBudget >= 4) {
     const shortenedSet = trimTitlePart(setName, setBudget);
-    const withShortSet = joinTitleParts([...identity, shortenedSet, number, gradeOrCondition]);
+    const withShortSet = joinTitleParts([...identity, shortenedSet, number, printing, gradeOrCondition]);
     if (withShortSet.length <= EBAY_TITLE_MAX) return withShortSet;
   }
 
   const fixedPrefix = "Pokemon TCG";
-  const fixedTail = joinTitleParts([number, gradeOrCondition]);
+  const fixedTail = joinTitleParts([number, printing, gradeOrCondition]);
   const nameBudget = EBAY_TITLE_MAX - fixedPrefix.length - fixedTail.length - 2;
   return joinTitleParts([
     fixedPrefix,
@@ -159,7 +163,7 @@ export function buildEbaySubtitle(input: ListingPackInput): string {
   if (graded) {
     return `${gradeListingPhrase(input.grade)}${input.certNumber ? ` · Cert ${input.certNumber}` : ""} · Fast tracked UK postage`;
   }
-  return `${input.condition || "Near Mint"} · Carded & sleeved · Fast UK postage`;
+  return `${rawConditionDisplay(input.condition)} · Carded & sleeved · Fast UK postage`;
 }
 
 export function listingPackChannelLabel(channel: ListingPackChannel | undefined): string {
@@ -175,12 +179,12 @@ export function ebayCondition(input: ListingPackInput): { condition: string; con
       condition: "Graded",
       conditionNote: `Professionally graded ${gradeListingPhrase(input.grade)}${
         input.certNumber ? `, cert ${input.certNumber}` : ""
-      }. Slab not reholdered; sold as graded.`,
+      }. Sold as graded; please inspect the slab photos.`,
     };
   }
   return {
     condition: "Ungraded",
-    conditionNote: `${input.condition || "Near Mint"} condition. Sleeved and top-loadered, posted with care.`,
+    conditionNote: `${rawConditionDisplay(input.condition)}${input.condition?.trim() ? " condition" : ""}. Sleeved and top-loadered, posted with care.`,
   };
 }
 
@@ -195,6 +199,10 @@ export function buildItemSpecifics(input: ListingPackInput): Record<string, stri
   if (card.setName) specifics.Set = card.setName;
   if (card.number) specifics["Card Number"] = card.number;
   if (card.rarity) specifics.Rarity = card.rarity;
+  const edition = editionLabel(card.edition);
+  const finish = finishLabel(card.finish);
+  if (edition) specifics.Edition = edition;
+  if (finish) specifics.Finish = finish;
   if (graded) {
     const grader = grade.split("_")[0] ?? "PSA";
     specifics["Professional Grader"] = grader;
@@ -202,8 +210,7 @@ export function buildItemSpecifics(input: ListingPackInput): Record<string, stri
     specifics["Card Condition"] = "Graded";
     if (input.certNumber) specifics.Certification = input.certNumber;
   } else {
-    specifics["Card Condition"] = input.condition || "Near Mint";
-    specifics.Features = "Holo / Foil";
+    specifics["Card Condition"] = rawConditionDisplay(input.condition);
   }
   return specifics;
 }
@@ -265,10 +272,11 @@ export function buildDescription(input: ListingPackInput): string {
   const idLine = [card.setName, card.number ? `#${card.number}` : null].filter(Boolean).join(" ");
   const gradeLine = isGradedGrade(grade)
     ? `Graded ${gradeListingPhrase(grade)}${input.certNumber ? ` (cert ${input.certNumber})` : ""}.`
-    : `Ungraded single, ${input.condition || "Near Mint"}.`;
+    : `Ungraded single, ${rawConditionDisplay(input.condition)}.`;
   const pricingEvidence = buildSoldEvidenceSentence(input);
   return [
     `${card.name}${idLine ? ` — ${idLine}` : ""}.`,
+    printingDescription(card),
     gradeLine,
     conditionNote,
     input.usesCatalogOnlyImages ? STOCK_IMAGE_DISCLOSURE : null,
@@ -285,10 +293,11 @@ function buildVintedDescription(input: ListingPackInput): string {
   const idLine = [card.setName, card.number ? `#${card.number}` : null].filter(Boolean).join(" ");
   const condition = isGradedGrade(grade)
     ? `${gradeListingPhrase(grade)}${input.certNumber ? `, cert ${input.certNumber}` : ""}`
-    : input.condition || "Near Mint";
+    : rawConditionDisplay(input.condition);
 
   return [
     `${card.name}${idLine ? ` - ${idLine}` : ""}`,
+    printingDescription(card),
     `Condition: ${condition}`,
     "Genuine Pokemon TCG single from a UK seller.",
     "Happy to bundle with other cards.",
@@ -302,13 +311,14 @@ function buildCardmarketDescription(input: ListingPackInput): string {
   const { card, grade } = input;
   const condition = isGradedGrade(grade)
     ? `${gradeListingPhrase(grade)}${input.certNumber ? `, cert ${input.certNumber}` : ""}`
-    : input.condition || "Near Mint";
+    : rawConditionDisplay(input.condition);
   const cmCondition = cardmarketConditionCode(input.condition);
 
   return [
     `${card.name}${card.number ? ` ${card.number}` : ""}${card.setName ? ` - ${card.setName}` : ""}`,
+    printingDescription(card),
     `Condition/grade: ${condition}`,
-    `Cardmarket condition: ${cmCondition}.`,
+    isGradedGrade(grade) ? null : `Cardmarket condition: ${cmCondition}.`,
     `${listingLanguage(card.language)} Pokemon TCG single.`,
     buildSoldEvidenceSentence(input),
     settings.postageTerms,
@@ -319,10 +329,11 @@ function buildInPersonDescription(input: ListingPackInput): string {
   const { card, grade } = input;
   const condition = isGradedGrade(grade)
     ? `${gradeListingPhrase(grade)}${input.certNumber ? `, cert ${input.certNumber}` : ""}`
-    : input.condition || "Near Mint";
+    : rawConditionDisplay(input.condition);
 
   return [
     `${card.name}${card.number ? ` ${card.number}` : ""}${card.setName ? ` - ${card.setName}` : ""}`,
+    printingDescription(card),
     condition,
     "In-person sale note. Buyer can inspect before payment.",
     buildSoldEvidenceSentence(input),
@@ -558,7 +569,7 @@ function inPersonCsvRow(input: ListingPackInput): string {
     input.card.name,
     input.card.setName ?? "",
     input.card.number ?? "",
-    isGradedGrade(input.grade) ? gradeListingPhrase(input.grade) : input.condition || "Near Mint",
+    isGradedGrade(input.grade) ? gradeListingPhrase(input.grade) : rawConditionDisplay(input.condition),
     input.certNumber ?? "",
     (pack.suggestedPricePence / 100).toFixed(2),
     "1",
@@ -590,9 +601,10 @@ function listingLanguage(language: string | null | undefined): string {
   return language;
 }
 
-function vintedCondition(input: ListingPackInput): "Very good" | "Good" | "Satisfactory" {
+function vintedCondition(input: ListingPackInput): "Very good" | "Good" | "Satisfactory" | "Review required" {
   if (isGradedGrade(input.grade)) return "Very good";
   const code = cardmarketConditionCode(input.condition);
+  if (code === "Review required") return code;
   if (code === "NM") return "Very good";
   if (code === "EX") return "Good";
   return "Satisfactory";
@@ -616,7 +628,8 @@ function buildVintedTitle(input: ListingPackInput): string {
     card.name,
     card.setName ?? "",
     card.number ?? "",
-    isGradedGrade(grade) ? gradeListingPhrase(grade) : input.condition || "Near Mint",
+    ...printingLabels(card),
+    isGradedGrade(grade) ? gradeListingPhrase(grade) : rawConditionDisplay(input.condition),
     "Pokemon card",
   ];
   return trimEbayTitle(parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim());
@@ -628,6 +641,7 @@ function buildCardmarketTitle(input: ListingPackInput): string {
     card.name,
     card.number ?? "",
     card.setName ?? "",
+    ...printingLabels(card),
     isGradedGrade(grade) ? gradeListingPhrase(grade) : cardmarketConditionCode(input.condition),
   ];
   return trimEbayTitle(parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim());
@@ -639,6 +653,7 @@ function buildInPersonTitle(input: ListingPackInput): string {
     card.name,
     card.setName ?? "",
     card.number ?? "",
+    ...printingLabels(card),
     isGradedGrade(grade) ? gradeListingPhrase(grade) : input.condition || "Raw",
   ];
   return trimEbayTitle(parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim());
@@ -674,11 +689,58 @@ function gradeSuffix(score: string): string {
   return "";
 }
 
-export function cardmarketConditionCode(condition: string | null | undefined): "NM" | "EX" | "GD" {
+export function cardmarketConditionCode(condition: string | null | undefined): "NM" | "EX" | "GD" | "PL" | "PO" | "Review required" {
   const normalized = (condition ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
-  if (!normalized || /\b(NM|NEAR MINT|MINT)\b/.test(normalized)) return "NM";
-  if (/\b(EX|EXCELLENT|LP|LIGHT PLAYED|LIGHTLY PLAYED)\b/.test(normalized)) return "EX";
-  return "GD";
+  if (/^(DMG|DAMAGED|PO|POOR)$/.test(normalized)) return "PO";
+  if (/^(HP|HEAVY PLAYED|HEAVILY PLAYED|PL|PLAYED)$/.test(normalized)) return "PL";
+  if (/^(MP|MODERATE PLAYED|MODERATELY PLAYED|GD|GOOD)$/.test(normalized)) return "GD";
+  if (/^(EX|EXCELLENT|LP|LIGHT PLAYED|LIGHTLY PLAYED)$/.test(normalized)) return "EX";
+  if (/^(NM|NEAR MINT|MINT)$/.test(normalized)) return "NM";
+  return "Review required";
+}
+
+/** Only recorded condition buckets and their unambiguous legacy labels qualify. */
+export function normalizeListingRawCondition(condition?: string | null): RawCondition | null {
+  const normalized = condition?.trim().toUpperCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ");
+  if (/^(DMG|DAMAGED)$/.test(normalized ?? "")) return "DMG";
+  if (/^(HP|HEAVY PLAYED|HEAVILY PLAYED|POOR|HEAVY WEAR)$/.test(normalized ?? "")) return "HP";
+  if (/^(MP|MODERATE PLAYED|MODERATELY PLAYED|VERY GOOD|VG|MODERATE WEAR)$/.test(normalized ?? "")) return "MP";
+  if (/^(LP|LIGHT PLAYED|LIGHTLY PLAYED|EXCELLENT|EX|LIGHT WEAR)$/.test(normalized ?? "")) return "LP";
+  if (/^(NM|NEAR MINT|MINT|NEAR MINT OR BETTER)$/.test(normalized ?? "")) return "NM";
+  return null;
+}
+
+function rawConditionDisplay(condition: string | null | undefined): string {
+  return condition?.trim() || "Condition not recorded";
+}
+
+function editionLabel(edition: string | null | undefined): string | null {
+  switch (edition) {
+    case "UNLIMITED": return "Unlimited";
+    case "FIRST_EDITION": return "1st Edition";
+    case "SHADOWLESS": return "Shadowless";
+    case "STAFF": return "Staff";
+    case "PRERELEASE": return "Prerelease";
+    default: return null;
+  }
+}
+
+function finishLabel(finish: string | null | undefined): string | null {
+  switch (finish) {
+    case "NORMAL": return "Non-Holo";
+    case "HOLO": return "Holo";
+    case "REVERSE_HOLO": return "Reverse Holo";
+    default: return null;
+  }
+}
+
+function printingLabels(card: ListingPackCard): string[] {
+  return [editionLabel(card.edition), finishLabel(card.finish)].filter((label): label is string => Boolean(label));
+}
+
+function printingDescription(card: ListingPackCard): string | null {
+  const printing = printingLabels(card).join(" · ");
+  return printing ? `Printing: ${printing}.` : null;
 }
 
 export function resolveListingCopySettings(settings: Partial<ListingCopySettings> | undefined): ListingCopySettings {

@@ -7,9 +7,11 @@ import {
   shouldRetryOfflineResponse,
   type CompCacheIdentity,
 } from "./policy.js";
+import { availableOfflineSaleQuantity, offlineSaleItemId, offlineSaleQuantity, readOfflineSaleStock, type OfflineSaleStock } from "./pendingSales.js";
 
 const DB_NAME = "poke-deal-offline";
-const DB_VERSION = 2;
+// v3 retains all stores while preventing older clients from deleting sale receipts.
+const DB_VERSION = 3;
 const QUEUE_STORE = "mutation-queue";
 const COMP_STORE = "comp-cache";
 const BOOTSTRAP_STORE = "bootstrap-cache";
@@ -42,6 +44,13 @@ export type OfflineMutation = {
   nextAttemptAt: string | null;
   lastError: string | null;
   requiresClient: boolean;
+  /** Original stock snapshot used to reserve a queued sale atomically. */
+  saleStock?: OfflineSaleStock;
+  /** Retained sale receipt protects tabs with stale inventory after sync. */
+  syncedAt?: string | null;
+  stockAfterSync?: OfflineSaleStock;
+  syncStartedAt?: string | null;
+  mayHaveReachedServer?: boolean;
 };
 
 export type OfflineCompCacheEntry<T = unknown> = {
@@ -76,6 +85,7 @@ export type OfflineFlushResult = {
 let currentSyncing = false;
 let currentLastError: string | null = null;
 let flushInFlight: Promise<OfflineFlushResult> | null = null;
+let stateChannel: BroadcastChannel | null = null;
 
 export function offlineStorageSupported(): boolean {
   return typeof window !== "undefined" && "indexedDB" in window;
@@ -90,6 +100,8 @@ export async function enqueueOfflineMutation(input: {
   headers?: Record<string, string>;
   summary: OfflineMutationSummary;
   requiresClient?: boolean;
+  saleStock?: OfflineSaleStock;
+  mayHaveReachedServer?: boolean;
 }): Promise<OfflineMutation> {
   const now = new Date().toISOString();
   const mutation: OfflineMutation = {
@@ -109,33 +121,98 @@ export async function enqueueOfflineMutation(input: {
     nextAttemptAt: null,
     lastError: null,
     requiresClient: Boolean(input.requiresClient),
+    ...(input.saleStock ? { saleStock: readOfflineSaleStock({ item: input.saleStock }) } : {}),
+    mayHaveReachedServer: Boolean(input.mayHaveReachedServer),
   };
-  await putRecord(QUEUE_STORE, mutation);
-  await requestBackgroundSync();
+  const saved = await withQueueRows((rows, store) => {
+    const existing = rows.find((row) => row.id === mutation.id);
+    if (existing) return existing;
+    if (mutation.kind === "mark-sold") {
+      const stock = mutation.saleStock;
+      if (!stock || stock.id !== offlineSaleItemId(mutation)) throw new Error("Reload this stock row before saving an offline sale.");
+      const available = availableOfflineSaleQuantity(stock, rows);
+      if (offlineSaleQuantity(mutation) > available) {
+        throw new Error(`Only ${available} available on this device; other copies are reserved by queued sales.`);
+      }
+    }
+    store.put(mutation);
+    return mutation;
+  });
+  // Safari/unsupported workers may never resolve serviceWorker.ready. Local
+  // persistence must complete without depending on worker installation.
+  void requestBackgroundSync();
   emitOfflineState();
-  return mutation;
+  return saved;
 }
 
 export async function listOfflineMutations(): Promise<OfflineMutation[]> {
   const rows = await getAllRecords<OfflineMutation>(QUEUE_STORE);
-  return rows.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  return rows.filter((row) => !row.syncedAt).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+}
+
+export async function listOfflineSaleReservations(): Promise<OfflineMutation[]> {
+  return (await getAllRecords<OfflineMutation>(QUEUE_STORE)).filter((row) => row.kind === "mark-sold");
+}
+
+/** Keep successful online sales safe if the subsequent inventory refresh fails. */
+export async function recordOfflineSaleReceipt(mutationId: string, item: OfflineSaleStock): Promise<OfflineMutation> {
+  const stock = readOfflineSaleStock({ item });
+  if (!stock || !Number.isFinite(Date.parse(stock.updatedAt ?? ""))) throw new Error("Sale response did not confirm current stock.");
+  const now = new Date().toISOString();
+  const receipt = await withQueueRows((rows, store) => {
+    const existing = rows.find((row) => row.id === mutationId);
+    if (existing && offlineSaleItemId(existing) !== stock.id) throw new Error("Sale receipt belongs to a different queued action.");
+    if (existing?.stockAfterSync && Date.parse(existing.stockAfterSync.updatedAt ?? "") > Date.parse(stock.updatedAt!)) return existing;
+    const value: OfflineMutation = {
+      id: mutationId,
+      kind: "mark-sold",
+      endpoint: `/api/inventory/${encodeURIComponent(stock.id)}/sell`,
+      method: "POST",
+      headers: {},
+      summary: { label: "Confirmed sale" },
+      createdAt: now,
+      attempts: 0,
+      ...existing,
+      updatedAt: now,
+      nextAttemptAt: null,
+      lastError: null,
+      requiresClient: false,
+      syncedAt: now,
+      stockAfterSync: stock,
+      syncStartedAt: null,
+      mayHaveReachedServer: true,
+    };
+    store.put(value);
+    return value;
+  });
+  emitOfflineState();
+  return receipt;
 }
 
 export async function removeOfflineMutation(id: string): Promise<void> {
-  await deleteRecord(QUEUE_STORE, id);
+  await withQueueRows((rows, store) => {
+    const mutation = rows.find((row) => row.id === id);
+    if (mutation?.kind === "mark-sold" && (mutation.syncedAt || mutation.syncStartedAt || mutation.mayHaveReachedServer)) {
+      throw new Error("This sale may already be recorded on the server. Reconnect and reconcile it before undoing the sale.");
+    }
+    store.delete(id);
+  });
   emitOfflineState();
 }
 
 export async function retryOfflineMutation(id: string): Promise<void> {
-  const mutation = await getRecord<OfflineMutation>(QUEUE_STORE, id);
-  if (!mutation) return;
-  mutation.requiresClient = false;
-  mutation.nextAttemptAt = null;
-  mutation.lastError = null;
-  mutation.updatedAt = new Date().toISOString();
-  await putRecord(QUEUE_STORE, mutation);
+  await withQueueRows((rows, store) => {
+    const mutation = rows.find((row) => row.id === id);
+    if (!mutation || mutation.syncedAt || (mutation.syncStartedAt && Date.now() - Date.parse(mutation.syncStartedAt) < 120_000)) return;
+    mutation.requiresClient = false;
+    mutation.nextAttemptAt = null;
+    mutation.lastError = null;
+    mutation.syncStartedAt = null;
+    mutation.updatedAt = new Date().toISOString();
+    store.put(mutation);
+  });
   emitOfflineState();
-  await requestBackgroundSync();
+  void requestBackgroundSync();
 }
 
 export async function putOfflineComp<T>(identity: CompCacheIdentity, payload: T, cachedAt = new Date().toISOString()): Promise<void> {
@@ -200,12 +277,15 @@ export function subscribeOfflineState(listener: (state: OfflineSyncState) => voi
   window.addEventListener("online", update);
   window.addEventListener("offline", update);
   navigator.serviceWorker?.addEventListener("message", update);
+  const channel = offlineStateChannel();
+  channel?.addEventListener("message", update);
   update();
   return () => {
     window.removeEventListener(STATE_EVENT, update);
     window.removeEventListener("online", update);
     window.removeEventListener("offline", update);
     navigator.serviceWorker?.removeEventListener("message", update);
+    channel?.removeEventListener("message", update);
   };
 }
 
@@ -233,8 +313,10 @@ async function runFlush(fetcher: typeof fetch): Promise<OfflineFlushResult> {
   try {
     const queue = await listOfflineMutations();
     if (typeof navigator !== "undefined" && !navigator.onLine) return { synced, blocked, remaining: queue };
-    for (const mutation of queue) {
-      if (mutation.requiresClient || !isDueOfflineMutation(mutation)) continue;
+    for (const queued of queue) {
+      if (queued.requiresClient || !isDueOfflineMutation(queued)) continue;
+      const mutation = queued.kind === "mark-sold" ? await claimOfflineSale(queued.id) : queued;
+      if (!mutation) continue;
       try {
         const response = await fetcher(mutation.endpoint, {
           method: mutation.method,
@@ -243,7 +325,20 @@ async function runFlush(fetcher: typeof fetch): Promise<OfflineFlushResult> {
           ...(mutation.body == null ? {} : { body: JSON.stringify(mutation.body) }),
         });
         if (response.ok) {
-          await deleteRecord(QUEUE_STORE, mutation.id);
+          if (mutation.kind === "mark-sold") {
+            const payload: unknown = await response.clone().json().catch(() => null);
+            const confirmedStock = readOfflineSaleStock(payload);
+            if (!confirmedStock || confirmedStock.id !== offlineSaleItemId(mutation) || !Number.isFinite(Date.parse(confirmedStock.updatedAt ?? ""))) {
+              throw new Error("Sale response did not confirm current stock. Retry sync to reconcile this sale safely.");
+            }
+            mutation.syncedAt = new Date().toISOString();
+            mutation.stockAfterSync = confirmedStock;
+            mutation.syncStartedAt = null;
+            mutation.lastError = null;
+            await saveOfflineSaleResult(mutation);
+          } else {
+            await deleteRecord(QUEUE_STORE, mutation.id);
+          }
           synced.push(mutation);
           continue;
         }
@@ -251,21 +346,24 @@ async function runFlush(fetcher: typeof fetch): Promise<OfflineFlushResult> {
         mutation.attempts += 1;
         mutation.updatedAt = new Date().toISOString();
         mutation.lastError = message;
+        mutation.syncStartedAt = null;
         if (shouldRetryOfflineResponse(response.status)) {
           mutation.nextAttemptAt = new Date(Date.now() + offlineRetryDelayMs(mutation.attempts)).toISOString();
         } else {
           mutation.nextAttemptAt = null;
           mutation.requiresClient = true;
+          mutation.mayHaveReachedServer = false;
           blocked.push(mutation);
         }
-        await putRecord(QUEUE_STORE, mutation);
+        await saveOfflineSaleResult(mutation);
         currentLastError = message;
       } catch (error) {
         mutation.attempts += 1;
         mutation.updatedAt = new Date().toISOString();
         mutation.lastError = error instanceof Error ? error.message : "Network request failed";
+        mutation.syncStartedAt = null;
         mutation.nextAttemptAt = new Date(Date.now() + offlineRetryDelayMs(mutation.attempts)).toISOString();
-        await putRecord(QUEUE_STORE, mutation);
+        await saveOfflineSaleResult(mutation);
         currentLastError = mutation.lastError;
         break;
       }
@@ -290,6 +388,34 @@ async function requestBackgroundSync(): Promise<void> {
 
 function emitOfflineState() {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(STATE_EVENT));
+  offlineStateChannel()?.postMessage("changed");
+}
+
+function offlineStateChannel(): BroadcastChannel | null {
+  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return null;
+  try { return stateChannel ??= new BroadcastChannel(STATE_EVENT); }
+  catch { return null; }
+}
+
+async function claimOfflineSale(id: string): Promise<OfflineMutation | null> {
+  return withQueueRows((rows, store) => {
+    const mutation = rows.find((row) => row.id === id);
+    if (!mutation || mutation.syncedAt || mutation.requiresClient || !isDueOfflineMutation(mutation)) return null;
+    if (mutation.syncStartedAt && Date.now() - Date.parse(mutation.syncStartedAt) < 120_000) return null;
+    mutation.syncStartedAt = new Date().toISOString();
+    mutation.mayHaveReachedServer = true;
+    store.put(mutation);
+    return mutation;
+  });
+}
+
+async function saveOfflineSaleResult(mutation: OfflineMutation): Promise<void> {
+  await withQueueRows((rows, store) => {
+    const existing = rows.find((row) => row.id === mutation.id);
+    // A late retry error must not erase another tab/worker's successful receipt.
+    if (!existing || existing.syncedAt) return;
+    store.put(mutation);
+  });
 }
 
 async function responseError(response: Response): Promise<string> {
@@ -305,14 +431,45 @@ function openOfflineDb(): Promise<IDBDatabase> {
   if (!offlineStorageSupported()) return Promise.reject(new Error("Offline storage unavailable"));
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
+    let blocked = false;
+    request.onblocked = () => {
+      blocked = true;
+      reject(new Error("Close or reload older Poke Deal tabs to update offline storage. Queued actions are retained."));
+    };
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(QUEUE_STORE)) db.createObjectStore(QUEUE_STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(COMP_STORE)) db.createObjectStore(COMP_STORE, { keyPath: "key" });
       if (!db.objectStoreNames.contains(BOOTSTRAP_STORE)) db.createObjectStore(BOOTSTRAP_STORE, { keyPath: "key" });
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => db.close();
+      if (blocked) db.close();
+      else resolve(db);
+    };
     request.onerror = () => reject(request.error ?? new Error("Offline storage failed to open"));
+  });
+}
+
+/** IndexedDB serializes readwrite transactions across tabs and the worker. */
+async function withQueueRows<T>(action: (rows: OfflineMutation[], store: IDBObjectStore) => T): Promise<T> {
+  const db = await openOfflineDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(QUEUE_STORE, "readwrite");
+    const store = transaction.objectStore(QUEUE_STORE);
+    const request = store.getAll();
+    let result: T;
+    let failure: unknown;
+    request.onsuccess = () => {
+      try { result = action(request.result as OfflineMutation[], store); }
+      catch (error) { failure = error; transaction.abort(); }
+    };
+    transaction.oncomplete = () => { db.close(); resolve(result!); };
+    transaction.onabort = transaction.onerror = () => {
+      db.close();
+      reject(failure ?? transaction.error ?? new Error("Offline storage transaction failed"));
+    };
   });
 }
 

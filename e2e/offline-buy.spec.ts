@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Route } from "playwright/test";
+import { expect, test, type BrowserContext, type Page, type Route } from "playwright/test";
 
 const card = {
   id: "card-offline-1",
@@ -58,7 +58,7 @@ test("offline buy stays visibly queued across reload and flushes once on reconne
   await expect(page.getByText(/7 traceable UK solds \/ 90d/)).toBeVisible();
 
   await expect.poll(() => page.evaluate(() => new Promise<number>((resolve, reject) => {
-    const request = indexedDB.open("poke-deal-offline", 2);
+    const request = indexedDB.open("poke-deal-offline", 3);
     request.onsuccess = () => {
       const db = request.result;
       const count = db.transaction("comp-cache", "readonly").objectStore("comp-cache").count();
@@ -194,6 +194,305 @@ test("Quick Fill keeps committed stock when draft creation loses the connection"
   expect(inventoryCreates).toBe(1);
 });
 
+test("offline last-copy sale stays reserved across reload and sync with a failed stock refresh", async ({ context, page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let sold = false;
+  const saleIds: string[] = [];
+  await mockAppApis(context, () => true, () => undefined);
+  await context.route("**/api/inventory/item-offline-1/sell", async (route) => {
+    saleIds.push(route.request().headers()["x-poke-deal-mutation-id"] ?? "");
+    sold = true;
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
+      item: { ...inventoryItem(), status: "SOLD", updatedAt: "2026-09-04T12:01:00.000Z" },
+      profitPence: 500,
+    }) });
+  });
+  await context.route("**/api/inventory", (route) => sold ? route.abort("failed") : route.fallback());
+
+  await prepareOfflineStockPage(page);
+  await context.setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await openOfflineSale(page);
+  await page.locator(".sell-sheet").getByRole("button", { name: "Create sale", exact: true }).click();
+  await expect.poll(() => pendingSales(page)).toBe(1);
+  await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toContainText("0 available");
+  expect(saleIds).toEqual([]);
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  const stockRow = page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" });
+  await expect(stockRow).toContainText("0 available");
+  await expect(stockRow.getByRole("button", { name: "Sell", exact: true }).and(page.locator(":enabled"))).toHaveCount(0);
+
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect.poll(() => sold).toBe(true);
+  await expect.poll(() => pendingSales(page)).toBe(0);
+  // The queue has acknowledged the server sale, but the stock GET deliberately
+  // fails. Its receipt must keep the stale cached row unavailable.
+  await expect(stockRow).toContainText("0 available");
+  await expect(stockRow.getByRole("button", { name: "Sell", exact: true }).and(page.locator(":enabled"))).toHaveCount(0);
+  await context.setOffline(true);
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByTestId("offline-sync-status")).toContainText("Partial");
+  expect(saleIds).toHaveLength(1);
+  expect(saleIds[0]).toMatch(/^[0-9a-f-]{36}$/i);
+});
+
+test("concurrent offline sale forms cannot reserve the same last copy and unsent undo releases it", async ({ context, page }) => {
+  await mockAppApis(context, () => true, () => undefined);
+  await prepareOfflineStockPage(page);
+  const other = await context.newPage();
+  try {
+    await other.goto("/?view=stock");
+    await openOfflineSale(page);
+    await openOfflineSale(other);
+    await context.setOffline(true);
+    await Promise.all([page, other].map((tab) => tab.evaluate(() => window.dispatchEvent(new Event("offline")))));
+    await Promise.all([page, other].map((tab) => tab.locator(".sell-sheet").getByRole("button", { name: "Create sale", exact: true }).click()));
+    await expect.poll(() => pendingSales(page)).toBe(1);
+    await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toContainText("0 available");
+    await expect(other.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toContainText("0 available");
+    await expect.poll(async () => await page.getByRole("button", { name: "Undo", exact: true }).isVisible() || await other.getByRole("button", { name: "Undo", exact: true }).isVisible()).toBe(true);
+    const winningPage = await page.getByRole("button", { name: "Undo", exact: true }).isVisible() ? page : other;
+    await winningPage.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect.poll(() => pendingSales(page)).toBe(0);
+    await expect(winningPage.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" }).getByRole("button", { name: "Sell", exact: true })).toBeEnabled();
+  } finally {
+    await other.close();
+  }
+});
+
+test("confirmed online sale remains unavailable after a failed refresh and an offline reload", async ({ context, page }) => {
+  let saleRequests = 0;
+  await mockAppApis(context, () => true, () => undefined);
+  await context.route("**/api/inventory/item-offline-1/sell", async (route) => {
+    saleRequests += 1;
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
+      item: { ...inventoryItem(), status: "SOLD", updatedAt: "2026-09-04T12:01:00.000Z" },
+      profitPence: 500,
+    }) });
+  });
+  await context.route("**/api/inventory", (route) => saleRequests > 0 ? route.abort("failed") : route.fallback());
+  await prepareOfflineStockPage(page);
+  await openOfflineSale(page);
+  await page.locator(".sell-sheet").getByRole("button", { name: "Create sale", exact: true }).click();
+  await expect.poll(() => saleRequests).toBe(1);
+  await expect(page.locator(".sell-sheet")).toHaveCount(0);
+  await page.getByRole("button", { name: "Stock", exact: true }).click();
+  await expect.poll(() => pendingSales(page)).toBe(0);
+  await context.setOffline(true);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
+  await expect(page.locator(".inventory-workspace").getByRole("button", { name: "Sell", exact: true }).and(page.locator(":enabled"))).toHaveCount(0);
+  expect(saleRequests).toBe(1);
+});
+
+test("an empty successful sale response stays reserved and retries the same sale ID", async ({ context, page }) => {
+  const saleIds: string[] = [];
+  let allowReconcile = false;
+  await mockAppApis(context, () => true, () => undefined);
+  await context.route("**/api/inventory/item-offline-1/sell", async (route) => {
+    saleIds.push(route.request().headers()["x-poke-deal-mutation-id"] ?? "");
+    // The server accepted the sale, but the first response lost its body.
+    if (!allowReconcile) return route.fulfill({ status: 201, contentType: "application/json", body: "" });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      item: { ...inventoryItem(), status: "SOLD", updatedAt: "2026-09-04T12:01:00.000Z" },
+      profitPence: 500, idempotent: true,
+    }) });
+  });
+  await context.route("**/api/inventory", (route) => saleIds.length ? route.abort("failed") : route.fallback());
+  await prepareOfflineStockPage(page);
+  await openOfflineSale(page);
+  await page.locator(".sell-sheet").getByRole("button", { name: "Create sale", exact: true }).click();
+  await expect.poll(() => pendingSales(page)).toBe(1);
+  await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toContainText("0 available");
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toHaveCount(0);
+
+  // Reopening online also fails to fetch stock. The unresolved sale remains
+  // reserved and its retry keeps the original idempotency key.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toContainText("0 available");
+  await page.getByRole("button", { name: "Comp / Buy", exact: true }).click();
+  const queuedSale = page.getByTestId("offline-queue-item").filter({ hasText: "Sale Gengar" });
+  await expect(queuedSale.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  await queuedSale.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect.poll(() => pendingSales(page)).toBe(1);
+  await expect(page.getByText(/This sale may already be recorded on the server/)).toBeVisible();
+  allowReconcile = true;
+  await queuedSale.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect.poll(() => pendingSales(page)).toBe(0);
+  expect(saleIds.length).toBeGreaterThanOrEqual(2);
+  expect(new Set(saleIds).size).toBe(1);
+  expect(saleIds[0]).toMatch(/^[0-9a-f-]{36}$/i);
+
+  await page.getByRole("button", { name: "Stock", exact: true }).click();
+  await context.setOffline(true);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toContainText("0 available");
+});
+
+test("an uncertain queued sale blocks stale listing activation but still permits marketplace removal", async ({ context, page }) => {
+  const now = new Date().toISOString();
+  const draft = {
+    id: "draft-offline-1", itemId: "item-offline-1", channel: "EBAY", state: "DRAFT",
+    title: "Gengar", titleCustomized: false, listPrice: 3000, suggestedPrice: null,
+    externalRef: null, externalUrl: null, createdAt: now, updatedAt: now,
+  };
+  const live = {
+    ...draft, id: "live-offline-1", channel: "VINTED", state: "ACTIVE",
+    externalRef: "vinted-offline-1", externalUrl: "https://www.vinted.co.uk/items/1234567890-gengar",
+  };
+  const listingWrites: Array<{ id: string; body: Record<string, unknown> }> = [];
+  let saleRequests = 0;
+  const stock = () => ({
+    ...inventoryItem(), status: "LISTED", listings: [draft, live],
+    photos: [{ id: "photo-offline-1", url: "/icon-512.png", origin: "REAL", role: "FRONT", order: 0, width: 512, height: 512 }],
+  });
+  await mockAppApis(context, () => true, () => undefined);
+  await context.route("**/api/inventory", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [stock()] }) }));
+  await context.route("**/api/listings**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === "GET" && path === "/api/listings") {
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ listings: [draft, live].map((row) => ({ ...row, item: stock() })) }) });
+    }
+    if (request.method() !== "GET") {
+      const id = path.split("/").at(-1)!;
+      const body = request.postDataJSON() as Record<string, unknown>;
+      listingWrites.push({ id, body });
+      if (id === live.id && body.state === "ENDED") live.state = "ENDED";
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ listing: { ...(id === live.id ? live : draft), ...body, item: stock() } }) });
+    }
+    return route.fallback();
+  });
+  await context.route("**/api/inventory/item-offline-1/sell", (route) => {
+    saleRequests++;
+    return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Sale acknowledgement unavailable" }) });
+  });
+  await prepareOfflineStockPage(page, true);
+  const listingTab = await context.newPage();
+  try {
+    // The editor already permits activation before another tab reserves stock.
+    await listingTab.goto("/?view=listings");
+    const draftRow = listingTab.locator(".listing-select-row").filter({ has: listingTab.locator('input[name="select-listing-draft-offline-1"]') });
+    await draftRow.getByText("More", { exact: true }).click();
+    await draftRow.getByRole("button", { name: "Edit listing details", exact: true }).click();
+    const editor = listingTab.locator(".sell-sheet");
+    await editor.getByRole("combobox", { name: "State", exact: true }).selectOption("ACTIVE");
+    await editor.getByRole("textbox", { name: "Listing URL", exact: true }).fill("https://www.ebay.co.uk/itm/123456789012");
+
+    await context.setOffline(true);
+    await openOfflineSale(page);
+    await page.locator(".sell-sheet").getByRole("button", { name: "Create sale", exact: true }).click();
+    await expect.poll(() => pendingSales(page)).toBe(1);
+    const stockRow = page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" });
+    await expect(stockRow).toContainText("0 available");
+    await expect(stockRow).toContainText(/Sync sale/i);
+    await page.getByRole("button", { name: "Today", exact: true }).click();
+    await expect(page.locator(".today-workspace")).toBeVisible();
+    await expect(page.locator(".today-workspace").getByRole("heading", { name: /(?:prepare|publish).*(?:stock|draft)/i })).toHaveCount(0);
+
+    await context.setOffline(false);
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await expect.poll(() => saleRequests).toBeGreaterThan(0);
+    await expect.poll(() => pendingSales(page)).toBe(1);
+    await editor.getByRole("button", { name: "Save listing", exact: true }).click();
+    await expect(listingTab.getByText(/Sync and refresh this card/)).toBeVisible();
+    expect(listingWrites).toEqual([]);
+
+    // Removing an existing marketplace listing reduces exposure and remains allowed.
+    await editor.getByRole("button", { name: "Close", exact: true }).click();
+    await listingTab.locator('select[name="listing-state"]').selectOption("ACTIVE");
+    const liveRow = listingTab.locator(".listing-select-row").filter({ has: listingTab.locator('input[name="select-listing-live-offline-1"]') });
+    await liveRow.getByText("More", { exact: true }).click();
+    await liveRow.getByRole("button", { name: "End listing", exact: true }).click();
+    await liveRow.getByRole("button", { name: "Confirm removed", exact: true }).click();
+    await expect.poll(() => listingWrites.length).toBe(1);
+    expect(listingWrites).toEqual([{ id: live.id, body: { state: "ENDED", externalRemovalConfirmed: true } }]);
+    await expect.poll(() => pendingSales(page)).toBe(1);
+  } finally {
+    await listingTab.close();
+  }
+});
+
+test("offline storage upgrade keeps existing queued sales and prevents old clients deleting receipts", async ({ context, page }) => {
+  await mockAppApis(context, () => true, () => undefined);
+  await page.goto("/privacy");
+  await page.evaluate(() => new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open("poke-deal-offline", 2);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore("mutation-queue", { keyPath: "id" });
+      request.result.createObjectStore("comp-cache", { keyPath: "key" });
+      request.result.createObjectStore("bootstrap-cache", { keyPath: "key" });
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction("mutation-queue", "readwrite");
+      transaction.objectStore("mutation-queue").put({
+        id: "legacy-queued-sale", kind: "mark-sold", endpoint: "/api/inventory/item-offline-1/sell", method: "POST",
+        headers: {}, body: { quantity: 1 }, summary: { label: "Legacy queued Gengar sale", quantity: 1 },
+        createdAt: "2026-09-04T12:00:00.000Z", updatedAt: "2026-09-04T12:00:00.000Z", attempts: 0,
+        nextAttemptAt: null, lastError: null, requiresClient: true,
+      });
+      transaction.oncomplete = () => { db.close(); resolve(); };
+      transaction.onerror = () => reject(transaction.error);
+    };
+    request.onerror = () => reject(request.error);
+  }));
+  await page.goto("/?view=stock");
+  await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toContainText("0 available");
+  await expect.poll(() => pendingSales(page)).toBe(1);
+  const oldClientError = await page.evaluate(() => new Promise<string>((resolve) => {
+    const request = indexedDB.open("poke-deal-offline", 2);
+    request.onerror = () => resolve(request.error?.name ?? "unknown");
+    request.onsuccess = () => { request.result.close(); resolve("unexpectedly opened"); };
+  }));
+  expect(oldClientError).toBe("VersionError");
+});
+
+async function prepareOfflineStockPage(page: Page, showAll = false) {
+  await page.goto("/?view=stock");
+  if (showAll) await page.getByRole("group", { name: "Inventory filters" }).getByRole("button", { name: /^All / }).click();
+  await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toBeVisible();
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await page.reload();
+  if (showAll) await page.getByRole("group", { name: "Inventory filters" }).getByRole("button", { name: /^All / }).click();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  await expect.poll(() => page.evaluate(() => new Promise<number>((resolve, reject) => {
+    const request = indexedDB.open("poke-deal-offline", 3);
+    request.onsuccess = () => {
+      const db = request.result;
+      const read = db.transaction("bootstrap-cache", "readonly").objectStore("bootstrap-cache").get("latest");
+      read.onsuccess = () => { db.close(); resolve(read.result?.payload?.inventory?.length ?? 0); };
+      read.onerror = () => reject(read.error);
+    };
+    request.onerror = () => reject(request.error);
+  }))).toBe(1);
+}
+
+async function openOfflineSale(page: Page) {
+  await page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" }).getByRole("button", { name: "Sell", exact: true }).click();
+  const saleSheet = page.locator(".sell-sheet");
+  await expect(saleSheet).toBeVisible();
+  await saleSheet.getByRole("textbox", { name: /^Actual sale price/ }).fill("30.00");
+  await saleSheet.getByRole("textbox", { name: "Fees", exact: true }).fill("0");
+  await saleSheet.getByRole("textbox", { name: "My postage cost", exact: true }).fill("0");
+}
+
+async function pendingSales(page: Page): Promise<number> {
+  return page.evaluate(() => new Promise<number>((resolve, reject) => {
+    const request = indexedDB.open("poke-deal-offline", 3);
+    request.onsuccess = () => {
+      const db = request.result;
+      const read = db.transaction("mutation-queue", "readonly").objectStore("mutation-queue").getAll();
+      read.onsuccess = () => { db.close(); resolve(read.result.filter((row) => row.kind === "mark-sold" && !row.syncedAt).length); };
+      read.onerror = () => reject(read.error);
+    };
+    request.onerror = () => reject(request.error);
+  }));
+}
+
 async function mockAppApis(
   context: BrowserContext,
   isAcquired: () => boolean,
@@ -230,7 +529,7 @@ async function mockAppApis(
     }
     if (url.pathname === "/api/listings") return json({ listings: [] });
     if (url.pathname === "/api/dashboard") return json({
-      metrics: { stockCount: isAcquired() ? 1 : 0, listedCount: 0, soldCount: 0, realizedProfitPence: 0, operatingExpensePence: 0, agedStockCount: 0 },
+      metrics: { stockCount: isAcquired() ? 1 : 0, listedCount: 0, soldCount: 0, realizedProfitPence: 0, operatingExpensePence: 0, agedStockCount: 0, channelBreakdown: [] },
       listingsByState: { DRAFT: 0, ACTIVE: 0, SOLD: 0, ENDED: 0 }, staleStock: [], recentSales: [], recentExpenses: [],
     });
     if (url.pathname === "/api/snapshots/portfolio") return json({ points: [], latest: null, previous: null, changePence: null, changePct: null });
@@ -260,6 +559,7 @@ function inventoryItem() {
     graderCert: null,
     status: "IN_STOCK",
     createdAt: new Date().toISOString(),
+    updatedAt: "2026-09-04T12:00:00.000Z",
     listings: [],
     sales: [],
     photos: [],

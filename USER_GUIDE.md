@@ -2,6 +2,21 @@
 
 Simple guide to what the platform does today, how each part is meant to be used, what is planned, and what still needs action.
 
+## Current selling routine — September 2026 implementation
+
+This section describes the updated code. Hosted availability and connected seller accounts still need a real rollout check; older “live today” statements below are not a current production-health guarantee.
+
+1. Open **Today**, then start with the singles you already own. Import a small batch, using original acquisition dates where known. If the import pauses, **Resume import** continues the same batch without re-creating confirmed rows. Imports create drafts, even if an older CSV says active.
+2. In **Stock**, distinguish **Drafts** from **Live**. Check the actual printing and condition, add suitable photos, set your asking price, and keep different-condition copies and distinct slabs on separate rows. **No purchase cost** means a real £0 cost; do not use it for an unknown amount.
+3. Use **List** to review each title, description and photo before publishing. Missing or ambiguous raw condition blocks eBay publication. A manually created eBay listing can be tracked by pasting its individual live item link.
+4. Record a sale after payment. Enter the buyer total and, if known, the postage charged within that total; keep seller postage separate. Check the actual-cost box only after checking the fees and postage. Complete dispatch, returns and refunds in the marketplace.
+5. If the last copy sells elsewhere, clear its other live listings. **Withdraw from eBay** requests withdrawal for a connected Inventory API offer. For a manual listing, remove it on that marketplace and use **Confirm removed**. A failed withdrawal stays visible.
+6. In **Profit**, confirm outstanding sale amounts from receipts. Historical acquisition cost starts blank where it was never snapshotted. A correction records the old amounts and your reason; the Sales CSV retains that evidence. Calculated recovery is not a bank or marketplace payout balance.
+
+Queued offline sales reserve their copies on this device immediately, including across its tabs. Stock shows **Sync sale**, and publication or activation waits for sync and refreshed stock; removing an existing live listing stays available. Profit updates after the server confirms the sale. Reconnect to resolve an uncertain attempted sale; do not delete its queue record and recreate it. Different devices and marketplaces cannot coordinate while disconnected. After this update, reload older open tabs to finish the storage upgrade without clearing queued work.
+
+The next expansion is a separate vending workflow: a customer basket across different singles, negotiated totals, payment/event attribution and end-of-day stock reconciliation. The current buy-side deal session is for acquisitions.
+
 ## The Big Idea
 
 Poke Deal is the daily operating system for a UK Pokemon card side hustle.
@@ -26,7 +41,7 @@ The app is deployed at:
 
 [https://poke-deal.vercel.app](https://poke-deal.vercel.app)
 
-It is password protected in production.
+Production uses the private trusted-browser link described in README; a password prompt is retired.
 
 Live today:
 
@@ -86,7 +101,7 @@ Intended use:
 
 Use this when you are buying, comping, or deciding whether to buy a card.
 
-This is the most important day-to-day flow.
+For the current sales-first phase, start in Today, Stock and List. Use Buy when you need valuation or acquisition support.
 
 ### Stock
 

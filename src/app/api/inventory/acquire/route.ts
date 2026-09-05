@@ -212,6 +212,7 @@ export async function POST(request: Request) {
       costBasisPence: d.costBasisPence,
       quantity: d.quantity,
       acquiredFrom: d.acquiredFrom,
+      acquiredAt: d.acquiredAt,
       location: d.location,
       condition: d.condition,
       graderCert: d.graderCert,

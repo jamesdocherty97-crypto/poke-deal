@@ -141,3 +141,15 @@ export async function publishEbayOffer(
     fetchImpl,
   );
 }
+
+/** Withdraw a published Inventory API offer; a failed request leaves local state alone. */
+export async function withdrawEbayOffer(
+  config: EbayConfig,
+  offerId: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const path = `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}/withdraw`;
+  const response = await ebayFetch(config, path, accessToken, { method: "POST" }, fetchImpl);
+  if (!response.ok) throw await readEbayApiError(response, path);
+}

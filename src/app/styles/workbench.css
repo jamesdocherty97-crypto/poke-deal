@@ -1567,10 +1567,11 @@ button.ghost-button:disabled,
   .vault-summary span,
   .settings-health-summary div { padding:12px 9px; }
   .vault-commandbar { position:static; display:block; padding:10px; }
-  .vault-heading { margin-bottom:8px; padding:2px 2px 9px; border-bottom:1px solid var(--color-border); border-radius:0; background:transparent; color:var(--color-text-primary); }
+  .vault-heading { flex-direction:column; align-items:stretch; gap:10px; margin-bottom:8px; padding:2px 2px 9px; border-bottom:1px solid var(--color-border); border-radius:0; background:transparent; color:var(--color-text-primary); }
   .vault-heading h3 { color:var(--color-text-primary); font-size:.98rem; white-space:nowrap; }
   .vault-heading .workspace-kicker { color:var(--brand-yellow); }
-  .vault-heading .heading-actions button { border-color:var(--color-border); background:var(--color-surface-3); color:var(--color-text-primary); }
+  .vault-heading .heading-actions { width:100%; flex-wrap:wrap; justify-content:flex-start; }
+  .vault-heading .heading-actions button { flex:1 1 auto; white-space:normal; border-color:var(--color-border); background:var(--color-surface-3); color:var(--color-text-primary); }
   .vault-heading .heading-actions > span { display:none; }
   .inventory-filter-tabs { margin-bottom:8px; }
   .vault-search { grid-template-columns:minmax(0,1fr) 112px; gap:6px; }
@@ -1585,7 +1586,7 @@ button.ghost-button:disabled,
   .item-badges { justify-content:flex-start; }
   .inventory-row-money { margin:11px 0; }
   .next-action-strip { align-items:flex-start; flex-direction:column; }
-  .row-primary-actions button { flex:1; }
+  .row-primary-actions button { flex:1 1 88px; padding:6px 10px; white-space:normal; }
   .bulk-action-bar { top:76px; }
 
   .market-pipeline { grid-template-columns:1fr auto 1fr auto 1fr; }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { normalizeListingUrl } from "./listingUrl.js";
+import { normalizeListingUrl, ebayListingIdFromUrl } from "./listingUrl.js";
 
 test("normalizeListingUrl accepts https listing URLs", () => {
   assert.equal(
@@ -36,4 +36,12 @@ test("normalizeListingUrl rejects non-web or malformed values", () => {
   assert.equal(normalizeListingUrl("notes from listing"), null);
   assert.equal(normalizeListingUrl("javascript:alert(1)"), null);
   assert.equal(normalizeListingUrl(""), null);
+});
+
+test("manual eBay activation extracts only a live item reference", () => {
+  assert.equal(ebayListingIdFromUrl("https://www.ebay.co.uk/itm/Pikachu/123456789012?hash=test"), "123456789012");
+  assert.equal(ebayListingIdFromUrl("https://www.ebay.com/itm/123456789012"), "123456789012");
+  assert.equal(ebayListingIdFromUrl("https://www.ebay.co.uk/sch/i.html"), null);
+  assert.equal(ebayListingIdFromUrl("https://ebay.co.uk.example.test/itm/123456789012"), null);
+  assert.equal(ebayListingIdFromUrl("https://www.ebay.co.uk/itm/not-an-item"), null);
 });

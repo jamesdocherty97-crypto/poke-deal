@@ -32,9 +32,9 @@ export function buildOperatingSnapshot(input: OperatingSnapshotInput): Operating
     },
     {
       id: "cash-net",
-      label: "Cash net",
+      label: "Calculated recovery",
       value: formatSignedPounds(input.cashNetPence),
-      detail: `${formatPounds(input.cashInPence)} in / ${formatPounds(input.cashOutPence)} out`,
+      detail: "Buyer totals less recorded costs · payouts unverified",
       tone: input.cashNetPence >= 0 ? "good" : input.cashInPence > 0 ? "warn" : "info",
     },
     {
@@ -48,7 +48,7 @@ export function buildOperatingSnapshot(input: OperatingSnapshotInput): Operating
       id: "sell-through",
       label: "Sell-through",
       value: `${formatPct(input.sellThroughPct)}%`,
-      detail: `${formatPct(input.cashRecoveryPct)}% cash recovery`,
+      detail: `${formatPct(input.cashRecoveryPct)}% recorded cost recovery`,
       tone: input.sellThroughPct > 0 ? "good" : "info",
     },
   ];

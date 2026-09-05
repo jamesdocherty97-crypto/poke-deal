@@ -1,5 +1,5 @@
 const DB_NAME = "poke-deal-offline";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const QUEUE_STORE = "mutation-queue";
 const COMP_STORE = "comp-cache";
 const BOOTSTRAP_STORE = "bootstrap-cache";
@@ -57,9 +57,11 @@ async function flushQueue() {
   const rows = await readAll(db);
   let synced = 0;
   let failed = 0;
-  for (const mutation of rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
-    if (mutation.requiresClient) continue;
-    if (mutation.nextAttemptAt && Date.parse(mutation.nextAttemptAt) > Date.now()) continue;
+  for (const queued of rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+    if (queued.requiresClient || queued.syncedAt) continue;
+    if (queued.nextAttemptAt && Date.parse(queued.nextAttemptAt) > Date.now()) continue;
+    const mutation = queued.kind === "mark-sold" ? await claimSale(db, queued.id) : queued;
+    if (!mutation) continue;
     try {
       const response = await fetch(mutation.endpoint, {
         method: mutation.method,
@@ -68,18 +70,35 @@ async function flushQueue() {
         ...(mutation.body == null ? {} : { body: JSON.stringify(mutation.body) }),
       });
       if (response.ok) {
-        await remove(db, mutation.id);
+        if (mutation.kind === "mark-sold") {
+          const payload = await response.clone().json().catch(() => null);
+          const item = payload?.item;
+          const match = /^\/api\/inventory\/([^/?]+)\/sell$/.exec(mutation.endpoint);
+          const itemId = match ? decodeURIComponent(match[1]) : null;
+          if (!item || item.id !== itemId || !Number.isSafeInteger(item.quantity) || item.quantity < 0 || !["IN_STOCK", "LISTED", "RESERVED", "SOLD"].includes(item.status) || !Number.isFinite(Date.parse(item.updatedAt || ""))) {
+            throw new Error("Sale response did not confirm current stock. Retry sync to reconcile this sale safely.");
+          }
+          mutation.syncedAt = new Date().toISOString();
+          mutation.syncStartedAt = null;
+          mutation.lastError = null;
+          mutation.stockAfterSync = { id: item.id, quantity: item.quantity, status: item.status, updatedAt: item.updatedAt };
+          await put(db, mutation);
+        } else {
+          await remove(db, mutation.id);
+        }
         synced += 1;
         continue;
       }
       mutation.attempts += 1;
       mutation.updatedAt = new Date().toISOString();
       mutation.lastError = await errorMessage(response);
+      mutation.syncStartedAt = null;
       if ([401, 403, 408, 425, 429].includes(response.status) || response.status >= 500) {
         mutation.nextAttemptAt = new Date(Date.now() + Math.min(1000 * 2 ** mutation.attempts, 900000)).toISOString();
       } else {
         mutation.nextAttemptAt = null;
         mutation.requiresClient = true;
+        mutation.mayHaveReachedServer = false;
       }
       await put(db, mutation);
       failed += 1;
@@ -87,6 +106,7 @@ async function flushQueue() {
       mutation.attempts += 1;
       mutation.updatedAt = new Date().toISOString();
       mutation.lastError = error instanceof Error ? error.message : "Network request failed";
+      mutation.syncStartedAt = null;
       mutation.nextAttemptAt = new Date(Date.now() + Math.min(1000 * 2 ** mutation.attempts, 900000)).toISOString();
       await put(db, mutation);
       failed += 1;
@@ -95,18 +115,29 @@ async function flushQueue() {
   }
   const clients = await self.clients.matchAll({ includeUncontrolled: true, type: "window" });
   clients.forEach((client) => client.postMessage({ type: "POKE_DEAL_SYNC_STATE", synced, failed }));
+  db.close();
 }
 
 function openDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
+    let blocked = false;
+    request.onblocked = () => {
+      blocked = true;
+      reject(new Error("Close or reload older Poke Deal tabs to update offline storage. Queued actions are retained."));
+    };
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(QUEUE_STORE)) db.createObjectStore(QUEUE_STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(COMP_STORE)) db.createObjectStore(COMP_STORE, { keyPath: "key" });
       if (!db.objectStoreNames.contains(BOOTSTRAP_STORE)) db.createObjectStore(BOOTSTRAP_STORE, { keyPath: "key" });
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => db.close();
+      if (blocked) db.close();
+      else resolve(db);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -120,7 +151,39 @@ function remove(db, id) {
 }
 
 function put(db, value) {
-  return requestResult(db.transaction(QUEUE_STORE, "readwrite").objectStore(QUEUE_STORE).put(value));
+  return queueTransaction(db, (rows, store) => {
+    const current = rows.find((row) => row.id === value.id);
+    if (current && !current.syncedAt) store.put(value);
+  });
+}
+
+function claimSale(db, id) {
+  return queueTransaction(db, (rows, store) => {
+    const mutation = rows.find((row) => row.id === id);
+    if (!mutation || mutation.syncedAt || mutation.requiresClient) return null;
+    if (mutation.nextAttemptAt && Date.parse(mutation.nextAttemptAt) > Date.now()) return null;
+    if (mutation.syncStartedAt && Date.now() - Date.parse(mutation.syncStartedAt) < 120000) return null;
+    mutation.syncStartedAt = new Date().toISOString();
+    mutation.mayHaveReachedServer = true;
+    store.put(mutation);
+    return mutation;
+  });
+}
+
+function queueTransaction(db, action) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(QUEUE_STORE, "readwrite");
+    const store = transaction.objectStore(QUEUE_STORE);
+    const request = store.getAll();
+    let result;
+    let failure;
+    request.onsuccess = () => {
+      try { result = action(request.result, store); }
+      catch (error) { failure = error; transaction.abort(); }
+    };
+    transaction.oncomplete = () => resolve(result);
+    transaction.onerror = transaction.onabort = () => reject(failure || transaction.error || new Error("Offline queue transaction failed"));
+  });
 }
 
 function requestResult(request) {

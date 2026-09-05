@@ -196,6 +196,12 @@ test("importEbayOrderLine books a matched listing sale and is idempotent", async
   assert.equal(db.sales[0]?.salePrice, 10499);
   assert.equal(db.sales[0]?.fees, 1374);
   assert.equal(db.sales[0]?.postage, 499);
+  assert.equal(db.sales[0]?.costBasis, 70000);
+  assert.equal(db.sales[0]?.itemRevenue, 10000);
+  assert.equal(db.sales[0]?.costsEstimated, true);
+  assert.equal(db.sales[0]?.clientMutationId, `ebay-order:${line.importKey}`);
+  db.items[0]!.costBasis = 123;
+  assert.equal(db.sales[0]?.costBasis, 70000, "later stock cost edits leave booked sale cost unchanged");
   assert.equal(db.items[0]?.status, "SOLD");
   assert.equal(db.listings[0]?.state, "SOLD");
   assert.equal(db.appAlerts[0]?.kind, "EBAY_SALE");
@@ -222,6 +228,24 @@ test("importEbayOrderLine leaves unmatched orders in a manual queue", async () =
   assert.match(result.reason ?? "", /No Poke Deal stock row/);
   assert.equal(db.sales.length, 0);
   assert.equal(db.imports[0]?.status, "UNMATCHED");
+});
+
+test("an eBay sale preserves another active marketplace listing and records removal work", async () => {
+  const db = fakeEbaySyncDb();
+  db.listings.push({ ...db.listings[0]!, id: "vinted-1", channel: "VINTED", externalRef: "vinted-ref" });
+  await importEbayOrderLine(db.client, orderLine());
+  assert.equal(db.listings[0]?.state, "SOLD");
+  assert.equal(db.listings[1]?.state, "ACTIVE");
+  assert.match(db.appAlerts.find((alert) => alert.kind === "REPRICE")?.title, /Remove sold stock/);
+});
+
+test("one paid copy of a multi-copy eBay listing leaves its remaining copies active", async () => {
+  const db = fakeEbaySyncDb();
+  db.items[0]!.quantity = 3;
+  await importEbayOrderLine(db.client, orderLine());
+  assert.equal(db.items[0]?.quantity, 2);
+  assert.equal(db.items[0]?.status, "LISTED");
+  assert.equal(db.listings[0]?.state, "ACTIVE");
 });
 
 function orderLine(input: Partial<NormalizedEbayOrderLine> = {}): NormalizedEbayOrderLine {
@@ -259,6 +283,9 @@ function fakeEbaySyncDb(options: { includeListing?: boolean; includeItem?: boole
   const appAlerts: any[] = [];
 
   const client = {
+    async $queryRaw(_strings: TemplateStringsArray, itemId: unknown) {
+      return items.filter((item) => item.id === itemId).map((item) => ({ id: item.id }));
+    },
     async $transaction(fn: any) {
       return fn(client);
     },
@@ -298,7 +325,8 @@ function fakeEbaySyncDb(options: { includeListing?: boolean; includeItem?: boole
       },
       async updateMany({ where, data }: any) {
         const matches = listings.filter((listing) => {
-          if (where.id && listing.id !== where.id) return false;
+          if (typeof where.id === "string" && listing.id !== where.id) return false;
+          if (where.id?.in && !where.id.in.includes(listing.id)) return false;
           if (where.itemId && listing.itemId !== where.itemId) return false;
           return true;
         });
@@ -348,3 +376,16 @@ function restoreEnv(key: string, value: string | undefined) {
   if (value === undefined) delete process.env[key];
   else process.env[key] = value;
 }
+
+
+test("multi-unit eBay sale splits exact item revenue and combined shipping once", async () => {
+  const db = fakeEbaySyncDb();
+  db.items[0]!.quantity = 3;
+  await importEbayOrderLine(db.client, orderLine({ quantity: 3, itemSubtotalPence: 10001, postageChargedPence: 499, buyerPaidPence: 10500 }));
+  assert.equal(db.sales.length, 3);
+  assert.deepEqual(db.sales.map((sale) => sale.itemRevenue), [3334, 3334, 3333]);
+  assert.equal(db.sales.reduce((sum, sale) => sum + sale.salePrice, 0), 10500);
+  assert.equal(db.sales.reduce((sum, sale) => sum + sale.postage, 0), 499);
+  assert.deepEqual(db.sales.map((sale) => sale.mutationIndex), [0, 1, 2]);
+  assert.ok(db.sales.every((sale) => sale.costsEstimated && sale.costBasis === 70000 && sale.clientMutationId.startsWith("ebay-order:")));
+});

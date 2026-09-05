@@ -62,10 +62,13 @@ import {
   normalizeManualCompSearchText,
   type ManualCompLinkKind,
 } from "@/lib/dealer/compLinks";
+import { inventoryItemMatchesFilter, emptyInventoryFilterText, hasLiveListing, stockReadiness, type InventoryFilter } from "@/lib/dealer/stockReadiness";
+import { createStockImportBatch, parseStockImportBatch, runStockImportBatch, importBatchProgress, STOCK_IMPORT_BATCH_KEY, type StockImportBatch } from "@/lib/dealer/stockImportBatch";
+import { parseAcquisitionDate } from "@/lib/inventory/acquiredAt";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
 import { normalizeListingUrl } from "@/lib/dealer/listingUrl";
 import { buildLaunchReadiness, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
-import { buildLaunchPlan, buildLaunchProgress, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
+import { buildLaunchPlan, buildLaunchProgress, summarizeSellingStock, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
 import { buildBuyPlan, buildBuyTargetOptions, buildBuyTargetSuggestion } from "@/lib/dealer/buyPlan";
 import { buildQuickGradeOptions } from "@/lib/dealer/buyWorkspace";
 import { splitTotalCostToUnitPence } from "@/lib/dealer/bundleCost";
@@ -132,7 +135,6 @@ import {
   grossSalePriceForProfitPence,
   grossSalePriceForNetPence,
   rescaleGrossSaleForQuantity,
-  salePriceBreakdown,
   saleItemSubtotalPence,
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
@@ -158,6 +160,9 @@ import {
   getOfflineComp,
   getOfflineSyncState,
   listOfflineMutations,
+  listOfflineSaleReservations,
+  offlineStorageSupported,
+  recordOfflineSaleReceipt,
   putOfflineComp,
   putOfflineBootstrap,
   registerOfflineWorker,
@@ -167,6 +172,8 @@ import {
   type OfflineMutation,
   type OfflineSyncState,
 } from "@/lib/offline/offlineStore";
+import { parseConfirmedPounds } from "@/lib/dealer/saleLedger";
+import { availableOfflineSaleQuantity, readOfflineSaleStock } from "@/lib/offline/pendingSales";
 import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
 import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
@@ -212,7 +219,6 @@ type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type AcquireListingState = "DRAFT" | "ACTIVE";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
 type ListingState = "DRAFT" | "ACTIVE" | "SOLD" | "ENDED";
-type InventoryFilter = "needs-action" | "all" | "needs-listing" | "listed" | "needs-photos" | "held" | "sold";
 type ExpenseCategory = "SUPPLIES" | "POSTAGE" | "GRADING" | "TABLE_FEE" | "TRAVEL" | "PLATFORM" | "OTHER";
 type BuyFlowState = "done" | "current" | "wait" | "warn";
 type BuyFlowStep = {
@@ -579,6 +585,8 @@ type InventoryItem = {
   graderCert: string | null;
   status: ItemStatus;
   createdAt: string;
+  acquiredAt?: string;
+  updatedAt?: string;
   listings: Listing[];
   sales: Sale[];
   photos?: CardPhoto[];
@@ -712,6 +720,7 @@ type Dashboard = {
     realizedProfitPence: number;
     operatingExpensePence: number;
     netProfitPence: number;
+    provisionalSaleCount?: number;
     cashInPence: number;
     cashOutPence: number;
     cashNetPence: number;
@@ -726,6 +735,8 @@ type Dashboard = {
   };
   monthlyPnl?: MonthlyPnlPoint[];
   recentSales: SaleSummary[];
+  salesToReconcile?: SaleSummary[];
+  salesToReconcileCount?: number;
   recentExpenses: ExpenseRecord[];
   staleStock: Array<{ id: string; name: string; grade: string; status: ItemStatus; createdAt: string }>;
   listingsByState: Record<string, number>;
@@ -769,6 +780,11 @@ type SaleSummary = {
   profitPence: number;
   marginPct: number | null;
   soldAt: string;
+  costsEstimated?: boolean;
+  costBasisEstimated?: boolean;
+  itemRevenuePence?: number | null;
+  amountRevisionCount?: number;
+  undoable?: boolean;
 };
 
 type DeleteTarget =
@@ -908,8 +924,9 @@ const editableStatuses: ItemStatus[] = ["IN_STOCK", "LISTED", "RESERVED"];
 const inventoryFilters: Array<{ value: InventoryFilter; label: string }> = [
   { value: "needs-action", label: "Needs action" },
   { value: "all", label: "All" },
-  { value: "needs-listing", label: "Needs listing" },
-  { value: "listed", label: "Listed" },
+  { value: "needs-listing", label: "Not live" },
+  { value: "drafts", label: "Drafts" },
+  { value: "listed", label: "Live" },
   { value: "needs-photos", label: "Needs photos" },
   { value: "held", label: "Held" },
   { value: "sold", label: "Sold" },
@@ -956,13 +973,17 @@ type NoticeAction = {
 };
 
 export default function Home() {
-  const [view, setViewState] = useState<View>("acquire");
+  const [view, setViewState] = useState<View>("today");
   const [name, setName] = useState("");
   const [setNameValue, setSetNameValue] = useState("");
   const [number, setNumber] = useState("");
   const [quickIntake, setQuickIntake] = useState("");
   const [manualCompQuery, setManualCompQuery] = useState("");
   const [stockImportText, setStockImportText] = useState("");
+  const [stockImportBatch, setStockImportBatch] = useState<StockImportBatch | null>(null);
+  const stockImportBatchRef = useRef<StockImportBatch | null>(null);
+  const stockImportBusyRef = useRef(false);
+  const [acquiredDate, setAcquiredDate] = useState("");
   const [grade, setGrade] = useState<Grade>("RAW");
   const [cost, setCost] = useState("");
   const [selectedQuickCostPence, setSelectedQuickCostPence] = useState<number | null>(null);
@@ -1021,15 +1042,19 @@ export default function Home() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemQuantity, setItemQuantity] = useState("1");
   const [itemCost, setItemCost] = useState("");
+  const [itemAcquiredDate, setItemAcquiredDate] = useState("");
   const [itemSource, setItemSource] = useState("");
   const [itemLocation, setItemLocation] = useState("");
   const [itemCondition, setItemCondition] = useState("");
   const [itemGraderCert, setItemGraderCert] = useState("");
   const [itemStatus, setItemStatus] = useState<ItemStatus>("IN_STOCK");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const saleSubmittingRef = useRef(false);
   const [salePrice, setSalePrice] = useState("");
   const [fees, setFees] = useState("");
   const [postage, setPostage] = useState("1.75");
+  const [buyerPostage, setBuyerPostage] = useState("");
+  const [saleCostsConfirmed, setSaleCostsConfirmed] = useState(false);
   const [soldAt, setSoldAt] = useState(todayInputValue());
   const [saleChannel, setSaleChannel] = useState<Channel>("EBAY");
   const [saleQuantity, setSaleQuantity] = useState("1");
@@ -1122,6 +1147,8 @@ export default function Home() {
     lastError: null,
   });
   const [offlineMutations, setOfflineMutations] = useState<OfflineMutation[]>([]);
+  const [offlineSaleReservations, setOfflineSaleReservations] = useState<OfflineMutation[]>([]);
+  const [offlineReservationsLoaded, setOfflineReservationsLoaded] = useState(false);
   const [offlineBootstrapAgeHours, setOfflineBootstrapAgeHours] = useState<number | null>(null);
   const [offlineBootstrapPartial, setOfflineBootstrapPartial] = useState(false);
   const [inventoryLoaded, setInventoryLoaded] = useState(false);
@@ -1156,6 +1183,8 @@ export default function Home() {
   const expenseDescriptionRef = useRef<HTMLInputElement | null>(null);
   const pnlWatchPanelRef = useRef<HTMLElement | null>(null);
   const offlineBootstrapCachedAtRef = useRef<string | null>(null);
+  const latestWorkspaceRef = useRef({ inventory, priceHistoryPreviews, listings, dashboard, portfolio, watches, alerts: appAlerts, alertUnreadCount: appAlertUnreadCount, expenses, systemStatus, dealSession });
+  latestWorkspaceRef.current = { inventory, priceHistoryPreviews, listings, dashboard, portfolio, watches, alerts: appAlerts, alertUnreadCount: appAlertUnreadCount, expenses, systemStatus, dealSession };
   const compLookupRef = useRef<{ id: number; controller: AbortController } | null>(null);
   const compLookupSequenceRef = useRef(0);
   const cardSuggestionCacheRef = useRef(new Map<string, { cards: CatalogSuggestion[]; cachedAt: number }>());
@@ -1184,6 +1213,17 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    try {
+      const batch = parseStockImportBatch(window.localStorage.getItem(STOCK_IMPORT_BATCH_KEY));
+      if (batch) {
+        stockImportBatchRef.current = batch;
+        setStockImportBatch(batch);
+        setStockImportText(batch.sourceText);
+      }
+    } catch { /* Opening-stock import explains storage failure before writing. */ }
+  }, []);
+
+  useEffect(() => {
     const handleCommandKey = (event: globalThis.KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -1203,15 +1243,17 @@ export default function Home() {
   useEffect(() => {
     let active = true;
     const refreshOfflineState = async () => {
-      const [state, queue] = await Promise.all([getOfflineSyncState(), listOfflineMutations().catch(() => [])]);
+      const [state, queue, reservations] = await Promise.all([getOfflineSyncState(), offlineStorageSupported() ? listOfflineMutations() : [], offlineStorageSupported() ? listOfflineSaleReservations() : []]);
       if (!active) return;
       setOfflineSync(state);
       setOfflineMutations(queue);
+      setOfflineSaleReservations(reservations);
+      setOfflineReservationsLoaded(true);
     };
     const unsubscribe = subscribeOfflineState((state) => {
       if (!active) return;
       setOfflineSync(state);
-      void listOfflineMutations().then((queue) => active && setOfflineMutations(queue));
+      void refreshOfflineState().catch(() => { if (active) setOfflineReservationsLoaded(false); });
     });
     const flushAndRefresh = async () => {
       const clientIntents = (await listOfflineMutations().catch(() => [])).filter((row) => row.requiresClient);
@@ -1252,13 +1294,13 @@ export default function Home() {
     const handleOnline = () => void flushAndRefresh();
     const handleWorkerMessage = (event: MessageEvent<{ type?: string; synced?: number }>) => {
       if (event.data?.type !== "POKE_DEAL_SYNC_STATE") return;
-      void refreshOfflineState();
+      void refreshOfflineState().catch(() => { if (active) setOfflineReservationsLoaded(false); });
       if ((event.data.synced ?? 0) > 0) void refreshAll();
     };
     void registerOfflineWorker().then(() => {
-      void refreshOfflineState();
+      void refreshOfflineState().catch(() => { if (active) setOfflineReservationsLoaded(false); });
       if (navigator.onLine) void flushAndRefresh();
-    }).catch(refreshOfflineState);
+    }).catch(() => refreshOfflineState().catch(() => { if (active) setOfflineReservationsLoaded(false); }));
     window.addEventListener("online", handleOnline);
     navigator.serviceWorker?.addEventListener("message", handleWorkerMessage);
     return () => {
@@ -1272,6 +1314,7 @@ export default function Home() {
   useEffect(() => {
     void getOfflineBootstrap<OfflineBootstrapPayload>().then((cached) => {
         if (!cached) return;
+        latestWorkspaceRef.current = { ...cached.payload, priceHistoryPreviews: cached.payload.priceHistoryPreviews ?? {} };
         setInventory(cached.payload.inventory);
         setPriceHistoryPreviews(cached.payload.priceHistoryPreviews ?? {});
         setListings(cached.payload.listings);
@@ -1558,6 +1601,21 @@ export default function Home() {
     if (!postageTouched) setPostage(penceToPounds(estimate.postagePence));
   }, [feesTouched, postageTouched, saleChannel, salePrice, sellingId, sellingItem?.grade]);
 
+  const inventoryForSelling = useMemo(
+    () => inventory.map((item) => ({ ...item, localAvailableQuantity: offlineReservationsLoaded ? availableToSell(item) : null })),
+    [inventory, offlineReservationsLoaded, offlineSaleReservations],
+  );
+  const sellingEligibleItemIds = useMemo(
+    () => new Set(inventoryForSelling.filter((item) => {
+      const readiness = stockReadiness(item);
+      return !readiness.sold && !readiness.held;
+    }).map((item) => item.id)),
+    [inventoryForSelling],
+  );
+  const actionableListings = useMemo(
+    () => listings.filter((listing) => listing.item && sellingEligibleItemIds.has(listing.item.id)),
+    [listings, sellingEligibleItemIds],
+  );
   const activeInventory = useMemo(
     () => inventory.filter((item) => item.status !== "SOLD"),
     [inventory],
@@ -1571,14 +1629,14 @@ export default function Home() {
       Object.fromEntries(
         inventoryFilters.map(({ value }) => [
           value,
-          inventory.filter((item) => inventoryItemMatchesFilter(item, value)).length,
+          inventoryForSelling.filter((item) => inventoryItemMatchesFilter(item, value)).length,
         ]),
       ) as Record<InventoryFilter, number>,
-    [inventory],
+    [inventoryForSelling],
   );
   const filteredInventory = useMemo(
-    () => inventory.filter((item) => inventoryItemMatchesFilter(item, inventoryFilter)),
-    [inventory, inventoryFilter],
+    () => inventoryForSelling.filter((item) => inventoryItemMatchesFilter(item, inventoryFilter)),
+    [inventoryForSelling, inventoryFilter],
   );
   const visibleInventory = useMemo(
     () => buildInventoryView(filteredInventory, { query: inventoryQuery, sort: inventorySort }),
@@ -1610,22 +1668,22 @@ export default function Home() {
     [listingPackId, listings],
   );
   const firstDraftListingTarget = useMemo(() => {
-    const nextId = nextDraftListingId(listings, null);
+    const nextId = nextDraftListingId(actionableListings, null);
     return nextId ? listings.find((listing) => listing.id === nextId) ?? null : null;
-  }, [listings]);
+  }, [listings, actionableListings]);
   const firstSaleListingTarget = useMemo(() => {
-    const nextId = nextSaleListingId(listings, null);
+    const nextId = nextSaleListingId(actionableListings, null);
     return nextId ? listings.find((listing) => listing.id === nextId) ?? null : null;
-  }, [listings]);
+  }, [listings, actionableListings]);
   const nextSaleAfterCurrentTarget = useMemo(() => {
     if (!sellingListingId) return null;
-    const nextId = nextSaleListingId(listings, sellingListingId);
+    const nextId = nextSaleListingId(actionableListings, sellingListingId);
     return nextId ? listings.find((listing) => listing.id === nextId) ?? null : null;
-  }, [listings, sellingListingId]);
+  }, [listings, actionableListings, sellingListingId]);
   const nextListingPackTarget = useMemo(() => {
-    const nextId = nextDraftListingId(visibleListings, listingPackId);
+    const nextId = nextDraftListingId(visibleListings.filter((listing) => listing.item && sellingEligibleItemIds.has(listing.item.id)), listingPackId);
     return nextId ? visibleListings.find((listing) => listing.id === nextId) ?? null : null;
-  }, [listingPackId, visibleListings]);
+  }, [listingPackId, visibleListings, sellingEligibleItemIds]);
   const listingPack = useMemo(() => {
     if (!listingPackTarget?.item) return null;
     const { item } = listingPackTarget;
@@ -1642,6 +1700,8 @@ export default function Home() {
         setName: item.card.setName,
         number: item.card.number,
         language: item.card.language ?? "EN",
+        edition: item.card.edition,
+        finish: item.card.finish,
       },
       grade: item.grade,
       listPricePence: savedListPrice,
@@ -1689,8 +1749,12 @@ export default function Home() {
     if (!sellingItem) return null;
     const soldQuantity = parseIntakeQuantity(saleQuantity) ?? 0;
     if (soldQuantity <= 0) return null;
-    return salePriceBreakdown(saleChannel, poundsToPence(salePrice), soldQuantity, { grade: sellingItem.grade });
-  }, [saleChannel, salePrice, saleQuantity, sellingItem]);
+    if (!buyerPostage.trim()) return null;
+    const grossPence = poundsToPence(salePrice);
+    const postagePaidPence = poundsToPence(buyerPostage);
+    const itemSubtotalPence = grossPence - postagePaidPence;
+    return { grossPence, postagePaidPence, itemSubtotalPence, quantity: soldQuantity, unitItemPence: Math.round(itemSubtotalPence / soldQuantity) };
+  }, [buyerPostage, salePrice, saleQuantity, sellingItem]);
   const apiHeadline = comp?.headline ?? null;
   const catalogCard = comp?.catalog ?? null;
   const headline = apiHeadline;
@@ -2254,8 +2318,10 @@ export default function Home() {
   const chaseLine = dashboard
     ? `${dashboard.metrics.stockCount} stocked / ${dashboard.metrics.soldCount} sold`
     : "loading deck";
-  const draftListingCount = Number(dashboard?.listingsByState.DRAFT ?? 0);
-  const activeListingCount = Number(dashboard?.listingsByState.ACTIVE ?? 0);
+  const draftListingCount = actionableListings.filter((listing) => listing.state === "DRAFT").length;
+  const sellingStockSummary = useMemo(() => summarizeSellingStock(inventoryForSelling), [inventoryForSelling]);
+  const activeListingCount = actionableListings.filter((listing) => hasLiveListing({ listings: [listing] })).length;
+  const previouslyLiveListings = listings.filter((listing) => listing.listedAt && (listing.externalUrl || listing.externalRef || listing.channel === "IN_PERSON")).length;
   const activeWatchCount = watches.filter((watch) => watch.active).length;
   const ebayPolicies = ebayStatus?.policies;
   const ebayHasPolicies = Boolean(
@@ -2326,9 +2392,10 @@ export default function Home() {
       activeInventory.filter(
         (item) =>
           item.status === "IN_STOCK" &&
+          sellingEligibleItemIds.has(item.id) &&
           !item.listings.some((listing) => listing.state === "DRAFT" || listing.state === "ACTIVE"),
       ),
-    [activeInventory],
+    [activeInventory, sellingEligibleItemIds],
   );
   const visibleUnlistedStock = useMemo(
     () => buildInventoryView(unlistedStock, { query: listingQuery, sort: "newest" }),
@@ -2426,7 +2493,10 @@ export default function Home() {
   const launchPlan = useMemo(
     () =>
       buildLaunchPlan({
-        stockCount: dashboard?.metrics.stockCount ?? activeInventory.length,
+        stockCount: inventory.length,
+        preparedDrafts: sellingStockSummary.preparedDrafts,
+        sellableStockCount: sellingStockSummary.availableRows,
+        previouslyLiveListings,
         draftListings: draftListingCount,
         activeListings: activeListingCount,
         soldCount: dashboard?.metrics.soldCount ?? soldInventory.length,
@@ -2437,7 +2507,10 @@ export default function Home() {
         alertDelivery: Boolean(systemStatus?.summary.alertDelivery),
       }),
     [
-      activeInventory.length,
+      inventory.length,
+      sellingStockSummary.preparedDrafts,
+      sellingStockSummary.availableRows,
+      previouslyLiveListings,
       activeListingCount,
       activeWatchCount,
       dashboard?.metrics.operatingExpensePence,
@@ -2452,7 +2525,10 @@ export default function Home() {
   const launchProgress = useMemo(
     () =>
       buildLaunchProgress({
-        stockCount: dashboard?.metrics.stockCount ?? activeInventory.length,
+        stockCount: inventory.length,
+        preparedDrafts: sellingStockSummary.preparedDrafts,
+        sellableStockCount: sellingStockSummary.availableRows,
+        previouslyLiveListings,
         draftListings: draftListingCount,
         activeListings: activeListingCount,
         soldCount: dashboard?.metrics.soldCount ?? soldInventory.length,
@@ -2463,7 +2539,10 @@ export default function Home() {
         alertDelivery: Boolean(systemStatus?.summary.alertDelivery),
       }),
     [
-      activeInventory.length,
+      inventory.length,
+      sellingStockSummary.preparedDrafts,
+      sellingStockSummary.availableRows,
+      previouslyLiveListings,
       activeListingCount,
       activeWatchCount,
       dashboard?.metrics.operatingExpensePence,
@@ -2578,22 +2657,26 @@ export default function Home() {
       }
 
       const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
-      const mergedBootstrap: OfflineBootstrapPayload | null = (nextDashboard ?? dashboard) && (nextPortfolio ?? portfolio) && (nextSystemStatus ?? systemStatus) && (nextDealSession ?? dealSession)
+      // A refresh started during mount must not cache the empty state captured
+      // before IndexedDB hydration. Keep failed datasets from the latest view.
+      const fallback = latestWorkspaceRef.current;
+      const mergedBootstrap: OfflineBootstrapPayload | null = (nextDashboard ?? fallback.dashboard) && (nextPortfolio ?? fallback.portfolio) && (nextSystemStatus ?? fallback.systemStatus) && (nextDealSession ?? fallback.dealSession)
         ? {
-            inventory: nextInventory ?? inventory,
-            priceHistoryPreviews: nextPriceHistoryPreviews ?? priceHistoryPreviews,
-            listings: nextListings ?? listings,
-            dashboard: (nextDashboard ?? dashboard)!,
-            portfolio: (nextPortfolio ?? portfolio)!,
-            watches: nextWatches ?? watches,
-            alerts: nextAlerts ?? appAlerts,
-            alertUnreadCount: nextAlertUnreadCount ?? appAlertUnreadCount,
-            expenses: nextExpenses ?? expenses,
-            systemStatus: (nextSystemStatus ?? systemStatus)!,
-            dealSession: (nextDealSession ?? dealSession)!,
+            inventory: nextInventory ?? fallback.inventory,
+            priceHistoryPreviews: nextPriceHistoryPreviews ?? fallback.priceHistoryPreviews,
+            listings: nextListings ?? fallback.listings,
+            dashboard: (nextDashboard ?? fallback.dashboard)!,
+            portfolio: (nextPortfolio ?? fallback.portfolio)!,
+            watches: nextWatches ?? fallback.watches,
+            alerts: nextAlerts ?? fallback.alerts,
+            alertUnreadCount: nextAlertUnreadCount ?? fallback.alertUnreadCount,
+            expenses: nextExpenses ?? fallback.expenses,
+            systemStatus: (nextSystemStatus ?? fallback.systemStatus)!,
+            dealSession: (nextDealSession ?? fallback.dealSession)!,
           }
         : null;
       if (mergedBootstrap) {
+        latestWorkspaceRef.current = { ...mergedBootstrap, priceHistoryPreviews: mergedBootstrap.priceHistoryPreviews ?? {} };
         const fullyFresh = failures.length === 0;
         const cachedAt = fullyFresh ? new Date().toISOString() : offlineBootstrapCachedAtRef.current ?? new Date().toISOString();
         offlineBootstrapCachedAtRef.current = cachedAt;
@@ -4480,6 +4563,16 @@ export default function Home() {
     }
   }
 
+  function validatedIntakeAmounts() {
+    try {
+      const costBasisPence = parseConfirmedPounds(cost, "What I paid");
+      const overrideListPricePence = listPriceOverride.trim() ? parseConfirmedPounds(listPriceOverride, "List price") : null;
+      if (overrideListPricePence != null && overrideListPricePence <= 0) throw new Error("List price must be above £0 or left blank.");
+      if (shouldCreateListing && channel === "EBAY" && overrideListPricePence != null && overrideListPricePence < 99) throw new Error("An eBay listing price must be at least £0.99.");
+      return { costBasisPence, overrideListPricePence, intakeAcquiredAt: parseAcquisitionDate(acquiredDate) };
+    } catch (err) { setError(err instanceof Error ? err.message : "Check the purchase details."); return null; }
+  }
+
   async function acquire(event?: FormEvent) {
     event?.preventDefault();
     if (busy === "acquire") return;
@@ -4488,15 +4581,9 @@ export default function Home() {
       setError("Quantity must be a whole number above 0.");
       return;
     }
-    if (!cost.trim() || poundsToPence(cost) < 0) {
-      setError("Enter what you paid, or choose No tracked cost (£0.00).");
-      return;
-    }
-    const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
-    if (overrideListPricePence != null && overrideListPricePence <= 0) {
-      setError("List price must be above £0 or left blank.");
-      return;
-    }
+    const intakeDetails = validatedIntakeAmounts();
+    if (!intakeDetails) return;
+    const { costBasisPence, overrideListPricePence, intakeAcquiredAt } = intakeDetails;
 
     const acquireBody = {
       card: buildCardIntakePayload({
@@ -4511,9 +4598,10 @@ export default function Home() {
         finish: catalogCard?.finish ?? comp?.headline?.card.finish,
       }),
       grade,
-      costBasisPence: poundsToPence(cost),
+      costBasisPence,
       quantity: intakeQuantity,
       acquiredFrom: source || undefined,
+      acquiredAt: intakeAcquiredAt,
       location: location || undefined,
       condition: condition.trim() || undefined,
       graderCert: graderCert.trim() || undefined,
@@ -4713,24 +4801,18 @@ export default function Home() {
       setError("Quantity must be a whole number above 0.");
       return;
     }
-    const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
-    if (overrideListPricePence != null && overrideListPricePence <= 0) {
-      setError("List price must be above £0 or left blank.");
-      return;
-    }
-    if (!cost.trim() || poundsToPence(cost) < 0) {
-      setError("Enter what you paid, or choose No tracked cost (£0.00).");
-      return;
-    }
+    const intakeDetails = validatedIntakeAmounts();
+    if (!intakeDetails) return;
+    const { costBasisPence, overrideListPricePence, intakeAcquiredAt } = intakeDetails;
 
     setBusy("manual-stock");
     setError(null);
     setNotice(null);
-    const costBasisPence = poundsToPence(cost);
     const draftDefaults = buildListingDraftDefaults({
       card: { name, number },
       grade,
       costBasis: costBasisPence,
+      condition,
     });
     const mutationId = crypto.randomUUID();
     const inventoryBody = {
@@ -4751,6 +4833,7 @@ export default function Home() {
       quantity: intakeQuantity,
       costBasisPence,
       acquiredFrom: source || undefined,
+      acquiredAt: intakeAcquiredAt,
       location: location || undefined,
       condition: condition.trim() || undefined,
       graderCert: graderCert.trim() || undefined,
@@ -4762,6 +4845,7 @@ export default function Home() {
       quantity: intakeQuantity,
       costBasisPence,
       acquiredFrom: source || undefined,
+      acquiredAt: intakeAcquiredAt,
       location: location || undefined,
       condition: condition.trim() || undefined,
       graderCert: graderCert.trim() || undefined,
@@ -4974,90 +5058,71 @@ export default function Home() {
     }
   }
 
+  function saveImportProgress(batch: StockImportBatch) {
+    // Persist first: a lost response must be retried with these exact identifiers.
+    window.localStorage.setItem(STOCK_IMPORT_BATCH_KEY, JSON.stringify(batch));
+    stockImportBatchRef.current = batch;
+    setStockImportBatch({ ...batch, rows: [...batch.rows] });
+  }
+
+  function stopStockImport() {
+    if (stockImportBatchRef.current && !window.confirm("Stop this import? Cards already saved stay in Stock. Check Stock before starting again, especially if a response was interrupted.")) return;
+    window.localStorage.removeItem(STOCK_IMPORT_BATCH_KEY);
+    stockImportBatchRef.current = null;
+    setStockImportBatch(null);
+    setStockImportText("");
+  }
+
   async function importStockRows(event: FormEvent) {
     event.preventDefault();
+    if (stockImportBusyRef.current) return;
     const parsed = parseStockImportText(stockImportText);
-    if (parsed.errors.length > 0) {
-      setError(`${parsed.errors.length} import row${parsed.errors.length === 1 ? "" : "s"} need fixing.`);
+    if (!stockImportBatchRef.current && (parsed.errors.length > 0 || parsed.rows.length === 0)) {
+      setError(parsed.errors.length ? "Fix the highlighted import rows first." : "Paste at least one stock row to import.");
       return;
     }
-    if (parsed.rows.length === 0) {
-      setError("Paste at least one stock row to import.");
-      return;
-    }
-
+    stockImportBusyRef.current = true;
     setBusy("stock-import");
     setError(null);
     setNotice(null);
-    let stocked = 0;
-    let listingsCreated = 0;
-    let firstCreatedListingId: string | null = null;
-    let firstCreatedListingState: ListingStateFilter = "DRAFT";
-
     try {
-      for (const row of parsed.rows) {
-        const stockRes = await fetch("/api/inventory", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            card: row.card,
-            grade: row.grade,
-            quantity: row.quantity,
-            costBasisPence: row.costBasisPence,
-            acquiredFrom: row.acquiredFrom ?? "Opening stock",
-            location: (row.location ?? location) || undefined,
-            condition: row.condition,
-            graderCert: row.graderCert,
-            status: "IN_STOCK",
-          }),
-        });
-        const stockPayload = await readJson(stockRes);
-        if (!stockRes.ok) throw new Error(stockPayload.error ?? "stock import failed");
-        stocked += 1;
-
-        if (stockPayload.item?.id) {
-          const listingRes = await fetch("/api/listings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              itemId: stockPayload.item.id,
-              channel: row.channel ?? channel,
-              state: row.listingState ?? "DRAFT",
-              ...(row.listPricePence != null ? { listPricePence: row.listPricePence } : {}),
-            }),
+      const initial = stockImportBatchRef.current ?? createStockImportBatch(stockImportText, parsed.rows, { channel, location }, crypto.randomUUID());
+      const finished = await runStockImportBatch(initial, {
+        save: saveImportProgress,
+        stock: async (row) => {
+          const response = await fetch("/api/inventory", {
+            method: "POST", headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": row.mutationId },
+            body: JSON.stringify(row.stock),
           });
-          const listingPayload = await readJson(listingRes);
-          if (!listingRes.ok) {
-            console.warn("[stock import] listing skipped:", listingPayload.error ?? "listing create failed");
-          } else {
-            listingsCreated += 1;
-            if (!firstCreatedListingId) {
-              firstCreatedListingId = listingPayload.listing?.id ?? null;
-              firstCreatedListingState = listingPayload.listing?.state === "ACTIVE" ? "ACTIVE" : "DRAFT";
-            }
-          }
-        }
-      }
-
+          const payload = await readJson(response);
+          if (!response.ok || !payload.item?.id) throw new Error(payload.error ?? "Stock import did not confirm the saved card.");
+          return payload.item.id;
+        },
+        draft: async (row) => {
+          const response = await fetch("/api/listings", {
+            method: "POST", headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": `${row.mutationId}:draft` },
+            body: JSON.stringify({ itemId: row.itemId, channel: row.channel, state: "DRAFT", ...(row.listPricePence != null ? { listPricePence: row.listPricePence } : {}) }),
+          });
+          const payload = await readJson(response);
+          if (!response.ok || !payload.listing?.id) throw new Error(payload.error ?? "Your card is saved; its draft needs a retry.");
+          return payload.listing.id;
+        },
+      });
+      window.localStorage.removeItem(STOCK_IMPORT_BATCH_KEY);
+      stockImportBatchRef.current = null;
+      setStockImportBatch(null);
       setStockImportText("");
-      setNotice(
-        `Imported ${stocked} stock row${stocked === 1 ? "" : "s"}${listingsCreated > 0 ? ` and ${listingsCreated} listing${listingsCreated === 1 ? "" : "s"}` : ""}.`,
-      );
+      setNotice(`Your squad is stocked: ${finished.rows.length} cards and drafts saved. Review their details, then publish.`);
       await refreshAll();
-      if (firstCreatedListingId) {
-        setListingStateFilter(firstCreatedListingState);
-        setListingSort("newest");
-        setListingPackId(firstCreatedListingId);
-        setListingPackCopied(false);
-        setListingPackCopiedField(null);
-        setEbayPreflight(null);
-        setView("listings");
-      } else {
-        setView("inventory");
-      }
+      setListingStateFilter("DRAFT");
+      setListingSort("newest");
+      setView("listings");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "stock import failed");
+      const progress = stockImportBatchRef.current ? importBatchProgress(stockImportBatchRef.current) : null;
+      await refreshAll();
+      setError(`${err instanceof Error ? err.message : "Import paused."}${progress ? ` ${progress.stocked}/${progress.total} stock rows and ${progress.drafted} drafts confirmed. Resume this batch to continue safely.` : " No import was started."}`);
     } finally {
+      stockImportBusyRef.current = false;
       setBusy(null);
     }
   }
@@ -5582,7 +5647,29 @@ export default function Home() {
     });
   }
 
+  function availableToSell(item: InventoryItem): number {
+    if (!offlineStorageSupported()) return typeof navigator !== "undefined" && navigator.onLine ? (item.status === "SOLD" ? 0 : item.quantity) : 0;
+    return offlineReservationsLoaded ? availableOfflineSaleQuantity(item, offlineSaleReservations) : 0;
+  }
+
+  async function assertListingStockAvailable(item: InventoryItem | undefined) {
+    const reservations = offlineStorageSupported() ? await listOfflineSaleReservations() : [];
+    const current = latestWorkspaceRef.current.inventory.find((row) => row.id === item?.id);
+    if (!current || current.status === "SOLD" || current.status === "RESERVED" || current.quantity < 1 || availableOfflineSaleQuantity(current, reservations) !== current.quantity) {
+      throw new Error("Sync and refresh this card before publishing or marking it live; a sale is reserved or its stock has changed on this device.");
+    }
+  }
+
+  async function removeQueuedAction(id: string) {
+    try { await removeOfflineMutation(id); setNotice("Queued action removed."); }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not remove queued action."); }
+  }
+
   function openSell(item: InventoryItem, listing?: Listing) {
+    if (availableToSell(item) < 1) {
+      setError(offlineReservationsLoaded ? "No copies available on this device; check queued sales." : "Checking queued sales. Try again in a moment.");
+      return;
+    }
     const saleListing = listing ?? item.listings[0];
     const price = saleListing?.listPrice ?? saleListing?.suggestedPrice ?? item.costBasis;
     const nextChannel = saleListing?.channel ?? "EBAY";
@@ -5598,7 +5685,9 @@ export default function Home() {
     setPostage(penceToPounds(estimate.postagePence));
     setSoldAt(todayInputValue());
     setSaleChannel(nextChannel);
+    setBuyerPostage(nextChannel === "IN_PERSON" ? "0.00" : "");
     setSellingListingId(saleListing?.id ?? null);
+    setSaleCostsConfirmed(false);
     setFeesTouched(false);
     setPostageTouched(false);
     setError(null);
@@ -5625,26 +5714,35 @@ export default function Home() {
     setListingPackCopiedField(null);
   }
 
+  function currentSaleItemSubtotal(grossPence: number): number {
+    if (buyerPostage.trim()) {
+      try { return Math.max(0, grossPence - parseConfirmedPounds(buyerPostage, "Buyer postage")); } catch { /* Use the estimate until corrected. */ }
+    }
+    return saleItemSubtotalPence(saleChannel, grossPence, { grade: sellingItem?.grade });
+  }
+
   function applySaleChannelPreset(nextChannel: Channel) {
     const currentGross = poundsToPence(salePrice);
     const currentItemSubtotal =
-      currentGross > 0 ? saleItemSubtotalPence(saleChannel, currentGross, { grade: sellingItem?.grade }) : 0;
+      currentGross > 0 ? currentSaleItemSubtotal(currentGross) : 0;
     const nextGross =
       currentItemSubtotal > 0
         ? defaultGrossSalePence(nextChannel, currentItemSubtotal, { grade: sellingItem?.grade })
         : currentGross;
     const estimate = estimateSaleCosts(nextChannel, nextGross, { grade: sellingItem?.grade });
     setSaleChannel(nextChannel);
+    setBuyerPostage(nextChannel === "IN_PERSON" ? "0.00" : "");
     setSalePrice(penceToPounds(nextGross));
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
+    setSaleCostsConfirmed(false);
     setFeesTouched(false);
     setPostageTouched(false);
   }
 
   function saleQuantityForShortcuts(): number {
     const parsed = parseIntakeQuantity(saleQuantity) ?? 1;
-    return Math.max(1, Math.min(sellingItem?.quantity ?? 1, parsed));
+    return Math.max(1, Math.min(sellingItem ? availableToSell(sellingItem) : 1, parsed));
   }
 
   function saleUnitReferencePence(): number {
@@ -5652,7 +5750,7 @@ export default function Home() {
     const quantityForPrice = saleQuantityForShortcuts();
     const currentTotal = poundsToPence(salePrice);
     if (currentTotal > 0) {
-      const itemSubtotal = saleItemSubtotalPence(saleChannel, currentTotal, { grade: sellingItem.grade });
+      const itemSubtotal = currentSaleItemSubtotal(currentTotal);
       return Math.round(itemSubtotal / quantityForPrice);
     }
     return saleListPrice(sellingItem) ?? sellingItem.costBasis;
@@ -5664,6 +5762,7 @@ export default function Home() {
     setSalePrice(penceToPounds(safeTotal));
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
+    setSaleCostsConfirmed(false);
     setFeesTouched(false);
     setPostageTouched(false);
   }
@@ -5766,15 +5865,15 @@ export default function Home() {
   function sellAllQuantity() {
     if (!sellingItem) return;
     const unitPrice = saleUnitReferencePence();
-    setSaleQuantity(String(sellingItem.quantity));
-    applySaleItemSubtotal(unitPrice * sellingItem.quantity);
+    setSaleQuantity(String(availableToSell(sellingItem)));
+    applySaleItemSubtotal(unitPrice * availableToSell(sellingItem));
   }
 
   function changeSaleQuantity(value: string) {
     const nextQuantity = parseIntakeQuantity(value);
     const currentQuantity = saleQuantityForShortcuts();
     setSaleQuantity(value);
-    if (!sellingItem || !nextQuantity || nextQuantity > sellingItem.quantity) return;
+    if (!sellingItem || !nextQuantity || nextQuantity > availableToSell(sellingItem)) return;
     const nextGross = rescaleGrossSaleForQuantity(
       saleChannel,
       poundsToPence(salePrice),
@@ -5786,10 +5885,12 @@ export default function Home() {
   }
 
   function applyCashSale() {
+    setSaleCostsConfirmed(false);
     const currentGross = poundsToPence(salePrice);
     const itemSubtotal =
-      currentGross > 0 ? saleItemSubtotalPence(saleChannel, currentGross, { grade: sellingItem?.grade }) : currentGross;
+      currentGross > 0 ? currentSaleItemSubtotal(currentGross) : currentGross;
     setSaleChannel("IN_PERSON");
+    setBuyerPostage("0.00");
     setSalePrice(penceToPounds(itemSubtotal));
     setFees("0.00");
     setPostage("0.00");
@@ -5801,11 +5902,13 @@ export default function Home() {
     const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice), { grade: sellingItem?.grade });
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
+    setSaleCostsConfirmed(false);
     setFeesTouched(false);
     setPostageTouched(false);
   }
 
   function clearSalePostage() {
+    setSaleCostsConfirmed(false);
     setPostage("0.00");
     setPostageTouched(true);
   }
@@ -5817,6 +5920,7 @@ export default function Home() {
     setCreatingListingItemId(null);
     setItemQuantity(String(item.quantity));
     setItemCost(penceToPounds(item.costBasis));
+    setItemAcquiredDate((item.acquiredAt ?? item.createdAt).slice(0, 10));
     setItemSource(item.acquiredFrom ?? "");
     setItemLocation(item.location ?? "");
     setItemCondition(item.condition ?? "");
@@ -5845,7 +5949,8 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           quantity,
-          costBasisPence: poundsToPence(itemCost),
+          costBasisPence: parseConfirmedPounds(itemCost, "Acquisition cost"),
+          acquiredAt: parseAcquisitionDate(itemAcquiredDate),
           acquiredFrom: itemSource.trim() || null,
           location: itemLocation.trim() || null,
           condition: itemCondition.trim() || null,
@@ -5867,87 +5972,123 @@ export default function Home() {
 
   async function markSold(event: FormEvent) {
     event.preventDefault();
-    if (!sellingId) return;
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-    const continueSelling = submitter?.value === "next";
-    const item = sellingItem;
-    const soldQuantity = parseIntakeQuantity(saleQuantity);
-    if (!item || !soldQuantity) {
-      setError("Sold quantity must be a whole number above 0.");
-      return;
-    }
-    if (soldQuantity > item.quantity) {
-      setError(`Only ${item.quantity} in stock.`);
-      return;
-    }
-    setBusy(`sell-${sellingId}`);
-    setError(null);
-    setNotice(null);
-    const nextSaleListing = continueSelling ? nextSaleAfterCurrentTarget : null;
-    const saleBody = {
-      channel: saleChannel,
-      salePricePence: poundsToPence(salePrice),
-      feesPence: poundsToPence(fees),
-      postagePence: poundsToPence(postage),
-      quantity: soldQuantity,
-      soldAt: soldAtIso(soldAt),
-      listingId: sellingListingId ?? undefined,
-    };
-    const mutationId = crypto.randomUUID();
-    if (!navigator.onLine) {
+    if (!sellingId || saleSubmittingRef.current) return;
+    saleSubmittingRef.current = true;
+    try {
+      const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+      const continueSelling = submitter?.value === "next";
+      const item = sellingItem;
+      const soldQuantity = parseIntakeQuantity(saleQuantity);
+      if (!item || !soldQuantity) {
+        setError("Sold quantity must be a whole number above 0.");
+        return;
+      }
+      let available: number;
       try {
-        await queueMarkSoldMutation(item, saleBody, mutationId);
+        const reservations = offlineStorageSupported() ? await listOfflineSaleReservations() : [];
+        setOfflineSaleReservations(reservations);
+        available = availableOfflineSaleQuantity(item, reservations);
+      } catch { setError("Could not check queued sales. Reopen the app before recording another sale."); return; }
+      if (soldQuantity > available) { setError(`Only ${available} available on this device; check queued sales.`); return; }
+      let amounts: { salePricePence: number; feesPence: number; postagePence: number; buyerPostagePence?: number };
+      try {
+        amounts = {
+          salePricePence: parseConfirmedPounds(salePrice, "Buyer total"),
+          feesPence: parseConfirmedPounds(fees, "Fees"),
+          postagePence: parseConfirmedPounds(postage, "My postage cost"),
+          ...(buyerPostage.trim() ? { buyerPostagePence: parseConfirmedPounds(buyerPostage, "Buyer postage") } : {}),
+        };
+        if ((amounts.buyerPostagePence ?? 0) > amounts.salePricePence) throw new Error("Buyer postage cannot exceed the buyer total.");
+      } catch (err) { setError(err instanceof Error ? err.message : "Check the sale amounts."); return; }
+      setBusy(`sell-${sellingId}`);
+      setError(null);
+      setNotice(null);
+      const nextSaleListing = continueSelling ? nextSaleAfterCurrentTarget : null;
+      const saleBody = {
+        channel: saleChannel,
+        ...amounts,
+        costsEstimated: !saleCostsConfirmed,
+        quantity: soldQuantity,
+        soldAt: soldAtIso(soldAt),
+        listingId: sellingListingId ?? undefined,
+      };
+      const mutationId = crypto.randomUUID();
+      if (!navigator.onLine) {
+        try {
+          await queueMarkSoldMutation(item, saleBody, mutationId);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Could not save this sale offline.");
+        } finally {
+          setBusy(null);
+        }
+        return;
+      }
+      let responseReceived = false;
+      try {
+        const res = await fetch(`/api/inventory/${sellingId}/sell`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId },
+          body: JSON.stringify(saleBody),
+        });
+        responseReceived = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429;
+        const payload = await readJson(res);
+        if (!res.ok) throw new Error(payload.error ?? "mark sold failed");
+        const receiptStock = readOfflineSaleStock(payload);
+        if (!receiptStock || receiptStock.id !== item.id || !receiptStock.updatedAt || !Number.isFinite(Date.parse(receiptStock.updatedAt)) ||
+          !["IN_STOCK", "LISTED", "RESERVED", "SOLD"].includes(receiptStock.status ?? "")) {
+          throw new Error("Sale response did not confirm the stock change. Reconnect to reconcile the same sale.");
+        }
+        responseReceived = true;
+        let receiptWarning: string | null = null;
+        // A successful write is evidence even if the following inventory refresh fails.
+        if (payload.item?.id === item.id) {
+          const confirmed = { ...item, ...payload.item } as InventoryItem;
+          setInventory((rows) => rows.map((row) => row.id === item.id ? confirmed : row));
+          setListings((rows) => rows.map((row) => row.item?.id === item.id ? { ...row, item: confirmed } : row));
+          try {
+            if (!offlineStorageSupported()) throw new Error("Offline storage unavailable");
+            const receipt = await recordOfflineSaleReceipt(mutationId, confirmed);
+            setOfflineSaleReservations((rows) => [...rows.filter((row) => row.id !== receipt.id), receipt]);
+          } catch { receiptWarning = "Sale saved. Local offline storage could not retain its receipt; refresh Stock online before using this device offline."; }
+        }
+        const saleNotice = `${soldQuantity > 1 ? `${soldQuantity} copies sold` : "Sold"}. ${saleCostsConfirmed ? "Profit" : "Estimated profit"} ${gbp(payload.profitPence)}.`;
+        setSellingId(null);
+        setSellingListingId(null);
+        await refreshAll();
+        if (receiptWarning) setError(receiptWarning);
+        if (nextSaleListing?.item) {
+          setNotice(`${saleNotice} Next sale loaded.`);
+          setListingStateFilter("ACTIVE");
+          setListingSort("newest");
+          setView("listings");
+          openSell(nextSaleListing.item, nextSaleListing);
+        } else {
+          setNotice(saleNotice);
+          setView("pnl");
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not save this sale offline.");
+        if (!responseReceived) {
+          try {
+            await queueMarkSoldMutation(item, saleBody, mutationId, true);
+          } catch (queueError) {
+            setError(queueError instanceof Error ? queueError.message : "Sale failed and could not be saved offline.");
+          }
+        } else {
+          setError(err instanceof Error ? err.message : "mark sold failed");
+        }
       } finally {
         setBusy(null);
       }
-      return;
-    }
-    let responseReceived = false;
-    try {
-      const res = await fetch(`/api/inventory/${sellingId}/sell`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Poke-Deal-Mutation-Id": mutationId },
-        body: JSON.stringify(saleBody),
-      });
-      responseReceived = true;
-      const payload = await readJson(res);
-      if (!res.ok) throw new Error(payload.error ?? "mark sold failed");
-      const saleNotice = `${soldQuantity > 1 ? `${soldQuantity} copies sold` : "Sold"}. Profit ${gbp(payload.profitPence)}.`;
-      setSellingId(null);
-      setSellingListingId(null);
-      await refreshAll();
-      if (nextSaleListing?.item) {
-        setNotice(`${saleNotice} Next sale loaded.`);
-        setListingStateFilter("ACTIVE");
-        setListingSort("newest");
-        setView("listings");
-        openSell(nextSaleListing.item, nextSaleListing);
-      } else {
-        setNotice(saleNotice);
-        setView("pnl");
-      }
-    } catch (err) {
-      if (!responseReceived) {
-        try {
-          await queueMarkSoldMutation(item, saleBody, mutationId);
-        } catch (queueError) {
-          setError(queueError instanceof Error ? queueError.message : "Sale failed and could not be saved offline.");
-        }
-      } else {
-        setError(err instanceof Error ? err.message : "mark sold failed");
-      }
-    } finally {
-      setBusy(null);
-    }
+    } finally { saleSubmittingRef.current = false; }
   }
 
-  async function queueMarkSoldMutation(item: InventoryItem, body: Record<string, unknown>, mutationId: string) {
+  async function queueMarkSoldMutation(item: InventoryItem, body: Record<string, unknown>, mutationId: string, mayHaveReachedServer = false) {
     const soldQuantity = Number(body.quantity ?? 1);
     const mutation = await enqueueOfflineMutation({
       id: mutationId,
       kind: "mark-sold",
+      saleStock: { id: item.id, quantity: item.quantity, status: item.status, updatedAt: item.updatedAt },
+      mayHaveReachedServer,
       endpoint: `/api/inventory/${item.id}/sell`,
       body,
       summary: {
@@ -5961,9 +6102,10 @@ export default function Home() {
     });
     setSellingId(null);
     setSellingListingId(null);
-    setNotice("Sale queued on this device — stock and profit are unchanged until sync.", {
+    setOfflineSaleReservations(await listOfflineSaleReservations());
+    setNotice("Sale queued. These copies are reserved on this device; profit updates after sync.", mayHaveReachedServer ? undefined : {
       label: "Undo",
-      onClick: () => void removeOfflineMutation(mutation.id).then(() => setNotice("Queued sale removed.")),
+      onClick: () => void removeQueuedAction(mutation.id),
     });
   }
 
@@ -6080,6 +6222,7 @@ export default function Home() {
       card: item.card,
       grade: item.grade,
       costBasis: item.costBasis,
+      condition: item.condition,
     });
     setCreatingListingItemId(item.id);
     setEditingListingId(null);
@@ -6109,6 +6252,7 @@ export default function Home() {
     const canActivateDirect =
       listingState === "ACTIVE" && (listingChannel !== "EBAY" || Boolean(trimmedExternalUrl));
     try {
+      if (canActivateDirect) await assertListingStockAvailable(item);
       const res = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -6150,7 +6294,7 @@ export default function Home() {
     }
     const isUnpublishedEbay =
       listing.channel === "EBAY" &&
-      !(listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl);
+      (listing.state !== "ACTIVE" || !(listing.externalRef && !listing.externalRef.startsWith("offer:") && listing.externalUrl));
     if (isUnpublishedEbay) {
       // eBay listings can't be activated directly — route to the listing
       // pack so the real reviewed publish flow runs.
@@ -6550,6 +6694,7 @@ export default function Home() {
     setError(null);
     setNotice(null);
     try {
+      await assertListingStockAvailable(publishedListing?.item);
       const res = await fetch(`/api/listings/${listingId}/ebay/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -6599,6 +6744,7 @@ export default function Home() {
       state: Exclude<ListingState, "SOLD">;
       listPricePence: number | null;
       externalUrl: string | null;
+      externalRemovalConfirmed: boolean;
     }>,
     message = "Listing updated.",
   ) {
@@ -6606,6 +6752,9 @@ export default function Home() {
     setError(null);
     setNotice(null);
     try {
+      if (patch.state === "ACTIVE" || (listing.state === "ACTIVE" && patch.state !== "ENDED" && patch.state !== "DRAFT")) {
+        await assertListingStockAvailable(listing.item);
+      }
       const res = await fetch(`/api/listings/${listing.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -7625,7 +7774,7 @@ export default function Home() {
           />
         </div>
         <button className="no-cost-button" type="button" onClick={() => setManualBuyCost("0.00")}>
-          No tracked cost · £0.00
+          No purchase cost · £0.00
         </button>
         <div className={`stock-listing-plan ${shouldCreateListing ? "ready" : "muted"}`}>
           <div>
@@ -7972,6 +8121,7 @@ export default function Home() {
             setListingSort("newest");
             setView("listings");
           }}
+          stockItems={inventoryForSelling}
           onRecordSale={(listing: unknown) => openSellFromListing(listing as Listing)}
           launchPlan={launchPlan}
           onOpenLaunchPlan={openLaunchPlan}
@@ -8053,7 +8203,7 @@ export default function Home() {
                       {mutation.lastError && (
                         <button type="button" onClick={() => void retryOfflineMutation(mutation.id).then(() => flushOfflineQueue())}>Retry</button>
                       )}
-                      <button className="ghost-button" type="button" onClick={() => void removeOfflineMutation(mutation.id)}>Remove</button>
+                      <button className="ghost-button" type="button" onClick={() => void removeQueuedAction(mutation.id)}>Remove</button>
                     </div>
                   </div>
                 ))}
@@ -9808,7 +9958,7 @@ export default function Home() {
               </label>
             </div>
             <button className="no-cost-button" type="button" onClick={() => setManualBuyCost("0.00")}>
-              No tracked cost · £0.00
+              No purchase cost · £0.00
             </button>
             {totalCostSplit && (
               <div className="split-cost-card">
@@ -9898,6 +10048,11 @@ export default function Home() {
                   <input value={location} onChange={(event) => setLocation(event.target.value)} />
                 </label>
               </div>
+              <label>
+                Date acquired
+                <input type="date" max={todayInputValue()} value={acquiredDate} onChange={(event) => setAcquiredDate(event.target.value)} />
+                <span className="hint">For existing stock, use the original purchase date so stock age stays useful.</span>
+              </label>
               <div className="form-grid">
                 <label>
                   Condition
@@ -10021,7 +10176,7 @@ export default function Home() {
                       : "Stock + draft"
                   : "Stock now"}
             </button>
-            {!manualStockReady && <p className="hint">Add a card, quantity and what you paid—or choose No tracked cost.</p>}
+            {!manualStockReady && <p className="hint">Add a card, quantity and what you paid—or choose No purchase cost.</p>}
             {suggestion && (
               <p className="hint">
                 Suggested list price {gbp(suggestion.pricePence)}. {suggestion.rationale}
@@ -10045,8 +10200,8 @@ export default function Home() {
                   <span className="muted">Paste existing stock rows when setting up.</span>
                 </div>
                 {stockImportHasText && (
-                  <button className="ghost-button" type="button" onClick={() => setStockImportText("")}>
-                    Clear
+                  <button className="ghost-button" type="button" onClick={stopStockImport} disabled={busy === "stock-import"}>
+                    {stockImportBatch ? "Stop import" : "Clear"}
                   </button>
                 )}
               </div>
@@ -10055,21 +10210,24 @@ export default function Home() {
                 <textarea
                   ref={stockImportTextareaRef}
                   value={stockImportText}
+                  readOnly={Boolean(stockImportBatch)}
                   onChange={(event) => setStockImportText(event.target.value)}
                   placeholder={STOCK_IMPORT_EXAMPLE}
                   rows={4}
                 />
               </label>
               <div className="stock-import-actions" aria-label="Opening stock shortcuts">
-                <button type="button" onClick={() => void pasteStockImportRows()}>
+                <button type="button" onClick={() => void pasteStockImportRows()} disabled={Boolean(stockImportBatch)}>
                   Paste clipboard
                 </button>
                 {stockImportTemplates.map((template) => (
-                  <button key={template.label} type="button" onClick={() => fillStockImportTemplate(template)}>
+                  <button key={template.label} type="button" onClick={() => fillStockImportTemplate(template)} disabled={Boolean(stockImportBatch)}>
                     {template.label}
                   </button>
                 ))}
               </div>
+              {stockImportBatch && <p role="status" className="hint">Saved progress: {importBatchProgress(stockImportBatch).stocked}/{stockImportBatch.rows.length} stock rows · {importBatchProgress(stockImportBatch).drafted} drafts. Resume safely after a connection drop.</p>}
+              <p className="hint">Imports create drafts for review, never live listings. Optional CSV columns: acquired date (YYYY-MM-DD), language, edition, finish.</p>
               {stockImportHasText && (
                 <div className={`stock-import-preview ${stockImportPreview.errors.length > 0 ? "warn" : "good"}`}>
                   {stockImportPreview.errors.length > 0 ? (
@@ -10124,7 +10282,7 @@ export default function Home() {
               >
                 {busy === "stock-import"
                   ? "Importing…"
-                  : stockImportPreview.rows.length > 0
+                  : stockImportBatch ? "Resume import" : stockImportPreview.rows.length > 0
                     ? `Import ${stockImportPreview.rows.length} row${stockImportPreview.rows.length === 1 ? "" : "s"}`
                     : "Import rows"}
               </button>
@@ -10210,6 +10368,7 @@ export default function Home() {
               key={item.id}
               item={item as InventoryItem}
               busy={busy}
+              availableQuantity={availableToSell(item as InventoryItem)}
               onSell={openSell}
               onComp={compInventoryItem}
               onList={listInventoryItem}
@@ -10228,6 +10387,8 @@ export default function Home() {
           saveInventoryItem={saveInventoryItem}
           closeInventoryEditor={() => setEditingItemId(null)}
           itemCost={itemCost}
+          itemAcquiredDate={itemAcquiredDate}
+          setItemAcquiredDate={setItemAcquiredDate}
           setItemCost={setItemCost}
           itemQuantity={itemQuantity}
           setItemQuantity={setItemQuantity}
@@ -10411,6 +10572,7 @@ export default function Home() {
                 onPublish={(review) => void publishEbayListing(listingPackTarget.id, review)}
                 onCancelPublish={() => setEbayPublishTarget(null)}
                 onClose={() => {
+                  if (listingPackTarget.state === "ACTIVE" && listingPackTarget.item?.status === "SOLD") setListingStateFilter("ACTIVE");
                   setListingPackId(null);
                   setListingPackCopied(false);
                   setListingPackCopiedField(null);
@@ -10437,6 +10599,7 @@ export default function Home() {
 
       {view === "pnl" && (
         <ProfitTab
+          onSaleCorrected={refreshAll}
           dashboard={dashboard}
           dashboardLoading={dashboardLoading}
           inventory={inventory}
@@ -10526,7 +10689,7 @@ export default function Home() {
               <h2>Mark sold</h2>
               {sellingItem && (
                 <span className="muted">
-                  {sellingItem.card.name} · paid {gbp(sellingItem.costBasis)} each · {sellingItem.quantity} in stock
+                  {sellingItem.card.name} · paid {gbp(sellingItem.costBasis)} each · {availableToSell(sellingItem)} available
                 </span>
               )}
               {sellingListing && (
@@ -10577,7 +10740,7 @@ export default function Home() {
                 <button type="button" onClick={() => void pasteSaleNetPrice()}>
                   Paste net
                 </button>
-                {sellingItem && sellingItem.quantity > 1 && (
+                {sellingItem && availableToSell(sellingItem) > 1 && (
                   <button type="button" onClick={sellAllQuantity}>
                     All qty
                   </button>
@@ -10645,20 +10808,25 @@ export default function Home() {
           <div className="form-grid">
             <label>
               Actual sale price · buyer total
-              <MoneyInput value={salePrice} onChange={setSalePrice} />
+              <MoneyInput value={salePrice} onChange={(value) => { setSalePrice(value); setSaleCostsConfirmed(false); }} />
             </label>
             <label>
               Qty sold
               <input
                 inputMode="numeric"
                 min="1"
-                max={sellingItem?.quantity ?? 1}
+                max={sellingItem ? availableToSell(sellingItem) : 1}
                 step="1"
                 value={saleQuantity}
                 onChange={(event) => changeSaleQuantity(event.target.value)}
               />
             </label>
           </div>
+          <label>
+            Buyer postage charged
+            <MoneyInput value={buyerPostage} onChange={setBuyerPostage} />
+          </label>
+          <p className="hint">The postage within the buyer total. Enter £0 for free postage; leave blank if unknown. Unknown splits stay out of sold-price evidence.</p>
           {saleBreakdown && (
             <div className="sale-breakdown" aria-label="Sale price breakdown">
               <div>
@@ -10690,6 +10858,7 @@ export default function Home() {
               <MoneyInput
                 value={fees}
                 onChange={(value) => {
+                  setSaleCostsConfirmed(false);
                   setFeesTouched(true);
                   setFees(value);
                 }}
@@ -10701,6 +10870,7 @@ export default function Home() {
             <MoneyInput
               value={postage}
               onChange={(value) => {
+                setSaleCostsConfirmed(false);
                 setPostageTouched(true);
                 setPostage(value);
               }}
@@ -10711,6 +10881,13 @@ export default function Home() {
               Default buyer total includes {gbp(buyerPaidPostagePence(saleChannel, sellingItem.grade))} postage, then deducts your postage cost below.
             </p>
           )}
+          <div className="settings-toggle-row">
+            <label>
+              <input type="checkbox" checked={saleCostsConfirmed} onChange={(event) => setSaleCostsConfirmed(event.target.checked)} />
+              I checked the actual fees and my postage cost
+            </label>
+          </div>
+          <p className="hint">{saleCostsConfirmed ? "Costs confirmed from your records." : "Costs are estimates until confirmed. You can reconcile them in Profit."}</p>
           {salePreview && (
             <div className={`sale-preview ${salePreview.profitPence >= 0 ? "good" : "warn"}`}>
               <div>
@@ -11061,6 +11238,10 @@ function ListingPackSheet({
       onRequestPublish();
       return;
     }
+    if (nextAction.id === "remove-listing") {
+      onClose();
+      return;
+    }
     if (nextAction.id === "record-sale") {
       onSell(listing);
     }
@@ -11372,6 +11553,8 @@ function buildListingPackInputFromItem(
       setName: item.card.setName,
       number: item.card.number,
       language: item.card.language ?? "EN",
+      edition: item.card.edition,
+      finish: item.card.finish,
     },
     grade: item.grade,
     listPricePence: options.listPricePence,
@@ -11563,6 +11746,7 @@ function listingStepStateLabel(state: ListingFlowStep["state"]): string {
 
 function InventoryRow({
   item,
+  availableQuantity,
   busy,
   onSell,
   onComp,
@@ -11577,6 +11761,7 @@ function InventoryRow({
   onHistory,
 }: {
   item: InventoryItem;
+  availableQuantity: number;
   busy: string | null;
   onSell: (item: InventoryItem) => void;
   onComp: (item: InventoryItem) => void;
@@ -11610,7 +11795,7 @@ function InventoryRow({
   const [isSwiping, setIsSwiping] = useState(false);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const swipeDelta = useRef({ x: 0, y: 0 });
-  const canSell = item.status !== "SOLD";
+  const canSell = item.status !== "SOLD" && availableQuantity > 0;
   const photoCount = item.photos?.length ?? 0;
   const ebayPhotoSummary = listing?.channel === "EBAY"
     ? summarizeListingPhotos({
@@ -11627,8 +11812,9 @@ function InventoryRow({
     ebayPhotoSummary?.catalogPhotoAllowed &&
     !ebayPhotoSummary.hasCatalogPhoto,
   );
-  const needsListing = item.status !== "SOLD" && !draftListing && !activeListing;
-  const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.createdAt).getTime()) / (24 * 60 * 60 * 1_000)));
+  const readiness = stockReadiness(item);
+  const needsListing = item.status !== "SOLD" && !readiness.live;
+  const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.acquiredAt ?? item.createdAt).getTime()) / (24 * 60 * 60 * 1_000)));
   const needsReprice = item.status !== "SOLD" && ageDays >= 30;
   const stockCost =
     item.quantity > 1
@@ -11649,7 +11835,7 @@ function InventoryRow({
   const listingSummary = listing
     ? `Your list price ${listPrice != null ? gbp(listPrice) : "not set"} · ${listingStateLabel} ${channelLabel(listing.channel)}`
     : "Your list price not set";
-  const primaryAction = item.status === "SOLD" || needsEbayPhotos
+  const primaryAction = item.status === "SOLD" || needsEbayPhotos || readiness.held
     ? null
     : draftListing
       ? {
@@ -11665,7 +11851,7 @@ function InventoryRow({
             detail: `${channelLabel(activeListing.channel)} active${listPrice ? ` at ${gbp(listPrice)}` : ""}`,
             tone: "good",
             onClick: () => onSell(item),
-            disabled: busy?.startsWith("sell-") ?? false,
+            disabled: !canSell || (busy?.startsWith("sell-") ?? false),
           }
         : {
             label: "Draft listing",
@@ -11737,9 +11923,9 @@ function InventoryRow({
           </div>
           <div className="inventory-row-meta">
             <span>{item.card.setName} {item.card.number ?? "no number"}</span>
-            <span>qty {item.quantity}</span>
+            <span>{availableQuantity < item.quantity ? `${availableQuantity} available · ${item.quantity - availableQuantity} reserved on this device` : `qty ${item.quantity}`}</span>
             <span>Paid {stockCost}</span>
-            <span>{ageLabel(item.createdAt)}</span>
+            <span>{item.acquiredAt ? "Acquired" : "Recorded"} {ageLabel(item.acquiredAt ?? item.createdAt)}</span>
           </div>
           <div className="inventory-row-money">
             <span>{listingSummary}{soldNote}</span>
@@ -11753,15 +11939,15 @@ function InventoryRow({
               <span>History</span>
             </button>
           </div>
-          {(needsListing || (needsPhotos && !needsEbayPhotos) || photoCount > 0 || needsReprice) && (
+          {(readiness.held || needsListing || (needsPhotos && !needsEbayPhotos) || photoCount > 0 || needsReprice) && (
             <div className="inventory-row-flags" role="group" aria-label="Stock tasks">
-              {needsListing && <span>Needs listing</span>}
-              {needsPhotos && !needsEbayPhotos && <span>Needs photos</span>}
+              {(needsListing || readiness.held) && <span>{readiness.next}</span>}
+              {!readiness.held && needsPhotos && !needsEbayPhotos && <span>Needs photos</span>}
               {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
-              {needsReprice && <span className="reprice-nudge">Reprice · {ageDays}d held</span>}
+              {!readiness.held && needsReprice && <span className="reprice-nudge">Reprice · {ageDays}d held</span>}
             </div>
           )}
-          {needsEbayPhotos && (
+          {needsEbayPhotos && !readiness.held && (
             <div className="next-action-strip">
               <label className={`next-action-button row-file-action ${busy === `photo-${item.id}` ? "disabled" : ""}`}>
                 {busy === `photo-${item.id}` ? "Uploading…" : "Add photos"}
@@ -12321,27 +12507,6 @@ function hasOpenListing(item: InventoryItem): boolean {
   return item.listings.some((listing) => listing.state === "DRAFT" || listing.state === "ACTIVE");
 }
 
-function inventoryItemMatchesFilter(item: InventoryItem, filter: InventoryFilter): boolean {
-  if (filter === "sold") return item.status === "SOLD";
-  if (item.status === "SOLD") return false;
-  if (filter === "all") return true;
-  if (filter === "needs-action") return !hasOpenListing(item) || (item.photos?.length ?? 0) === 0;
-  if (filter === "needs-listing") return !hasOpenListing(item);
-  if (filter === "listed") return hasOpenListing(item) || item.status === "LISTED";
-  if (filter === "needs-photos") return (item.photos?.length ?? 0) === 0;
-  if (filter === "held") return item.status === "RESERVED";
-  return true;
-}
-
-function emptyInventoryFilterText(filter: InventoryFilter): string {
-  if (filter === "needs-action") return "All active stock is caught up.";
-  if (filter === "needs-listing") return "Everything has a draft or active listing.";
-  if (filter === "listed") return "No listed stock yet.";
-  if (filter === "needs-photos") return "Every active stock row has photos.";
-  if (filter === "held") return "No stock is on hold.";
-  if (filter === "sold") return "No sold stock yet.";
-  return "No stock in this view.";
-}
 
 function gradeTone(grade: string): string {
   if (grade === "RAW") return "raw";
@@ -12906,7 +13071,8 @@ function parseViewQuery(value: string | null): View {
   if (normalized === "list" || normalized === "listings") return "listings";
   if (normalized === "profit" || normalized === "pnl" || normalized === "p&l") return "pnl";
   if (normalized === "setup" || normalized === "settings" || normalized === "health") return "settings";
-  return "acquire";
+  if (normalized === "buy" || normalized === "acquire") return "acquire";
+  return "today";
 }
 
 function viewQueryValue(view: View): string {
@@ -13076,6 +13242,8 @@ function hydrateStockMutationResult(
           ? rawItem.costBasisPence
           : 0,
     acquiredFrom: rawItem.acquiredFrom ?? null,
+    acquiredAt: rawItem.acquiredAt,
+    updatedAt: rawItem.updatedAt,
     location: rawItem.location ?? null,
     condition: rawItem.condition ?? null,
     graderCert: rawItem.graderCert ?? null,

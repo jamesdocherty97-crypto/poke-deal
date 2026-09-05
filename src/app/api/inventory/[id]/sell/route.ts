@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
 import { realizedProfit } from "@/lib/comps/pricing";
-import { planSaleListingClosure, planUnitSale, splitPence } from "@/lib/dealer/unitSale";
+import { exactItemRevenue } from "@/lib/dealer/saleLedger";
+import { planUnitSale, splitPence } from "@/lib/dealer/unitSale";
+import { planSaleListingUpdates } from "@/lib/dealer/saleListingUpdates";
+import { createInboxAlert } from "@/lib/alerts/inbox";
 import { readClientMutationId, saleMutationFields } from "@/lib/offline/clientMutation";
 import { lockInventoryItemForSale, type SaleLockDb } from "@/lib/inventory/saleTransaction";
 
@@ -11,12 +14,16 @@ export const dynamic = "force-dynamic";
 
 const sellSchema = z.object({
   channel: z.enum(["EBAY", "CARDMARKET", "VINTED", "IN_PERSON"]).default("EBAY"),
-  salePricePence: z.coerce.number().int().nonnegative(),
+  salePricePence: z.coerce.number().int().nonnegative().max(2_147_483_647),
+  buyerPostagePence: z.number().int().nonnegative().max(2_147_483_647).optional(),
+  costsEstimated: z.boolean().default(true),
   feesPence: z.coerce.number().int().nonnegative().default(0),
   postagePence: z.coerce.number().int().nonnegative().default(0),
   quantity: z.coerce.number().int().positive().default(1),
   soldAt: z.coerce.date().optional(),
   listingId: z.string().trim().min(1).optional(),
+}).refine((value) => value.buyerPostagePence == null || value.buyerPostagePence <= value.salePricePence, {
+  path: ["buyerPostagePence"], message: "Buyer-paid postage cannot exceed the buyer payment.",
 });
 
 export async function POST(
@@ -52,7 +59,7 @@ export async function POST(
       if (!locked) throw new Error("Inventory item not found");
       const item = await tx.inventoryItem.findUnique({
         where: { id: params.id },
-        include: { card: true },
+        include: { card: true, listings: true },
       });
       if (!item) throw new Error("Inventory item not found");
       const salePlan = planUnitSale({
@@ -62,6 +69,8 @@ export async function POST(
       });
       const soldAt = d.soldAt ?? new Date();
       const salePrices = splitPence(d.salePricePence, salePlan.soldQuantity);
+      const itemRevenue = exactItemRevenue(d.salePricePence, d.buyerPostagePence ?? (d.channel === "IN_PERSON" ? 0 : undefined));
+      const itemRevenues = itemRevenue == null ? null : splitPence(itemRevenue, salePlan.soldQuantity);
       const fees = splitPence(d.feesPence, salePlan.soldQuantity);
       const postage = splitPence(d.postagePence, salePlan.soldQuantity);
 
@@ -73,6 +82,9 @@ export async function POST(
               itemId: item.id,
               channel: d.channel,
               salePrice: salePrices[index] ?? 0,
+              costBasis: item.costBasis,
+              itemRevenue: itemRevenues?.[index] ?? null,
+              costsEstimated: d.costsEstimated,
               fees: fees[index] ?? 0,
               postage: postage[index] ?? 0,
               soldAt,
@@ -96,28 +108,45 @@ export async function POST(
         },
       });
 
-      const listingClosure = planSaleListingClosure({
-        itemId: item.id,
+      const listingUpdates = planSaleListingUpdates({
+        listings: item.listings,
         soldListingId: d.listingId,
-        closeOpenListings: salePlan.closeOpenListings,
+        soldChannel: d.channel,
+        fullySold: salePlan.fullySold,
       });
-      if (listingClosure?.kind === "all-open") {
+      if (listingUpdates.soldListingIds.length > 0) {
         await tx.listing.updateMany({
-          where: { itemId: listingClosure.itemId, state: { in: ["DRAFT", "ACTIVE"] } },
-          data: { state: "SOLD", endedAt: soldAt },
-        });
-      } else if (listingClosure?.kind === "one") {
-        await tx.listing.updateMany({
-          where: {
-            id: listingClosure.listingId,
-            itemId: listingClosure.itemId,
-            state: { in: ["DRAFT", "ACTIVE"] },
-          },
+          where: { itemId: item.id, id: { in: listingUpdates.soldListingIds }, state: { in: ["DRAFT", "ACTIVE"] } },
           data: { state: "SOLD", endedAt: soldAt },
         });
       }
+      if (listingUpdates.endedListingIds.length > 0) {
+        await tx.listing.updateMany({
+          where: { itemId: item.id, id: { in: listingUpdates.endedListingIds }, state: { in: ["DRAFT", "ACTIVE"] } },
+          data: { state: "ENDED", endedAt: soldAt },
+        });
+      }
+      if (listingUpdates.externalAttentionIds.length > 0) {
+        await createInboxAlert(tx as any, {
+          kind: "REPRICE",
+          title: salePlan.fullySold ? `Remove sold stock from other listings: ${item.card.name}` : `Update other listing quantities: ${item.card.name}`,
+          message: salePlan.fullySold
+            ? `${listingUpdates.externalAttentionIds.length} marketplace listing(s) may still be live. Remove them and confirm removal in Listings.`
+            : `${salePlan.remainingQuantity} copies remain. Check quantities on the other ${listingUpdates.externalAttentionIds.length} marketplace listing(s) before selling again.`,
+          href: "/?view=listings",
+          sourceKey: `sale-listings:${sales[0]!.id}`,
+        });
+      }
 
-      return { item: updatedItem, sale: sales[0] ?? null, sales, salePlan };
+      const itemWithUpdatedListings = {
+        ...updatedItem,
+        listings: updatedItem.listings.map((listing) => {
+          if (listingUpdates.soldListingIds.includes(listing.id)) return { ...listing, state: "SOLD" as const, endedAt: soldAt };
+          if (listingUpdates.endedListingIds.includes(listing.id)) return { ...listing, state: "ENDED" as const, endedAt: soldAt };
+          return listing;
+        }),
+      };
+      return { item: itemWithUpdatedListings, sale: sales[0] ?? null, sales, salePlan };
     });
 
     const profitPence = result.sales.reduce(
@@ -127,7 +156,7 @@ export async function POST(
           salePrice: sale.salePrice,
           fees: sale.fees,
           postage: sale.postage,
-          costBasis: result.item.costBasis,
+          costBasis: sale.costBasis ?? result.item.costBasis,
         }),
       0,
     );
@@ -176,7 +205,7 @@ async function replaySale(clientMutationId: string, inventoryItemId: string) {
     salePrice: sale.salePrice,
     fees: sale.fees,
     postage: sale.postage,
-    costBasis: item.costBasis,
+    costBasis: sale.costBasis ?? item.costBasis,
   }), 0);
   return NextResponse.json({
     item,

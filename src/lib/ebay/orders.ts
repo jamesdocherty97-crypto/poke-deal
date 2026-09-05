@@ -1,6 +1,8 @@
 import { createInboxAlert } from "../alerts/inbox.js";
 import { estimateSaleCosts } from "../dealer/saleFees.js";
-import { planSaleListingClosure, planUnitSale, splitPence } from "../dealer/unitSale.js";
+import { planUnitSale, splitPence } from "../dealer/unitSale.js";
+import { planSaleListingUpdates } from "../dealer/saleListingUpdates.js";
+import { lockInventoryItemForSale, type SaleLockDb } from "../inventory/saleTransaction.js";
 import { formatGbp } from "../format/money.js";
 import type { EbayConfig } from "./config.js";
 import { getEbayConfig, isEbayConfigured } from "./config.js";
@@ -112,7 +114,7 @@ type ListingMatch = {
   };
 };
 
-type EbaySalesSyncDb = {
+type EbaySalesSyncDb = SaleLockDb & {
   $transaction<T>(fn: (tx: EbaySalesSyncDb) => Promise<T>): Promise<T>;
   ebayOrderImport: {
     findUnique(args: any): Promise<any | null>;
@@ -331,9 +333,16 @@ export async function importEbayOrderLine(
       return summarizeImport(row);
     }
 
+    await lockInventoryItemForSale(tx, match.itemId);
+    // Another sync may have imported this line while this transaction waited
+    // for the stock row. Never overwrite its receipt with an unmatched result.
+    const committedImport = await tx.ebayOrderImport.findUnique({ where: { importKey: line.importKey } });
+    if (committedImport?.saleId || committedImport?.status === "MATCHED") {
+      return summarizeImport(committedImport, "SKIPPED", "Already imported.");
+    }
     const item = await tx.inventoryItem.findUnique({
       where: { id: match.itemId },
-      include: { card: true },
+      include: { card: true, listings: true },
     });
     if (!item) {
       const row = await upsertImport(tx, line, {
@@ -364,6 +373,7 @@ export async function importEbayOrderLine(
 
     const feesEstimate = estimateSaleCosts("EBAY", line.buyerPaidPence, { grade: item.grade });
     const salePrices = splitPence(line.buyerPaidPence, salePlan.soldQuantity);
+    const itemRevenues = splitPence(line.itemSubtotalPence, salePlan.soldQuantity);
     const fees = splitPence(feesEstimate.feesPence, salePlan.soldQuantity);
     const postage = splitPence(feesEstimate.postagePence, salePlan.soldQuantity);
     const soldAt = line.paidAt ?? line.orderCreatedAt ?? new Date();
@@ -376,6 +386,11 @@ export async function importEbayOrderLine(
             itemId: item.id,
             channel: "EBAY",
             salePrice: salePrices[index] ?? 0,
+            costBasis: item.costBasis,
+            itemRevenue: itemRevenues[index] ?? 0,
+            costsEstimated: true,
+            clientMutationId: `ebay-order:${line.importKey}`,
+            mutationIndex: index,
             fees: fees[index] ?? 0,
             postage: postage[index] ?? 0,
             soldAt,
@@ -392,20 +407,33 @@ export async function importEbayOrderLine(
       },
     });
 
-    const listingClosure = planSaleListingClosure({
-      itemId: item.id,
+    const listingUpdates = planSaleListingUpdates({
+      listings: item.listings ?? [],
       soldListingId: match.listingId,
-      closeOpenListings: salePlan.closeOpenListings,
+      soldChannel: "EBAY",
+      fullySold: salePlan.fullySold,
     });
-    if (listingClosure?.kind === "all-open") {
+    if (listingUpdates.soldListingIds.length > 0) {
       await tx.listing.updateMany({
-        where: { itemId: listingClosure.itemId, state: { in: ["DRAFT", "ACTIVE"] } },
+        where: { itemId: item.id, id: { in: listingUpdates.soldListingIds }, state: { in: ["DRAFT", "ACTIVE"] } },
         data: { state: "SOLD", endedAt: soldAt },
       });
-    } else if (listingClosure?.kind === "one") {
+    }
+    if (listingUpdates.endedListingIds.length > 0) {
       await tx.listing.updateMany({
-        where: { id: listingClosure.listingId, itemId: listingClosure.itemId, state: { in: ["DRAFT", "ACTIVE"] } },
-        data: { state: "SOLD", endedAt: soldAt },
+        where: { itemId: item.id, id: { in: listingUpdates.endedListingIds }, state: { in: ["DRAFT", "ACTIVE"] } },
+        data: { state: "ENDED", endedAt: soldAt },
+      });
+    }
+    if (listingUpdates.externalAttentionIds.length > 0) {
+      await createInboxAlert(tx as any, {
+        kind: "REPRICE",
+        title: salePlan.fullySold ? `Remove sold stock from other listings: ${item.card.name}` : `Update other listing quantities: ${item.card.name}`,
+        message: salePlan.fullySold
+          ? `${listingUpdates.externalAttentionIds.length} other marketplace listing(s) may still be live. Remove them and confirm removal in Listings.`
+          : `${salePlan.remainingQuantity} copies remain. Check quantities on the other ${listingUpdates.externalAttentionIds.length} marketplace listing(s).`,
+        href: "/?view=listings",
+        sourceKey: `sale-listings:${line.importKey}`,
       });
     }
 
@@ -421,7 +449,7 @@ export async function importEbayOrderLine(
     await createInboxAlert(tx as any, {
       kind: "EBAY_SALE",
       title: `eBay sale imported: ${item.card.name}`,
-      message: `${item.card.setName}${item.card.number ? ` #${item.card.number}` : ""} sold for ${formatGbp(line.buyerPaidPence)}. Fees are estimated until payout reconciliation is added.`,
+      message: `${item.card.setName}${item.card.number ? ` #${item.card.number}` : ""} sold for ${formatGbp(line.buyerPaidPence)}. Fees and seller postage are estimated. Confirm actual costs in Profit after checking the marketplace record.`,
       pence: line.buyerPaidPence,
       href: "/?view=listings",
       sourceKey: `ebay-sale:${line.importKey}`,

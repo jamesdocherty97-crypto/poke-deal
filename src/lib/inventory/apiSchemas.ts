@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { acquiredAtSchema } from "./acquiredAt.js";
 import { GRADE_VALUES } from "../domain/types.js";
 
 const optionalCardText = z.preprocess(
@@ -37,6 +38,7 @@ export const acquireRequestSchema = z.object({
   costBasisPence: z.coerce.number().int().nonnegative(),
   quantity: z.coerce.number().int().positive().default(1),
   acquiredFrom: z.string().min(1).optional(),
+  acquiredAt: acquiredAtSchema.optional(),
   location: z.string().min(1).optional(),
   condition: z.string().trim().min(1).optional(),
   graderCert: z.string().trim().min(1).optional(),
@@ -76,8 +78,9 @@ export const inventoryDraftRequestSchema = z.object({
   quantity: z.coerce.number().int().positive().default(1),
   costBasisPence: z.coerce.number().int().nonnegative(),
   acquiredFrom: z.string().min(1).optional(),
+  acquiredAt: acquiredAtSchema.optional(),
   location: z.string().min(1).optional(),
   condition: z.string().trim().min(1).optional(),
   graderCert: z.string().trim().min(1).optional(),
-  status: z.enum(["IN_STOCK", "LISTED", "SOLD", "RESERVED"]).default("IN_STOCK"),
+  status: z.enum(["IN_STOCK", "LISTED", "RESERVED"]).default("IN_STOCK"),
 });

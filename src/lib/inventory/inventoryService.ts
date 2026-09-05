@@ -13,6 +13,7 @@ export interface InventoryItemDraft {
   quantity: number;
   costBasisPence: number;
   acquiredFrom?: string;
+  acquiredAt?: string;
   location?: string;
   condition?: string;
   graderCert?: string;
@@ -36,6 +37,7 @@ export interface AcquireInput {
   costBasisPence: number;
   quantity?: number;
   acquiredFrom?: string;
+  acquiredAt?: string;
   location?: string;
   condition?: string;
   graderCert?: string;
@@ -72,6 +74,7 @@ export async function acquireToInventory(
     quantity: input.quantity ?? 1,
     costBasisPence: input.costBasisPence,
     acquiredFrom: input.acquiredFrom,
+    acquiredAt: input.acquiredAt,
     location: input.location,
     condition: input.condition,
     graderCert: input.graderCert,

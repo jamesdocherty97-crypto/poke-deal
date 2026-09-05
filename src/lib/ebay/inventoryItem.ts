@@ -5,11 +5,12 @@ import type { EbayConfig } from "./config.js";
 import { ebayFetch } from "./client.js";
 import { readEbayApiError } from "./errors.js";
 import type { ListingPackInput } from "../dealer/listingPack.js";
-import { buildListingPack, isGradedGrade } from "../dealer/listingPack.js";
+import { buildListingPack, isGradedGrade, normalizeListingRawCondition } from "../dealer/listingPack.js";
 
 export interface EbayConditionDescriptor {
   name: string;
-  values: string[];
+  values?: string[];
+  additionalInfo?: string;
 }
 
 export interface EbayInventoryItem {
@@ -103,15 +104,22 @@ const LIGHTLY_PLAYED_ID = "400015";
 const MODERATELY_PLAYED_ID = "400016";
 const HEAVILY_PLAYED_ID = "400017";
 
-/** Best-effort classification of our free-text raw condition into eBay's 4 supported buckets for 183454. */
-function ungradedCardConditionId(conditionText?: string | null): string {
-  const t = (conditionText ?? "").trim().toLowerCase();
-  if (/(^|\b)(hp|heavily ?played|poor|damaged|heavy ?wear)(\b|$)/.test(t)) return HEAVILY_PLAYED_ID;
-  if (/(^|\b)(mp|moderately ?played|very ?good|vg|moderate ?wear)(\b|$)/.test(t)) return MODERATELY_PLAYED_ID;
-  if (/(^|\b)(lp|lightly ?played|excellent|ex|light ?wear|edgewear|whitening)(\b|$)/.test(t)) return LIGHTLY_PLAYED_ID;
-  // Default (includes empty/"NM"/"Near Mint"/"Mint"/anything unrecognized) —
-  // matches the rest of the app's existing fallback-to-"Near Mint" convention.
-  return NEAR_MINT_OR_BETTER_ID;
+/** Damaged singles use eBay's lowest supported CCG bucket, with DMG retained in copy. */
+function ungradedCardConditionId(conditionText?: string | null): string | null {
+  switch (normalizeListingRawCondition(conditionText)) {
+    case "DMG":
+    case "HP": return HEAVILY_PLAYED_ID;
+    case "MP": return MODERATELY_PLAYED_ID;
+    case "LP": return LIGHTLY_PLAYED_ID;
+    case "NM": return NEAR_MINT_OR_BETTER_ID;
+    default: return null;
+  }
+}
+
+export function validateEbayRawCondition(grade: string, condition?: string | null): string | null {
+  return isGradedGrade(grade) || normalizeListingRawCondition(condition)
+    ? null
+    : "Record the raw card's inspected condition in Stock (NM, LP, MP, HP or DMG) before sending it to eBay.";
 }
 
 /** Parses a grade like "PSA_9_5" -> { grader: "PSA", gradeValue: "9.5" }; "ACE_10" -> { grader: "ACE", gradeValue: "10" }. */
@@ -134,12 +142,14 @@ function buildConditionFields(input: ListingPackInput): {
     ];
     const gradeId = GRADE_VALUE_IDS[gradeValue];
     if (gradeId) conditionDescriptors.push({ name: "27502", values: [gradeId] });
-    if (input.certNumber) conditionDescriptors.push({ name: "27503", values: [input.certNumber] });
+    if (input.certNumber) conditionDescriptors.push({ name: "27503", additionalInfo: input.certNumber });
     return { condition: GRADED_CONDITION_ENUM, conditionDescriptors };
   }
+  const conditionId = ungradedCardConditionId(input.condition);
+  if (!conditionId) throw new Error(validateEbayRawCondition(input.grade, input.condition)!);
   return {
     condition: UNGRADED_CONDITION_ENUM,
-    conditionDescriptors: [{ name: "40001", values: [ungradedCardConditionId(input.condition)] }],
+    conditionDescriptors: [{ name: "40001", values: [conditionId] }],
   };
 }
 

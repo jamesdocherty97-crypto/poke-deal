@@ -87,6 +87,36 @@ test("ledger restore refuses a non-empty database unless force is set", async ()
   );
 });
 
+test("restore books sales before SOLD listings and retains financial evidence and listing retry keys", async () => {
+  const seed = seedRows();
+  seed.listings![0]!.state = "SOLD";
+  seed.listings![0]!.clientMutationId = "opening-stock-listing-1";
+  seed.sales![0]!.costBasis = 85000;
+  seed.sales![0]!.itemRevenue = 119501;
+  seed.sales![0]!.costsEstimated = false;
+  seed.sales![0]!.amountRevisions = [{
+    changedAt: "2026-07-03T00:00:00.000Z",
+    reason: "Checked order receipt",
+    before: { costBasis: null, itemRevenue: null, fees: 15600, postage: 350, costsEstimated: null },
+    after: { costBasis: 85000, itemRevenue: 119501, fees: 15600, postage: 350, costsEstimated: false },
+  }];
+  const backup = await createLedgerBackup(fakeBackupDb(seed).client);
+  const target = fakeBackupDb();
+  const insertListings = target.client.listing!.createMany;
+  target.client.listing!.createMany = async (args) => {
+    for (const listing of args.data) {
+      if (listing.state === "SOLD") {
+        assert.ok(target.stores.sale!.rows.some((sale) => sale.itemId === listing.itemId), "database trigger requires the sale before a SOLD listing commits");
+      }
+    }
+    return insertListings(args);
+  };
+  await restoreLedgerBackup(JSON.parse(JSON.stringify(backup)), { db: target.client });
+  const restored = await createLedgerBackup(target.client);
+  assert.deepEqual(restored.tables.sales, backup.tables.sales);
+  assert.deepEqual(restored.tables.listings, backup.tables.listings);
+});
+
 test("ledger restore force wipes existing rows before restoring and verifies counts", async () => {
   const backup = await createLedgerBackup(fakeBackupDb(seedRows()).client);
   const target = fakeBackupDb({

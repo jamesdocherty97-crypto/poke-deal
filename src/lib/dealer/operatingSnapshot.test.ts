@@ -19,7 +19,7 @@ test("buildOperatingSnapshot summarizes early trading cash and listing state", (
   assert.equal(rows[0]?.value, "£145.00");
   assert.equal(rows[1]?.value, "-£145.00");
   assert.equal(rows[2]?.value, "1 live / 7 draft");
-  assert.equal(rows[3]?.detail, "0% cash recovery");
+  assert.equal(rows[3]?.detail, "0% recorded cost recovery");
 });
 
 test("buildOperatingSnapshot marks profitable cash net as good", () => {

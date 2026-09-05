@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import { ebayListingIdFromUrl } from "@/lib/dealer/listingUrl";
 import { getPrisma } from "@/lib/db/prisma";
 import { getEbayConfig, isEbayConfigured } from "@/lib/ebay/config";
 import { getAccessToken } from "@/lib/ebay/tokens";
 import { fetchEbayPolicies } from "@/lib/ebay/policies";
-import { getOfferBySku } from "@/lib/ebay/offer";
+import { withdrawEbayOffer } from "@/lib/ebay/offer";
+import { activeListingEditError, planListingEnd } from "@/lib/dealer/listingEnd";
+import { validateEbayRawCondition } from "@/lib/ebay/inventoryItem";
 import { buildEbayOfferPreflight, toEbaySku } from "@/lib/ebay/preflight";
 import {
   hasEbayOfferPresentationChanged,
@@ -38,6 +41,7 @@ const listingPatchSchema = z.object({
   listPricePence: z.coerce.number().int().nonnegative().nullable().optional(),
   externalRef: nullableText,
   externalUrl: nullableUrl,
+  externalRemovalConfirmed: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -67,7 +71,47 @@ export async function PATCH(
     if (!existing) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
+    const editError = activeListingEditError(existing, d);
+    if (editError) return NextResponse.json({ error: editError }, { status: 409 });
+    if (d.state === "ENDED" && existing.state !== "ENDED" && Object.keys(d).some((key) => key !== "state" && key !== "externalRemovalConfirmed")) {
+      return NextResponse.json({ error: "Use the End listing control to remove this listing, then edit its saved details separately." }, { status: 400 });
+    }
+    if (d.state === "ACTIVE" && existing.state === "ENDED" && existing.channel === "EBAY") {
+      return NextResponse.json({ error: "This eBay listing was ended. Use Review & publish to put its offer live again." }, { status: 409 });
+    }
+    if (existing.state === "SOLD" && d.state && d.state !== "ENDED") {
+      return NextResponse.json({ error: "A sold listing cannot be reactivated. Restore stock through the sale correction flow first." }, { status: 409 });
+    }
+    if (d.state === "ENDED") {
+      const endPlan = planListingEnd({ ...existing, externalRemovalConfirmed: d.externalRemovalConfirmed });
+      if (endPlan === "confirm-removal") {
+        return NextResponse.json({
+          error: "Remove this listing on its marketplace, then use Confirm removed in Listings. It stays active here until you confirm removal.",
+        }, { status: 409 });
+      }
+      if (endPlan === "withdraw-ebay") {
+        const config = getEbayConfig();
+        if (!config || !isEbayConfigured()) {
+          return NextResponse.json({ error: "eBay is unavailable. The listing remains active. Reconnect eBay or remove it there and confirm removal in Listings." }, { status: 503 });
+        }
+        try {
+          const accessToken = await getAccessToken(config);
+          await withdrawEbayOffer(config, existing.ebayOfferId!, accessToken);
+        } catch (err) {
+          return NextResponse.json({
+            ...ebayApiErrorResponseBody(err, "eBay withdrawal failed"),
+            error: `${err instanceof Error ? err.message : "eBay withdrawal failed"}. The listing remains active here; retry or remove it on eBay and confirm removal.`,
+          }, { status: 502 });
+        }
+      }
+    }
     const effectiveChannel = d.channel ?? existing.channel;
+    if (effectiveChannel === "EBAY" && d.externalUrl && existing.state !== "ACTIVE") {
+      const itemReference = ebayListingIdFromUrl(d.externalUrl);
+      if (!itemReference) return NextResponse.json({ error: "Paste the individual live eBay item URL, not a search or seller page." }, { status: 400 });
+      if (d.externalRef && d.externalRef !== itemReference) return NextResponse.json({ error: "The eBay item reference does not match its URL." }, { status: 400 });
+      d.externalRef = itemReference;
+    }
     const effectiveListPrice =
       d.listPricePence !== undefined ? d.listPricePence : existing.listPrice;
     const effectiveTitle = d.title !== undefined ? d.title : existing.title;
@@ -157,13 +201,6 @@ export async function PATCH(
       if (priceError) {
         return NextResponse.json({ error: priceError }, { status: 400 });
       }
-      if (!isEbayConfigured()) {
-        return NextResponse.json(
-          { error: "eBay is not configured, so the live listing was not changed." },
-          { status: 503 },
-        );
-      }
-
       const current = await prisma.listing.findUnique({
         where: { id: params.id },
         include: {
@@ -178,6 +215,24 @@ export async function PATCH(
       if (!current) {
         return NextResponse.json({ error: "Listing not found" }, { status: 404 });
       }
+      // A pasted live URL does not prove that an old offer for this SKU owns it.
+      // Require the stored association instead of inferring one from the SKU.
+      const offerId = current.ebayOfferId;
+      if (!offerId) {
+        return NextResponse.json(
+          { error: "This live eBay listing is tracked manually and has no linked editable offer. The app was not changed; edit it on eBay." },
+          { status: 409 },
+        );
+      }
+      if (!isEbayConfigured()) {
+        return NextResponse.json(
+          { error: "eBay is not configured, so the live listing was not changed." },
+          { status: 503 },
+        );
+      }
+
+      const conditionError = validateEbayRawCondition(current.item.grade, current.item.condition);
+      if (conditionError) return NextResponse.json({ error: conditionError }, { status: 400 });
 
       const listPricePence = effectiveListPrice!;
       const photoSummary = summarizeListingPhotos({
@@ -200,17 +255,6 @@ export async function PATCH(
         const accessToken = await getAccessToken(config);
         const policies = await fetchEbayPolicies(config, accessToken);
         const sku = toEbaySku(current.id, current.itemId);
-        const offerId = current.ebayOfferId ?? await getOfferBySku(config, sku, accessToken);
-        if (!offerId) {
-          return NextResponse.json(
-            {
-              error:
-                "This live eBay listing is not linked to an editable eBay offer. The app was not changed; edit it on eBay, then reconnect or refresh the listing.",
-            },
-            { status: 409 },
-          );
-        }
-
         const preflight = buildEbayOfferPreflight({
           listingId: current.id,
           itemId: current.itemId,
@@ -224,6 +268,8 @@ export async function PATCH(
               number: current.item.card.number,
               rarity: current.item.card.rarity,
               language: current.item.card.language,
+              edition: current.item.card.edition,
+              finish: current.item.card.finish,
             },
             grade: current.item.grade,
             listPricePence,
@@ -267,6 +313,9 @@ export async function PATCH(
         include: { item: true },
       });
       if (!current) return null;
+      if (d.state === "ACTIVE" && current.item.status === "SOLD") {
+        throw new Error("Sold stock cannot be activated on a marketplace.");
+      }
 
       const data: Prisma.ListingUpdateInput = {
         channel: d.channel,
@@ -278,6 +327,15 @@ export async function PATCH(
         externalRef: d.externalRef,
         externalUrl: d.externalUrl,
       };
+
+      if (effectiveChannel === "EBAY" && current.state !== "ACTIVE" &&
+          d.externalRef !== undefined && d.externalRef !== current.externalRef) {
+        // Adopting another live item must not make its price edits or removal
+        // target a previously prepared, unrelated offer.
+        data.ebayOfferId = null;
+        data.offerSyncedAt = null;
+        data.offerSyncedPrice = null;
+      }
 
       if (liveEbaySync) {
         data.ebayOfferId = liveEbaySync.offerId;

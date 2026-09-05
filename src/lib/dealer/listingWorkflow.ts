@@ -29,6 +29,7 @@ export type ListingNextActionId =
   | "create-offer"
   | "publish"
   | "record-sale"
+  | "remove-listing"
   | "done";
 
 export interface ListingNextAction {
@@ -116,11 +117,25 @@ export function listingVenueAction(
 }
 
 export function buildListingSellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
+  if (input.state === "ACTIVE" && input.sellable === false && input.channel !== "IN_PERSON") {
+    return [
+      { id: "sale", label: "Sale booked", detail: "No copies remain in stock.", state: "done" },
+      { id: "remove", label: "Remove external listing", detail: "Remove it from the marketplace and confirm removal in Listings.", state: "current" },
+    ];
+  }
   if (input.channel === "EBAY") return buildEbaySellFlow(input);
   return buildManualSellFlow(input);
 }
 
 export function buildListingNextAction(input: ListingSellFlowInput): ListingNextAction {
+  if (input.state === "ACTIVE" && input.sellable === false && input.channel !== "IN_PERSON") {
+    return {
+      id: "remove-listing",
+      title: "Remove the external listing",
+      detail: "Stock is sold. Remove this listing from its marketplace and confirm removal in Listings.",
+      cta: "Remove listing",
+    };
+  }
   const sold = input.state === "SOLD" || input.sellable === false;
   if (sold) {
     return {
@@ -131,13 +146,18 @@ export function buildListingNextAction(input: ListingSellFlowInput): ListingNext
     };
   }
 
+  if (input.state === "ENDED") {
+    // A retained URL is history, not proof that an ended listing is live again.
+    return buildListingNextAction({ ...input, state: "DRAFT", externalRef: null, externalUrl: null, packCopied: false });
+  }
+
   if (input.channel === "EBAY") return buildEbayNextAction(input);
   return buildManualNextAction(input);
 }
 
 function buildEbaySellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
   const sold = input.state === "SOLD" || input.sellable === false;
-  const published = Boolean(input.externalRef && !input.externalRef.startsWith("offer:"));
+  const published = input.state === "ACTIVE" && Boolean(input.externalRef && !input.externalRef.startsWith("offer:"));
 
   return [
     {
@@ -163,13 +183,13 @@ function buildEbaySellFlow(input: ListingSellFlowInput): ListingFlowStep[] {
 
 function buildEbayNextAction(input: ListingSellFlowInput): ListingNextAction {
   const hasOffer = Boolean(input.externalRef?.startsWith("offer:"));
-  const published = Boolean(input.externalRef && !input.externalRef.startsWith("offer:"));
+  const published = input.state === "ACTIVE" && Boolean(input.externalRef && !input.externalRef.startsWith("offer:"));
 
   if (published || input.state === "ACTIVE") {
     return {
       id: "record-sale",
-      title: "Wait for sale",
-      detail: "When it sells, book price, fees and buyer-paid postage here.",
+      title: "Listing active",
+      detail: "Record a sale only after the buyer has paid. Review price and photos if it is not selling.",
       cta: "Record sale",
     };
   }
@@ -248,8 +268,8 @@ function buildManualNextAction(input: ListingSellFlowInput): ListingNextAction {
   if (input.state === "ACTIVE") {
     return {
       id: "record-sale",
-      title: "Wait for sale",
-      detail: "When it sells, book price, fees and postage here.",
+      title: "Listing active",
+      detail: "Record a sale only after the buyer has paid. Review price and photos if it is not selling.",
       cta: "Record sale",
     };
   }

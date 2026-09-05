@@ -185,12 +185,11 @@ export function parseTradingApiResult(raw: string): TradingApiResult {
   };
 }
 
-function buildConditionDescriptorsXml(descriptors: Array<{ name: string; values: string[] }>): string {
+function buildConditionDescriptorsXml(descriptors: Array<{ name: string; values?: string[]; additionalInfo?: string }>): string {
   if (descriptors.length === 0) return "";
   const rows = descriptors.map((descriptor) => {
-    const valueRows = descriptor.name === "27503"
-      ? descriptor.values.map((value) => `        <AdditionalInfo>${xml(value)}</AdditionalInfo>`)
-      : descriptor.values.map((value) => `        <Value>${xml(value)}</Value>`);
+    const valueRows = (descriptor.values ?? []).map((value) => `        <Value>${xml(value)}</Value>`);
+    if (descriptor.additionalInfo) valueRows.push(`        <AdditionalInfo>${xml(descriptor.additionalInfo)}</AdditionalInfo>`);
     return [
       "      <ConditionDescriptor>",
       `        <Name>${xml(descriptor.name)}</Name>`,

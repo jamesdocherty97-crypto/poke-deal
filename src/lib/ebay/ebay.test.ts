@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { EBAY_RECONNECT_HINT, EBAY_USER_SCOPES, buildAuthUrl, exchangeCodeForTokens, refreshAccessToken } from "./oauth.js";
 import { ebayJson } from "./client.js";
 import { ebayApiErrorResponseBody, ebayErrorMessage, isEbayPermissionReconnectError } from "./errors.js";
-import { buildInventoryItemPayload, upsertInventoryItem } from "./inventoryItem.js";
+import { buildInventoryItemPayload, upsertInventoryItem, validateEbayRawCondition } from "./inventoryItem.js";
 import { buildOfferPayload } from "./offer.js";
 import { buildEbayOfferPreflight, toEbaySku } from "./preflight.js";
 import {
@@ -14,6 +14,7 @@ import {
 } from "./offerSync.js";
 import {
   EbayTradingApiError,
+  addTradingFixedPriceItem,
   buildTradingFixedPriceItemXml,
   buildTradingVerifyFixedPriceItemXml,
   parseTradingApiResult,
@@ -551,13 +552,71 @@ test("buildInventoryItemPayload produces trading-card condition descriptors for 
   assert.equal(item.product.aspects["Card Name"]?.[0], "Umbreon VMAX");
 });
 
+test("all supported raw conditions map explicitly, including damaged cards", () => {
+  for (const [condition, expected] of [
+    ["NM", "400010"], ["LP", "400015"], ["MP", "400016"], ["HP", "400017"], ["DMG", "400017"],
+    ["Near Mint", "400010"], ["Damaged", "400017"],
+  ]) {
+    const item = buildInventoryItemPayload({ ...rawInput, condition }, 1);
+    assert.deepEqual(item.conditionDescriptors, [{ name: "40001", values: [expected] }], condition);
+    assert.equal(item.product.aspects["Card Condition"]?.[0], condition);
+    assert.equal(validateEbayRawCondition("RAW", condition), null);
+  }
+});
+
+test("uninspected and ambiguous raw cards cannot generate an eBay publish payload", () => {
+  for (const condition of [undefined, null, "", "   ", "unknown", "not near mint", "NM / LP", "NM with whitening"]) {
+    assert.match(validateEbayRawCondition("RAW", condition)!, /inspected condition/);
+    assert.throws(() => buildInventoryItemPayload({ ...rawInput, condition }, 1), /inspected condition/);
+  }
+  assert.equal(validateEbayRawCondition("PSA_10", null), null);
+});
+
+test("raw condition inspection blocks both preflight and Trading publish before network writes", async () => {
+  const packInput = { ...rawInput, condition: null };
+  assert.throws(() => buildEbayOfferPreflight({
+    listingId: "uninspected-single",
+    packInput,
+    quantity: 1,
+    policies: MOCK_POLICIES,
+    config: TEST_CONFIG,
+  }), /inspected condition/);
+  let requests = 0;
+  await assert.rejects(addTradingFixedPriceItem(TEST_CONFIG, "synthetic-token", {
+    listingId: "uninspected-single",
+    packInput,
+    quantity: 1,
+    imageUrls: ["https://images.example.com/front.jpg"],
+    policies: MOCK_POLICIES,
+    location: "Manchester",
+    postalCode: "M1 1AA",
+  }, async () => {
+    requests += 1;
+    throw new Error("Must not reach the provider");
+  }), /inspected condition/);
+  assert.equal(requests, 0);
+});
+
+test("eBay payload preserves the inspected printing in title, description and aspects", () => {
+  const item = buildInventoryItemPayload({
+    ...rawInput,
+    card: { name: "Pikachu", number: "60/64", edition: "FIRST_EDITION", finish: "NORMAL" },
+    condition: "DMG",
+  }, 1);
+  assert.match(item.product.title, /1st Edition Non-Holo DMG/);
+  assert.match(item.product.description, /1st Edition · Non-Holo/);
+  assert.deepEqual(item.product.aspects.Edition, ["1st Edition"]);
+  assert.deepEqual(item.product.aspects.Finish, ["Non-Holo"]);
+  assert.match(item.conditionDescription!, /DMG/);
+});
+
 test("buildInventoryItemPayload produces trading-card condition descriptors for PSA slab", () => {
   const item = buildInventoryItemPayload(slabInput, 1);
   assert.equal(item.condition, "LIKE_NEW");
   assert.deepEqual(item.conditionDescriptors, [
     { name: "27501", values: ["275010"] },
     { name: "27502", values: ["275020"] },
-    { name: "27503", values: ["84213567"] },
+    { name: "27503", additionalInfo: "84213567" },
   ]);
   assert.match(item.product.title, /Charizard ex/);
   assert.equal(item.product.aspects["Professional Grader"]?.[0], "PSA");
