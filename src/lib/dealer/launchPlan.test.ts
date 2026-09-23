@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildLaunchPlan, buildLaunchProgress, buildSellingMission, summarizeSellingStock, type LaunchPlanInput } from "./launchPlan.js";
+import { buildLaunchPlan, buildLaunchProgress, buildSellingMission, formatOrderSyncFreshness, summarizeSellingStock, type LaunchPlanInput } from "./launchPlan.js";
 
 const empty: LaunchPlanInput = {
   stockCount: 0, draftListings: 0, preparedDrafts: 0, activeListings: 0, soldCount: 0,
@@ -105,4 +105,23 @@ test("pending full or partial sales remain in raw stock totals but never become 
   assert.equal(synced.totalRows, 1);
   assert.equal(synced.preparedDrafts, 1);
   assert.equal(buildSellingMission(synced, 0).target, "drafts");
+});
+
+
+test("mission priority is removal, then unmatched orders, then provisional costs, then selling prep", () => {
+  const stock = { totalRows: 5, availableRows: 5, heldRows: 0, preparationRows: 2, preparedDrafts: 3, liveRows: 2, removalListings: 0 };
+  assert.equal(buildSellingMission({ ...stock, removalListings: 2 }, 1, { unmatchedPaidOrders: 4, provisionalCosts: 3 }).kind, "removal");
+  assert.equal(buildSellingMission(stock, 1, { unmatchedPaidOrders: 4, provisionalCosts: 3 }).kind, "unmatched-orders");
+  assert.equal(buildSellingMission(stock, 1, { unmatchedPaidOrders: 0, provisionalCosts: 3 }).kind, "provisional-costs");
+  assert.equal(buildSellingMission(stock, 1, { unmatchedPaidOrders: 0, provisionalCosts: 0 }).kind, "publish");
+  assert.equal(buildSellingMission(stock, 1, {}).kind, "publish");
+  assert.equal(buildSellingMission(stock, 1, { unmatchedPaidOrders: null, provisionalCosts: null }).kind, "publish");
+});
+
+test("order sync freshness stays unknown until a successful sync timestamp exists", () => {
+  assert.equal(formatOrderSyncFreshness(null).tone, "unknown");
+  assert.match(formatOrderSyncFreshness(null).label, /unknown/);
+  const now = new Date("2026-09-23T12:00:00.000Z");
+  assert.equal(formatOrderSyncFreshness(new Date(now.getTime() - 30 * 60 * 1000).toISOString(), now).tone, "good");
+  assert.equal(formatOrderSyncFreshness(new Date(now.getTime() - 10 * 60 * 60 * 1000).toISOString(), now).tone, "warn");
 });

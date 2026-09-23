@@ -81,6 +81,18 @@ The bottom nav has five main areas.
 
 ### Today
 
+Phone-first selling surface. Open **https://poke-deal.vercel.app/?view=today** (or the Home Screen icon after Add to Home Screen).
+
+Priority order on Today:
+1. Remove sold cross-listings
+2. Match unmatched paid eBay orders
+3. Confirm provisional sale costs
+4. Prepare / publish / work live stock
+
+eBay order freshness is shown under the mission. Sync is manual from List (Sync eBay sales). The agent must not sync, publish, remove listings, or write the ledger for you.
+
+## Today
+
 Use this as the home screen.
 
 It shows:
@@ -1521,3 +1533,13 @@ The platform is doing its job when James can:
 10. Watch future buy targets.
 
 The next big unlock is enabling PokeTrace and eBay Marketplace Insights in production, then using the app with real buys and sales for a week.
+
+
+## Phone Home Screen (Today)
+
+1. Safari → https://poke-deal.vercel.app/?view=today
+2. Share → Add to Home Screen → name **Poke Deal**
+3. Optional Reminder: `Sell owned singles — Today` with URL `https://poke-deal.vercel.app/?view=today`
+4. Each session: open Today → List → Sync eBay sales → match paid orders → remove sold cross-listings → confirm Profit costs → backup
+
+James only for marketplace and ledger writes. Crons stay empty.

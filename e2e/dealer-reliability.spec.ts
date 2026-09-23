@@ -54,6 +54,8 @@ test("Today leads with a prepared draft despite reviews and Stock never counts t
 
   await page.goto("/?view=today");
   await expect(page.getByRole("heading", { name: "Publish 1 prepared draft", exact: true })).toBeVisible();
+  // Path B keeps optional research secondary inside the collapsed Quest log.
+  await page.locator("details.today-more-moves > summary").click();
   await expect(page.getByRole("button", { name: /Professor.s review · optional research/ })).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "First-sale quest" })).toHaveAttribute("aria-valuenow", "2");
   await expect(page.locator(".today-command-progress")).toContainText("Next: a live listing");
@@ -202,6 +204,7 @@ async function mockReliabilityApis(context: BrowserContext, ledger: ReliabilityL
     if (pathname === "/api/alerts/inbox") return json({ alerts: [], unreadCount: 0 });
     if (pathname === "/api/expenses") return json({ expenses: [] });
     if (pathname === "/api/ebay/status") return json({ configured: false, connected: false });
+    if (pathname === "/api/ebay/orders/sync" && method === "GET") return json({ unmatched: [], unmatchedCount: 0, unmatchedPreviewCount: 0, lastSuccessfulSyncAt: null, lastSuccessfulSyncJob: null, lastSuccessfulSyncSource: "unknown" });
     if (pathname === "/api/system/status") return json({ sources: [], summary: { livePrimaryComps: false, liveCatalogKey: false, secondaryCrossCheck: false, alertDelivery: false, storedSales: Boolean(ledger.sale) } });
     if (pathname === "/api/deal-sessions") return json({ session: null, summary: { includedCount: 0, excludedCount: 0, totalMaxCashPence: 0, totalMaxTradePence: 0, totalExpectedProceedsPence: 0, totalExpectedProfitPence: 0, suggestedBundleOfferPence: 0, completionReady: false, completionBlockers: [] } });
     if (pathname === "/api/catalog/cards") return json({ cards: [] });

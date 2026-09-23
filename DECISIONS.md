@@ -146,3 +146,13 @@ The historical decisions below record earlier intent. Current owner direction an
 - Preserve fresh stock/sale reads and financial evidence. Slim dashboard projections to the fields actually consumed and remove the redundant per-item sales sort; the final merged sales list is still sorted. Avoid caching mutable stock or profit to save queries.
 - Setup reports the schedule policy from the same `vercel.json` that controls deployment. README documents restoring aligned daily/weekly schedules and explains why zero batch limits do not stop database wake-ups.
 - No production configuration, Neon setting, schema, data or deployment change is implied by this local implementation. Savings require rollout and must be measured in Neon.
+
+
+## 2026-09-23 — Path B Today slim + truthful mission priorities
+
+- Today mission order: sold-listing removal, unmatched paid orders, provisional costs, then selling prep.
+- Order sync freshness is shown honestly (last success or unknown) with a route to manual List sync. No automatic sale import on open.
+- GET `/api/ebay/orders/sync` returns a complete UNMATCHED count (not only the latest 20) plus a small preview and last successful sync timestamp.
+- Slim phone viewport: one mission, up to three records, compact progress; secondary quest log and pulse details collapsed.
+- Today bootstrap paints after inventory + listings + dashboard; remaining reads continue in the background. Offline sale protections unchanged.
+- PWA `start_url` is `/?view=today`. Vercel crons remain empty.

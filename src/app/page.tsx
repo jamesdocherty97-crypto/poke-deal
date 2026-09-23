@@ -1094,6 +1094,12 @@ export default function Home() {
   const [ebayPreflight, setEbayPreflight] = useState<EbayPreflight | null>(null);
   const [ebayPublishTarget, setEbayPublishTarget] = useState<string | null>(null);
   const [ebaySalesSync, setEbaySalesSync] = useState<EbaySalesSyncResult | null>(null);
+  const [orderSyncStatus, setOrderSyncStatus] = useState<{
+    unmatchedCount: number | null;
+    lastSuccessfulSyncAt: string | null;
+    unmatchedPreview: Array<{ id: string; title: string; detail: string }>;
+    statusKnown: boolean;
+  } | null>(null);
   const [ebayLocationName, setEbayLocationName] = useState("Poke Deal");
   const [ebayLocationAddress1, setEbayLocationAddress1] = useState("");
   const [ebayLocationAddress2, setEbayLocationAddress2] = useState("");
@@ -1207,6 +1213,13 @@ export default function Home() {
     url.searchParams.set("view", nextParam);
     window.history.pushState({ view: nextParam }, "", url);
   }
+
+
+  useEffect(() => {
+    if (view !== "today") return;
+    if (!inventoryLoaded && !listingsLoaded && !dashboardLoaded) return;
+    void refreshOrderSyncStatus();
+  }, [view, inventoryLoaded, listingsLoaded, dashboardLoaded]);
 
   useEffect(() => {
     const syncViewFromLocation = () => setViewState(parseViewQuery(new URL(window.location.href).searchParams.get("view")));
@@ -2650,12 +2663,31 @@ export default function Home() {
       const results: PromiseSettledResult<void>[] = [];
       // Keep database-backed bootstrap reads within the configured one-slot
       // connection budget. Every dataset still paints as soon as it arrives.
-      for (const task of orderedTasks) {
+      const criticalCount = requestedView === "today" ? Math.min(3, orderedTasks.length) : orderedTasks.length;
+      for (let index = 0; index < criticalCount; index += 1) {
+        const task = orderedTasks[index]!;
         try {
           await task();
           results.push({ status: "fulfilled", value: undefined });
         } catch (reason) {
           results.push({ status: "rejected", reason });
+        }
+      }
+      const secondaryTasks = orderedTasks.slice(criticalCount);
+      if (requestedView === "today" && secondaryTasks.length > 0) {
+        void (async () => {
+          for (const task of secondaryTasks) {
+            try { await task(); } catch { /* secondary Today bootstrap failures stay non-blocking */ }
+          }
+        })();
+      } else {
+        for (const task of secondaryTasks) {
+          try {
+            await task();
+            results.push({ status: "fulfilled", value: undefined });
+          } catch (reason) {
+            results.push({ status: "rejected", reason });
+          }
         }
       }
 
@@ -6717,6 +6749,43 @@ export default function Home() {
     }
   }
 
+
+  async function refreshOrderSyncStatus() {
+    try {
+      const res = await fetch("/api/ebay/orders/sync");
+      const payload = await readJson(res);
+      if (!res.ok) {
+        setOrderSyncStatus({
+          unmatchedCount: null,
+          lastSuccessfulSyncAt: null,
+          unmatchedPreview: [],
+          statusKnown: false,
+        });
+        return;
+      }
+      const preview = Array.isArray(payload.unmatched)
+        ? payload.unmatched.slice(0, 3).map((row: any) => ({
+            id: String(row.importKey ?? row.orderId ?? row.id ?? Math.random()),
+            title: String(row.title ?? row.sku ?? row.orderId ?? "Paid eBay order"),
+            detail: String(row.reason ?? "Needs a stock match"),
+          }))
+        : [];
+      setOrderSyncStatus({
+        unmatchedCount: typeof payload.unmatchedCount === "number" ? payload.unmatchedCount : null,
+        lastSuccessfulSyncAt: typeof payload.lastSuccessfulSyncAt === "string" ? payload.lastSuccessfulSyncAt : null,
+        unmatchedPreview: preview,
+        statusKnown: true,
+      });
+    } catch {
+      setOrderSyncStatus({
+        unmatchedCount: null,
+        lastSuccessfulSyncAt: null,
+        unmatchedPreview: [],
+        statusKnown: false,
+      });
+    }
+  }
+
   async function syncEbaySales() {
     setBusy("ebay-sales-sync");
     setError(null);
@@ -6733,6 +6802,7 @@ export default function Home() {
           `eBay sync complete: ${payload.matchedCount ?? 0} matched, ${payload.unmatchedCount ?? 0} unmatched.`,
         );
       }
+      await refreshOrderSyncStatus();
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "eBay sales sync failed");
@@ -8175,6 +8245,7 @@ export default function Home() {
           manualReviewBusyId={manualReviewBusyId}
           onAcceptManualReview={(review) => void resolveManualReview(review, "ACCEPT_HEADLINE")}
           onAddReviewCheckedComp={(review, input) => void addReviewCheckedComp(review, input)}
+          orderSyncStatus={orderSyncStatus}
         />
       )}
 
