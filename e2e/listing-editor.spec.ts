@@ -453,6 +453,7 @@ async function installFixture(context: BrowserContext, page: Page, options: Opti
     if (path === "/api/expenses") return json({ expenses: [] });
     if (path === "/api/comps/reviews") return json({ reviews: [], nextCursor: null });
     if (path === "/api/ebay/status") return json({ configured: true, connected: true, tokenSource: "db", hasPolicies: true, hasMerchantLocation: true });
+    if (path === "/api/ebay/orders/sync") return json({ unmatched: [], unmatchedCount: 0, unmatchedPreviewCount: 0, lastSuccessfulSyncAt: null, lastSuccessfulSyncJob: null, lastSuccessfulSyncSource: "unknown" });
     if (path === "/api/system/status") return json({ sources: [], summary: { livePrimaryComps: false, liveCatalogKey: false, secondaryCrossCheck: false, alertDelivery: false, storedSales: false } });
     if (path === "/api/deal-sessions") return json({ session: null, summary: { includedCount: 0, excludedCount: 0, totalMaxCashPence: 0, totalMaxTradePence: 0, totalExpectedProceedsPence: 0, totalExpectedProfitPence: 0, suggestedBundleOfferPence: 0, completionReady: false, completionBlockers: [] } });
     if (path === "/api/catalog/cards") return json({ cards: [] });
