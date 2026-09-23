@@ -139,3 +139,10 @@ The historical decisions below record earlier intent. Current owner direction an
 - **Revocation and local data:** Rotating `APP_ACCESS_TOKEN` stops future enrollment through old links but leaves current sessions intact. Rotating `APP_SESSION_SECRET` invalidates every session immediately. The explicit same-origin access deletion endpoint clears the cookie and asks supporting browsers to clear cache/storage, but a remote secret rotation cannot erase Cache Storage or IndexedDB already offline on a device; the operating-system lock and clearing site data before device transfer remain necessary boundaries.
 - **Rollback:** Restore a reviewed authentication layer and its tests; never remove middleware or use `APP_PUBLIC_ACCESS` as a production fallback. No database migration is involved.
 - **Guards:** Exact-path middleware tests, malformed/cross-origin/oversize enrollment tests, tamper/expiry/renewal session tests, Vercel-production fail-closed checks, bearer-only cron tests, OAuth callback equality tests, service-worker cache isolation, production build, and mobile/desktop browser enrollment and revisit checks.
+
+## 2026-09-15 — On-demand operation to reduce Neon compute
+
+- Ship with no Vercel cron schedules. Snapshot, watch, reprice and eBay-order controls remain available on demand; unattended checks and imports pause after deployment. Cron endpoints retain bearer authentication and idempotent run logs.
+- Preserve fresh stock/sale reads and financial evidence. Slim dashboard projections to the fields actually consumed and remove the redundant per-item sales sort; the final merged sales list is still sorted. Avoid caching mutable stock or profit to save queries.
+- Setup reports the schedule policy from the same `vercel.json` that controls deployment. README documents restoring aligned daily/weekly schedules and explains why zero batch limits do not stop database wake-ups.
+- No production configuration, Neon setting, schema, data or deployment change is implied by this local implementation. Savings require rollout and must be measured in Neon.

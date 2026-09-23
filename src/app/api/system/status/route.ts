@@ -13,6 +13,7 @@ import { getEbayConfig } from "@/lib/ebay/config";
 import { resolveEbayRefreshToken } from "@/lib/ebay/credentials";
 import { accountDeletionVerificationToken } from "@/lib/ebay/accountDeletion";
 import { readScanEvaluation, type ScanEvaluationDb } from "@/lib/scan/scanEvaluation";
+import vercelConfig from "../../../../../vercel.json";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ export async function GET() {
   const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
   const deletionTokenConfigured = Boolean(accountDeletionVerificationToken());
   const databaseReady = Boolean(process.env.DATABASE_URL?.trim());
+  const automationScheduled = vercelConfig.crons.length > 0;
   const [fx, ebayRefreshToken, scanEvaluation, cronRuns] = await Promise.all([
     getFxHealth(),
     ebayConfig ? resolveEbayRefreshToken().catch(() => null) : Promise.resolve(null),
@@ -219,9 +221,10 @@ export async function GET() {
       id: "automation",
       label: "Automation",
       role: "daily snapshot + weekly reprice",
-      status: lastSnapshot || lastWatchCheck || lastReprice ? "ready" : "building",
-      required: true,
+      status: !automationScheduled ? "info" : lastSnapshot || lastWatchCheck || lastReprice ? "ready" : "building",
+      required: automationScheduled,
       setupHint: [
+        automationScheduled ? "Scheduled checks are configured." : "Scheduled checks are paused to save database compute. Run checks and eBay order sync in the app when needed.",
         lastSnapshot ? `Last snapshot: ${lastSnapshot.startedAt.toISOString()}.` : "Last snapshot: not run yet.",
         lastWatchCheck ? `Last buy-watch check: ${lastWatchCheck.startedAt.toISOString()}.` : "Last buy-watch check: not run yet.",
         lastReprice ? `Last weekly reprice: ${lastReprice.startedAt.toISOString()}.` : "Last weekly reprice: not run yet.",

@@ -1069,8 +1069,8 @@ Intended use:
 
 Automation:
 
-- A Vercel daily cron takes a stock-value snapshot.
-- The same daily cron checks buy watches with a capped source budget.
+- Scheduled jobs are paused by default to reduce database compute while the app is unused.
+- Run Stock Value, buy-target checks and eBay order sync in the app when needed; they no longer run automatically each day after this configuration is deployed.
 - Setup shows the last successful snapshot and buy-watch run.
 
 ## Buy Watches
@@ -1093,7 +1093,7 @@ Flow:
 Current behavior:
 
 - In-app checks work.
-- Daily cron checks active watches with a capped source budget.
+- Check active watches in the app; automatic daily checks are paused by default.
 - Hits land in the Status automation inbox.
 - Optional off-app delivery needs `ALERT_WEBHOOK_URL`.
 
@@ -1103,7 +1103,7 @@ Stock Health helps find cards that may need repricing.
 
 Automation:
 
-- A Vercel weekly cron runs the stock-health reprice check.
+- Run the stock-health check in the app; automatic weekly checks are paused by default.
 - Reprice recommendations land in the Status automation inbox.
 - Cron failures also land in the inbox so failed background work is visible.
 

@@ -39,10 +39,34 @@ export async function GET() {
     const prisma = getPrisma();
     const [items, expenses]: [DashboardInventoryItem[], DashboardExpense[]] = await Promise.all([
       prisma.inventoryItem.findMany({
-        include: {
-          card: true,
-          listings: true,
-          sales: { orderBy: { soldAt: "desc" } },
+        // Dashboard calculations do not need listing copy, card metadata or
+        // other inventory fields. Keep reads fresh but transfer only inputs
+        // used below, including the evidence needed for provisional profit.
+        select: {
+          id: true,
+          grade: true,
+          status: true,
+          quantity: true,
+          costBasis: true,
+          createdAt: true,
+          acquiredAt: true,
+          card: { select: { name: true } },
+          listings: { select: { state: true } },
+          sales: {
+            select: {
+              id: true,
+              channel: true,
+              soldAt: true,
+              salePrice: true,
+              fees: true,
+              postage: true,
+              costBasis: true,
+              itemRevenue: true,
+              costsEstimated: true,
+              amountRevisions: true,
+              clientMutationId: true,
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
       }),
