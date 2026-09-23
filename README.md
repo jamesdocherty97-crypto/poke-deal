@@ -134,6 +134,16 @@ After updating the app, reload all its open tabs. Offline storage upgrades from 
 
 ---
 
+## Database compute budget
+
+Scheduled jobs are **paused by default** (`vercel.json` has an empty `crons` list), so this app does not deliberately wake Neon every day while unused. This takes effect after deploying the change; existing production schedules are unchanged until then.
+
+Use the app's Stock Value snapshot, buy-target check, stock-health check and eBay order-sync controls when needed. With scheduling paused, there are no automatic daily snapshots, background watch alerts, weekly reprice checks or daily eBay order imports. Saved data and manual workflows remain available. The bearer-protected cron endpoints are retained for explicit operational use.
+
+To restore scheduling, add `/api/cron/daily` at `30 7 * * *` and `/api/cron/weekly` at `30 7 * * 1` to `vercel.json`, configure `CRON_SECRET`, and deploy. These are UTC schedules, aligned to one wake window on Mondays. Setting batch limits to zero does **not** eliminate database usage: cron run logs and other reads still execute.
+
+Neon compute depends on active time and compute size, not just query count. Check the project's usage graph and scale-to-zero setting if usage persists while the app is closed. Local tools using the same database and external monitors can also wake it. Do not poll database-backed health endpoints to keep the app warm. No Neon plan, compute setting or production usage has been verified by this code change.
+
 ## Status
 
 - [x] Architecture + domain model
