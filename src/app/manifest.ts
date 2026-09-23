@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Poke Deal",
     short_name: "Poke Deal",
     description: "GBP-native command centre for Pokémon card dealing.",
-    start_url: "/",
+    start_url: "/?view=today",
     scope: "/",
     display: "standalone",
     background_color: "#080b13",

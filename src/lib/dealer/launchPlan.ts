@@ -34,50 +34,175 @@ export function summarizeSellingStock(items: readonly StockReadinessItem[]) {
   };
 }
 
-export function buildSellingMission(stock: ReturnType<typeof summarizeSellingStock>, soldCount: number): {
+export type SellingMissionReconciliation = {
+  /** Complete unresolved paid-order count. null/undefined means unknown (do not treat as zero). */
+  unmatchedPaidOrders?: number | null;
+  /** Sales with estimated fees/postage or unverified acquisition cost. */
+  provisionalCosts?: number | null;
+};
+
+export function buildSellingMission(
+  stock: ReturnType<typeof summarizeSellingStock>,
+  soldCount: number,
+  reconciliation: SellingMissionReconciliation = {},
+): {
   title: string; detail: string; action: string; target: "opening-stock" | "stock" | "drafts" | "listings" | "profit";
+  kind: "removal" | "unmatched-orders" | "provisional-costs" | "publish" | "prepare" | "live" | "held" | "review-sales" | "import";
 } {
   if (stock.removalListings > 0) return {
     title: `Remove ${stock.removalListings} sold listing${stock.removalListings === 1 ? "" : "s"}`,
     detail: "These cards have sold, but another marketplace listing may still be live. Remove it before it sells again.",
-    action: "Review live listings", target: "listings",
+    action: "Review live listings", target: "listings", kind: "removal",
+  };
+  const unmatched = reconciliation.unmatchedPaidOrders;
+  if (typeof unmatched === "number" && unmatched > 0) return {
+    title: `Match ${unmatched} paid eBay order${unmatched === 1 ? "" : "s"}`,
+    detail: "Paid orders are waiting for a stock match. Open List, sync if needed, then match each order before it ages.",
+    action: "Open list to match", target: "listings", kind: "unmatched-orders",
+  };
+  const provisional = reconciliation.provisionalCosts;
+  if (typeof provisional === "number" && provisional > 0) return {
+    title: `Confirm costs on ${provisional} sale${provisional === 1 ? "" : "s"}`,
+    detail: "Fees, postage or acquisition cost are still provisional. Confirm actual amounts in Profit before trusting the ledger.",
+    action: "Open profit", target: "profit", kind: "provisional-costs",
   };
   if (stock.preparedDrafts > 0) return {
     title: `Publish ${Math.min(5, stock.preparedDrafts)} prepared draft${Math.min(5, stock.preparedDrafts) === 1 ? "" : "s"}`,
     detail: "Condition, photos and price are recorded. Review the listing, publish it and verify buyers can see it.",
-    action: "Open listing desk", target: "drafts",
+    action: "Open listing desk", target: "drafts", kind: "publish",
   };
   if (stock.preparationRows > 0) return {
     title: `Prepare ${Math.min(5, stock.preparationRows)} single${Math.min(5, stock.preparationRows) === 1 ? "" : "s"} for sale`,
     detail: "Choose a small batch from your stock. Check each physical card, add the photos it needs and set your asking price.",
-    action: "Prepare stock", target: "stock",
+    action: "Prepare stock", target: "stock", kind: "prepare",
   };
   if (stock.liveRows > 0) return {
     title: "Work your live listings",
     detail: `${stock.liveRows} stock row${stock.liveRows === 1 ? " is" : "s are"} live. Check paid orders, refresh weak listings and record actual sale costs.`,
-    action: "Review live listings", target: "listings",
+    action: "Review live listings", target: "listings", kind: "live",
   };
   if (stock.availableRows > 0) return {
     title: "Get your next single in front of buyers",
     detail: "Check your saved drafts and confirm a real live listing. Preparing or exporting a pack does not publish it.",
-    action: "Open listing desk", target: "drafts",
+    action: "Open listing desk", target: "drafts", kind: "publish",
   };
   if (stock.heldRows > 0) return {
     title: "Review your held stock",
     detail: "Check reservations and pending sales before making these cards available to another buyer.",
-    action: "Open stock vault", target: "stock",
+    action: "Open stock vault", target: "stock", kind: "held",
   };
   if (soldCount > 0) return {
     title: "Review sales before replenishing",
     detail: "Confirm actual costs, finish dispatch in the marketplace and use completed sales to choose your next stock.",
-    action: "Review sales", target: "profit",
+    action: "Review sales", target: "profit", kind: "review-sales",
   };
   return {
     title: "Load your existing singles",
     detail: "Start your selling quest with the cards you already own. Import them, then prepare a small batch for buyers.",
-    action: "Import stock", target: "opening-stock",
+    action: "Import stock", target: "opening-stock", kind: "import",
   };
 }
+
+export type NextSellingCard = {
+  id: string;
+  title: string;
+  detail: string;
+  tone: "warn" | "good" | "neutral";
+};
+
+/** Up to N records that belong to the current mission (removal/order/cost/prep). */
+export function buildNextSellingCards(input: {
+  missionKind: ReturnType<typeof buildSellingMission>["kind"];
+  stockItems?: readonly StockReadinessItem[];
+  unmatchedPreview?: ReadonlyArray<{ id: string; title: string; detail: string }>;
+  provisionalPreview?: ReadonlyArray<{ id: string; title: string; detail: string }>;
+  limit?: number;
+}): NextSellingCard[] {
+  const limit = Math.max(1, Math.min(5, Math.floor(input.limit ?? 3)));
+  if (input.missionKind === "removal" && input.stockItems) {
+    const cards: NextSellingCard[] = [];
+    for (const item of input.stockItems) {
+      const readiness = stockReadiness(item);
+      if (!readiness.sold) continue;
+      const liveCross = item.listings.filter((listing) => listing.state === "ACTIVE" && listing.channel !== "IN_PERSON");
+      if (liveCross.length === 0) continue;
+      const name = "card" in item && item.card && typeof (item as { card?: { name?: string } }).card?.name === "string"
+        ? (item as { card: { name: string } }).card.name
+        : "Sold stock";
+      cards.push({
+        id: ("id" in item && typeof (item as { id?: string }).id === "string") ? (item as { id: string }).id : `${name}-${cards.length}`,
+        title: name,
+        detail: `${liveCross.length} live listing${liveCross.length === 1 ? "" : "s"} still need removal`,
+        tone: "warn",
+      });
+      if (cards.length >= limit) break;
+    }
+    return cards;
+  }
+  if (input.missionKind === "unmatched-orders") {
+    return (input.unmatchedPreview ?? []).slice(0, limit).map((row) => ({
+      id: row.id, title: row.title, detail: row.detail, tone: "warn" as const,
+    }));
+  }
+  if (input.missionKind === "provisional-costs") {
+    return (input.provisionalPreview ?? []).slice(0, limit).map((row) => ({
+      id: row.id, title: row.title, detail: row.detail, tone: "warn" as const,
+    }));
+  }
+  if ((input.missionKind === "prepare" || input.missionKind === "publish" || input.missionKind === "live") && input.stockItems) {
+    const cards: NextSellingCard[] = [];
+    for (const item of input.stockItems) {
+      const readiness = stockReadiness(item);
+      if (readiness.sold || readiness.held) continue;
+      const name = "card" in item && item.card && typeof (item as { card?: { name?: string } }).card?.name === "string"
+        ? (item as { card: { name: string } }).card.name
+        : "Stock row";
+      let detail = "Ready to review";
+      let tone: "warn" | "good" | "neutral" = "neutral";
+      if (input.missionKind === "prepare" && (readiness.needsCondition || readiness.needsPhotos || readiness.needsPrice)) {
+        detail = [readiness.needsCondition ? "condition" : null, readiness.needsPhotos ? "photos" : null, readiness.needsPrice ? "price" : null].filter(Boolean).join(", ");
+        tone = "warn";
+      } else if (input.missionKind === "publish" && readiness.draft && !readiness.live && !readiness.needsCondition && !readiness.needsPhotos && !readiness.needsPrice) {
+        detail = "Prepared draft ready to publish";
+        tone = "good";
+      } else if (input.missionKind === "live" && readiness.live) {
+        detail = "Live listing";
+        tone = "good";
+      } else {
+        continue;
+      }
+      cards.push({
+        id: ("id" in item && typeof (item as { id?: string }).id === "string") ? (item as { id: string }).id : `${name}-${cards.length}`,
+        title: name,
+        detail,
+        tone,
+      });
+      if (cards.length >= limit) break;
+    }
+    return cards;
+  }
+  return [];
+}
+
+export function formatOrderSyncFreshness(lastSuccessAt: string | null | undefined, now = new Date()): {
+  label: string;
+  tone: "good" | "warn" | "unknown";
+} {
+  if (!lastSuccessAt) {
+    return { label: "eBay orders: last successful sync unknown · sync manually from List", tone: "unknown" };
+  }
+  const then = new Date(lastSuccessAt);
+  if (Number.isNaN(then.getTime())) {
+    return { label: "eBay orders: last successful sync unknown · sync manually from List", tone: "unknown" };
+  }
+  const ageMs = Math.max(0, now.getTime() - then.getTime());
+  const ageHours = ageMs / 3_600_000;
+  if (ageHours < 1) return { label: "eBay orders checked less than 1h ago", tone: "good" };
+  if (ageHours < 24) return { label: `eBay orders checked ${Math.floor(ageHours)}h ago`, tone: ageHours < 6 ? "good" : "warn" };
+  const days = Math.floor(ageHours / 24);
+  return { label: `eBay orders checked ${days}d ago · sync manually from List`, tone: "warn" };
+}
+
 
 export interface LaunchPlanItem {
   id: string;

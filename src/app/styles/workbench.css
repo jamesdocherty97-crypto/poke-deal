@@ -1736,3 +1736,26 @@ button.ghost-button:disabled,
   .recent-intake-actions { grid-column:auto; display:flex; gap:6px; }
   .recent-intake-actions button { min-width:64px; }
 }
+
+
+/* Path B slim Today — one mission, three records, compact progress */
+.today-slim .today-command-progress-compact p { margin-bottom: 0; }
+.today-freshness { margin: 10px 0 0; font-size: .84rem; color: var(--color-text-secondary); }
+.today-freshness.tone-good { color: var(--color-success, #1f9d63); }
+.today-freshness.tone-warn { color: var(--color-warning, #c47b16); }
+.today-freshness.tone-unknown { color: var(--color-text-secondary); }
+.today-mission-rail { margin: 12px 0 4px; padding: 14px 16px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface-1); }
+.today-mission-rail-heading { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 10px; }
+.today-mission-cards { list-style: none; display: grid; gap: 8px; margin: 0; padding: 0; }
+.today-mission-card { display: grid; gap: 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-surface-2); }
+.today-mission-card strong { font-size: .95rem; }
+.today-mission-card small { color: var(--color-text-secondary); font-size: .78rem; }
+.today-mission-card.tone-warn { border-color: color-mix(in srgb, var(--color-warning, #c47b16) 45%, var(--color-border)); }
+.today-mission-card.tone-good { border-color: color-mix(in srgb, var(--color-success, #1f9d63) 40%, var(--color-border)); }
+.today-more-moves > summary,
+.today-pulse-details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
+.today-more-moves > summary::-webkit-details-marker { display: none; }
+@media (max-width: 720px) {
+  .today-slim .today-command-actions { display: grid; grid-template-columns: 1fr; }
+  .today-mission-cards { grid-template-columns: 1fr; }
+}

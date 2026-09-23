@@ -5,7 +5,7 @@ import type { TodayAction, TodayActionTarget } from "@/lib/dealer/today";
 import type { ManualCompReview } from "@/lib/comps/manualReview";
 import type { OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
 import type { LaunchPlanItem, LaunchProgress, LaunchPlanTarget } from "@/lib/dealer/launchPlan";
-import { buildSellingMission, summarizeSellingStock } from "@/lib/dealer/launchPlan";
+import { buildNextSellingCards, buildSellingMission, formatOrderSyncFreshness, summarizeSellingStock } from "@/lib/dealer/launchPlan";
 import type { StockReadinessItem } from "@/lib/dealer/stockReadiness";
 import type { LaunchReadinessItem, LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { formatGbp as gbp } from "@/lib/format/money";
@@ -13,8 +13,22 @@ import { ManualReviewQueue } from "./ManualReviewQueue";
 import { CardImage, WorkspaceSkeleton } from "./UiBits";
 
 type TodayDashboard = {
-  metrics: { stockCount: number; soldCount: number; operatingExpensePence: number };
+  metrics: {
+    stockCount: number;
+    soldCount: number;
+    operatingExpensePence: number;
+    provisionalSaleCount?: number;
+  };
   recentSales?: Array<{ soldAt: string; profitPence: number }>;
+  salesToReconcile?: Array<{ id: string; cardName?: string; channel?: string; soldAt?: string }>;
+  salesToReconcileCount?: number;
+};
+
+type OrderSyncStatus = {
+  unmatchedCount: number | null;
+  lastSuccessfulSyncAt: string | null;
+  unmatchedPreview?: Array<{ id: string; title: string; detail: string }>;
+  statusKnown: boolean;
 };
 
 type TodayListing = {
@@ -102,6 +116,7 @@ type TodayProps = {
   manualReviewBusyId: string | null;
   onAcceptManualReview: (review: ManualCompReview) => void;
   onAddReviewCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; condition?: string; priceBasis: "DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN"; sourceUrl: string; note?: string }) => void;
+  orderSyncStatus?: OrderSyncStatus | null;
   loading?: boolean;
 };
 
@@ -146,6 +161,7 @@ export function TodayTab({
   manualReviewBusyId,
   onAcceptManualReview,
   onAddReviewCheckedComp,
+  orderSyncStatus = null,
   loading = false,
 }: TodayProps) {
   const greeting = useTodayGreeting();
@@ -163,9 +179,28 @@ export function TodayTab({
     heldRows: 0,
     removalListings: 0,
   }, [stockItems, dashboard?.metrics.stockCount, activeListingCount]);
-  const mission = buildSellingMission(sellingStock, dashboard?.metrics.soldCount ?? 0);
+  const provisionalCosts = dashboard?.salesToReconcileCount
+    ?? dashboard?.metrics.provisionalSaleCount
+    ?? null;
+  const mission = buildSellingMission(sellingStock, dashboard?.metrics.soldCount ?? 0, {
+    unmatchedPaidOrders: orderSyncStatus?.statusKnown ? orderSyncStatus.unmatchedCount : null,
+    provisionalCosts,
+  });
   const missionTitle = mission.title;
   const missionDetail = mission.detail;
+  const orderFreshness = formatOrderSyncFreshness(orderSyncStatus?.lastSuccessfulSyncAt ?? null);
+  const missionCards = useMemo(() => buildNextSellingCards({
+    missionKind: mission.kind,
+    stockItems,
+    unmatchedPreview: orderSyncStatus?.unmatchedPreview,
+    provisionalPreview: (dashboard?.salesToReconcile ?? []).map((sale) => ({
+      id: sale.id,
+      title: sale.cardName ?? "Sale",
+      detail: [sale.channel, sale.soldAt ? new Date(sale.soldAt).toLocaleDateString("en-GB") : null].filter(Boolean).join(" · ") || "Confirm actual costs",
+    })),
+    limit: 3,
+  }), [mission.kind, stockItems, orderSyncStatus?.unmatchedPreview, dashboard?.salesToReconcile]);
+  const [doneForToday, setDoneForToday] = useState(false);
   const hasManualReviews = manualReviews.length > 0;
   const secondaryActions = todayActions
     .filter((action) => action.target !== "buy" && action.target !== "watches" && action.target !== "opening-stock")
@@ -200,22 +235,26 @@ export function TodayTab({
   if (loading) return <section className="workspace today-workspace"><WorkspaceSkeleton label="Loading today's work" rows={3} /></section>;
 
   return (
-    <section className="workspace today-workspace focused-today">
+    <section className="workspace today-workspace focused-today today-slim">
       <header className="workspace-masthead today-command" aria-labelledby="today-command-title">
         <div className="today-command-copy">
-          <span className="workspace-eyebrow">{greeting}, Trainer · dealer command centre</span>
-          <span className={`today-command-priority ${sellingStock.removalListings > 0 ? "warn" : "good"}`}>Priority one</span>
+          <span className="workspace-eyebrow">{greeting}, Trainer · sell owned singles</span>
+          <span className={`today-command-priority ${mission.kind === "removal" || mission.kind === "unmatched-orders" ? "warn" : "good"}`}>Priority one</span>
           <h2 id="today-command-title">{missionTitle}</h2>
           <p>{missionDetail}</p>
+          <p className={`today-freshness tone-${orderFreshness.tone}`} role="status">{orderFreshness.label}</p>
           <div className="today-command-actions">
             <button type="button" className="primary-button" onClick={openMission}>
               {mission.action}
             </button>
             <button type="button" className="ghost-button" onClick={onInventory}>Open stock vault</button>
+            <button type="button" className="ghost-button" onClick={() => setDoneForToday((value) => !value)}>
+              {doneForToday ? "Show mission cards" : "Done for today"}
+            </button>
           </div>
         </div>
 
-        <div className="today-command-progress" aria-label={`First-sale quest: ${launchProgress.label}`}>
+        <div className="today-command-progress today-command-progress-compact" aria-label={`First-sale quest: ${launchProgress.label}`}>
           <div className="today-command-progress-heading">
             <span>First-sale quest</span>
             <strong>{launchProgress.label}</strong>
@@ -230,25 +269,35 @@ export function TodayTab({
           >
             <span style={{ width: `${readinessPercent}%` }} />
           </div>
-          <p>{launchProgress.nextLabel}</p>
-          {nextLaunchStep && (
-            <button type="button" className="text-button" onClick={() => onOpenLaunchPlan(nextLaunchStep.target)}>
-              Next work · {nextLaunchStep.action}: {nextLaunchStep.title}
-            </button>
-          )}
+          <p>{launchProgress.nextLabel}{nextLaunchStep ? ` · ${nextLaunchStep.action}` : ""}</p>
         </div>
       </header>
 
+      {!doneForToday && missionCards.length > 0 && (
+        <section className="today-mission-rail" aria-label="Mission records">
+          <div className="today-mission-rail-heading">
+            <span className="workspace-eyebrow">This mission</span>
+            <strong>Up to {missionCards.length} record{missionCards.length === 1 ? "" : "s"}</strong>
+          </div>
+          <ul className="today-mission-cards">
+            {missionCards.map((card) => (
+              <li key={card.id} className={`today-mission-card tone-${card.tone}`}>
+                <strong>{card.title}</strong>
+                <small>{card.detail}</small>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="today-command-grid">
         <section className="priority-queue" aria-labelledby="priority-queue-title">
-          <div className="priority-queue-heading">
-            <div>
-              <span className="workspace-eyebrow">Today&apos;s quest log</span>
-              <h2 id="priority-queue-title">Next moves</h2>
-              <p>Highest-impact work first. Clear the queue without hunting through menus.</p>
-            </div>
-            <span className="pill good">{secondaryActions.length} selling moves</span>
-          </div>
+          <details className="today-more-moves">
+            <summary>
+              <span className="workspace-eyebrow">More moves</span>
+              <strong id="priority-queue-title">Quest log</strong>
+              <span className="pill good">{secondaryActions.length}</span>
+            </summary>
 
           <ol className="today-action-list">
             {secondaryActions.map((action, index) => (
@@ -279,6 +328,7 @@ export function TodayTab({
               </li>
             )}
           </ol>
+          </details>
 
           {firstSaleListingTarget && saleCard && (
             <article className="deal-sleeve sale-ready-sleeve">
@@ -318,15 +368,6 @@ export function TodayTab({
               </span>
             </div>
 
-            <dl className="dealer-pulse-ledger">
-              {operatingSnapshot.map((row) => (
-                <div className={`dealer-pulse-row ${row.tone}`} key={row.id}>
-                  <dt><span>{row.label}</span><small>{row.detail}</small></dt>
-                  <dd>{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-
             <div className="dealer-pulse-status" aria-label="Current work counts">
               <button type="button" onClick={onActiveListings} disabled={activeListingCount === 0}>
                 <strong>{sellingStock.liveRows}</strong><span>live stock</span>
@@ -338,6 +379,18 @@ export function TodayTab({
                 <strong>{dashboard?.metrics.soldCount ?? 0}</strong><span>sold</span>
               </button>
             </div>
+
+            <details className="dealer-tools today-pulse-details">
+              <summary>Dealer pulse details</summary>
+              <dl className="dealer-pulse-ledger">
+                {operatingSnapshot.map((row) => (
+                  <div className={`dealer-pulse-row ${row.tone}`} key={row.id}>
+                    <dt><span>{row.label}</span><small>{row.detail}</small></dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
 
             {latestUnreadAlert && (
               <div className="dealer-alert">
