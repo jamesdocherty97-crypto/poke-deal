@@ -13,6 +13,21 @@ const CARD = {
   language: "EN",
 };
 
+// Checked-comp sale dates must stay inside the app's 90-day sold window
+// (DEFAULT_CHECKED_COMP_WINDOW_DAYS server-side; the client re-filters entries
+// by soldDate against real Date.now()). Hard-coded calendar dates silently aged
+// out of that window, so fixture sale dates are computed relative to the run.
+// The browser and the dev server both use real time, so no clock mocking.
+const DAY_MS = 24 * 60 * 60 * 1_000;
+const RUN_STARTED_AT = Date.now();
+const isoDaysAgo = (days: number, extraMinutes = 0) =>
+  new Date(RUN_STARTED_AT - days * DAY_MS + extraMinutes * 60_000).toISOString();
+/** YYYY-MM-DD for the "Sold date" input, well inside the 90-day window. */
+const SOLD_DATE_INPUT = isoDaysAgo(14).slice(0, 10);
+const SOLD_AT = isoDaysAgo(14);
+const PROVIDER_AS_OF = isoDaysAgo(2);
+const LOGGED_AT = isoDaysAgo(1);
+
 const RAYQUAZA = {
   ...CARD,
   id: "card-fixture-rayquaza",
@@ -70,15 +85,15 @@ test("old no-cost stock keeps purchase cost, market guidance and user list price
   await manualLogSheet.getByText("Individual sold-item link · needed for trusted evidence").click();
   await manualLogSheet.getByPlaceholder("https://www.ebay.co.uk/itm/…").fill("https://www.ebay.co.uk/itm/157802426654");
   const soldDate = manualLogSheet.getByLabel("Sold date");
-  await soldDate.fill("2026-07-01");
+  await soldDate.fill(SOLD_DATE_INPUT);
   await soldDate.press("Enter");
   await expect.poll(() => ledger.manualCompBodies.length).toBe(0);
-  await expect(soldDate).toHaveValue("2026-07-01");
+  await expect(soldDate).toHaveValue(SOLD_DATE_INPUT);
   await manualLogSheet.getByRole("button", { name: "Log price", exact: true }).click();
   await expect.poll(() => ledger.manualCompBodies.length).toBe(1);
   expect(ledger.manualCompBodies[0]).toMatchObject({
     pricePence: 600,
-    soldDate: "2026-07-01",
+    soldDate: SOLD_DATE_INPUT,
     condition: "NM",
     priceBasis: "DISPLAYED_PRICE",
     sourceUrl: "https://www.ebay.co.uk/itm/157802426654",
@@ -241,13 +256,13 @@ test("checked-comp logger keeps the eBay loop open and promotes the second quali
   const soldUrl = logSheet.getByPlaceholder("https://www.ebay.co.uk/itm/…");
 
   await soldPrice.fill("450.00");
-  await soldDate.fill("2026-07-18");
+  await soldDate.fill(SOLD_DATE_INPUT);
   await soldUrl.fill("https://www.ebay.co.uk/itm/257584212141");
   await logSheet.getByRole("button", { name: "Log price", exact: true }).click();
 
   await expect.poll(() => ledger.manualCompBodies.length).toBe(1);
   await expect(manualCompCard.getByText("1 of 2 qualified solds — add one more to headline", { exact: true })).toBeVisible();
-  await expect(soldDate).toHaveValue("2026-07-18");
+  await expect(soldDate).toHaveValue(SOLD_DATE_INPUT);
   await expect(soldPrice).toBeFocused();
 
   await soldPrice.fill("750.00");
@@ -258,7 +273,7 @@ test("checked-comp logger keeps the eBay loop open and promotes the second quali
   await expect(manualCompCard.getByText("2 of 2 qualified solds — range can headline if spread checks pass", { exact: true })).toBeVisible();
   await expect(compPanel.getByText("eBay UK sold range", { exact: true })).toBeVisible();
   await expect(compPanel.getByText("£450.00–£750.00", { exact: true })).toBeVisible();
-  await expect(soldDate).toHaveValue("2026-07-18");
+  await expect(soldDate).toHaveValue(SOLD_DATE_INPUT);
   await expect(soldPrice).toBeFocused();
 
   await soldPrice.fill("451.00");
@@ -515,13 +530,13 @@ class IndicativePricingLedger extends PricingLedger {
 
 class RayquazaThinPricingLedger extends PricingLedger {
   override compEvents() {
-    const asOf = "2026-07-18T20:00:00.000Z";
+    const asOf = PROVIDER_AS_OF;
     const entry = {
       id: "rayquaza-checked-1",
       cardId: RAYQUAZA.id,
       grade: "RAW",
       pricePence: 66_080,
-      soldDate: "2026-07-01T12:00:00.000Z",
+      soldDate: SOLD_AT,
       platform: "ebay-uk",
       condition: "NM",
       priceBasis: "DISPLAYED_PRICE",
@@ -529,7 +544,7 @@ class RayquazaThinPricingLedger extends PricingLedger {
       sourceListingId: "ebay-uk:257584212141",
       traceable: true,
       evidenceStatus: "used",
-      createdAt: "2026-07-19T12:00:00.000Z",
+      createdAt: LOGGED_AT,
     };
     const checked = {
       source: "checked-comps",
@@ -642,7 +657,7 @@ class EvidenceThroughputPricingLedger extends PricingLedger {
       sourceListingId,
       traceable: true,
       evidenceStatus: "used",
-      createdAt: `2026-07-20T10:0${this.checkedEntries.length}:00.000Z`,
+      createdAt: isoDaysAgo(1, this.checkedEntries.length),
     };
     this.checkedEntries.push(entry);
     return {
@@ -665,7 +680,7 @@ class EvidenceThroughputPricingLedger extends PricingLedger {
       windowDays: 90,
       trendPct: null,
       outliersRemoved: 0,
-      asOf: "2026-07-19T20:00:00.000Z",
+      asOf: PROVIDER_AS_OF,
       raw: { kind: "sold-aggregate", market: "US", priceSource: "ebay", approxSaleCount: true },
     };
     const checked = this.checkedEntries.length > 0 ? this.checkedAggregate() : null;
@@ -793,7 +808,7 @@ async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
         sourceListingId: "ebay-uk:157802426654",
         traceable: true,
         evidenceStatus: "used",
-        createdAt: "2026-07-13T20:05:00.000Z",
+        createdAt: LOGGED_AT,
       };
       return json({
         entry,
@@ -811,7 +826,7 @@ async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
           windowDays: 90,
           trendPct: null,
           outliersRemoved: 0,
-          asOf: "2026-07-13T20:05:00.000Z",
+          asOf: LOGGED_AT,
           raw: { kind: "checked-comps", region: "UK", condition: "NM", conditionMatched: true, traceableCount: 1, grossSpread: 1, entries: [entry] },
         },
       }, 201);
@@ -825,7 +840,7 @@ async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
         cardId: CARD.id,
         grade: "RAW",
         pricePence: 600,
-        soldDate: "2026-07-01",
+        soldDate: SOLD_DATE_INPUT,
         platform: "ebay-uk",
         condition: "NM",
         priceBasis: "DISPLAYED_PRICE",
@@ -834,9 +849,9 @@ async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
         traceable: false,
         evidenceStatus: "corroboration",
         exclusionReasons: ["voided"],
-        voidedAt: "2026-07-13T20:06:00.000Z",
+        voidedAt: isoDaysAgo(1, 1),
         voidReason: String(body.reason),
-        createdAt: "2026-07-13T20:05:00.000Z",
+        createdAt: LOGGED_AT,
       };
       return json({
         entry,
@@ -854,7 +869,7 @@ async function mockPricingApis(context: BrowserContext, ledger: PricingLedger) {
           windowDays: 90,
           trendPct: null,
           outliersRemoved: 0,
-          asOf: "2026-07-13T20:06:00.000Z",
+          asOf: isoDaysAgo(1, 1),
           raw: { kind: "checked-comps", reason: "no traceable condition-matched eBay UK sold listings", entries: [entry] },
         },
       });
