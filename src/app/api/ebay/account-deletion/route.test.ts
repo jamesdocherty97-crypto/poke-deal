@@ -6,9 +6,8 @@ import { clearTokenCache } from "../../../../lib/ebay/tokens.js";
 import { GET, POST } from "./route.js";
 
 // Route-level coverage for the eBay Marketplace Account Deletion callback.
-// The fixture pattern (fake eBay provider + injected globalThis.prisma) follows
-// draft PR #22. The key guarantee here: with EBAY_DELETION_SCRUB unset, a valid
-// signed notification is acknowledged with 204 and the database is never used.
+// Synthetic provider and database fixtures: success must mean the required
+// legacy scrub completed, including when no environment flag is configured.
 
 const callbackUrl = "https://callback.test/api/ebay/account-deletion";
 const verificationToken = "test-token_123456789012345678901234567890";
@@ -51,9 +50,11 @@ test("GET rejects missing challenges and unavailable verification tokens", { con
   }
 });
 
-test("POST (scrub off by default) acknowledges a valid signed notification with 204 and zero DB calls", { concurrency: false }, async (t) => {
+test("POST without a flag scrubs matching legacy payloads before 204 and preserves the seller ledger on retries", { concurrency: false }, async (t) => {
   const fixture = setup(t);
-  const before = structuredClone(fixture.rows);
+  const ledgerBefore = fixture.rows.map(({ payload, ...ledger }) => ledger);
+  const unrelatedPayload = fixture.rows[1]!.payload;
+  const minimizedPayload = fixture.rows[2]!.payload;
   for (const message of [notification, notification, {
     ...notification,
     notification: { ...notification.notification, data: { userId: "unknown-buyer" } },
@@ -62,42 +63,31 @@ test("POST (scrub off by default) acknowledges a valid signed notification with 
     assert.equal(response.status, 204);
     assert.equal(response.body, null);
     assert.equal(await response.text(), "");
+    assert.equal(fixture.rows[0]!.payload, null);
+    assert.deepEqual(fixture.rows[1]!.payload, unrelatedPayload);
+    assert.deepEqual(fixture.rows[2]!.payload, minimizedPayload);
+    assert.deepEqual(fixture.rows.map(({ payload, ...ledger }) => ledger), ledgerBefore);
   }
-  // Signature verification still happens (token + public key fetched once, then cached)...
   assert.equal(fixture.calls.provider, 2);
-  // ...but the database is never read or written.
-  assert.equal(fixture.calls.reads, 0);
-  assert.equal(fixture.calls.updates, 0);
-  assert.deepEqual(fixture.rows, before);
+  assert.equal(fixture.calls.reads, 3);
+  assert.equal(fixture.calls.updates, 1);
 });
 
-test("POST (scrub off) never constructs a Prisma client on the acknowledgement path", { concurrency: false }, async (t) => {
-  // No injected DB: getPrisma() would construct a real PrismaClient and cache
-  // it on globalThis.prisma. It must stay undefined, proving getPrisma() was
-  // never called and no client/connection was created.
-  const fixture = setup(t, { injectDb: false });
-  const globals = globalThis as Globals;
-  assert.equal(globals.prisma, undefined);
-  const response = await POST(fixture.signedRequest(notification));
-  assert.equal(response.status, 204);
-  assert.equal(globals.prisma, undefined);
-});
-
-test("POST treats any EBAY_DELETION_SCRUB value other than exactly 1 as off", { concurrency: false }, async (t) => {
-  const fixture = setup(t);
-  for (const value of ["", "0", "true", "yes", "01"]) {
-    process.env.EBAY_DELETION_SCRUB = value;
+for (const value of ["", "0", "1", "true", "yes", "01"]) {
+  test(`POST cannot skip the legacy scrub with retired EBAY_DELETION_SCRUB=${JSON.stringify(value)}`, { concurrency: false }, async (t) => {
+    const fixture = setup(t, { legacyScrubSetting: value });
     assert.equal((await POST(fixture.signedRequest(notification))).status, 204);
-  }
-  assert.equal(fixture.calls.reads, 0);
-  assert.equal(fixture.calls.updates, 0);
-});
+    assert.equal(fixture.rows[0]!.payload, null);
+    assert.equal(fixture.calls.reads, 1);
+    assert.equal(fixture.calls.updates, 1);
+  });
+}
 
-for (const scrub of [false, true]) {
-  const label = scrub ? "scrub on" : "scrub off";
+for (const legacyScrubSetting of [undefined, "0", "1"]) {
+  const label = `legacy flag ${legacyScrubSetting ?? "unset"}`;
 
   test(`POST (${label}) rejects missing config and missing or malformed signatures with the same statuses`, { concurrency: false }, async (t) => {
-    const fixture = setup(t, { scrub });
+    const fixture = setup(t, { legacyScrubSetting });
     delete process.env.EBAY_CLIENT_ID;
     assert.equal((await POST(fixture.signedRequest(notification))).status, 503);
     process.env.EBAY_CLIENT_ID = "test-client";
@@ -111,7 +101,7 @@ for (const scrub of [false, true]) {
   });
 
   test(`POST (${label}) rejects a tampered signed notification with 412 and no DB access`, { concurrency: false }, async (t) => {
-    const fixture = setup(t, { scrub });
+    const fixture = setup(t, { legacyScrubSetting });
     const original = fixture.signedRequest(notification);
     const response = await POST(postRequest(JSON.stringify({ ...notification, tampered: true }), {
       "x-ebay-signature": original.headers.get("x-ebay-signature")!,
@@ -124,7 +114,7 @@ for (const scrub of [false, true]) {
   });
 
   test(`POST (${label}) rejects signed notifications for other topics or without identifiers`, { concurrency: false }, async (t) => {
-    const fixture = setup(t, { scrub });
+    const fixture = setup(t, { legacyScrubSetting });
     for (const message of [
       { ...notification, metadata: { topic: "OTHER_TOPIC" } },
       { ...notification, notification: { data: { userId: " " } } },
@@ -136,7 +126,7 @@ for (const scrub of [false, true]) {
   });
 
   test(`POST (${label}) returns 503 when public-key lookup fails`, { concurrency: false }, async (t) => {
-    const fixture = setup(t, { scrub, keyLookupFails: true });
+    const fixture = setup(t, { legacyScrubSetting, keyLookupFails: true });
     assert.equal((await POST(fixture.signedRequest(notification))).status, 503);
     assert.equal(fixture.failedKeyLookups, 1);
     assert.equal(fixture.calls.reads, 0);
@@ -158,26 +148,8 @@ test("POST rejects malformed or oversized JSON before signature verification or 
   assert.deepEqual(fixture.calls, { provider: 0, reads: 0, updates: 0 });
 });
 
-test("POST with EBAY_DELETION_SCRUB=1 still scrubs matching payloads and acknowledges with 204", { concurrency: false }, async (t) => {
-  const fixture = setup(t, { scrub: true });
-  const unrelatedPayload = fixture.rows[1]!.payload;
-  for (const message of [notification, notification, {
-    ...notification,
-    notification: { ...notification.notification, data: { userId: "unknown-buyer" } },
-  }]) {
-    const response = await POST(fixture.signedRequest(message));
-    assert.equal(response.status, 204);
-    assert.equal(await response.text(), "");
-    assert.equal(fixture.rows[0]!.payload, null);
-    assert.deepEqual(fixture.rows[1]!.payload, unrelatedPayload);
-  }
-  assert.equal(fixture.calls.reads, 3);
-  assert.equal(fixture.calls.updates, 1);
-  assert.equal(fixture.calls.provider, 2);
-});
-
-test("POST with EBAY_DELETION_SCRUB=1 sends Prisma null sentinels for the Json payload, never plain null", { concurrency: false }, async (t) => {
-  const fixture = setup(t, { scrub: true });
+test("POST sends Prisma null sentinels for the Json payload, never plain null", { concurrency: false }, async (t) => {
+  const fixture = setup(t);
   const response = await POST(fixture.signedRequest(notification));
 
   // Prisma 5.22 quietly reads plain `null` as JSON null, so the route still
@@ -197,8 +169,19 @@ test("POST with EBAY_DELETION_SCRUB=1 sends Prisma null sentinels for the Json p
   assert.equal(fixture.rows[0]!.payload, null, "the cleared payload must be a database NULL");
 });
 
-test("POST with EBAY_DELETION_SCRUB=1 returns 503 rather than acknowledging a failed scrub", { concurrency: false }, async (t) => {
-  const fixture = setup(t, { scrub: true });
+test("POST returns 503 rather than acknowledging a failed scrub read", { concurrency: false }, async (t) => {
+  const fixture = setup(t);
+  const read = t.mock.method(fixture.db.ebayOrderImport, "findMany", async () => { throw new Error("Database unavailable"); });
+  const response = await POST(fixture.signedRequest(notification));
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "Account deletion processing failed." });
+  assert.equal(read.mock.callCount(), 1);
+  assert.equal(fixture.calls.updates, 0);
+  assert.notEqual(fixture.rows[0]!.payload, null);
+});
+
+test("POST returns 503 rather than acknowledging a failed scrub write", { concurrency: false }, async (t) => {
+  const fixture = setup(t);
   const update = t.mock.method(fixture.db.ebayOrderImport, "update", async () => { throw new Error("Database unavailable"); });
   const response = await POST(fixture.signedRequest(notification));
   assert.equal(response.status, 503);
@@ -208,11 +191,40 @@ test("POST with EBAY_DELETION_SCRUB=1 returns 503 rather than acknowledging a fa
   assert.notEqual(fixture.rows[0]!.payload, null);
 });
 
+test("POST retries a partial scrub without changing seller ledger fields or unrelated payloads", { concurrency: false }, async (t) => {
+  const fixture = setup(t);
+  fixture.rows.push({
+    ...fixture.rows[0]!, id: "matching-2", orderId: "order-3",
+    payload: { order: { buyers: [{ userId: "buyer-1" }] } },
+  });
+  const ledgerBefore = fixture.rows.map(({ payload, ...ledger }) => ledger);
+  const unrelatedPayload = fixture.rows[1]!.payload;
+  const update = fixture.db.ebayOrderImport.update.bind(fixture.db.ebayOrderImport);
+  let failNextWrite = true;
+  t.mock.method(fixture.db.ebayOrderImport, "update", async (args: Parameters<typeof update>[0]) => {
+    if (args.where.id === "matching-2" && failNextWrite) {
+      failNextWrite = false;
+      throw new Error("Temporary write failure");
+    }
+    return update(args);
+  });
+
+  assert.equal((await POST(fixture.signedRequest(notification))).status, 503);
+  assert.equal(fixture.rows[0]!.payload, null);
+  assert.notEqual(fixture.rows.at(-1)!.payload, null);
+  assert.equal((await POST(fixture.signedRequest(notification))).status, 204);
+  assert.equal(fixture.rows.at(-1)!.payload, null);
+  assert.equal((await POST(fixture.signedRequest(notification))).status, 204);
+  assert.equal(fixture.calls.updates, 2);
+  assert.deepEqual(fixture.rows[1]!.payload, unrelatedPayload);
+  assert.deepEqual(fixture.rows.map(({ payload, ...ledger }) => ledger), ledgerBefore);
+});
+
 function postRequest(body: string, headers: Record<string, string> = {}): Request {
   return new Request(callbackUrl, { method: "POST", headers: { "content-type": "application/json", ...headers }, body });
 }
 
-function setup(t: TestContext, options: { scrub?: boolean; injectDb?: boolean; keyLookupFails?: boolean } = {}) {
+function setup(t: TestContext, options: { legacyScrubSetting?: string; keyLookupFails?: boolean } = {}) {
   const values: Record<string, string | undefined> = {
     EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN: verificationToken,
     EBAY_CLIENT_ID: "test-client",
@@ -220,7 +232,7 @@ function setup(t: TestContext, options: { scrub?: boolean; injectDb?: boolean; k
     EBAY_RU_NAME: "test-redirect",
     EBAY_REDIRECT_URI: undefined,
     EBAY_ENV: "sandbox",
-    EBAY_DELETION_SCRUB: options.scrub ? "1" : undefined,
+    EBAY_DELETION_SCRUB: options.legacyScrubSetting,
     // Belt and braces: never let a route test reach a real database.
     DATABASE_URL: undefined,
   };
@@ -231,9 +243,10 @@ function setup(t: TestContext, options: { scrub?: boolean; injectDb?: boolean; k
   const keyId = `route-test-${++nextKeyId}`;
   const calls = { provider: 0, reads: 0, updates: 0 };
   let failedKeyLookups = 0;
-  const rows: Array<{ id: string; payload: unknown }> = [
-    { id: "matching", payload: { order: { buyer: { userId: "buyer-1" } } } },
-    { id: "unrelated", payload: { order: { buyer: { userId: "buyer-10" } } } },
+  const rows: Array<{ id: string; orderId: string; buyerPaidPence: number; saleId: string | null; payload: unknown }> = [
+    { id: "matching", orderId: "order-1", buyerPaidPence: 1200, saleId: "sale-1", payload: { order: { buyer: { userId: "buyer-1" } } } },
+    { id: "unrelated", orderId: "order-2", buyerPaidPence: 800, saleId: null, payload: { order: { buyer: { userId: "buyer-10" } } } },
+    { id: "minimized", orderId: "order-4", buyerPaidPence: 1000, saleId: null, payload: { schemaVersion: 1, order: { orderId: "order-4" }, line: { lineItemId: "line-4" } } },
   ];
   // Models the nullable Json `payload` column: a stored `null` is a database
   // NULL and STORED_JSON_NULL is a stored JSON `null`. Plain `null` is not
@@ -268,8 +281,7 @@ function setup(t: TestContext, options: { scrub?: boolean; injectDb?: boolean; k
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-  if (options.injectDb === false) delete globals.prisma;
-  else globals.prisma = db;
+  globals.prisma = db;
   t.after(() => {
     clearTokenCache();
     if (previousDb === undefined) delete globals.prisma;

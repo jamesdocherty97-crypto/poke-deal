@@ -87,10 +87,12 @@ test("syncOwnEbaySales follows Fulfillment pagination before importing", async (
 });
 
 test("normalizePaidEbayOrder maps paid order lines to GBP pence and import keys", () => {
-  const lines = normalizePaidEbayOrder({
+  const providerOrder = {
     orderId: "01-12345-67890",
     creationDate: "2026-07-03T10:00:00.000Z",
     orderPaymentStatus: "PAID",
+    buyer: { username: "synthetic-buyer", userId: "synthetic-account" },
+    fulfillmentStartInstructions: [{ shippingStep: { shipTo: { fullName: "Synthetic Buyer", contactAddress: { addressLine1: "Synthetic Address" } } } }],
     pricingSummary: {
       deliveryCost: { value: "4.99", currency: "GBP" },
     },
@@ -107,7 +109,8 @@ test("normalizePaidEbayOrder maps paid order lines to GBP pence and import keys"
         lineItemCost: { value: "100.00", currency: "GBP" },
       },
     ],
-  });
+  };
+  const lines = normalizePaidEbayOrder(providerOrder);
 
   assert.equal(lines.length, 1);
   assert.equal(lines[0]?.importKey, "ebay:01-12345-67890:line-1");
@@ -115,6 +118,20 @@ test("normalizePaidEbayOrder maps paid order lines to GBP pence and import keys"
   assert.equal(lines[0]?.postageChargedPence, 499);
   assert.equal(lines[0]?.paidAt?.toISOString(), "2026-07-03T10:01:00.000Z");
   assert.doesNotMatch(JSON.stringify(lines[0]?.raw), /buyer|address/i);
+  assert.deepEqual(lines[0]?.raw, {
+    schemaVersion: 1,
+    order: {
+      orderId: providerOrder.orderId,
+      creationDate: providerOrder.creationDate,
+      lastModifiedDate: undefined,
+      orderPaymentStatus: "PAID",
+      orderFulfillmentStatus: undefined,
+    },
+    line: {
+      lineItemId: "line-1", legacyItemId: "1234567890", sku: "pdos-item-1",
+      title: "Charizard ex 151 PSA 10", quantity: 1,
+    },
+  });
 });
 
 test("normalizePaidEbayOrder ignores unpaid orders", () => {
