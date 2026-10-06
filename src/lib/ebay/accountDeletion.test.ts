@@ -130,25 +130,46 @@ test("scrub runs against a real Prisma client: sentinels are accepted and plain 
         { importKey: `${tag}-other`, orderId: tag, payload: { order: { buyer: { username: `${identifier}-0` } } } },
         { importKey: `${tag}-dbnull`, orderId: tag, payload: Prisma.DbNull },
         { importKey: `${tag}-jsonnull`, orderId: tag, payload: Prisma.JsonNull },
+        { importKey: `${tag}-probe`, orderId: tag, payload: { probe: true } },
       ],
     });
 
-    // The original bug: Prisma itself refuses plain null for this column.
-    await assert.rejects(
-      async () => prisma.ebayOrderImport.findMany({ where: { orderId: tag, payload: { not: null as never } } }),
-      Prisma.PrismaClientValidationError,
-    );
-    await assert.rejects(
-      async () => prisma.ebayOrderImport.updateMany({ where: { orderId: tag }, data: { payload: null as never } }),
-      Prisma.PrismaClientValidationError,
-    );
-
-    assert.deepEqual(await keysWhere({ not: Prisma.AnyNull }), ["match", "other"]);
+    assert.deepEqual(await keysWhere({ not: Prisma.AnyNull }), ["match", "other", "probe"]);
+    assert.deepEqual(await keysWhere({ not: Prisma.DbNull }), ["jsonnull", "match", "other", "probe"]);
     assert.equal(await scrubDeletedEbayAccountPayloads(prisma, [identifier]), 1);
     assert.equal(await scrubDeletedEbayAccountPayloads(prisma, [identifier]), 0);
     assert.deepEqual(await keysWhere({ equals: Prisma.DbNull }), ["dbnull", "match"]);
     assert.deepEqual(await keysWhere({ equals: Prisma.JsonNull }), ["jsonnull"]);
-    assert.deepEqual(await keysWhere({ not: Prisma.AnyNull }), ["other"]);
+    assert.deepEqual(await keysWhere({ not: Prisma.AnyNull }), ["other", "probe"]);
+
+    // What plain null (the old code) really does on this engine.
+    const outcome = async (run: () => Promise<unknown>) => {
+      try {
+        return await run();
+      } catch (error) {
+        const lines = String((error as Error).message).split("\n").filter((line) => line.trim());
+        return `rejected: ${(error as Error).constructor.name}: ${lines.at(-1)?.trim()}`;
+      }
+    };
+    const observed = {
+      filterNotNull: await outcome(() => keysWhere({ not: null as never })),
+      filterEqualsNull: await outcome(() => keysWhere({ equals: null as never })),
+      writeNull: await outcome(async () => {
+        await prisma.ebayOrderImport.update({
+          where: { importKey: `${tag}-probe` },
+          data: { payload: null as never },
+        });
+        return {
+          storedAsDbNull: (await keysWhere({ equals: Prisma.DbNull })).includes("probe"),
+          storedAsJsonNull: (await keysWhere({ equals: Prisma.JsonNull })).includes("probe"),
+        };
+      }),
+    };
+    assert.deepEqual(observed, {
+      filterNotNull: ["other", "probe"],
+      filterEqualsNull: ["jsonnull"],
+      writeNull: "rejected: PrismaClientValidationError",
+    });
   } finally {
     await prisma.ebayOrderImport.deleteMany({ where: { orderId: tag } });
     await prisma.$disconnect();
