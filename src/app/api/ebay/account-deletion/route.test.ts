@@ -19,6 +19,8 @@ const notification = {
 const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
 let nextKeyId = 0;
 
+const STORED_JSON_NULL = Symbol("stored JSON null");
+
 type Globals = typeof globalThis & { prisma?: unknown };
 
 test("GET returns the challenge hash for the registered endpoint without DB access", { concurrency: false }, async (t) => {
@@ -178,8 +180,8 @@ test("POST with EBAY_DELETION_SCRUB=1 sends Prisma null sentinels for the Json p
   const fixture = setup(t, { scrub: true });
   const response = await POST(fixture.signedRequest(notification));
 
-  // Assert the recorded Prisma arguments before the status: on the old code
-  // the plain nulls are the cause and the 503 is only the symptom.
+  // Prisma 5.22 quietly reads plain `null` as JSON null, so the route still
+  // answers 204 either way: only the recorded arguments tell the two apart.
   assert.equal(fixture.findManyArgs.length, 1);
   assert.notEqual(fixture.findManyArgs[0]!.where.payload.not, null, "the payload filter must not be plain null");
   assert.equal(fixture.findManyArgs[0]!.where.payload.not, Prisma.AnyNull, "the payload filter must be Prisma.AnyNull");
@@ -191,7 +193,8 @@ test("POST with EBAY_DELETION_SCRUB=1 sends Prisma null sentinels for the Json p
   assert.equal(fixture.updateArgs[0]!.data.payload, Prisma.DbNull, "the payload clear must be Prisma.DbNull");
 
   assert.equal(response.status, 204);
-  assert.equal(fixture.rows[0]!.payload, null);
+  assert.notEqual(fixture.rows[0]!.payload, STORED_JSON_NULL, "the cleared payload must not be a stored JSON null");
+  assert.equal(fixture.rows[0]!.payload, null, "the cleared payload must be a database NULL");
 });
 
 test("POST with EBAY_DELETION_SCRUB=1 returns 503 rather than acknowledging a failed scrub", { concurrency: false }, async (t) => {
@@ -232,8 +235,10 @@ function setup(t: TestContext, options: { scrub?: boolean; injectDb?: boolean; k
     { id: "matching", payload: { order: { buyer: { userId: "buyer-1" } } } },
     { id: "unrelated", payload: { order: { buyer: { userId: "buyer-10" } } } },
   ];
-  // Mirrors Prisma 5 for the nullable Json `payload` column: plain `null` is
-  // rejected in filters and writes, and a stored `null` models a database NULL.
+  // Models the nullable Json `payload` column: a stored `null` is a database
+  // NULL and STORED_JSON_NULL is a stored JSON `null`. Plain `null` is not
+  // rejected; it is read as JSON null in the filter and the write, which is
+  // what Prisma 5.22 was observed to do on the CI database.
   const findManyArgs: Array<{ where: { payload: { not: unknown } }; select: unknown }> = [];
   const updateArgs: Array<{ where: { id: string }; data: { payload: unknown } }> = [];
   const db = {
@@ -242,15 +247,18 @@ function setup(t: TestContext, options: { scrub?: boolean; injectDb?: boolean; k
         calls.reads++;
         findManyArgs.push(args);
         const not = args.where.payload.not;
-        if (not !== Prisma.AnyNull && not !== Prisma.DbNull) throw new Error("Argument `not` must not be null.");
-        return rows.filter((row) => row.payload !== null);
+        return rows
+          .filter((row) => row.payload !== null && (not === Prisma.DbNull || row.payload !== STORED_JSON_NULL))
+          .map((row) => ({ id: row.id, payload: row.payload === STORED_JSON_NULL ? null : row.payload }));
       },
       async update(args: (typeof updateArgs)[number]) {
         calls.updates++;
         updateArgs.push(args);
-        if (args.data.payload !== Prisma.DbNull) throw new Error("Argument `payload` must not be null.");
+        const payload = args.data.payload;
         const row = rows.find((candidate) => candidate.id === args.where.id)!;
-        row.payload = null;
+        if (payload === Prisma.DbNull) row.payload = null;
+        else if (payload === null || payload === Prisma.JsonNull) row.payload = STORED_JSON_NULL;
+        else row.payload = payload;
         return row;
       },
     },

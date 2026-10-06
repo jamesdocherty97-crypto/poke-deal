@@ -32,7 +32,7 @@ export type EbayAccountDeletionNotification = {
 };
 
 // Real Prisma delegate types, not `unknown` args: `payload` is a nullable Json
-// column, so tsc must reject plain `null` and demand a Prisma null sentinel.
+// column, so tsc rejects a plain `null` and demands a Prisma null sentinel.
 export type EbayDeletionDb = {
   ebayOrderImport: Pick<Prisma.EbayOrderImportDelegate, "findMany" | "update">;
 };
@@ -128,10 +128,12 @@ export function readEbayAccountDeletionIdentifiers(message: EbayAccountDeletionN
  * identifiers. Normalized seller ledger facts remain; new imports no longer
  * persist the full provider order object.
  *
- * `payload` is a nullable Json column, so Prisma rejects plain `null` for it.
- * The filter uses AnyNull to skip both a database NULL (never stored, or
- * already scrubbed) and a stored JSON `null`: neither can hold an identifier.
- * The clear writes DbNull so a scrubbed row is a real database NULL.
+ * `payload` is a nullable Json column, so it takes Prisma's null sentinels.
+ * Prisma 5 does not reject a plain `null` here at runtime: it reads it as
+ * JSON null, which left scrubbed rows holding a stored JSON `null` instead of
+ * a database NULL. The filter uses AnyNull to skip both kinds (never stored,
+ * already scrubbed, or left as JSON null by that older behaviour): neither
+ * can hold an identifier. The clear writes DbNull, a real database NULL.
  */
 export async function scrubDeletedEbayAccountPayloads(
   db: EbayDeletionDb,
