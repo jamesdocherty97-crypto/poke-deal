@@ -1,4 +1,5 @@
 import { createHash, createVerify } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import type { EbayConfig } from "./config.js";
 import { ebayJson } from "./client.js";
 import { getApplicationAccessToken } from "./tokens.js";
@@ -30,11 +31,10 @@ export type EbayAccountDeletionNotification = {
   };
 };
 
-type EbayDeletionDb = {
-  ebayOrderImport: {
-    findMany(args: unknown): Promise<Array<{ id: string; payload: unknown }>>;
-    update(args: unknown): Promise<unknown>;
-  };
+// Real Prisma delegate types, not `unknown` args: `payload` is a nullable Json
+// column, so tsc must reject plain `null` and demand a Prisma null sentinel.
+export type EbayDeletionDb = {
+  ebayOrderImport: Pick<Prisma.EbayOrderImportDelegate, "findMany" | "update">;
 };
 
 export function accountDeletionVerificationToken(env: Record<string, string | undefined> = process.env): string | null {
@@ -127,6 +127,11 @@ export function readEbayAccountDeletionIdentifiers(message: EbayAccountDeletionN
  * Remove historical raw provider payloads that contain the deleted account's
  * identifiers. Normalized seller ledger facts remain; new imports no longer
  * persist the full provider order object.
+ *
+ * `payload` is a nullable Json column, so Prisma rejects plain `null` for it.
+ * The filter uses AnyNull to skip both a database NULL (never stored, or
+ * already scrubbed) and a stored JSON `null`: neither can hold an identifier.
+ * The clear writes DbNull so a scrubbed row is a real database NULL.
  */
 export async function scrubDeletedEbayAccountPayloads(
   db: EbayDeletionDb,
@@ -135,13 +140,13 @@ export async function scrubDeletedEbayAccountPayloads(
   const needles = new Set(identifiers.filter(Boolean));
   if (needles.size === 0) return 0;
   const rows = await db.ebayOrderImport.findMany({
-    where: { payload: { not: null } },
+    where: { payload: { not: Prisma.AnyNull } },
     select: { id: true, payload: true },
   });
   const affected = rows.filter((row) => jsonContainsExactString(row.payload, needles));
   await Promise.all(affected.map((row) => db.ebayOrderImport.update({
     where: { id: row.id },
-    data: { payload: null },
+    data: { payload: Prisma.DbNull },
   })));
   return affected.length;
 }

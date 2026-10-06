@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import test, { type TestContext } from "node:test";
+import { Prisma } from "@prisma/client";
 import { clearTokenCache } from "../../../../lib/ebay/tokens.js";
 import { GET, POST } from "./route.js";
 
@@ -173,6 +174,26 @@ test("POST with EBAY_DELETION_SCRUB=1 still scrubs matching payloads and acknowl
   assert.equal(fixture.calls.provider, 2);
 });
 
+test("POST with EBAY_DELETION_SCRUB=1 sends Prisma null sentinels for the Json payload, never plain null", { concurrency: false }, async (t) => {
+  const fixture = setup(t, { scrub: true });
+  const response = await POST(fixture.signedRequest(notification));
+
+  // Assert the recorded Prisma arguments before the status: on the old code
+  // the plain nulls are the cause and the 503 is only the symptom.
+  assert.equal(fixture.findManyArgs.length, 1);
+  assert.notEqual(fixture.findManyArgs[0]!.where.payload.not, null, "the payload filter must not be plain null");
+  assert.equal(fixture.findManyArgs[0]!.where.payload.not, Prisma.AnyNull, "the payload filter must be Prisma.AnyNull");
+  assert.deepEqual(fixture.findManyArgs[0]!.select, { id: true, payload: true });
+
+  assert.equal(fixture.updateArgs.length, 1);
+  assert.deepEqual(fixture.updateArgs[0]!.where, { id: "matching" });
+  assert.notEqual(fixture.updateArgs[0]!.data.payload, null, "the payload clear must not be plain null");
+  assert.equal(fixture.updateArgs[0]!.data.payload, Prisma.DbNull, "the payload clear must be Prisma.DbNull");
+
+  assert.equal(response.status, 204);
+  assert.equal(fixture.rows[0]!.payload, null);
+});
+
 test("POST with EBAY_DELETION_SCRUB=1 returns 503 rather than acknowledging a failed scrub", { concurrency: false }, async (t) => {
   const fixture = setup(t, { scrub: true });
   const update = t.mock.method(fixture.db.ebayOrderImport, "update", async () => { throw new Error("Database unavailable"); });
@@ -211,13 +232,25 @@ function setup(t: TestContext, options: { scrub?: boolean; injectDb?: boolean; k
     { id: "matching", payload: { order: { buyer: { userId: "buyer-1" } } } },
     { id: "unrelated", payload: { order: { buyer: { userId: "buyer-10" } } } },
   ];
+  // Mirrors Prisma 5 for the nullable Json `payload` column: plain `null` is
+  // rejected in filters and writes, and a stored `null` models a database NULL.
+  const findManyArgs: Array<{ where: { payload: { not: unknown } }; select: unknown }> = [];
+  const updateArgs: Array<{ where: { id: string }; data: { payload: unknown } }> = [];
   const db = {
     ebayOrderImport: {
-      async findMany() { calls.reads++; return rows.filter((row) => row.payload !== null); },
-      async update({ where, data }: { where: { id: string }; data: { payload: null } }) {
+      async findMany(args: (typeof findManyArgs)[number]) {
+        calls.reads++;
+        findManyArgs.push(args);
+        const not = args.where.payload.not;
+        if (not !== Prisma.AnyNull && not !== Prisma.DbNull) throw new Error("Argument `not` must not be null.");
+        return rows.filter((row) => row.payload !== null);
+      },
+      async update(args: (typeof updateArgs)[number]) {
         calls.updates++;
-        const row = rows.find((candidate) => candidate.id === where.id)!;
-        row.payload = data.payload;
+        updateArgs.push(args);
+        if (args.data.payload !== Prisma.DbNull) throw new Error("Argument `payload` must not be null.");
+        const row = rows.find((candidate) => candidate.id === args.where.id)!;
+        row.payload = null;
         return row;
       },
     },
@@ -256,7 +289,7 @@ function setup(t: TestContext, options: { scrub?: boolean; injectDb?: boolean; k
     return Response.json({ key: publicKey.export({ type: "spki", format: "pem" }).toString() });
   });
   return {
-    calls, rows, db,
+    calls, rows, db, findManyArgs, updateArgs,
     get failedKeyLookups() { return failedKeyLookups; },
     signedRequest(message: unknown) {
       const body = JSON.stringify(message);
