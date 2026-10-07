@@ -3,7 +3,6 @@ import {
   accountDeletionVerificationToken,
   buildAccountDeletionChallengeResponse,
   EBAY_ACCOUNT_DELETION_ENDPOINT,
-  ebayAccountDeletionScrubEnabled,
   type EbayAccountDeletionNotification,
   readEbayAccountDeletionIdentifiers,
   scrubDeletedEbayAccountPayloads,
@@ -60,22 +59,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid account deletion notification." }, { status: 400 });
     }
 
-    // Default: acknowledge the verified notification without touching the
-    // database. eBay sends these roughly once a minute, and a DB read here
-    // kept the Neon compute awake around the clock. Since 2026-07-17 order
-    // imports store only a minimised projection with no buyer identifiers,
-    // and legacy full payloads are cleared by a one-off ops step. Prisma is
-    // imported lazily so this path never even constructs a client.
-    // Set EBAY_DELETION_SCRUB=1 to restore the historical payload scrub.
-    if (!ebayAccountDeletionScrubEnabled()) {
-      console.info(JSON.stringify({
-        event: "ebay_account_deletion_acknowledged",
-        notificationId: message.notification?.notificationId ?? null,
-        scrub: "disabled",
-      }));
-      return new Response(null, { status: 204 });
-    }
-
+    // New imports omit buyer identifiers, but that does not prove historical
+    // payloads were cleared. Complete the scrub before acknowledging; a read
+    // or write failure reaches the 503 response below so eBay can retry.
     const { getPrisma } = await import("@/lib/db/prisma");
     const scrubbedPayloads = await scrubDeletedEbayAccountPayloads(getPrisma(), identifiers);
     console.info(JSON.stringify({

@@ -42,15 +42,6 @@ export function accountDeletionVerificationToken(env: Record<string, string | un
   return token && /^[A-Za-z0-9_-]{32,80}$/.test(token) ? token : null;
 }
 
-/**
- * Historical payload scrubbing on account-deletion notifications is opt-in.
- * Only the exact value "1" enables it; anything else (including unset) keeps
- * the notification path database-free.
- */
-export function ebayAccountDeletionScrubEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return env.EBAY_DELETION_SCRUB?.trim() === "1";
-}
-
 export function buildAccountDeletionChallengeResponse(input: {
   challengeCode: string;
   verificationToken: string;
