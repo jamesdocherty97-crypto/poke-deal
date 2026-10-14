@@ -62,7 +62,7 @@ import {
   normalizeManualCompSearchText,
   type ManualCompLinkKind,
 } from "@/lib/dealer/compLinks";
-import { inventoryItemMatchesFilter, emptyInventoryFilterText, hasLiveListing, stockReadiness, type InventoryFilter } from "@/lib/dealer/stockReadiness";
+import { inventoryItemMatchesFilter, emptyInventoryFilterText, hasLiveListing, stockReadiness, stockRowTaskFlags, type InventoryFilter } from "@/lib/dealer/stockReadiness";
 import { createStockImportBatch, parseStockImportBatch, runStockImportBatch, importBatchProgress, STOCK_IMPORT_BATCH_KEY, type StockImportBatch } from "@/lib/dealer/stockImportBatch";
 import { parseAcquisitionDate } from "@/lib/inventory/acquiredAt";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
@@ -178,7 +178,7 @@ import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
 import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
 import { CardImage, EmptyState, Metric, MoneyInput } from "./components/UiBits";
-import { PriceHistorySheet, StockHistorySparkline } from "./components/PriceHistory";
+import { PriceHistorySheet, StockHistorySparkline, stockHistoryLabel } from "./components/PriceHistory";
 import { ListingEditor, type ListingEditorPatch } from "./components/ListingEditor";
 
 const InventoryTab = dynamic(() => import("./components/InventoryTab").then((mod) => mod.InventoryTab));
@@ -11880,6 +11880,15 @@ function InventoryRow({
   const needsListing = item.status !== "SOLD" && !readiness.live;
   const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.acquiredAt ?? item.createdAt).getTime()) / (24 * 60 * 60 * 1_000)));
   const needsReprice = item.status !== "SOLD" && ageDays >= 30;
+  const taskFlags = stockRowTaskFlags({
+    held: readiness.held,
+    next: readiness.next,
+    needsListing,
+    needsPhotos,
+    needsEbayPhotos,
+    photoCount,
+    repriceAgeDays: needsReprice ? ageDays : null,
+  });
   const stockCost =
     item.quantity > 1
       ? `${gbp(item.costBasis)} each · ${gbp(item.costBasis * item.quantity)} total`
@@ -12000,15 +12009,12 @@ function InventoryRow({
             {stockNotes && <span>{stockNotes}</span>}
             <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`Open ${item.card.name} price history`}>
               <StockHistorySparkline history={history} preview={historyPreview} />
-              <span>History</span>
+              <span>{stockHistoryLabel(history, historyPreview)}</span>
             </button>
           </div>
-          {(readiness.held || needsListing || (needsPhotos && !needsEbayPhotos) || photoCount > 0 || needsReprice) && (
+          {taskFlags.length > 0 && (
             <div className="inventory-row-flags" role="group" aria-label="Stock tasks">
-              {(needsListing || readiness.held) && <span>{readiness.next}</span>}
-              {!readiness.held && needsPhotos && !needsEbayPhotos && <span>Needs photos</span>}
-              {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
-              {!readiness.held && needsReprice && <span className="reprice-nudge">Reprice · {ageDays}d held</span>}
+              {taskFlags.map((flag) => <span key={flag.text} className={flag.reprice ? "reprice-nudge" : undefined}>{flag.text}</span>)}
             </div>
           )}
           {needsEbayPhotos && !readiness.held && (

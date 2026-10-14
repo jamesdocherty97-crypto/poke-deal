@@ -41,6 +41,24 @@ export function plotHistoryPoints(points: HistoryPoint[], width = 320, height = 
   }));
 }
 
+function stockMarketPoints(
+  history: CardPriceHistory | null | undefined,
+  preview?: CardPriceHistoryPreview | null,
+): HistoryPoint[] {
+  return history
+    ? buildPriceHistoryPoints(history).filter((point) => point.kind === "market")
+    : (preview?.market ?? []).map((point) => ({ at: point.takenAt, pence: point.marketPence, kind: "market" as const }));
+}
+
+/** Visible label for the stock row history button; the sparkline itself carries no text. */
+export function stockHistoryLabel(
+  history: CardPriceHistory | null | undefined,
+  preview?: CardPriceHistoryPreview | null,
+): string {
+  if (!history && !preview) return "History";
+  return stockMarketPoints(history, preview).length === 0 ? "No price history" : "History";
+}
+
 export function StockHistorySparkline({
   history,
   preview,
@@ -48,12 +66,9 @@ export function StockHistorySparkline({
   history: CardPriceHistory | null | undefined;
   preview?: CardPriceHistoryPreview | null;
 }) {
-  if (!history && !preview) return <span className="stock-sparkline empty" aria-label="Price history not loaded">History</span>;
-  const market = history
-    ? buildPriceHistoryPoints(history).filter((point) => point.kind === "market")
-    : (preview?.market ?? []).map((point) => ({ at: point.takenAt, pence: point.marketPence, kind: "market" as const }));
-  const points = plotHistoryPoints(market, 92, 28);
-  if (points.length === 0) return <span className="stock-sparkline empty" aria-label="No market price history">No history</span>;
+  if (!history && !preview) return null;
+  const points = plotHistoryPoints(stockMarketPoints(history, preview), 92, 28);
+  if (points.length === 0) return null;
   const path = points.length === 1
     ? "0,14 92,14"
     : points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");

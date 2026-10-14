@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { CardPriceHistory } from "@/lib/comps/priceHistory";
-import { buildPriceHistoryPoints, plotHistoryPoints } from "./PriceHistory.js";
+import { buildPriceHistoryPoints, plotHistoryPoints, stockHistoryLabel } from "./PriceHistory.js";
 
 const history: CardPriceHistory = {
   card: { id: "card-1", name: "Pikachu", setName: "Crown Zenith", number: "GG30", imageUrl: null, displayImageUrl: null },
@@ -24,4 +24,10 @@ test("history plot is deterministic and bounded", () => {
   const points = plotHistoryPoints(buildPriceHistoryPoints(history), 100, 50);
   assert.ok(points.every((point) => point.x >= 0 && point.x <= 100 && point.y >= 0 && point.y <= 50));
   assert.deepEqual(points[0] && { x: points[0].x, y: points[0].y }, { x: 0, y: 31.25 });
+});
+
+test("stock history button names its state once instead of repeating History", () => {
+  assert.equal(stockHistoryLabel(undefined, undefined), "History");
+  assert.equal(stockHistoryLabel({ ...history, snapshots: [], comps: [] }, undefined), "No price history");
+  assert.equal(stockHistoryLabel(history, undefined), "History");
 });
