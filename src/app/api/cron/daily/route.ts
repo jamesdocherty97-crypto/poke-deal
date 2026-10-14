@@ -60,6 +60,7 @@ export async function GET(request: Request) {
         matchedCount: result.matchedCount,
         unmatchedCount: result.unmatchedCount,
         skippedCount: result.skippedCount,
+        reversedCount: result.reversedCount,
       }),
     });
 

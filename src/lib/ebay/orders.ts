@@ -25,6 +25,8 @@ export type EbayFulfillmentLineItem = {
   title?: string;
   quantity?: number;
   lineItemCost?: EbayMoney;
+  /** Present only when a promotion reduced the line's cost; lineItemCost is the pre-discount amount. */
+  discountedLineItemCost?: EbayMoney;
   total?: EbayMoney;
   deliveryCost?: { shippingCost?: EbayMoney; importCharges?: EbayMoney } | EbayMoney;
 };
@@ -35,6 +37,7 @@ export type EbayFulfillmentOrder = {
   lastModifiedDate?: string;
   orderPaymentStatus?: string;
   orderFulfillmentStatus?: string;
+  cancelStatus?: { cancelState?: string };
   pricingSummary?: {
     priceSubtotal?: EbayMoney;
     deliveryCost?: EbayMoney;
@@ -69,6 +72,8 @@ export type NormalizedEbayOrderLine = {
   itemSubtotalPence: number;
   postageChargedPence: number;
   buyerPaidPence: number;
+  /** Set when the line must stay in the manual queue instead of booking a sale. */
+  holdReason?: string | null;
   raw: unknown;
 };
 
@@ -98,6 +103,8 @@ export type EbaySalesSyncResult = {
   matchedCount: number;
   unmatchedCount: number;
   skippedCount: number;
+  /** Previously imported sales whose eBay order is now cancelled or fully refunded. */
+  reversedCount: number;
   imports: EbayOrderImportSummary[];
 };
 
@@ -187,6 +194,11 @@ export async function syncOwnEbaySales({
     imports.push(await importEbayOrderLine(db, line));
   }
 
+  let reversedCount = 0;
+  for (const reversal of orders.flatMap(reversedEbayOrderLines)) {
+    if (await flagReversedImport(db, reversal)) reversedCount += 1;
+  }
+
   return {
     ok: true,
     checkedAt: now.toISOString(),
@@ -195,6 +207,7 @@ export async function syncOwnEbaySales({
     matchedCount: imports.filter((row) => row.status === "MATCHED").length,
     unmatchedCount: imports.filter((row) => row.status === "UNMATCHED").length,
     skippedCount: imports.filter((row) => row.status === "SKIPPED").length,
+    reversedCount,
     imports,
   };
 }
@@ -264,22 +277,33 @@ async function fetchFulfillmentOrdersPages({
 
 export function normalizePaidEbayOrder(order: EbayFulfillmentOrder): NormalizedEbayOrderLine[] {
   const orderId = order.orderId?.trim();
-  if (!orderId || !isPaidOrder(order)) return [];
+  // Cancelled and refunded orders stay in getOrders results. A cancellation
+  // still in progress is held like an unpaid order until eBay settles it.
+  if (!orderId || !isPaidOrder(order) || isReversedOrder(order) || hasPendingCancellation(order)) return [];
 
   const orderPostagePence = moneyToGbpPence(order.pricingSummary?.deliveryCost);
   const lines = order.lineItems ?? [];
   const postageParts = splitPence(orderPostagePence, Math.max(1, lines.length));
+  // Line delivery is the shipping for all units of that line. When any line
+  // reports it, a zero on another line means free postage, not "unknown".
+  const lineDelivery = lines.map(lineDeliveryPence);
+  const useLineDelivery = lineDelivery.some((pence) => pence > 0);
+  const nonGbp = hasNonGbpAmount(order.pricingSummary?.deliveryCost);
 
   return lines.map((line, index) => {
     const lineItemId = line.lineItemId?.trim() || null;
-    const itemSubtotalPence = moneyToGbpPence(line.lineItemCost) || moneyToGbpPence(line.total);
-    const postageChargedPence = lineDeliveryPence(line) || postageParts[index] || 0;
+    const itemCost = line.discountedLineItemCost?.value ? line.discountedLineItemCost : line.lineItemCost;
+    const itemSubtotalPence = moneyToGbpPence(itemCost) || moneyToGbpPence(line.total);
+    const postageChargedPence = useLineDelivery ? lineDelivery[index] ?? 0 : postageParts[index] ?? 0;
     const buyerPaidPence = itemSubtotalPence + postageChargedPence;
     const orderCreatedAt = parseDate(order.creationDate);
     const paidAt = parseDate(order.paymentSummary?.payments?.find((payment) => isPaidStatus(payment.paymentStatus))?.paymentDate) ?? orderCreatedAt;
+    const holdReason = nonGbp || hasNonGbpLineAmount(line)
+      ? "eBay reported this order line in a currency other than GBP. Record the sale manually in GBP."
+      : null;
 
     return {
-      importKey: `ebay:${orderId}:${lineItemId ?? line.legacyItemId ?? index}`,
+      importKey: lineImportKey(orderId, line, index),
       orderId,
       lineItemId,
       sku: line.sku?.trim() || null,
@@ -291,6 +315,7 @@ export function normalizePaidEbayOrder(order: EbayFulfillmentOrder): NormalizedE
       itemSubtotalPence,
       postageChargedPence,
       buyerPaidPence,
+      holdReason,
       // Persist only fulfillment fields used for audit/replay. The provider's
       // full order object may contain buyer account or address data and must
       // not be retained in this operational ledger.
@@ -323,6 +348,9 @@ export async function importEbayOrderLine(
     const existing = await tx.ebayOrderImport.findUnique({ where: { importKey: line.importKey } });
     if (existing?.saleId || existing?.status === "MATCHED") {
       return summarizeImport(existing, "SKIPPED", "Already imported.");
+    }
+    if (line.holdReason) {
+      return summarizeImport(await upsertImport(tx, line, { status: "UNMATCHED", reason: line.holdReason }));
     }
 
     const match = await findListingMatch(tx, line);
@@ -614,8 +642,59 @@ function emptySyncResult(now: Date, reason: string): EbaySalesSyncResult {
     matchedCount: 0,
     unmatchedCount: 0,
     skippedCount: 0,
+    reversedCount: 0,
     imports: [],
   };
+}
+
+type ReversedEbayOrderLine = { importKey: string; orderId: string; title: string | null };
+
+/** Import keys of order lines that eBay now reports as cancelled or fully refunded. */
+export function reversedEbayOrderLines(order: EbayFulfillmentOrder): ReversedEbayOrderLine[] {
+  const orderId = order.orderId?.trim();
+  if (!orderId || !isReversedOrder(order)) return [];
+  return (order.lineItems ?? []).map((line, index) => ({
+    importKey: lineImportKey(orderId, line, index),
+    orderId,
+    title: line.title?.trim() || null,
+  }));
+}
+
+async function flagReversedImport(db: EbaySalesSyncDb, reversal: ReversedEbayOrderLine): Promise<boolean> {
+  const existing = await db.ebayOrderImport.findUnique({ where: { importKey: reversal.importKey } });
+  if (!existing?.saleId && existing?.status !== "MATCHED") return false;
+  await createInboxAlert(db as any, {
+    kind: "EBAY_SALE",
+    title: `eBay order cancelled or refunded: ${reversal.title ?? existing.title ?? reversal.orderId}`,
+    message: `eBay now shows order ${reversal.orderId} as cancelled or fully refunded. Poke Deal booked it as a sale when it was paid, so that sale still counts in Profit and its stock is still marked sold. Imported sales cannot be undone here; check the order on eBay before relisting the card.`,
+    href: "/?view=pnl",
+    sourceKey: `ebay-reversal:${reversal.importKey}`,
+  });
+  return true;
+}
+
+// Existing import receipts are keyed by this exact format; changing it would re-import paid orders.
+function lineImportKey(orderId: string, line: EbayFulfillmentLineItem, index: number): string {
+  return `ebay:${orderId}:${(line.lineItemId?.trim() || null) ?? line.legacyItemId ?? index}`;
+}
+
+function isReversedOrder(order: EbayFulfillmentOrder): boolean {
+  return /^fully_refunded$/i.test(order.orderPaymentStatus?.trim() ?? "") ||
+    /^cancell?ed$/i.test(order.cancelStatus?.cancelState?.trim() ?? "");
+}
+
+function hasPendingCancellation(order: EbayFulfillmentOrder): boolean {
+  return /^in_progress$/i.test(order.cancelStatus?.cancelState?.trim() ?? "");
+}
+
+function hasNonGbpLineAmount(line: EbayFulfillmentLineItem): boolean {
+  const delivery = line.deliveryCost;
+  const deliveryAmounts = !delivery ? [] : isNestedDeliveryCost(delivery) ? [delivery.shippingCost, delivery.importCharges] : [delivery];
+  return [line.lineItemCost, line.discountedLineItemCost, line.total, ...deliveryAmounts].some(hasNonGbpAmount);
+}
+
+function hasNonGbpAmount(money: EbayMoney | undefined): boolean {
+  return Boolean(money?.value && money.currency && money.currency.toUpperCase() !== "GBP");
 }
 
 function isPaidOrder(order: EbayFulfillmentOrder): boolean {

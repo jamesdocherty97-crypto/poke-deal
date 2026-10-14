@@ -33,6 +33,7 @@ type EbaySalesSyncResult = {
   matchedCount: number;
   unmatchedCount: number;
   skippedCount: number;
+  reversedCount?: number;
   imports: Array<{
     importKey: string;
     title: string | null;
@@ -595,6 +596,7 @@ export function ListingsTab({
               <span>{ebaySalesSync.matchedCount} sales booked</span>
               <span>{ebaySalesSync.skippedCount} already imported</span>
               {ebaySalesSync.unmatchedCount > 0 && <span className="warn">{ebaySalesSync.unmatchedCount} need matching</span>}
+              {(ebaySalesSync.reversedCount ?? 0) > 0 && <span className="warn">{ebaySalesSync.reversedCount} cancelled or refunded after import</span>}
             </div>
           )}
           {ebaySalesSync?.imports.some((row) => row.status === "UNMATCHED") && (

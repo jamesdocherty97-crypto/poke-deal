@@ -406,3 +406,151 @@ test("multi-unit eBay sale splits exact item revenue and combined shipping once"
   assert.deepEqual(db.sales.map((sale) => sale.mutationIndex), [0, 1, 2]);
   assert.ok(db.sales.every((sale) => sale.costsEstimated && sale.costBasis === 70000 && sale.clientMutationId.startsWith("ebay-order:")));
 });
+
+test("normalizePaidEbayOrder does not import fully refunded orders even though the original payment shows PAID", () => {
+  assert.deepEqual(
+    normalizePaidEbayOrder({
+      orderId: "order-refunded",
+      orderPaymentStatus: "FULLY_REFUNDED",
+      paymentSummary: { payments: [{ paymentStatus: "PAID", paymentDate: "2026-07-03T10:01:00.000Z" }] },
+      lineItems: [{ lineItemId: "line-1", sku: "pdos-listing-1", quantity: 1, lineItemCost: { value: "10.00", currency: "GBP" } }],
+    }),
+    [],
+  );
+});
+
+test("normalizePaidEbayOrder skips cancelled orders and holds orders with a cancellation in progress", () => {
+  const paidLine = { lineItemId: "line-1", sku: "pdos-listing-1", quantity: 1, lineItemCost: { value: "10.00", currency: "GBP" } };
+  assert.deepEqual(normalizePaidEbayOrder({
+    orderId: "order-cancelled", orderPaymentStatus: "PAID", cancelStatus: { cancelState: "CANCELED" }, lineItems: [paidLine],
+  }), []);
+  assert.deepEqual(normalizePaidEbayOrder({
+    orderId: "order-cancelling", orderPaymentStatus: "PAID", cancelStatus: { cancelState: "IN_PROGRESS" }, lineItems: [paidLine],
+  }), []);
+  assert.equal(normalizePaidEbayOrder({
+    orderId: "order-kept", orderPaymentStatus: "PAID", cancelStatus: { cancelState: "NONE_REQUESTED" }, lineItems: [paidLine],
+  }).length, 1);
+});
+
+test("normalizePaidEbayOrder still imports a partially refunded order as a sale", () => {
+  const lines = normalizePaidEbayOrder({
+    orderId: "order-partial",
+    orderPaymentStatus: "PARTIALLY_REFUNDED",
+    paymentSummary: { payments: [{ paymentStatus: "PAID", paymentDate: "2026-07-03T10:01:00.000Z" }] },
+    lineItems: [{ lineItemId: "line-1", quantity: 1, lineItemCost: { value: "10.00", currency: "GBP" } }],
+  });
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0]?.itemSubtotalPence, 1000);
+});
+
+test("normalizePaidEbayOrder books the discounted line cost when a promotion applied", () => {
+  const [line] = normalizePaidEbayOrder({
+    orderId: "order-promo",
+    orderPaymentStatus: "PAID",
+    lineItems: [{
+      lineItemId: "line-1",
+      quantity: 2,
+      lineItemCost: { value: "20.00", currency: "GBP" },
+      discountedLineItemCost: { value: "18.00", currency: "GBP" },
+      deliveryCost: { shippingCost: { value: "1.50", currency: "GBP" } },
+    }],
+  });
+  assert.equal(line?.itemSubtotalPence, 1800);
+  assert.equal(line?.postageChargedPence, 150);
+  assert.equal(line?.buyerPaidPence, 1950);
+});
+
+test("normalizePaidEbayOrder trusts per-line delivery, including free postage on one line", () => {
+  const lines = normalizePaidEbayOrder({
+    orderId: "order-two-lines",
+    orderPaymentStatus: "PAID",
+    pricingSummary: { deliveryCost: { value: "3.00", currency: "GBP" } },
+    lineItems: [
+      { lineItemId: "line-1", quantity: 1, lineItemCost: { value: "10.00", currency: "GBP" }, deliveryCost: { shippingCost: { value: "3.00", currency: "GBP" } } },
+      { lineItemId: "line-2", quantity: 1, lineItemCost: { value: "5.00", currency: "GBP" }, deliveryCost: { shippingCost: { value: "0.00", currency: "GBP" } } },
+    ],
+  });
+  assert.deepEqual(lines.map((line) => line.postageChargedPence), [300, 0]);
+  assert.equal(lines.reduce((sum, line) => sum + line.buyerPaidPence, 0), 1800, "buyer total matches the order, with postage counted once");
+});
+
+test("normalizePaidEbayOrder still splits order-level delivery when lines carry none", () => {
+  const lines = normalizePaidEbayOrder({
+    orderId: "order-order-level-postage",
+    orderPaymentStatus: "PAID",
+    pricingSummary: { deliveryCost: { value: "3.01", currency: "GBP" } },
+    lineItems: [
+      { lineItemId: "line-1", quantity: 1, lineItemCost: { value: "10.00", currency: "GBP" } },
+      { lineItemId: "line-2", quantity: 1, lineItemCost: { value: "5.00", currency: "GBP" } },
+    ],
+  });
+  assert.deepEqual(lines.map((line) => line.postageChargedPence), [151, 150]);
+});
+
+test("a non-GBP eBay order line is held for review instead of booking a zero-value sale", async () => {
+  const [line] = normalizePaidEbayOrder({
+    orderId: "order-usd",
+    orderPaymentStatus: "PAID",
+    lineItems: [{ lineItemId: "line-1", sku: "pdos-listing-1", quantity: 1, lineItemCost: { value: "12.00", currency: "USD" } }],
+  });
+  assert.ok(line);
+  const db = fakeEbaySyncDb();
+  const result = await importEbayOrderLine(db.client, line);
+  assert.equal(result.status, "UNMATCHED");
+  assert.match(result.reason ?? "", /GBP/);
+  assert.equal(db.sales.length, 0);
+  assert.equal(db.items[0]?.status, "LISTED");
+  assert.equal(db.listings[0]?.state, "ACTIVE");
+});
+
+test("syncOwnEbaySales flags an already-imported sale whose eBay order was later cancelled or refunded", async () => {
+  const savedEnv = {
+    clientId: process.env.EBAY_CLIENT_ID,
+    clientSecret: process.env.EBAY_CLIENT_SECRET,
+    ruName: process.env.EBAY_RU_NAME,
+    refreshToken: process.env.EBAY_REFRESH_TOKEN,
+  };
+  process.env.EBAY_CLIENT_ID = TEST_CONFIG.clientId;
+  process.env.EBAY_CLIENT_SECRET = TEST_CONFIG.clientSecret;
+  process.env.EBAY_RU_NAME = TEST_CONFIG.ruName;
+  process.env.EBAY_REFRESH_TOKEN = "refresh-token";
+  const db = fakeEbaySyncDb();
+  await importEbayOrderLine(db.client, orderLine());
+  assert.equal(db.sales.length, 1);
+  const fetchImpl: typeof globalThis.fetch = (url) => {
+    if (String(url).includes("/identity/v1/oauth2/token")) {
+      return Promise.resolve(Response.json({ access_token: "user-token", expires_in: 7200 }));
+    }
+    return Promise.resolve(Response.json({
+      total: 1,
+      limit: 25,
+      offset: 0,
+      orders: [{
+        orderId: "order-1",
+        creationDate: "2026-07-03T10:00:00.000Z",
+        orderPaymentStatus: "FULLY_REFUNDED",
+        cancelStatus: { cancelState: "CANCELED" },
+        paymentSummary: { payments: [{ paymentStatus: "PAID" }] },
+        lineItems: [{ lineItemId: "line-1", sku: "pdos-listing-1", title: "Charizard ex 151 PSA 10", quantity: 1, lineItemCost: { value: "100.00", currency: "GBP" } }],
+      }],
+    }));
+  };
+
+  try {
+    const first = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl });
+    const second = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl });
+    assert.equal(first.reversedCount, 1);
+    assert.equal(second.reversedCount, 1);
+    assert.equal(first.matchedCount, 0);
+    assert.equal(db.sales.length, 1, "no new sale is booked for the reversed order");
+    const reversals = db.appAlerts.filter((alert) => alert.sourceKey === "ebay-reversal:ebay:order-1:line-1");
+    assert.equal(reversals.length, 1, "repeat syncs keep one alert");
+    assert.match(reversals[0]?.title ?? "", /cancelled or refunded/i);
+    assert.equal(reversals[0]?.kind, "EBAY_SALE");
+  } finally {
+    restoreEnv("EBAY_CLIENT_ID", savedEnv.clientId);
+    restoreEnv("EBAY_CLIENT_SECRET", savedEnv.clientSecret);
+    restoreEnv("EBAY_RU_NAME", savedEnv.ruName);
+    restoreEnv("EBAY_REFRESH_TOKEN", savedEnv.refreshToken);
+  }
+});

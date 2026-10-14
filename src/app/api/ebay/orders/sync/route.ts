@@ -59,6 +59,7 @@ export async function POST() {
             details: {
               matchedCount: result.matchedCount,
               unmatchedCount: result.unmatchedCount,
+              reversedCount: result.reversedCount,
               fetchedOrders: result.fetchedOrders,
             },
           },
