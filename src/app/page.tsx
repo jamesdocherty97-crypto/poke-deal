@@ -178,7 +178,7 @@ import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
 import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
 import { CardImage, EmptyState, Metric, MoneyInput } from "./components/UiBits";
-import { PriceHistorySheet, StockHistorySparkline, stockHistoryLabel } from "./components/PriceHistory";
+import { PriceHistorySheet, StockHistorySparkline } from "./components/PriceHistory";
 import { ListingEditor, type ListingEditorPatch } from "./components/ListingEditor";
 
 const InventoryTab = dynamic(() => import("./components/InventoryTab").then((mod) => mod.InventoryTab));
@@ -6799,7 +6799,9 @@ export default function Home() {
         setNotice(payload.reason ?? "eBay sales sync skipped.");
       } else {
         setNotice(
-          `eBay sync complete: ${payload.matchedCount ?? 0} matched, ${payload.unmatchedCount ?? 0} unmatched.`,
+          `eBay sync complete: ${payload.matchedCount ?? 0} matched, ${payload.unmatchedCount ?? 0} unmatched` +
+            `${payload.reversedCount ? `, ${payload.reversedCount} cancelled or refunded after import` : ""}` +
+            `${payload.partialRefundCount ? `, ${payload.partialRefundCount} partly refunded on eBay` : ""}.`,
         );
       }
       await refreshOrderSyncStatus();
@@ -12007,9 +12009,9 @@ function InventoryRow({
               {marketCompPence != null ? ` · ${marketCompAgeDays != null && marketCompAgeDays > 90 ? "stale — refresh · " : ""}${marketCompMeta}` : ""}
             </span>
             {stockNotes && <span>{stockNotes}</span>}
-            <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`${stockHistoryLabel(history, historyPreview)}: ${item.card.name}`}>
+            <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`History for ${item.card.name}`}>
               <StockHistorySparkline history={history} preview={historyPreview} />
-              <span>{stockHistoryLabel(history, historyPreview)}</span>
+              <span>History</span>
             </button>
           </div>
           {taskFlags.length > 0 && (

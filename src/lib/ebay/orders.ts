@@ -28,9 +28,18 @@ export type EbayFulfillmentLineItem = {
   /** Present only when a promotion reduced the line's cost; lineItemCost is the pre-discount amount. */
   discountedLineItemCost?: EbayMoney;
   total?: EbayMoney;
-  deliveryCost?: { shippingCost?: EbayMoney; importCharges?: EbayMoney } | EbayMoney;
+  deliveryCost?: EbayLineDeliveryCost | EbayMoney;
   /** Present only when the buyer is due a refund for this line; amounts are the seller's net. */
   refunds?: Array<{ amount?: EbayMoney; refundDate?: string }>;
+};
+
+/** Delivery for all units of a line. shippingCost is always returned (0.0 when free). */
+export type EbayLineDeliveryCost = {
+  shippingCost?: EbayMoney;
+  handlingCost?: EbayMoney;
+  importCharges?: EbayMoney;
+  /** A shipping discount on this line, present only when one applies. */
+  discountAmount?: EbayMoney;
 };
 
 export type EbayFulfillmentOrder = {
@@ -39,14 +48,20 @@ export type EbayFulfillmentOrder = {
   lastModifiedDate?: string;
   orderPaymentStatus?: string;
   orderFulfillmentStatus?: string;
-  cancelStatus?: { cancelState?: string };
+  cancelStatus?: {
+    /** IN_PROGRESS while any cancellation request exists, including rejected ones. */
+    cancelState?: string;
+    cancelRequests?: Array<{ cancelRequestState?: string }>;
+  };
   pricingSummary?: {
     /** All line items before discounts. */
     priceSubtotal?: EbayMoney;
     /** Item-level discounts for the whole order, usually negative; excludes delivery discounts. */
     priceDiscount?: EbayMoney;
-    /** Delivery for every line after delivery discounts. */
+    /** Delivery for every line before delivery discounts (Sell Fulfillment). */
     deliveryCost?: EbayMoney;
+    /** Delivery discounts for the order, usually negative. */
+    deliveryDiscount?: EbayMoney;
     total?: EbayMoney;
   };
   paymentSummary?: {
@@ -82,6 +97,8 @@ export type NormalizedEbayOrderLine = {
   holdReason?: string | null;
   /** False when eBay reported amounts in another currency; the pence fields are then not usable. */
   amountsInGbp?: boolean;
+  /** Added to a manual-queue reason when eBay shows a refund on this line. */
+  refundNote?: string | null;
   raw: unknown;
 };
 
@@ -115,6 +132,8 @@ export type EbaySalesSyncResult = {
   reversedCount: number;
   /** Imported sales newly found partly refunded on eBay during this sync. */
   partialRefundCount: number;
+  /** False when the extra read for refunds and cancellations on older orders failed; imports are unaffected. */
+  lateChangesChecked: boolean;
   imports: EbayOrderImportSummary[];
 };
 
@@ -185,31 +204,40 @@ export async function syncOwnEbaySales({
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
   const windowStart = since ?? new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
   let orders: EbayFulfillmentOrder[];
+  let changedOrders: EbayFulfillmentOrder[] = [];
+  let lateChangesChecked = false;
   try {
     const { accessToken } = await getAccessTokenWithSource(config, fetchImpl, { refreshToken });
-    // Orders changed in the window: new orders plus older ones that were later
-    // refunded or cancelled. Only orders created in the window are imported.
-    orders = await fetchFulfillmentOrdersPages({
-      config,
-      accessToken,
-      since: windowStart,
-      until: now,
-      limit: safeLimit,
-      fetchImpl,
-    });
+    const window = { config, accessToken, since: windowStart, until: now, limit: safeLimit, fetchImpl };
+    // Imports read orders created in the window, exactly as before.
+    orders = await fetchFulfillmentOrdersPages({ ...window, dateField: "creationdate" });
+    // A second, best-effort read finds refunds and cancellations on older
+    // orders. It only raises signals, so its failure never blocks imports.
+    try {
+      changedOrders = await fetchFulfillmentOrdersPages({ ...window, dateField: "lastmodifieddate" });
+      lateChangesChecked = true;
+    } catch {
+      changedOrders = [];
+    }
   } catch (err) {
     throw new Error(ebayErrorMessage(err, "eBay sales sync failed"));
   }
-  const lines = orders.filter((order) => createdSince(order, windowStart)).flatMap(normalizePaidEbayOrder);
+  const lines = orders.flatMap(normalizePaidEbayOrder);
   const imports: EbayOrderImportSummary[] = [];
 
   for (const line of lines) {
     imports.push(await importEbayOrderLine(db, line));
   }
 
+  // The latest view of each order, preferring the last-modified read.
+  const latestOrders = new Map<string, EbayFulfillmentOrder>();
+  for (const order of [...orders, ...changedOrders]) {
+    const orderId = order.orderId?.trim();
+    if (orderId) latestOrders.set(orderId, order);
+  }
   let reversedCount = 0;
   let partialRefundCount = 0;
-  for (const signal of orders.flatMap(ebayOrderLineSignals)) {
+  for (const signal of [...latestOrders.values()].flatMap(ebayOrderLineSignals)) {
     if ((await flagOrderLineSignal(db, signal)) !== "new") continue;
     if (signal.kind === "reversed") reversedCount += 1;
     else partialRefundCount += 1;
@@ -225,6 +253,7 @@ export async function syncOwnEbaySales({
     skippedCount: imports.filter((row) => row.status === "SKIPPED").length,
     reversedCount,
     partialRefundCount,
+    lateChangesChecked,
     imports,
   };
 }
@@ -234,7 +263,7 @@ export function buildFulfillmentOrdersPath({
   until,
   limit = 25,
   offset = 0,
-  dateField = "lastmodifieddate",
+  dateField = "creationdate",
 }: {
   since: Date;
   until: Date;
@@ -259,6 +288,7 @@ async function fetchFulfillmentOrdersPages({
   until,
   limit,
   fetchImpl,
+  dateField,
 }: {
   config: EbayConfig;
   accessToken: string;
@@ -266,12 +296,13 @@ async function fetchFulfillmentOrdersPages({
   until: Date;
   limit: number;
   fetchImpl: typeof fetch;
+  dateField: "creationdate" | "lastmodifieddate";
 }): Promise<EbayFulfillmentOrder[]> {
   const orders: EbayFulfillmentOrder[] = [];
   let offset = 0;
 
   for (let page = 0; page < MAX_FULFILLMENT_ORDER_PAGES; page += 1) {
-    const path = buildFulfillmentOrdersPath({ since, until, limit, offset });
+    const path = buildFulfillmentOrdersPath({ since, until, limit, offset, dateField });
     const response = await ebayJson<EbayFulfillmentOrdersResponse>(
       config,
       path,
@@ -303,6 +334,7 @@ export function normalizePaidEbayOrder(order: EbayFulfillmentOrder): NormalizedE
 
   const lines = order.lineItems ?? [];
   const amounts = ebayOrderLineAmounts(order);
+  const partlyRefunded = new Set(ebayOrderLineSignals(order).filter((signal) => signal.kind === "partial-refund").map((signal) => signal.importKey));
   const orderCreatedAt = parseDate(order.creationDate);
   const paidAt = parseDate(order.paymentSummary?.payments?.find((payment) => isPaidStatus(payment.paymentStatus))?.paymentDate) ?? orderCreatedAt;
 
@@ -311,12 +343,13 @@ export function normalizePaidEbayOrder(order: EbayFulfillmentOrder): NormalizedE
     // A line refunded in full is a reversal: there is no sale to book.
     if (lineRefundedInFull(lineAmounts)) return [];
     const lineItemId = line.lineItemId?.trim() || null;
+    const importKey = lineImportKey(orderId, line, index);
     const holdReason = lineAmounts.inGbp
       ? null
       : "eBay reported this order line in a currency other than GBP. Record the sale manually in GBP.";
 
     return [{
-      importKey: lineImportKey(orderId, line, index),
+      importKey,
       orderId,
       lineItemId,
       sku: line.sku?.trim() || null,
@@ -330,6 +363,7 @@ export function normalizePaidEbayOrder(order: EbayFulfillmentOrder): NormalizedE
       buyerPaidPence: lineAmounts.buyerPaidPence,
       holdReason,
       amountsInGbp: lineAmounts.inGbp,
+      refundNote: partlyRefunded.has(importKey) ? PARTIAL_REFUND_QUEUE_NOTE : null,
       // Persist only fulfillment fields used for audit/replay. The provider's
       // full order object may contain buyer account or address data and must
       // not be retained in this operational ledger.
@@ -361,6 +395,8 @@ export type EbayOrderLineAmounts = {
   postageChargedPence: number;
   buyerPaidPence: number;
   refundedPence: number;
+  /** eBay's own total for the line, when reported. */
+  lineTotalPence: number | null;
   inGbp: boolean;
 };
 
@@ -374,7 +410,7 @@ export function ebayOrderLineAmounts(order: EbayFulfillmentOrder): EbayOrderLine
   const lines = order.lineItems ?? [];
   if (lines.length === 0) return [];
   const pricing = order.pricingSummary;
-  const orderInGbp = ![pricing?.priceSubtotal, pricing?.priceDiscount, pricing?.deliveryCost].some(hasNonGbpAmount);
+  const orderInGbp = ![pricing?.priceSubtotal, pricing?.priceDiscount, pricing?.deliveryCost, pricing?.deliveryDiscount].some(hasNonGbpAmount);
 
   // Item cost by presence, so a 100% discount stays 0 rather than falling
   // through to the line total, which already includes postage.
@@ -393,7 +429,11 @@ export function ebayOrderLineAmounts(order: EbayFulfillmentOrder): EbayOrderLine
   }
 
   const reported = lines.map((line) => lineDeliveryPence(line) ?? 0);
-  const orderDelivery = gbpPence(pricing?.deliveryCost);
+  // Sell Fulfillment reports order delivery before delivery discounts.
+  const deliveryBeforeDiscount = gbpPence(pricing?.deliveryCost);
+  const orderDelivery = deliveryBeforeDiscount == null
+    ? null
+    : Math.max(0, deliveryBeforeDiscount - (gbpPence(pricing?.deliveryDiscount, { absolute: true }) ?? 0));
   const postage = orderDelivery == null || sumPence(reported) === orderDelivery
     ? reported
     : allocatePence(orderDelivery, reported);
@@ -406,6 +446,7 @@ export function ebayOrderLineAmounts(order: EbayFulfillmentOrder): EbayOrderLine
       postageChargedPence,
       buyerPaidPence: itemSubtotalPence + postageChargedPence,
       refundedPence: sumPence((line.refunds ?? []).map((refund) => gbpPence(refund.amount) ?? 0)),
+      lineTotalPence: gbpPence(line.total),
       inGbp: orderInGbp && !hasNonGbpLineAmount(line),
     };
   });
@@ -659,6 +700,7 @@ async function upsertImport(
     feesEstimatePence?: number | null;
   },
 ) {
+  const reason = patch.status === "UNMATCHED" && line.refundNote ? `${patch.reason} ${line.refundNote}` : patch.reason;
   const data = {
     orderId: line.orderId,
     lineItemId: line.lineItemId,
@@ -666,7 +708,7 @@ async function upsertImport(
     ebayItemId: line.ebayItemId,
     title: line.title,
     status: patch.status,
-    reason: patch.reason,
+    reason,
     itemId: patch.itemId ?? null,
     listingId: patch.listingId ?? null,
     saleId: patch.saleId ?? null,
@@ -715,6 +757,7 @@ function emptySyncResult(now: Date, reason: string): EbaySalesSyncResult {
     skippedCount: 0,
     reversedCount: 0,
     partialRefundCount: 0,
+    lateChangesChecked: false,
     imports: [],
   };
 }
@@ -729,7 +772,7 @@ export type EbayOrderLineSignal = {
 const REVERSED_BOOKED_REASON = "Cancelled or refunded in full on eBay after import. The booked sale still counts in Profit.";
 const REVERSED_QUEUE_REASON = "Cancelled or refunded in full on eBay. There is no sale to record.";
 const PARTIAL_REFUND_BOOKED_REASON = "eBay shows a refund on this order. Profit shows the amount originally paid.";
-const PARTIAL_REFUND_QUEUE_NOTE = "eBay shows a refund on this order; record only what the buyer kept paying.";
+const PARTIAL_REFUND_QUEUE_NOTE = "eBay shows a refund on this order. Check the refunded amount before recording the sale.";
 
 /**
  * Lines eBay now reports as cancelled or refunded. A whole-order cancellation
@@ -784,7 +827,7 @@ async function flagOrderLineSignal(db: EbaySalesSyncDb, signal: EbayOrderLineSig
     await createInboxAlert(db as any, {
       kind: "EBAY_SALE",
       title: `eBay order cancelled or refunded: ${title}`,
-      message: `eBay now shows order ${signal.orderId} as cancelled or refunded in full for this card. Poke Deal booked it as a sale when it was paid, so that sale still counts in Profit and its stock is still marked sold. Imported sales cannot be undone here; check the order on eBay before relisting the card.`,
+      message: `eBay now shows order ${signal.orderId} as cancelled or refunded in full for this card. Poke Deal booked it as a sale when it was paid, so that sale still counts in Profit and the stock was reduced when it was booked. Imported sales cannot be undone here; check the order on eBay before selling this copy again.`,
       href: "/?view=pnl",
       sourceKey: `ebay-reversal:${signal.importKey}`,
     });
@@ -795,21 +838,18 @@ async function flagOrderLineSignal(db: EbaySalesSyncDb, signal: EbayOrderLineSig
   await db.ebayOrderImport.update({ where, data: { reason: PARTIAL_REFUND_BOOKED_REASON } });
   await createInboxAlert(db as any, {
     kind: "EBAY_SALE",
-    title: `eBay refund on an imported sale: ${title}`,
-    message: `eBay shows a refund on order ${signal.orderId} after Poke Deal booked it as a sale. Profit still shows the amount originally paid. Check the refund on eBay.`,
+    title: `eBay refund on a booked sale: ${title}`,
+    message: `eBay shows a refund on order ${signal.orderId}, which Poke Deal booked as a sale. Profit still shows the amount originally paid. Check the refund on eBay.`,
     href: "/?view=pnl",
     sourceKey: `ebay-partial-refund:${signal.importKey}`,
   });
   return "new";
 }
 
+/** Judged against eBay's own line total, not this app's postage allocation. */
 function lineRefundedInFull(line: EbayOrderLineAmounts): boolean {
-  return line.buyerPaidPence > 0 && line.refundedPence >= line.buyerPaidPence;
-}
-
-function createdSince(order: EbayFulfillmentOrder, windowStart: Date): boolean {
-  const created = parseDate(order.creationDate);
-  return !created || created.getTime() >= windowStart.getTime();
+  const lineTotal = line.lineTotalPence ?? line.buyerPaidPence;
+  return lineTotal > 0 && line.refundedPence >= lineTotal;
 }
 
 function heldAmountsForLine(order: EbayFulfillmentOrder, line: EbayFulfillmentLineItem) {
@@ -819,9 +859,15 @@ function heldAmountsForLine(order: EbayFulfillmentOrder, line: EbayFulfillmentLi
     discountedLineItemCost: pickMoney(line.discountedLineItemCost),
     total: pickMoney(line.total),
     deliveryCost: !delivery ? undefined : isNestedDeliveryCost(delivery)
-      ? { shippingCost: pickMoney(delivery.shippingCost), importCharges: pickMoney(delivery.importCharges) }
+      ? {
+        shippingCost: pickMoney(delivery.shippingCost),
+        handlingCost: pickMoney(delivery.handlingCost),
+        importCharges: pickMoney(delivery.importCharges),
+        discountAmount: pickMoney(delivery.discountAmount),
+      }
       : pickMoney(delivery),
     orderDeliveryCost: pickMoney(order.pricingSummary?.deliveryCost),
+    orderDeliveryDiscount: pickMoney(order.pricingSummary?.deliveryDiscount),
   };
 }
 
@@ -839,13 +885,21 @@ function isReversedOrder(order: EbayFulfillmentOrder): boolean {
     /^cancell?ed$/i.test(order.cancelStatus?.cancelState?.trim() ?? "");
 }
 
+/**
+ * Held only while a cancellation request is still open. cancelState stays
+ * IN_PROGRESS after a request is rejected, and those orders must import.
+ */
 function hasPendingCancellation(order: EbayFulfillmentOrder): boolean {
-  return /^in_progress$/i.test(order.cancelStatus?.cancelState?.trim() ?? "");
+  return (order.cancelStatus?.cancelRequests ?? []).some((request) => /^requested$/i.test(request.cancelRequestState?.trim() ?? ""));
 }
 
 function hasNonGbpLineAmount(line: EbayFulfillmentLineItem): boolean {
   const delivery = line.deliveryCost;
-  const deliveryAmounts = !delivery ? [] : isNestedDeliveryCost(delivery) ? [delivery.shippingCost, delivery.importCharges] : [delivery];
+  const deliveryAmounts = !delivery
+    ? []
+    : isNestedDeliveryCost(delivery)
+      ? [delivery.shippingCost, delivery.handlingCost, delivery.importCharges, delivery.discountAmount]
+      : [delivery];
   const refundAmounts = (line.refunds ?? []).map((refund) => refund.amount);
   return [line.lineItemCost, line.discountedLineItemCost, line.total, ...deliveryAmounts, ...refundAmounts].some(hasNonGbpAmount);
 }
@@ -863,22 +917,22 @@ function isPaidStatus(status: string | undefined): boolean {
   return /^(paid|settled)$/i.test(status?.trim() ?? "");
 }
 
-/** The line's own delivery charge, or null when the line reports none. */
+/** The line's own delivery charge after its shipping discount, or null when the line reports none. */
 function lineDeliveryPence(line: EbayFulfillmentLineItem): number | null {
   const delivery = line.deliveryCost;
   if (!delivery) return null;
   if (isNestedDeliveryCost(delivery)) {
-    const shipping = gbpPence(delivery.shippingCost);
-    const importCharges = gbpPence(delivery.importCharges);
-    return shipping == null && importCharges == null ? null : (shipping ?? 0) + (importCharges ?? 0);
+    const charges = [delivery.shippingCost, delivery.handlingCost, delivery.importCharges].map((money) => gbpPence(money));
+    if (charges.every((charge) => charge == null)) return null;
+    const discount = gbpPence(delivery.discountAmount, { absolute: true }) ?? 0;
+    return Math.max(0, sumPence(charges.map((charge) => charge ?? 0)) - discount);
   }
   return gbpPence(delivery);
 }
 
-function isNestedDeliveryCost(
-  delivery: EbayFulfillmentLineItem["deliveryCost"],
-): delivery is { shippingCost?: EbayMoney; importCharges?: EbayMoney } {
-  return typeof delivery === "object" && delivery !== null && ("shippingCost" in delivery || "importCharges" in delivery);
+function isNestedDeliveryCost(delivery: EbayFulfillmentLineItem["deliveryCost"]): delivery is EbayLineDeliveryCost {
+  return typeof delivery === "object" && delivery !== null &&
+    ("shippingCost" in delivery || "handlingCost" in delivery || "importCharges" in delivery || "discountAmount" in delivery);
 }
 
 /**

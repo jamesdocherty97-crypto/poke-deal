@@ -22,7 +22,7 @@ const TEST_CONFIG: EbayConfig = {
   tokenUrl: "https://api.sandbox.ebay.com/identity/v1/oauth2/token",
 };
 
-test("buildFulfillmentOrdersPath requests recently changed orders with a bounded limit", () => {
+test("buildFulfillmentOrdersPath requests recent orders by creation date with a bounded limit", () => {
   const path = buildFulfillmentOrdersPath({
     since: new Date("2026-07-01T00:00:00.000Z"),
     until: new Date("2026-07-03T00:00:00.000Z"),
@@ -33,14 +33,14 @@ test("buildFulfillmentOrdersPath requests recently changed orders with a bounded
   assert.equal(url.pathname, "/sell/fulfillment/v1/order");
   assert.equal(url.searchParams.get("limit"), "100");
   assert.equal(url.searchParams.get("offset"), "0");
-  // Last-modified catches refunds and cancellations on older orders; imports still use creation date.
-  assert.equal(url.searchParams.get("filter"), "lastmodifieddate:[2026-07-01T00:00:00.000Z..2026-07-03T00:00:00.000Z]");
-  const byCreation = new URL(`https://api.ebay.com${buildFulfillmentOrdersPath({
+  assert.equal(url.searchParams.get("filter"), "creationdate:[2026-07-01T00:00:00.000Z..2026-07-03T00:00:00.000Z]");
+  // The separate signals read uses last-modified date to see later refunds and cancellations.
+  const byModified = new URL(`https://api.ebay.com${buildFulfillmentOrdersPath({
     since: new Date("2026-07-01T00:00:00.000Z"),
     until: new Date("2026-07-03T00:00:00.000Z"),
-    dateField: "creationdate",
+    dateField: "lastmodifieddate",
   })}`);
-  assert.equal(byCreation.searchParams.get("filter"), "creationdate:[2026-07-01T00:00:00.000Z..2026-07-03T00:00:00.000Z]");
+  assert.equal(byModified.searchParams.get("filter"), "lastmodifieddate:[2026-07-01T00:00:00.000Z..2026-07-03T00:00:00.000Z]");
 });
 
 test("syncOwnEbaySales follows Fulfillment pagination before importing", async () => {
@@ -60,8 +60,9 @@ test("syncOwnEbaySales follows Fulfillment pagination before importing", async (
     if (href.includes("/identity/v1/oauth2/token")) {
       return Promise.resolve(Response.json({ access_token: "user-token", expires_in: 7200 }));
     }
-    const offset = new URL(href).searchParams.get("offset") ?? "";
-    offsets.push(offset);
+    const params = new URL(href).searchParams;
+    const offset = params.get("offset") ?? "";
+    offsets.push(`${(params.get("filter") ?? "").split(":")[0]}@${offset}`);
     const index = Number(offset);
     return Promise.resolve(Response.json({
       total: 2,
@@ -86,7 +87,8 @@ test("syncOwnEbaySales follows Fulfillment pagination before importing", async (
     });
     assert.equal(result.fetchedOrders, 2);
     assert.equal(result.unmatchedCount, 2);
-    assert.deepEqual(offsets, ["0", "1"]);
+    assert.deepEqual(offsets, ["creationdate@0", "creationdate@1", "lastmodifieddate@0", "lastmodifieddate@1"]);
+    assert.equal(result.lateChangesChecked, true);
   } finally {
     restoreEnv("EBAY_CLIENT_ID", savedEnv.clientId);
     restoreEnv("EBAY_CLIENT_SECRET", savedEnv.clientSecret);
@@ -428,14 +430,23 @@ test("normalizePaidEbayOrder does not import fully refunded orders even though t
   );
 });
 
-test("normalizePaidEbayOrder skips cancelled orders and holds orders with a cancellation in progress", () => {
+test("normalizePaidEbayOrder skips cancelled orders and holds only an open cancellation request", () => {
   const paidLine = { lineItemId: "line-1", sku: "pdos-listing-1", quantity: 1, lineItemCost: { value: "10.00", currency: "GBP" } };
   assert.deepEqual(normalizePaidEbayOrder({
     orderId: "order-cancelled", orderPaymentStatus: "PAID", cancelStatus: { cancelState: "CANCELED" }, lineItems: [paidLine],
   }), []);
   assert.deepEqual(normalizePaidEbayOrder({
-    orderId: "order-cancelling", orderPaymentStatus: "PAID", cancelStatus: { cancelState: "IN_PROGRESS" }, lineItems: [paidLine],
+    orderId: "order-cancelling", orderPaymentStatus: "PAID",
+    cancelStatus: { cancelState: "IN_PROGRESS", cancelRequests: [{ cancelRequestState: "REQUESTED" }] }, lineItems: [paidLine],
   }), []);
+  // cancelState stays IN_PROGRESS after the seller rejects the request; the sale stands and must import, as on main.
+  assert.equal(normalizePaidEbayOrder({
+    orderId: "order-cancel-rejected", orderPaymentStatus: "PAID",
+    cancelStatus: { cancelState: "IN_PROGRESS", cancelRequests: [{ cancelRequestState: "REJECTED" }] }, lineItems: [paidLine],
+  }).length, 1);
+  assert.equal(normalizePaidEbayOrder({
+    orderId: "order-cancel-no-detail", orderPaymentStatus: "PAID", cancelStatus: { cancelState: "IN_PROGRESS", cancelRequests: [] }, lineItems: [paidLine],
+  }).length, 1);
   assert.equal(normalizePaidEbayOrder({
     orderId: "order-kept", orderPaymentStatus: "PAID", cancelStatus: { cancelState: "NONE_REQUESTED" }, lineItems: [paidLine],
   }).length, 1);
@@ -581,10 +592,22 @@ async function withEbayEnv<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-function ordersFetch(orders: unknown[]): typeof globalThis.fetch {
-  return (url) => String(url).includes("/identity/v1/oauth2/token")
-    ? Promise.resolve(Response.json({ access_token: "user-token", expires_in: 7200 }))
-    : Promise.resolve(Response.json({ total: orders.length, limit: 25, offset: 0, orders }));
+/** A fake Fulfillment API that applies the date filter it is sent, like eBay does. */
+function ordersFetch(orders: Array<Record<string, unknown>>, options: { failModifiedRead?: boolean } = {}): typeof globalThis.fetch {
+  return (url) => {
+    const href = String(url);
+    if (href.includes("/identity/v1/oauth2/token")) return Promise.resolve(Response.json({ access_token: "user-token", expires_in: 7200 }));
+    const match = /^(creationdate|lastmodifieddate):\[(.+)\.\.(.+)\]$/.exec(new URL(href).searchParams.get("filter") ?? "");
+    if (!match) return Promise.resolve(Response.json({ errors: [{ message: "bad filter" }] }, { status: 400 }));
+    if (match[1] === "lastmodifieddate" && options.failModifiedRead) return Promise.resolve(Response.json({ errors: [{ message: "unavailable" }] }, { status: 500 }));
+    const from = Date.parse(match[2]!);
+    const to = Date.parse(match[3]!);
+    const inRange = orders.filter((order) => {
+      const at = Date.parse(String(match[1] === "creationdate" ? order.creationDate : order.lastModifiedDate ?? order.creationDate));
+      return at >= from && at <= to;
+    });
+    return Promise.resolve(Response.json({ total: inRange.length, limit: 25, offset: 0, orders: inRange }));
+  };
 }
 
 const gbp = (value: string) => ({ value, currency: "GBP" });
@@ -626,13 +649,17 @@ test("multi-line orders always book exactly the order's delivery and discounted 
     const listed = Array.from({ length: count }, () => 100 + next(50_000));
     const subtotal = listed.reduce((sum, pence) => sum + pence, 0);
     const delivery = next(3) === 0 ? 0 : next(2_000);
+    const deliveryDiscount = next(3) === 0 ? next(delivery + 1) : 0;
     const discount = next(3) === 0 ? next(subtotal) : 0;
     const lineItems = listed.map((pence, index) => ({
       lineItemId: `line-${index}`,
       quantity: 1 + next(3),
       lineItemCost: money(pence),
       // Lines report delivery in several inconsistent ways: none, zero, per line, or the whole order's figure.
-      ...(next(4) === 0 ? {} : { deliveryCost: { shippingCost: money([0, next(800), delivery][next(3)]!) } }),
+      ...(next(4) === 0 ? {} : { deliveryCost: {
+        shippingCost: money([0, next(800), delivery][next(3)]!),
+        ...(next(3) === 0 ? { discountAmount: gbp(`-${(next(300) / 100).toFixed(2)}`) } : {}),
+      } }),
     }));
     const lines = normalizePaidEbayOrder({
       orderId: `order-property-${round}`,
@@ -640,12 +667,13 @@ test("multi-line orders always book exactly the order's delivery and discounted 
       pricingSummary: {
         priceSubtotal: money(subtotal),
         deliveryCost: money(delivery),
+        ...(deliveryDiscount ? { deliveryDiscount: gbp(`-${(deliveryDiscount / 100).toFixed(2)}`) } : {}),
         ...(discount ? { priceDiscount: gbp(`-${(discount / 100).toFixed(2)}`) } : {}),
       },
       lineItems,
     });
     assert.equal(lines.length, count);
-    assert.equal(lines.reduce((sum, line) => sum + line.postageChargedPence, 0), delivery, `round ${round}: postage`);
+    assert.equal(lines.reduce((sum, line) => sum + line.postageChargedPence, 0), delivery - deliveryDiscount, `round ${round}: postage`);
     assert.equal(lines.reduce((sum, line) => sum + line.itemSubtotalPence, 0), subtotal - discount, `round ${round}: items`);
     assert.ok(lines.every((line) => line.buyerPaidPence === line.itemSubtotalPence + line.postageChargedPence && line.itemSubtotalPence >= 0));
   }
@@ -777,6 +805,7 @@ test("an order created before the window is never imported, but its later refund
     };
     const oldUnseen = { ...oldButRefunded, orderId: "order-old-paid", orderPaymentStatus: "PAID", lineItems: [{ lineItemId: "line-9", sku: "pdos-item-1", quantity: 1, lineItemCost: gbp("50.00") }] };
     const result = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl: ordersFetch([oldButRefunded, oldUnseen]), now: new Date("2026-07-05T00:00:00.000Z") });
+    assert.equal(result.lateChangesChecked, true);
     assert.equal(result.reversedCount, 1);
     assert.equal(result.imports.length, 0, "orders created before the window are not imported");
     assert.equal(db.sales.length, 1);
@@ -796,4 +825,98 @@ test("held non-GBP rows store no pence amounts but keep eBay's own figures for m
   assert.equal(db.imports[0]?.buyerPaidPence, null);
   assert.equal(db.imports[0]?.postageChargedPence, null);
   assert.deepEqual(db.imports[0]?.payload?.heldAmounts?.lineItemCost, { value: "14.00", currency: "EUR" });
+});
+
+// ---- Verification follow-ups: delivery discounts, eBay's own line totals, signals never block imports ----
+
+test("an order-level delivery discount is taken off the booked postage", () => {
+  const lines = normalizePaidEbayOrder({
+    orderId: "order-delivery-discount",
+    orderPaymentStatus: "PAID",
+    pricingSummary: { priceSubtotal: gbp("14.00"), deliveryCost: gbp("3.50"), deliveryDiscount: gbp("-2.00"), total: gbp("15.50") },
+    lineItems: [
+      { lineItemId: "line-1", quantity: 1, lineItemCost: gbp("10.00"), deliveryCost: { shippingCost: gbp("2.00"), discountAmount: gbp("-2.00") }, total: gbp("10.00") },
+      { lineItemId: "line-2", quantity: 1, lineItemCost: gbp("4.00"), deliveryCost: { shippingCost: gbp("1.50") }, total: gbp("5.50") },
+    ],
+  });
+  assert.deepEqual(lines.map((line) => line.postageChargedPence), [0, 150]);
+  assert.equal(lines.reduce((sum, line) => sum + line.buyerPaidPence, 0), 1550, "matches eBay's order total");
+});
+
+test("a line refunded for eBay's own line total is a reversal even when postage was reallocated", () => {
+  const order = {
+    orderId: "order-refund-vs-total",
+    orderPaymentStatus: "PARTIALLY_REFUNDED",
+    paymentSummary: { payments: [{ paymentStatus: "PAID" }] },
+    pricingSummary: { deliveryCost: gbp("3.00") },
+    lineItems: [
+      // eBay's line total includes 3.00 postage; the order's single 3.00 delivery is shared across lines here.
+      { lineItemId: "line-1", quantity: 1, lineItemCost: gbp("10.00"), deliveryCost: { shippingCost: gbp("3.00") }, total: gbp("13.00"), refunds: [{ amount: gbp("13.00") }] },
+      { lineItemId: "line-2", quantity: 1, lineItemCost: gbp("5.00"), deliveryCost: { shippingCost: gbp("3.00") }, total: gbp("8.00") },
+    ],
+  };
+  assert.deepEqual(ebayOrderLineSignals(order).map((signal) => signal.kind), ["reversed"]);
+  assert.deepEqual(normalizePaidEbayOrder(order).map((line) => line.lineItemId), ["line-2"]);
+
+  // A refund that only covers the app's smaller postage share is still a partial refund of eBay's line.
+  const partial = { ...order, lineItems: [{ ...order.lineItems[0]!, refunds: [{ amount: gbp("11.50") }] }, order.lineItems[1]!] };
+  assert.deepEqual(ebayOrderLineSignals(partial).map((signal) => signal.kind), ["partial-refund"]);
+  assert.equal(normalizePaidEbayOrder(partial).length, 2);
+});
+
+test("imports still run when the extra read for older orders fails", async () => {
+  await withEbayEnv(async () => {
+    const db = fakeEbaySyncDb();
+    const order = {
+      orderId: "order-1",
+      creationDate: "2026-07-03T10:00:00.000Z",
+      orderPaymentStatus: "PAID",
+      lineItems: [{ lineItemId: "line-1", sku: "pdos-listing-1", quantity: 1, lineItemCost: gbp("100.00") }],
+    };
+    const result = await syncOwnEbaySales({
+      db: db.client, config: TEST_CONFIG, now: new Date("2026-07-05T00:00:00.000Z"),
+      fetchImpl: ordersFetch([order], { failModifiedRead: true }),
+    });
+    assert.equal(result.matchedCount, 1);
+    assert.equal(result.lateChangesChecked, false);
+    assert.equal(db.sales.length, 1);
+  });
+});
+
+test("a partly refunded line in the manual queue shows its refund note in the sync result", async () => {
+  await withEbayEnv(async () => {
+    const db = fakeEbaySyncDb({ includeListing: false, includeItem: false });
+    const order = {
+      orderId: "order-queue-refund",
+      creationDate: "2026-07-03T10:00:00.000Z",
+      orderPaymentStatus: "PARTIALLY_REFUNDED",
+      paymentSummary: { payments: [{ paymentStatus: "PAID" }] },
+      lineItems: [{ lineItemId: "line-1", sku: "pdos-missing", quantity: 1, lineItemCost: gbp("20.00"), total: gbp("20.00"), refunds: [{ amount: gbp("5.00") }] }],
+    };
+    const result = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, now: new Date("2026-07-05T00:00:00.000Z"), fetchImpl: ordersFetch([order]) });
+    assert.equal(result.imports[0]?.status, "UNMATCHED");
+    assert.match(result.imports[0]?.reason ?? "", /No Poke Deal stock row.*Check the refunded amount/);
+    assert.equal(db.sales.length, 0);
+  });
+});
+
+test("reversal alert copy is true for a multi-copy stock row that stays listed", async () => {
+  await withEbayEnv(async () => {
+    const db = fakeEbaySyncDb();
+    db.items[0]!.quantity = 3;
+    const paid = {
+      orderId: "order-1",
+      creationDate: "2026-07-03T10:00:00.000Z",
+      orderPaymentStatus: "PAID",
+      lineItems: [{ lineItemId: "line-1", sku: "pdos-listing-1", title: "Charizard ex 151 PSA 10", quantity: 1, lineItemCost: gbp("100.00") }],
+    };
+    const now = new Date("2026-07-05T00:00:00.000Z");
+    await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, now, fetchImpl: ordersFetch([paid]) });
+    assert.equal(db.items[0]?.status, "LISTED");
+    const result = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, now, fetchImpl: ordersFetch([{ ...paid, cancelStatus: { cancelState: "CANCELED" } }]) });
+    assert.equal(result.reversedCount, 1);
+    const alert = db.appAlerts.find((row) => row.sourceKey === "ebay-reversal:ebay:order-1:line-1");
+    assert.doesNotMatch(alert?.message ?? "", /marked sold|relist/i);
+    assert.match(alert?.message ?? "", /stock was reduced/);
+  });
 });

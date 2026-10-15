@@ -50,15 +50,6 @@ function stockMarketPoints(
     : (preview?.market ?? []).map((point) => ({ at: point.takenAt, pence: point.marketPence, kind: "market" as const }));
 }
 
-/** Visible label for the stock row history button; the sparkline itself carries no text. */
-export function stockHistoryLabel(
-  history: CardPriceHistory | null | undefined,
-  preview?: CardPriceHistoryPreview | null,
-): string {
-  if (!history && !preview) return "History";
-  return stockMarketPoints(history, preview).length === 0 ? "No price history" : "History";
-}
-
 export function StockHistorySparkline({
   history,
   preview,

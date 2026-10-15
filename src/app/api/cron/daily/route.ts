@@ -62,6 +62,7 @@ export async function GET(request: Request) {
         skippedCount: result.skippedCount,
         reversedCount: result.reversedCount,
         partialRefundCount: result.partialRefundCount,
+        lateChangesChecked: result.lateChangesChecked,
       }),
     });
 
