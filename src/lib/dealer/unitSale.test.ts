@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildSalePreview, planSaleUndo, planUnitSale, splitPence } from "./unitSale.js";
+import { allocatePence, buildSalePreview, planSaleUndo, planUnitSale, splitPence } from "./unitSale.js";
 
 test("planUnitSale fully sells a single-copy stock row", () => {
   assert.deepEqual(planUnitSale({ quantity: 1, status: "LISTED" }), {
@@ -106,4 +106,25 @@ test("buildSalePreview handles multiple sold copies", () => {
   assert.equal(preview.profitPence, 1925);
   assert.equal(preview.roiPct, 32.1);
   assert.equal(preview.marginPct, 21.4);
+});
+
+test("allocatePence splits by weight and always sums to the exact total", () => {
+  assert.deepEqual(allocatePence(300, [300, 300]), [150, 150]);
+  assert.deepEqual(allocatePence(500, [300, 0]), [500, 0]);
+  assert.deepEqual(allocatePence(100, [1, 1, 1]), [34, 33, 33]);
+  assert.deepEqual(allocatePence(301, [0, 0]), [151, 150], "no positive weight splits evenly");
+  assert.deepEqual(allocatePence(0, [5, 7]), [0, 0]);
+  assert.deepEqual(allocatePence(10, []), []);
+  let seed = 7;
+  const next = (max: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % max; };
+  for (let round = 0; round < 2000; round += 1) {
+    const total = next(2_000_000);
+    const weights = Array.from({ length: 1 + next(9) }, () => (next(4) === 0 ? 0 : next(5_000_000)));
+    const parts = allocatePence(total, weights);
+    assert.equal(parts.reduce((sum, part) => sum + part, 0), total);
+    assert.ok(parts.every((part) => Number.isSafeInteger(part) && part >= 0));
+    if (weights.some((weight) => weight > 0)) {
+      assert.ok(parts.every((part, index) => weights[index] !== 0 || part === 0), "zero-weight lines get nothing when another line has weight");
+    }
+  }
 });

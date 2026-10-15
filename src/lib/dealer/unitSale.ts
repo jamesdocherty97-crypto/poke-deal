@@ -105,6 +105,31 @@ export function splitPence(totalPence: number, parts: number): number[] {
   });
 }
 
+/**
+ * Split total pence in proportion to weights by largest remainder, so the parts
+ * always sum to exactly the total. With no positive weight it splits evenly.
+ */
+export function allocatePence(totalPence: number, weights: readonly number[]): number[] {
+  if (weights.length === 0) return [];
+  const total = Math.max(0, Math.round(totalPence));
+  const clean = weights.map((weight) => (Number.isFinite(weight) && weight > 0 ? Math.round(weight) : 0));
+  const weightSum = clean.reduce((sum, weight) => sum + weight, 0);
+  if (weightSum === 0) return splitPence(total, weights.length);
+  const bigTotal = BigInt(total);
+  const bigSum = BigInt(weightSum);
+  const parts = clean.map((weight) => Number((bigTotal * BigInt(weight)) / bigSum));
+  const order = clean
+    .map((weight, index) => ({ index, remainder: (bigTotal * BigInt(weight)) % bigSum }))
+    .sort((a, b) => (a.remainder === b.remainder ? a.index - b.index : a.remainder > b.remainder ? -1 : 1));
+  let left = total - parts.reduce((sum, part) => sum + part, 0);
+  for (const { index } of order) {
+    if (left <= 0) break;
+    parts[index] = (parts[index] ?? 0) + 1;
+    left -= 1;
+  }
+  return parts;
+}
+
 export function buildSalePreview(input: SalePreviewInput): SalePreview {
   const soldQuantity = Math.max(1, Math.floor(input.soldQuantity));
   const salePricePence = Math.max(0, Math.round(input.salePricePence));

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildFulfillmentOrdersPath,
+  ebayOrderLineSignals,
   importEbayOrderLine,
   normalizePaidEbayOrder,
   syncOwnEbaySales,
@@ -21,7 +22,7 @@ const TEST_CONFIG: EbayConfig = {
   tokenUrl: "https://api.sandbox.ebay.com/identity/v1/oauth2/token",
 };
 
-test("buildFulfillmentOrdersPath requests recent fulfillment orders with a bounded limit", () => {
+test("buildFulfillmentOrdersPath requests recently changed orders with a bounded limit", () => {
   const path = buildFulfillmentOrdersPath({
     since: new Date("2026-07-01T00:00:00.000Z"),
     until: new Date("2026-07-03T00:00:00.000Z"),
@@ -32,7 +33,14 @@ test("buildFulfillmentOrdersPath requests recent fulfillment orders with a bound
   assert.equal(url.pathname, "/sell/fulfillment/v1/order");
   assert.equal(url.searchParams.get("limit"), "100");
   assert.equal(url.searchParams.get("offset"), "0");
-  assert.equal(url.searchParams.get("filter"), "creationdate:[2026-07-01T00:00:00.000Z..2026-07-03T00:00:00.000Z]");
+  // Last-modified catches refunds and cancellations on older orders; imports still use creation date.
+  assert.equal(url.searchParams.get("filter"), "lastmodifieddate:[2026-07-01T00:00:00.000Z..2026-07-03T00:00:00.000Z]");
+  const byCreation = new URL(`https://api.ebay.com${buildFulfillmentOrdersPath({
+    since: new Date("2026-07-01T00:00:00.000Z"),
+    until: new Date("2026-07-03T00:00:00.000Z"),
+    dateField: "creationdate",
+  })}`);
+  assert.equal(byCreation.searchParams.get("filter"), "creationdate:[2026-07-01T00:00:00.000Z..2026-07-03T00:00:00.000Z]");
 });
 
 test("syncOwnEbaySales follows Fulfillment pagination before importing", async () => {
@@ -74,6 +82,7 @@ test("syncOwnEbaySales follows Fulfillment pagination before importing", async (
       config: TEST_CONFIG,
       fetchImpl,
       limit: 1,
+      now: new Date("2026-07-04T00:00:00.000Z"),
     });
     assert.equal(result.fetchedOrders, 2);
     assert.equal(result.unmatchedCount, 2);
@@ -432,7 +441,7 @@ test("normalizePaidEbayOrder skips cancelled orders and holds orders with a canc
   }).length, 1);
 });
 
-test("normalizePaidEbayOrder still imports a partially refunded order as a sale", () => {
+test("normalizePaidEbayOrder books a partially refunded order; the sync flags it for a refund check", () => {
   const lines = normalizePaidEbayOrder({
     orderId: "order-partial",
     orderPaymentStatus: "PARTIALLY_REFUNDED",
@@ -539,8 +548,9 @@ test("syncOwnEbaySales flags an already-imported sale whose eBay order was later
   try {
     const first = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl });
     const second = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl });
-    assert.equal(first.reversedCount, 1);
-    assert.equal(second.reversedCount, 1);
+    const third = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl });
+    assert.deepEqual([first.reversedCount, second.reversedCount, third.reversedCount], [1, 0, 0], "only the first sync counts the reversal");
+    assert.match(db.imports[0]?.reason ?? "", /Cancelled or refunded in full on eBay after import/);
     assert.equal(first.matchedCount, 0);
     assert.equal(db.sales.length, 1, "no new sale is booked for the reversed order");
     const reversals = db.appAlerts.filter((alert) => alert.sourceKey === "ebay-reversal:ebay:order-1:line-1");
@@ -553,4 +563,237 @@ test("syncOwnEbaySales flags an already-imported sale whose eBay order was later
     restoreEnv("EBAY_RU_NAME", savedEnv.ruName);
     restoreEnv("EBAY_REFRESH_TOKEN", savedEnv.refreshToken);
   }
+});
+
+// ---- Review follow-ups (PR #26): totals reconcile to eBay's own order figures ----
+
+async function withEbayEnv<T>(fn: () => Promise<T>): Promise<T> {
+  const keys = ["EBAY_CLIENT_ID", "EBAY_CLIENT_SECRET", "EBAY_RU_NAME", "EBAY_REFRESH_TOKEN"] as const;
+  const saved = keys.map((key) => process.env[key]);
+  process.env.EBAY_CLIENT_ID = TEST_CONFIG.clientId;
+  process.env.EBAY_CLIENT_SECRET = TEST_CONFIG.clientSecret;
+  process.env.EBAY_RU_NAME = TEST_CONFIG.ruName;
+  process.env.EBAY_REFRESH_TOKEN = "refresh-token";
+  try {
+    return await fn();
+  } finally {
+    keys.forEach((key, index) => restoreEnv(key, saved[index]));
+  }
+}
+
+function ordersFetch(orders: unknown[]): typeof globalThis.fetch {
+  return (url) => String(url).includes("/identity/v1/oauth2/token")
+    ? Promise.resolve(Response.json({ access_token: "user-token", expires_in: 7200 }))
+    : Promise.resolve(Response.json({ total: orders.length, limit: 25, offset: 0, orders }));
+}
+
+const gbp = (value: string) => ({ value, currency: "GBP" });
+
+test("per-line postage is reconciled to the order delivery total when a line reports none", () => {
+  const lines = normalizePaidEbayOrder({
+    orderId: "order-mixed-postage",
+    orderPaymentStatus: "PAID",
+    pricingSummary: { deliveryCost: gbp("5.00") },
+    lineItems: [
+      { lineItemId: "line-1", quantity: 1, lineItemCost: gbp("10.00"), deliveryCost: { shippingCost: gbp("3.00") } },
+      { lineItemId: "line-2", quantity: 1, lineItemCost: gbp("5.00") },
+    ],
+  });
+  assert.equal(lines.reduce((sum, line) => sum + line.postageChargedPence, 0), 500, "no postage is dropped");
+  assert.equal(lines.reduce((sum, line) => sum + line.buyerPaidPence, 0), 2000);
+});
+
+test("combined postage is booked once, not once per line", () => {
+  const lines = normalizePaidEbayOrder({
+    orderId: "order-combined-postage",
+    orderPaymentStatus: "PAID",
+    pricingSummary: { deliveryCost: gbp("3.00"), total: gbp("18.00") },
+    lineItems: [
+      { lineItemId: "line-1", quantity: 1, lineItemCost: gbp("10.00"), deliveryCost: { shippingCost: gbp("3.00") } },
+      { lineItemId: "line-2", quantity: 1, lineItemCost: gbp("5.00"), deliveryCost: { shippingCost: gbp("3.00") } },
+    ],
+  });
+  assert.deepEqual(lines.map((line) => line.postageChargedPence), [150, 150]);
+  assert.equal(lines.reduce((sum, line) => sum + line.buyerPaidPence, 0), 1800, "no phantom revenue");
+});
+
+test("multi-line orders always book exactly the order's delivery and discounted item totals", () => {
+  let seed = 11;
+  const next = (max: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % max; };
+  const money = (pence: number) => gbp((pence / 100).toFixed(2));
+  for (let round = 0; round < 1500; round += 1) {
+    const count = 1 + next(6);
+    const listed = Array.from({ length: count }, () => 100 + next(50_000));
+    const subtotal = listed.reduce((sum, pence) => sum + pence, 0);
+    const delivery = next(3) === 0 ? 0 : next(2_000);
+    const discount = next(3) === 0 ? next(subtotal) : 0;
+    const lineItems = listed.map((pence, index) => ({
+      lineItemId: `line-${index}`,
+      quantity: 1 + next(3),
+      lineItemCost: money(pence),
+      // Lines report delivery in several inconsistent ways: none, zero, per line, or the whole order's figure.
+      ...(next(4) === 0 ? {} : { deliveryCost: { shippingCost: money([0, next(800), delivery][next(3)]!) } }),
+    }));
+    const lines = normalizePaidEbayOrder({
+      orderId: `order-property-${round}`,
+      orderPaymentStatus: "PAID",
+      pricingSummary: {
+        priceSubtotal: money(subtotal),
+        deliveryCost: money(delivery),
+        ...(discount ? { priceDiscount: gbp(`-${(discount / 100).toFixed(2)}`) } : {}),
+      },
+      lineItems,
+    });
+    assert.equal(lines.length, count);
+    assert.equal(lines.reduce((sum, line) => sum + line.postageChargedPence, 0), delivery, `round ${round}: postage`);
+    assert.equal(lines.reduce((sum, line) => sum + line.itemSubtotalPence, 0), subtotal - discount, `round ${round}: items`);
+    assert.ok(lines.every((line) => line.buyerPaidPence === line.itemSubtotalPence + line.postageChargedPence && line.itemSubtotalPence >= 0));
+  }
+});
+
+test("an order-level discount without per-line discounted costs reduces the booked item amount", () => {
+  const [line] = normalizePaidEbayOrder({
+    orderId: "order-order-discount",
+    orderPaymentStatus: "PAID",
+    pricingSummary: { priceSubtotal: gbp("10.00"), priceDiscount: gbp("-2.00") },
+    lineItems: [{ lineItemId: "line-1", quantity: 1, lineItemCost: gbp("10.00") }],
+  });
+  assert.equal(line?.itemSubtotalPence, 800);
+  assert.equal(line?.buyerPaidPence, 800);
+});
+
+test("a 100% discounted line books 0 for the item and does not double-count postage", () => {
+  const [line] = normalizePaidEbayOrder({
+    orderId: "order-free-item",
+    orderPaymentStatus: "PAID",
+    lineItems: [{
+      lineItemId: "line-1",
+      quantity: 1,
+      lineItemCost: gbp("5.00"),
+      discountedLineItemCost: gbp("0.00"),
+      total: gbp("3.00"),
+      deliveryCost: { shippingCost: gbp("3.00") },
+    }],
+  });
+  assert.equal(line?.itemSubtotalPence, 0);
+  assert.equal(line?.postageChargedPence, 300);
+  assert.equal(line?.buyerPaidPence, 300);
+});
+
+test("a line refunded in full inside a multi-line order is not booked and is signalled as a reversal", () => {
+  const order = {
+    orderId: "order-one-returned",
+    orderPaymentStatus: "PARTIALLY_REFUNDED",
+    paymentSummary: { payments: [{ paymentStatus: "PAID" }] },
+    pricingSummary: { deliveryCost: gbp("0.00") },
+    lineItems: [
+      { lineItemId: "line-1", quantity: 1, lineItemCost: gbp("10.00") },
+      { lineItemId: "line-2", quantity: 1, lineItemCost: gbp("20.00"), refunds: [{ amount: gbp("20.00") }] },
+      { lineItemId: "line-3", quantity: 1, lineItemCost: gbp("30.00") },
+    ],
+  };
+  assert.deepEqual(normalizePaidEbayOrder(order).map((line) => line.lineItemId), ["line-1", "line-3"]);
+  assert.deepEqual(ebayOrderLineSignals(order).map((signal) => [signal.importKey, signal.kind]), [["ebay:order-one-returned:line-2", "reversed"]]);
+});
+
+test("a partly refunded line is booked and signalled; an order-level partial refund signals every line", () => {
+  const lineRefund = {
+    orderId: "order-line-partial",
+    orderPaymentStatus: "PARTIALLY_REFUNDED",
+    paymentSummary: { payments: [{ paymentStatus: "PAID" }] },
+    lineItems: [
+      { lineItemId: "line-1", quantity: 1, lineItemCost: gbp("10.00"), refunds: [{ amount: gbp("4.00") }] },
+      { lineItemId: "line-2", quantity: 1, lineItemCost: gbp("20.00") },
+    ],
+  };
+  assert.equal(normalizePaidEbayOrder(lineRefund).length, 2);
+  assert.deepEqual(ebayOrderLineSignals(lineRefund).map((signal) => [signal.importKey, signal.kind]), [["ebay:order-line-partial:line-1", "partial-refund"]]);
+  const orderRefund = { ...lineRefund, orderId: "order-order-partial", lineItems: lineRefund.lineItems.map(({ refunds: _refunds, ...line }) => line) };
+  assert.deepEqual(ebayOrderLineSignals(orderRefund).map((signal) => signal.kind), ["partial-refund", "partial-refund"]);
+});
+
+test("syncOwnEbaySales books a partly refunded order once and raises one refund alert, also when the refund comes later", async () => {
+  await withEbayEnv(async () => {
+    const paid = {
+      orderId: "order-1",
+      creationDate: "2026-07-03T10:00:00.000Z",
+      orderPaymentStatus: "PAID",
+      paymentSummary: { payments: [{ paymentStatus: "PAID" }] },
+      lineItems: [{ lineItemId: "line-1", sku: "pdos-listing-1", title: "Charizard ex 151 PSA 10", quantity: 1, lineItemCost: gbp("100.00") }],
+    };
+    const refunded = { ...paid, orderPaymentStatus: "PARTIALLY_REFUNDED", lineItems: [{ ...paid.lineItems[0]!, refunds: [{ amount: gbp("15.00") }] }] };
+    const now = new Date("2026-07-05T00:00:00.000Z");
+    const db = fakeEbaySyncDb();
+    const first = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl: ordersFetch([paid]), now });
+    const second = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl: ordersFetch([refunded]), now });
+    const third = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl: ordersFetch([refunded]), now });
+    assert.equal(first.matchedCount, 1);
+    assert.deepEqual([first.partialRefundCount, second.partialRefundCount, third.partialRefundCount], [0, 1, 0]);
+    assert.equal(db.sales.length, 1, "the refund never books a second sale");
+    assert.equal(db.appAlerts.filter((alert) => alert.sourceKey === "ebay-partial-refund:ebay:order-1:line-1").length, 1);
+    assert.match(db.imports[0]?.reason ?? "", /refund/i);
+
+    // Partly refunded at first sight: booked and flagged in the same sync.
+    const fresh = fakeEbaySyncDb();
+    const once = await syncOwnEbaySales({ db: fresh.client, config: TEST_CONFIG, fetchImpl: ordersFetch([refunded]), now });
+    assert.deepEqual([once.matchedCount, once.partialRefundCount], [1, 1]);
+  });
+});
+
+test("a cancelled order leaves the manual queue instead of inviting a hand-booked sale", async () => {
+  await withEbayEnv(async () => {
+    const order = {
+      orderId: "order-unmatched",
+      creationDate: "2026-07-03T10:00:00.000Z",
+      orderPaymentStatus: "PAID",
+      lineItems: [{ lineItemId: "line-1", sku: "pdos-missing", title: "Unknown card", quantity: 1, lineItemCost: gbp("12.00") }],
+    };
+    const now = new Date("2026-07-05T00:00:00.000Z");
+    const db = fakeEbaySyncDb({ includeListing: false, includeItem: false });
+    await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl: ordersFetch([order]), now });
+    assert.equal(db.imports[0]?.status, "UNMATCHED");
+    const cancelled = await syncOwnEbaySales({
+      db: db.client, config: TEST_CONFIG, now,
+      fetchImpl: ordersFetch([{ ...order, cancelStatus: { cancelState: "CANCELED" } }]),
+    });
+    assert.equal(db.imports[0]?.status, "SKIPPED");
+    assert.match(db.imports[0]?.reason ?? "", /no sale to record/i);
+    assert.equal(cancelled.reversedCount, 0, "nothing was booked, so nothing was reversed");
+    assert.equal(db.sales.length, 0);
+  });
+});
+
+test("an order created before the window is never imported, but its later refund is still flagged", async () => {
+  await withEbayEnv(async () => {
+    const db = fakeEbaySyncDb();
+    await importEbayOrderLine(db.client, orderLine());
+    const oldButRefunded = {
+      orderId: "order-1",
+      creationDate: "2026-06-01T10:00:00.000Z",
+      lastModifiedDate: "2026-07-04T10:00:00.000Z",
+      orderPaymentStatus: "FULLY_REFUNDED",
+      paymentSummary: { payments: [{ paymentStatus: "PAID" }] },
+      lineItems: [{ lineItemId: "line-1", sku: "pdos-listing-1", quantity: 1, lineItemCost: gbp("104.99") }],
+    };
+    const oldUnseen = { ...oldButRefunded, orderId: "order-old-paid", orderPaymentStatus: "PAID", lineItems: [{ lineItemId: "line-9", sku: "pdos-item-1", quantity: 1, lineItemCost: gbp("50.00") }] };
+    const result = await syncOwnEbaySales({ db: db.client, config: TEST_CONFIG, fetchImpl: ordersFetch([oldButRefunded, oldUnseen]), now: new Date("2026-07-05T00:00:00.000Z") });
+    assert.equal(result.reversedCount, 1);
+    assert.equal(result.imports.length, 0, "orders created before the window are not imported");
+    assert.equal(db.sales.length, 1);
+  });
+});
+
+test("held non-GBP rows store no pence amounts but keep eBay's own figures for manual entry", async () => {
+  const [line] = normalizePaidEbayOrder({
+    orderId: "order-eur",
+    orderPaymentStatus: "PAID",
+    lineItems: [{ lineItemId: "line-1", sku: "pdos-listing-1", quantity: 1, lineItemCost: { value: "14.00", currency: "EUR" } }],
+  });
+  assert.ok(line);
+  const db = fakeEbaySyncDb();
+  await importEbayOrderLine(db.client, line);
+  assert.equal(db.imports[0]?.status, "UNMATCHED");
+  assert.equal(db.imports[0]?.buyerPaidPence, null);
+  assert.equal(db.imports[0]?.postageChargedPence, null);
+  assert.deepEqual(db.imports[0]?.payload?.heldAmounts?.lineItemCost, { value: "14.00", currency: "EUR" });
 });

@@ -12007,7 +12007,7 @@ function InventoryRow({
               {marketCompPence != null ? ` · ${marketCompAgeDays != null && marketCompAgeDays > 90 ? "stale — refresh · " : ""}${marketCompMeta}` : ""}
             </span>
             {stockNotes && <span>{stockNotes}</span>}
-            <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`Open ${item.card.name} price history`}>
+            <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`${stockHistoryLabel(history, historyPreview)}: ${item.card.name}`}>
               <StockHistorySparkline history={history} preview={historyPreview} />
               <span>{stockHistoryLabel(history, historyPreview)}</span>
             </button>
