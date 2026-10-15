@@ -62,7 +62,7 @@ import {
   normalizeManualCompSearchText,
   type ManualCompLinkKind,
 } from "@/lib/dealer/compLinks";
-import { inventoryItemMatchesFilter, emptyInventoryFilterText, hasLiveListing, stockReadiness, type InventoryFilter } from "@/lib/dealer/stockReadiness";
+import { inventoryItemMatchesFilter, emptyInventoryFilterText, hasLiveListing, stockReadiness, stockRowTaskFlags, type InventoryFilter } from "@/lib/dealer/stockReadiness";
 import { createStockImportBatch, parseStockImportBatch, runStockImportBatch, importBatchProgress, STOCK_IMPORT_BATCH_KEY, type StockImportBatch } from "@/lib/dealer/stockImportBatch";
 import { parseAcquisitionDate } from "@/lib/inventory/acquiredAt";
 import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
@@ -6799,7 +6799,9 @@ export default function Home() {
         setNotice(payload.reason ?? "eBay sales sync skipped.");
       } else {
         setNotice(
-          `eBay sync complete: ${payload.matchedCount ?? 0} matched, ${payload.unmatchedCount ?? 0} unmatched.`,
+          `eBay sync complete: ${payload.matchedCount ?? 0} matched, ${payload.unmatchedCount ?? 0} unmatched` +
+            `${payload.reversedCount ? `, ${payload.reversedCount} cancelled or refunded after import` : ""}` +
+            `${payload.partialRefundCount ? `, ${payload.partialRefundCount} partly refunded on eBay` : ""}.`,
         );
       }
       await refreshOrderSyncStatus();
@@ -11880,6 +11882,15 @@ function InventoryRow({
   const needsListing = item.status !== "SOLD" && !readiness.live;
   const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.acquiredAt ?? item.createdAt).getTime()) / (24 * 60 * 60 * 1_000)));
   const needsReprice = item.status !== "SOLD" && ageDays >= 30;
+  const taskFlags = stockRowTaskFlags({
+    held: readiness.held,
+    next: readiness.next,
+    needsListing,
+    needsPhotos,
+    needsEbayPhotos,
+    photoCount,
+    repriceAgeDays: needsReprice ? ageDays : null,
+  });
   const stockCost =
     item.quantity > 1
       ? `${gbp(item.costBasis)} each · ${gbp(item.costBasis * item.quantity)} total`
@@ -11998,17 +12009,14 @@ function InventoryRow({
               {marketCompPence != null ? ` · ${marketCompAgeDays != null && marketCompAgeDays > 90 ? "stale — refresh · " : ""}${marketCompMeta}` : ""}
             </span>
             {stockNotes && <span>{stockNotes}</span>}
-            <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`Open ${item.card.name} price history`}>
+            <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`History for ${item.card.name}`}>
               <StockHistorySparkline history={history} preview={historyPreview} />
               <span>History</span>
             </button>
           </div>
-          {(readiness.held || needsListing || (needsPhotos && !needsEbayPhotos) || photoCount > 0 || needsReprice) && (
+          {taskFlags.length > 0 && (
             <div className="inventory-row-flags" role="group" aria-label="Stock tasks">
-              {(needsListing || readiness.held) && <span>{readiness.next}</span>}
-              {!readiness.held && needsPhotos && !needsEbayPhotos && <span>Needs photos</span>}
-              {photoCount > 0 && <span>{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
-              {!readiness.held && needsReprice && <span className="reprice-nudge">Reprice · {ageDays}d held</span>}
+              {taskFlags.map((flag) => <span key={flag.text} className={flag.reprice ? "reprice-nudge" : undefined}>{flag.text}</span>)}
             </div>
           )}
           {needsEbayPhotos && !readiness.held && (

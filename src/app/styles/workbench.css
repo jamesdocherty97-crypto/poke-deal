@@ -1148,7 +1148,8 @@ textarea:focus-visible {
 .inventory-workspace .bulk-select-row:hover .card-thumb,
 .inventory-workspace .bulk-select-row:focus-within .card-thumb { border-color:rgba(244,240,231,.82); box-shadow:0 0 0 4px color-mix(in srgb,var(--view-accent) 18%,transparent),0 18px 32px rgba(6,8,18,.42); transform:translateY(-2px); }
 .inventory-workspace .item-main { display:flex; flex-direction:column; min-width:0; padding:22px 48px 18px 20px; }
-.inventory-workspace .item-title-line { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+/* Leave room for the 44px bulk-select checkbox so status badges never sit under it. */
+.inventory-workspace .item-title-line { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding-right:16px; }
 .inventory-workspace .item-title-line h3 { font-size:1.25rem; }
 .item-badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px; }
 .inventory-row-meta { display:flex; flex-wrap:wrap; gap:0; margin:8px 0 0; color:var(--muted); font-size:.72rem; }

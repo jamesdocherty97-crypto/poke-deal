@@ -59,6 +59,9 @@ export async function POST() {
             details: {
               matchedCount: result.matchedCount,
               unmatchedCount: result.unmatchedCount,
+              reversedCount: result.reversedCount,
+              partialRefundCount: result.partialRefundCount,
+              lateChangesChecked: result.lateChangesChecked,
               fetchedOrders: result.fetchedOrders,
             },
           },

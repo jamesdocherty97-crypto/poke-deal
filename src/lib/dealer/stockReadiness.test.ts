@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hasLiveListing, inventoryItemMatchesFilter, stockReadiness, type StockReadinessItem } from "./stockReadiness.js";
+import { hasLiveListing, inventoryItemMatchesFilter, stockReadiness, stockRowTaskFlags, type StockReadinessItem } from "./stockReadiness.js";
 
 const item: StockReadinessItem = {
   status: "IN_STOCK", grade: "RAW", condition: "NM", quantity: 1,
@@ -88,4 +88,20 @@ test("a local hold preserves evidence of an external live listing without offeri
   assert.equal(inventoryItemMatchesFilter(pending, "held"), true);
   assert.equal(stockReadiness({ ...pending, status: "SOLD" }).held, false);
   assert.equal(inventoryItemMatchesFilter({ ...pending, status: "SOLD" }, "sold"), true);
+});
+
+test("stock row chips do not repeat a photo task the row already shows", () => {
+  const base = { held: false, needsListing: true, needsPhotos: true, needsEbayPhotos: false, photoCount: 0, repriceAgeDays: null };
+  // Unlisted stock without photos: one "Add photos" next step, not also "Needs photos".
+  assert.deepEqual(stockRowTaskFlags({ ...base, next: "Add photos" }), [{ text: "Add photos" }]);
+  // eBay draft without photos: the Add photos action strip covers it, so no chip.
+  assert.deepEqual(stockRowTaskFlags({ ...base, next: "Add photos", needsEbayPhotos: true }), []);
+  // A different next step keeps the separate photo reminder.
+  assert.deepEqual(stockRowTaskFlags({ ...base, next: "Check condition" }), [{ text: "Check condition" }, { text: "Needs photos" }]);
+  // Held stock keeps its hold reason and suppresses photo and reprice nudges.
+  assert.deepEqual(stockRowTaskFlags({ ...base, held: true, next: "Sync sale", needsEbayPhotos: true, repriceAgeDays: 40 }), [{ text: "Sync sale" }]);
+  assert.deepEqual(stockRowTaskFlags({ ...base, needsListing: false, needsPhotos: false, next: "Live", photoCount: 1, repriceAgeDays: 33 }), [
+    { text: "1 photo" },
+    { text: "Reprice · 33d held", reprice: true },
+  ]);
 });

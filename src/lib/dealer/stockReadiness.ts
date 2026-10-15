@@ -75,3 +75,28 @@ export function emptyInventoryFilterText(filter: InventoryFilter): string {
   if (filter === "sold") return "No sold stock yet.";
   return "No stock in this view.";
 }
+
+export type StockRowTaskFlag = { text: string; reprice?: true };
+
+/**
+ * Task chips for a stock row. A photo task already offered as the row's
+ * Add photos action, or already named by the next step, is not repeated.
+ */
+export function stockRowTaskFlags(input: {
+  held: boolean;
+  next: string;
+  needsListing: boolean;
+  needsPhotos: boolean;
+  needsEbayPhotos: boolean;
+  photoCount: number;
+  repriceAgeDays: number | null;
+}): StockRowTaskFlag[] {
+  const photoActionShown = input.needsEbayPhotos && !input.held;
+  const nextFlag = (input.needsListing || input.held) && !(photoActionShown && input.next === "Add photos") ? input.next : null;
+  const flags: StockRowTaskFlag[] = [];
+  if (nextFlag) flags.push({ text: nextFlag });
+  if (!input.held && input.needsPhotos && !input.needsEbayPhotos && nextFlag !== "Add photos") flags.push({ text: "Needs photos" });
+  if (input.photoCount > 0) flags.push({ text: `${input.photoCount} photo${input.photoCount === 1 ? "" : "s"}` });
+  if (!input.held && input.repriceAgeDays != null) flags.push({ text: `Reprice · ${input.repriceAgeDays}d held`, reprice: true });
+  return flags;
+}

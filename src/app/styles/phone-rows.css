@@ -1,0 +1,99 @@
+/*
+ * Phone stock rows and List "Stock to draft" rows.
+ *
+ * Below 720px the card art sits beside the title and identity line only, so
+ * prices, tasks and actions use the full row width instead of a narrow column
+ * beside a full-height image strip. Layout only: colours, type and controls
+ * keep the existing tokens and component styles.
+ */
+@media (max-width: 719px) {
+  .inventory-workspace .swipe-content,
+  .listings-workspace .listing-queue-row {
+    grid-template-columns: 64px minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: start;
+    min-height: 0;
+    padding: 14px;
+    background: var(--color-surface-1);
+  }
+
+  .inventory-workspace .swipe-content > .item-main,
+  .listings-workspace .listing-queue-row > .item-main {
+    display: contents;
+  }
+
+  .inventory-workspace .swipe-content > .card-thumb,
+  .listings-workspace .listing-queue-row > .card-thumb {
+    grid-row: 1 / span 2;
+    width: 64px;
+    height: auto;
+    margin: 0;
+  }
+
+  .inventory-workspace .item-main > *,
+  .listings-workspace .listing-queue-row .item-main > * {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  /* Title and badges beside the art, clear of the bulk-select checkbox. */
+  .inventory-workspace .item-main > .item-title-line {
+    grid-column: 2;
+    grid-row: 1;
+    padding-right: 48px;
+  }
+
+  .listings-workspace .listing-queue-row .item-main > .item-title-line {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* The identity line (set, number, quantity, cost) stays beside the art. */
+  .inventory-workspace .item-main > .inventory-row-meta,
+  .listings-workspace .listing-queue-row .item-main > .item-title-line + p {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 6px;
+  }
+
+  .inventory-workspace .item-main > .inventory-row-money {
+    margin: 12px 0 10px;
+  }
+
+  .inventory-workspace .row-primary-actions,
+  .listings-workspace .listing-queue-row .row-more-actions {
+    margin-top: 8px;
+  }
+}
+
+/*
+ * Phone Stock header: match the List screen, which already drops its
+ * masthead description on phones, so the first card starts higher.
+ */
+@media (max-width: 719px) {
+  .inventory-workspace .vault-masthead .workspace-masthead-copy > p {
+    display: none;
+  }
+
+  .inventory-workspace .vault-summary {
+    margin-top: 12px;
+  }
+
+  .inventory-workspace .vault-summary span {
+    padding: 8px 9px;
+  }
+
+  .inventory-workspace .vault-summary strong {
+    font-size: 1.2rem;
+  }
+
+  /* "Inventory" is already the page heading; keep this one for assistive tech only. */
+  .inventory-workspace .vault-heading > div:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
