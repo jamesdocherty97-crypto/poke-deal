@@ -5,7 +5,6 @@ import {
   EBAY_ACCOUNT_DELETION_ENDPOINT,
   type EbayAccountDeletionNotification,
   readEbayAccountDeletionIdentifiers,
-  scrubDeletedEbayAccountPayloads,
   verifyEbayNotificationSignature,
 } from "@/lib/ebay/accountDeletion";
 import { getEbayConfig } from "@/lib/ebay/config";
@@ -59,15 +58,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid account deletion notification." }, { status: 400 });
     }
 
-    // New imports omit buyer identifiers, but that does not prove historical
-    // payloads were cleared. Complete the scrub before acknowledging; a read
-    // or write failure reaches the 503 response below so eBay can retry.
-    const { getPrisma } = await import("@/lib/db/prisma");
-    const scrubbedPayloads = await scrubDeletedEbayAccountPayloads(getPrisma(), identifiers);
+    // Nothing stored here identifies an eBay account: imports persist only the
+    // buyer-free projection in orderImportPayload.ts, and the one-off
+    // scripts/scrub-ebay-order-import-buyers.ts cleared older payloads. So a
+    // verified notification is acknowledged without touching the database;
+    // eBay sends these continuously and each one would otherwise wake it.
     console.info(JSON.stringify({
       event: "ebay_account_deletion_processed",
       notificationId: message.notification?.notificationId ?? null,
-      scrubbedPayloads,
+      storedBuyerData: "none",
     }));
     return new Response(null, { status: 204 });
   } catch (error) {

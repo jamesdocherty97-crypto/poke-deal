@@ -109,7 +109,7 @@ The UI can run without these, but provider-backed features remain explicitly una
 
 **eBay account connection path:** set `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_RU_NAME` and `TOKEN_ENCRYPTION_KEY`, then visit `/api/ebay/connect`. The callback stores the seller refresh token encrypted in Neon; `EBAY_REFRESH_TOKEN` is only a legacy fallback if no DB token exists.
 
-**eBay account deletion:** signed marketplace deletion notifications always clear matching historical order-import payloads before returning 204. Sales, amounts and normalized seller ledger fields remain intact. Database failures return 503 so delivery can be retried; the retired `EBAY_DELETION_SCRUB` setting cannot disable processing. This may wake Neon on each valid notification. See [deletion handling and the operator verification boundary](docs/EBAY_ACCOUNT_DELETION.md) before planning a database-free path.
+**eBay account deletion:** the callback verifies eBay's challenge and signatures and answers 204 without touching the database, because order imports keep no buyer data. Historical payloads are cleared once with `npm run scrub:ebay-buyers` (dry run by default, `-- --apply` to write), which must run against production before this callback is deployed. See [deletion handling](docs/EBAY_ACCOUNT_DELETION.md).
 
 **eBay Marketplace Insights path:** the code is wired as `EbayMarketplaceInsightsSource`, but eBay must grant restricted Marketplace Insights access before it will return UK sold comps. After approval, set `EBAY_INSIGHTS_ENABLED=true` alongside the existing eBay credentials and seller OAuth connection (`EBAY_MARKETPLACE_INSIGHTS_ENABLED=true` still works as the legacy flag). Until then the source stays out of comp aggregation and the manual UK sold link remains the reliable fallback.
 
@@ -144,7 +144,9 @@ Use the app's Stock Value snapshot, buy-target check, stock-health check and eBa
 
 To restore scheduling, add `/api/cron/daily` at `30 7 * * *` and `/api/cron/weekly` at `30 7 * * 1` to `vercel.json`, configure `CRON_SECRET`, and deploy. These are UTC schedules, aligned to one wake window on Mondays. Setting batch limits to zero does **not** eliminate database usage: cron run logs and other reads still execute.
 
-Neon compute depends on active time and compute size, not just query count. Check the project's usage graph and scale-to-zero setting if usage persists while the app is closed. Local tools using the same database and external monitors can also wake it. Do not poll database-backed health endpoints to keep the app warm. No Neon plan, compute setting or production usage has been verified by this code change.
+Neon compute depends on active time and compute size, not just query count. Check the project's usage graph and scale-to-zero setting if usage persists while the app is closed. Local tools using the same database and external monitors can also wake it. Do not poll database-backed health endpoints to keep the app warm. `/api/system/health` reuses its last report for 60 seconds per server instance so repeat checks do not wake Neon again.
+
+**Previews never use the production database.** When `VERCEL_ENV=preview`, the app ignores `DATABASE_URL` and connects only to `PREVIEW_DATABASE_URL`, refusing it if it points at the same Neon endpoint as `DATABASE_URL`. Without it, previews have no database and database routes fail. In Vercel, scope `DATABASE_URL` and `DIRECT_URL` to Production only, and optionally add a Preview-scoped `PREVIEW_DATABASE_URL` for a Neon branch. No Neon plan, compute setting or production usage has been verified by this code change.
 
 ## Status
 

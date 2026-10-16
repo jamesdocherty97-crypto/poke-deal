@@ -9,6 +9,7 @@ import { getEbayConfig, isEbayConfigured } from "./config.js";
 import { resolveEbayRefreshToken } from "./credentials.js";
 import { ebayJson } from "./client.js";
 import { ebayErrorMessage } from "./errors.js";
+import { minimalOrderImportPayload } from "./orderImportPayload.js";
 import { getAccessTokenWithSource } from "./tokens.js";
 
 export type EbayOrderImportStatus = "MATCHED" | "UNMATCHED" | "SKIPPED";
@@ -367,25 +368,8 @@ export function normalizePaidEbayOrder(order: EbayFulfillmentOrder): NormalizedE
       // Persist only fulfillment fields used for audit/replay. The provider's
       // full order object may contain buyer account or address data and must
       // not be retained in this operational ledger.
-      raw: {
-        schemaVersion: 1,
-        order: {
-          orderId: order.orderId,
-          creationDate: order.creationDate,
-          lastModifiedDate: order.lastModifiedDate,
-          orderPaymentStatus: order.orderPaymentStatus,
-          orderFulfillmentStatus: order.orderFulfillmentStatus,
-        },
-        line: {
-          lineItemId: line.lineItemId,
-          legacyItemId: line.legacyItemId,
-          sku: line.sku,
-          title: line.title,
-          quantity: line.quantity,
-        },
-        // Held lines keep eBay's own amounts so the sale can be recorded by hand.
-        ...(lineAmounts.inGbp ? {} : { heldAmounts: heldAmountsForLine(order, line) }),
-      },
+      // Held lines keep eBay's own amounts so the sale can be recorded by hand.
+      raw: minimalOrderImportPayload(order, line, lineAmounts.inGbp ? undefined : heldAmountsForLine(order, line)),
     }];
   });
 }

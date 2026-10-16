@@ -134,9 +134,7 @@ test("normalizePaidEbayOrder maps paid order lines to GBP pence and import keys"
     order: {
       orderId: providerOrder.orderId,
       creationDate: providerOrder.creationDate,
-      lastModifiedDate: undefined,
       orderPaymentStatus: "PAID",
-      orderFulfillmentStatus: undefined,
     },
     line: {
       lineItemId: "line-1", legacyItemId: "1234567890", sku: "pdos-item-1",

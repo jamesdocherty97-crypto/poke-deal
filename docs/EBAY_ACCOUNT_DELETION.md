@@ -1,30 +1,26 @@
 # eBay account-deletion handling
 
-Older full order-import payloads can contain buyer account identifiers, names or addresses. The current importer keeps an explicit operational projection instead of the full provider response. That protects new imports; it does not prove historical payloads or older backups have been cleaned.
+Older full order-import payloads can contain buyer account identifiers, names or addresses. The importer now keeps only an allowlisted operational projection, and a one-off scrub brings historical rows to that same projection.
 
-eBay's [deletion notification guide](https://developer.ebay.com/develop/guides-v2/marketplace-user-account-deletion) describes 204 as acknowledgement of receipt and retries notifications that are not acknowledged. A quick acknowledgement can be followed by durable processing, but this app has no deletion work queue. Returning 204 while skipping all processing can therefore drop the request. The [eBay SDK](https://github.com/eBay/event-notification-nodejs-sdk#features) likewise processes the message before responding with 204.
+eBay's [deletion notification guide](https://developer.ebay.com/develop/guides-v2/marketplace-user-account-deletion) describes 204 as acknowledgement of receipt and retries notifications that are not acknowledged. The [eBay SDK](https://github.com/eBay/event-notification-nodejs-sdk#features) processes the message before responding with 204. Once the scrub is verified, no stored account data is left to process, so acknowledging a verified notification completes it. That is why the scrub is a deployment precondition, not an optional cleanup.
 
 ## Callback behavior
 
-- GET challenge verification is database-free.
-- POST verifies the signature, expected topic and usable account identifiers before accessing the database.
-- Every verified deletion notification scans non-null historical import payloads for an exact identifier match, including nested objects and arrays. A matching row's entire extra payload becomes database NULL using `Prisma.DbNull`. Normalized import fields, sales and inventory are preserved. Unrelated payloads are unchanged.
-- Database NULL and stored JSON null are both excluded with `Prisma.AnyNull`.
-- The callback acknowledges only after all required writes finish. A read or write error returns 503. If some rows were cleared before a failure, redelivery clears the remaining matches; duplicate deliveries are idempotent.
-- `EBAY_DELETION_SCRUB` is retired and ignored, including an existing value of `0`. There is no unchecked configuration bypass.
+- GET challenge verification is database-free: SHA-256 of `challenge_code`, the verification token and the registered endpoint, returned as `{"challengeResponse": "..."}` with `application/json`.
+- POST verifies the signature (eBay Notification API public key, ECDSA), the `MARKETPLACE_ACCOUNT_DELETION` topic and usable account identifiers, then returns 204 with no database access. The route's import graph excludes the database client, and route tests fail if it is touched.
+- Failures keep eBay's retry semantics: a missing signature or bad signature is 412, a malformed body 400/413, missing eBay config or a failed public-key lookup 503.
+- The log line `ebay_account_deletion_processed` carries the notification ID only, never account identifiers.
 
-This restores database access on valid deletion callbacks and can keep Neon awake when notifications are frequent. Eliminating these reads needs a separately verified cleanup or a durable deletion-processing design. Database cost alone is not evidence that processing can be skipped.
+Acknowledging without processing is correct only because nothing stored identifies an eBay account. New imports persist the allowlisted projection in `src/lib/ebay/orderImportPayload.ts` (order and line scalars, plus eBay's own amounts on held non-GBP lines). Older rows are cleared once by `scripts/scrub-ebay-order-import-buyers.ts`, which rewrites each legacy payload to that same projection and clears anything unrecognisable to database NULL (`Prisma.DbNull`; `Prisma.AnyNull` skips both null kinds). It writes only `payload`, conditionally on `updatedAt`, so seller ledger fields and concurrent imports are untouched.
 
-## Before production
+## Before deploying the database-free callback
 
-The code change does not require a schema migration or configuration change. Merge and production rollout remain separate authorized actions. Local and CI tests use synthetic records; they do not establish the state of production data.
+The scrub must have run against production, and been verified, before this callback ships. Until then the previous callback, which scrubs per notification, stays deployed.
 
-An authorized operator should:
+1. Back up first (`npm run backup`), following the agreed backup procedure.
+2. Dry run, which only reads: `DATABASE_URL=<production direct URL> npm run scrub:ebay-buyers`. It prints the database host and counts only.
+3. Apply: rerun with `-- --apply`. It is idempotent; rerun if it reports `skippedConcurrent`.
+4. Verify: a second dry run must report `rewritten: 0` and `cleared: 0`. Record the database target, time and commit, without buyer data or credentials.
+5. Merge and deploy, then exercise the GET challenge from eBay's developer portal notification settings.
 
-1. Verify the exact deployed commit and exercise signature, retry and acknowledgement behavior with a controlled synthetic fixture, without logging account identifiers or payloads.
-2. If investigating historical cleanup, obtain approval for the production read first. Use aggregate counts to distinguish database NULL, JSON null, the current allowlisted projection and older full payloads. Do not export buyer records or assume a schema-version marker alone proves a payload has no extra fields.
-3. Obtain separate approval before any bulk redaction or cleanup. Scope it to legacy extra payloads, preserve normalized seller ledger facts, and prepare the agreed backup/rollback procedure. A previously mentioned cleanup command is not proof it ran.
-4. Verify the result with aggregate evidence and unchanged ledger counts/totals. Record the database target, verification time and code/importer version without recording buyer data or credentials.
-5. Review retention and restore procedures separately: older backups/exported import rows may contain the original payloads. Restoring them must not silently reintroduce material that was scrubbed. Do not inspect, delete or rewrite backups without the owner's authorization.
-
-Do not enable a database-free acknowledgement based only on a comment, an unset variable or an unverified operator assertion. Requests acknowledged by the old bypass were not queued; this patch cannot reconstruct those requests. Any catch-up cleanup is a separate approved operation.
+Backups and exports taken before the scrub may still hold full payloads. Restoring one must be followed by another scrub run. Reviewing or deleting old backups is a separate owner decision.

@@ -1,8 +1,7 @@
 import { createHash, createVerify } from "node:crypto";
-import { Prisma } from "@prisma/client";
 import type { EbayConfig } from "./config.js";
 import { ebayJson } from "./client.js";
-import { getApplicationAccessToken } from "./tokens.js";
+import { getApplicationAccessToken } from "./applicationToken.js";
 
 export const EBAY_ACCOUNT_DELETION_ENDPOINT = "https://poke-deal.vercel.app/api/ebay/account-deletion";
 const PUBLIC_KEY_CACHE_MS = 60 * 60 * 1000;
@@ -29,12 +28,6 @@ export type EbayAccountDeletionNotification = {
     notificationId?: unknown;
     data?: { userId?: unknown; username?: unknown; eiasToken?: unknown };
   };
-};
-
-// Real Prisma delegate types, not `unknown` args: `payload` is a nullable Json
-// column, so tsc rejects a plain `null` and demands a Prisma null sentinel.
-export type EbayDeletionDb = {
-  ebayOrderImport: Pick<Prisma.EbayOrderImportDelegate, "findMany" | "update">;
 };
 
 export function accountDeletionVerificationToken(env: Record<string, string | undefined> = process.env): string | null {
@@ -114,36 +107,6 @@ export function readEbayAccountDeletionIdentifiers(message: EbayAccountDeletionN
     .map((value) => value.trim());
 }
 
-/**
- * Remove historical raw provider payloads that contain the deleted account's
- * identifiers. Normalized seller ledger facts remain; new imports no longer
- * persist the full provider order object.
- *
- * `payload` is a nullable Json column, so it takes Prisma's null sentinels.
- * Prisma 5 does not reject a plain `null` here at runtime: it reads it as
- * JSON null, which left scrubbed rows holding a stored JSON `null` instead of
- * a database NULL. The filter uses AnyNull to skip both kinds (never stored,
- * already scrubbed, or left as JSON null by that older behaviour): neither
- * can hold an identifier. The clear writes DbNull, a real database NULL.
- */
-export async function scrubDeletedEbayAccountPayloads(
-  db: EbayDeletionDb,
-  identifiers: string[],
-): Promise<number> {
-  const needles = new Set(identifiers.filter(Boolean));
-  if (needles.size === 0) return 0;
-  const rows = await db.ebayOrderImport.findMany({
-    where: { payload: { not: Prisma.AnyNull } },
-    select: { id: true, payload: true },
-  });
-  const affected = rows.filter((row) => jsonContainsExactString(row.payload, needles));
-  await Promise.all(affected.map((row) => db.ebayOrderImport.update({
-    where: { id: row.id },
-    data: { payload: Prisma.DbNull },
-  })));
-  return affected.length;
-}
-
 async function getEbayNotificationPublicKey(
   config: EbayConfig,
   keyId: string,
@@ -173,13 +136,4 @@ function formatEbayPublicKey(key: string): string {
   return key
     .replace(/-----BEGIN PUBLIC KEY-----\s*/, "-----BEGIN PUBLIC KEY-----\n")
     .replace(/\s*-----END PUBLIC KEY-----/, "\n-----END PUBLIC KEY-----");
-}
-
-function jsonContainsExactString(value: unknown, needles: Set<string>): boolean {
-  if (typeof value === "string") return needles.has(value);
-  if (Array.isArray(value)) return value.some((item) => jsonContainsExactString(item, needles));
-  if (value && typeof value === "object") {
-    return Object.values(value as Record<string, unknown>).some((item) => jsonContainsExactString(item, needles));
-  }
-  return false;
 }
