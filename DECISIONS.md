@@ -156,3 +156,12 @@ The historical decisions below record earlier intent. Current owner direction an
 - Slim phone viewport: one mission, up to three records, compact progress; secondary quest log and pulse details collapsed.
 - Today bootstrap paints after inventory + listings + dashboard; remaining reads continue in the background. Offline sale protections unchanged.
 - PWA `start_url` is `/?view=today`. Vercel crons remain empty.
+
+## 2026-10-16 — Database-free eBay deletion callback, preview DB isolation, cached health
+
+- After a one-off scrub of historical `EbayOrderImport` payloads (`scripts/scrub-ebay-order-import-buyers.ts`), nothing stored identifies an eBay account, so the deletion callback verifies the challenge/signature and returns 204 without database access. The scrub must be applied and verified against production before this ships; until then the per-notification scrub stays deployed.
+- Imports and the scrub share one allowlisted projection (`src/lib/ebay/orderImportPayload.ts`), so new rows never need scrubbing and repeated scrubs are no-ops.
+- The eBay application token moved to `applicationToken.ts` so the callback's import graph excludes the seller-credential store and the database client; a route test walks that graph.
+- Hosted previews use only `PREVIEW_DATABASE_URL` and refuse the production endpoint, so preview traffic cannot wake or write production Neon.
+- `/api/system/health` memoises its report for 60 seconds per isolate; `/api` responses stay `private, no-store`.
+- Rollback: revert the commit; the previous callback resumes per-notification scrubbing. No schema migration.

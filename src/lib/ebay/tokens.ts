@@ -10,7 +10,10 @@ import {
   type EbayRefreshTokenSource,
   type ResolvedEbayRefreshToken,
 } from "./credentials.js";
-import { fetchApplicationAccessToken, refreshAccessToken } from "./oauth.js";
+import { clearApplicationTokenCache } from "./applicationToken.js";
+import { refreshAccessToken } from "./oauth.js";
+
+export { getApplicationAccessToken } from "./applicationToken.js";
 
 interface TokenCache {
   value: string;
@@ -19,13 +22,7 @@ interface TokenCache {
   refreshTokenSource: EbayRefreshTokenSource;
 }
 
-interface ApplicationTokenCache {
-  value: string;
-  expiresAt: number; // Unix ms
-}
-
 let cache: TokenCache | null = null;
-let applicationCache: ApplicationTokenCache | null = null;
 
 export async function getAccessToken(
   config: EbayConfig,
@@ -68,24 +65,8 @@ export async function getAccessTokenWithSource(
   return { accessToken: cache.value, tokenSource: refreshToken.source };
 }
 
-export async function getApplicationAccessToken(
-  config: EbayConfig,
-  fetchImpl: typeof fetch = fetch,
-): Promise<string> {
-  const now = Date.now();
-  if (applicationCache && applicationCache.expiresAt > now + 90_000) {
-    return applicationCache.value;
-  }
-  const tokens = await fetchApplicationAccessToken(config, fetchImpl);
-  applicationCache = {
-    value: tokens.access_token,
-    expiresAt: now + tokens.expires_in * 1000,
-  };
-  return tokens.access_token;
-}
-
 /** Clear the in-memory cache — for tests only. */
 export function clearTokenCache(): void {
   cache = null;
-  applicationCache = null;
+  clearApplicationTokenCache();
 }
