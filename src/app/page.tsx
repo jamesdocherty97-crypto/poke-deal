@@ -3,7 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
 import { type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
-import { formatGbp as gbp, penceToPounds, poundsToPence } from "@/lib/format/money";
+import { formatGbp as gbp, penceToPounds, poundsFieldMessage, poundsToPence, readFormPence } from "@/lib/format/money";
 import { compressPhotoForUpload, inventoryPhotoUploadPath, preparePhotoForScan } from "@/lib/photos/imageProcessing";
 import {
   orderListingPhotos,
@@ -1612,7 +1612,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!sellingId) return;
-    const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice), { grade: sellingItem?.grade });
+    const salePricePence = readFormPence(salePrice);
+    if (salePricePence == null) return;
+    const estimate = estimateSaleCosts(saleChannel, salePricePence, { grade: sellingItem?.grade });
     if (!feesTouched) setFees(penceToPounds(estimate.feesPence));
     if (!postageTouched) setPostage(penceToPounds(estimate.postagePence));
   }, [feesTouched, postageTouched, saleChannel, salePrice, sellingId, sellingItem?.grade]);
@@ -1738,39 +1740,57 @@ export default function Home() {
     () => inventory.find((item) => item.id === creatingListingItemId) ?? null,
     [creatingListingItemId, inventory],
   );
+  const saleAmountMessage =
+    labeledPoundsMessage("Actual sale price", salePrice) ??
+    labeledPoundsMessage("Fees", fees) ??
+    labeledPoundsMessage("My postage", postage) ??
+    labeledPoundsMessage("Buyer postage", buyerPostage);
   const salePreview = useMemo(() => {
-    if (!sellingItem) return null;
+    if (!sellingItem || saleAmountMessage) return null;
     const soldQuantity = parseIntakeQuantity(saleQuantity) ?? 0;
     if (soldQuantity <= 0) return null;
+    const salePricePence = readFormPence(salePrice);
+    const feesPence = readFormPence(fees);
+    const postagePence = readFormPence(postage);
+    if (salePricePence == null || feesPence == null || postagePence == null) return null;
     return buildSalePreview({
-      salePricePence: poundsToPence(salePrice),
-      feesPence: poundsToPence(fees),
-      postagePence: poundsToPence(postage),
+      salePricePence,
+      feesPence,
+      postagePence,
       unitCostPence: sellingItem.costBasis,
       soldQuantity,
     });
-  }, [fees, postage, salePrice, saleQuantity, sellingItem]);
-  const salePrompt = useMemo(
-    () =>
-      buildSalePrompt({
-        salePricePence: poundsToPence(salePrice),
-        netPence: salePreview?.netPence ?? null,
-        profitPence: salePreview?.profitPence ?? null,
-        soldQuantity: salePreview?.soldQuantity ?? parseIntakeQuantity(saleQuantity) ?? 1,
-        nextSaleAvailable: Boolean(nextSaleAfterCurrentTarget),
-      }),
-    [nextSaleAfterCurrentTarget, salePreview?.netPence, salePreview?.profitPence, salePreview?.soldQuantity, salePrice, saleQuantity],
-  );
+  }, [fees, postage, saleAmountMessage, salePrice, saleQuantity, sellingItem]);
+  const salePrompt = useMemo(() => {
+    if (saleAmountMessage) {
+      return {
+        title: "Check the amounts",
+        detail: saleAmountMessage,
+        cta: "Create sale",
+        tone: "warn" as const,
+        action: "create-sale" as const,
+      };
+    }
+    const salePricePence = readFormPence(salePrice);
+    return buildSalePrompt({
+      salePricePence: salePricePence ?? 0,
+      netPence: salePreview?.netPence ?? null,
+      profitPence: salePreview?.profitPence ?? null,
+      soldQuantity: salePreview?.soldQuantity ?? parseIntakeQuantity(saleQuantity) ?? 1,
+      nextSaleAvailable: Boolean(nextSaleAfterCurrentTarget),
+    });
+  }, [nextSaleAfterCurrentTarget, saleAmountMessage, salePreview?.netPence, salePreview?.profitPence, salePreview?.soldQuantity, salePrice, saleQuantity]);
   const saleBreakdown = useMemo(() => {
-    if (!sellingItem) return null;
+    if (!sellingItem || saleAmountMessage) return null;
     const soldQuantity = parseIntakeQuantity(saleQuantity) ?? 0;
     if (soldQuantity <= 0) return null;
     if (!buyerPostage.trim()) return null;
-    const grossPence = poundsToPence(salePrice);
-    const postagePaidPence = poundsToPence(buyerPostage);
+    const grossPence = readFormPence(salePrice);
+    const postagePaidPence = readFormPence(buyerPostage);
+    if (grossPence == null || postagePaidPence == null) return null;
     const itemSubtotalPence = grossPence - postagePaidPence;
     return { grossPence, postagePaidPence, itemSubtotalPence, quantity: soldQuantity, unitItemPence: Math.round(itemSubtotalPence / soldQuantity) };
-  }, [buyerPostage, salePrice, saleQuantity, sellingItem]);
+  }, [buyerPostage, saleAmountMessage, salePrice, saleQuantity, sellingItem]);
   const apiHeadline = comp?.headline ?? null;
   const catalogCard = comp?.catalog ?? null;
   const headline = apiHeadline;
@@ -1790,22 +1810,21 @@ export default function Home() {
     .filter(Boolean)
     .join(" · ");
   const sourceMatchSourceLabel = apiHeadline ? sourceLabel(apiHeadline.source, false) : "Source";
-  const deal = useMemo(
-    () => (actionableHeadline ? judgeDeal(actionableHeadline, poundsToPence(cost), channel, grade, headlineAdjustmentCondition) : null),
-    [actionableHeadline, channel, headlineAdjustmentCondition, cost, grade],
-  );
-  const gradeEv = useMemo(
-    () =>
-      actionableHeadline && gradeComp
-        ? calculateGradeEv({
-            rawPence: actionableHeadline.medianPence,
-            psa10Pence: gradeComp.medianPence,
-            oddsPct: Number(gradeOdds),
-            gradingCostPence: poundsToPence(gradingCost),
-          })
-        : null,
-    [actionableHeadline, gradeComp, gradeOdds, gradingCost],
-  );
+  const deal = useMemo(() => {
+    const costPence = readFormPence(cost);
+    return actionableHeadline && costPence != null ? judgeDeal(actionableHeadline, costPence, channel, grade, headlineAdjustmentCondition) : null;
+  }, [actionableHeadline, channel, headlineAdjustmentCondition, cost, grade]);
+  const gradeEv = useMemo(() => {
+    const gradingCostPence = readFormPence(gradingCost);
+    return actionableHeadline && gradeComp && gradingCostPence != null
+      ? calculateGradeEv({
+          rawPence: actionableHeadline.medianPence,
+          psa10Pence: gradeComp.medianPence,
+          oddsPct: Number(gradeOdds),
+          gradingCostPence,
+        })
+      : null;
+  }, [actionableHeadline, gradeComp, gradeOdds, gradingCost]);
   const selectedSet = useMemo(() => findSelectedSet([...popularSets, ...setSuggestions, ...allSets], setNameValue), [
     allSets,
     popularSets,
@@ -2080,18 +2099,17 @@ export default function Home() {
       : null;
   const stockImportPreview = useMemo(() => parseStockImportText(stockImportText), [stockImportText]);
   const stockImportHasText = stockImportText.trim().length > 0;
-  const projectedListSuggestion = useMemo(
-    () =>
-      headline
-        ? suggestListPrice({
-            comp: compForAutomaticPricing(headline, unverifiedHeadline),
-            strategy,
-            costBasisPence: poundsToPence(cost),
-            condition: headlineAdjustmentCondition,
-          })
-        : null,
-    [headline, headlineAdjustmentCondition, strategy, cost, unverifiedHeadline],
-  );
+  const projectedListSuggestion = useMemo(() => {
+    const costBasisPence = readFormPence(cost);
+    return headline && costBasisPence != null
+      ? suggestListPrice({
+          comp: compForAutomaticPricing(headline, unverifiedHeadline),
+          strategy,
+          costBasisPence,
+          condition: headlineAdjustmentCondition,
+        })
+      : null;
+  }, [headline, headlineAdjustmentCondition, strategy, cost, unverifiedHeadline]);
   const stockCompSuggestion = useMemo(
     () =>
       headline && stockCompItem
@@ -2109,12 +2127,15 @@ export default function Home() {
     headline && conditionAdjustmentActive ? conditionAdjustedPricePence(headline.medianPence, grade, condition) : null;
   const buyPlan = useMemo(() => {
     const intakeQuantity = parseIntakeQuantity(quantity) ?? 1;
-    const overrideListPricePence = listPriceOverride.trim() ? poundsToPence(listPriceOverride) : null;
+    const costPence = readFormPence(cost);
+    if (costPence == null) return null;
+    if (listPriceOverride.trim() && readFormPence(listPriceOverride) == null) return null;
+    const overrideListPricePence = listPriceOverride.trim() ? readFormPence(listPriceOverride) : null;
     const listPricePence = overrideListPricePence ?? projectedListSuggestion?.pricePence ?? actionableHeadline?.medianPence ?? 0;
     if (listPricePence <= 0) return null;
 
     return buildBuyPlan({
-      unitCostPence: poundsToPence(cost),
+      unitCostPence: costPence,
       quantity: intakeQuantity,
       listPricePence,
       channel,
@@ -2133,27 +2154,28 @@ export default function Home() {
     quantity,
   ]);
   const quickStockQuantity = parseIntakeQuantity(quantity) ?? 0;
-  const quickStockCostPence = poundsToPence(cost);
+  const quickStockCostPence = readFormPence(cost);
   const quickStockListPence = listPriceOverride.trim()
-    ? poundsToPence(listPriceOverride)
+    ? readFormPence(listPriceOverride) ?? 0
     : projectedListSuggestion?.pricePence ?? actionableHeadline?.medianPence ?? 0;
+  const quickStockListInvalid = listPriceOverride.trim().length > 0 && readFormPence(listPriceOverride) == null;
   const effectiveAcquireListingState: AcquireListingState = channel === "EBAY" ? "DRAFT" : acquireListingState;
-  const eBayDraftPriceNeedsReview = shouldCreateListing && channel === "EBAY" && quickStockListPence > 0 && quickStockListPence < 99;
-  const effectiveDraftListPricePence = intakeDraftListPricePence(channel, shouldCreateListing, quickStockListPence);
+  const eBayDraftPriceNeedsReview = shouldCreateListing && channel === "EBAY" && !quickStockListInvalid && quickStockListPence > 0 && quickStockListPence < 99;
+  const effectiveDraftListPricePence = quickStockListInvalid ? null : intakeDraftListPricePence(channel, shouldCreateListing, quickStockListPence);
   const hasEnteredBuyCost = cost.trim().length > 0;
-  const manualStockReady = Boolean(name.trim() && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence >= 0);
+  const manualStockReady = Boolean(name.trim() && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence != null && quickStockCostPence >= 0);
   const totalCostSplit = useMemo(
     () =>
-      quickStockQuantity > 1 && quickStockCostPence > 0
+      quickStockQuantity > 1 && quickStockCostPence != null && quickStockCostPence > 0
         ? splitTotalCostToUnitPence(quickStockCostPence, quickStockQuantity)
         : null,
     [quickStockCostPence, quickStockQuantity],
   );
-  const dealSessionPaidPence = poundsToPence(dealSessionPaid);
-  const dealSessionBudgetRemainingPence = dealSession
+  const dealSessionPaidPence = readFormPence(dealSessionPaid);
+  const dealSessionBudgetRemainingPence = dealSession && dealSessionPaidPence != null
     ? dealSession.summary.totalMaxCashPence - dealSessionPaidPence
-    : 0;
-  const quickStockReady = Boolean(actionableHeadline && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence >= 0 && quickStockListPence > 0);
+    : null;
+  const quickStockReady = Boolean(actionableHeadline && quickStockQuantity > 0 && hasEnteredBuyCost && quickStockCostPence != null && quickStockCostPence >= 0 && !quickStockListInvalid && quickStockListPence > 0);
   const quickOfferOptions = useMemo(() => {
     const targetPence = deal?.targetBuyPence ?? 0;
     const options: Array<{ label: string; valuePence: number }> = [];
@@ -2178,7 +2200,7 @@ export default function Home() {
             targetBuyPence: deal?.targetBuyPence ?? null,
             compMedianPence: actionableHeadline.medianPence,
             compLowPence: actionableHeadline.lowPence,
-            currentTargetPence: poundsToPence(watchTarget),
+            currentTargetPence: readFormPence(watchTarget),
           })
         : null,
     [actionableHeadline, deal?.targetBuyPence, watchTarget],
@@ -2190,7 +2212,7 @@ export default function Home() {
             targetBuyPence: deal?.targetBuyPence ?? null,
             compMedianPence: actionableHeadline.medianPence,
             compLowPence: actionableHeadline.lowPence,
-            currentTargetPence: poundsToPence(watchTarget),
+            currentTargetPence: readFormPence(watchTarget),
           })
         : [],
     [actionableHeadline, deal?.targetBuyPence, watchTarget],
@@ -2254,9 +2276,9 @@ export default function Home() {
   const buyFlowSteps = useMemo<BuyFlowStep[]>(() => {
     const cardReady = Boolean(name.trim() && (setNameValue.trim() || number.trim()));
     const compReady = Boolean(headline && !isAmbiguousComp);
-    const costPence = poundsToPence(cost);
+    const costPence = readFormPence(cost);
     const qty = parseIntakeQuantity(quantity) ?? 0;
-    const stockReady = cost.trim().length > 0 && costPence >= 0 && qty > 0;
+    const stockReady = cost.trim().length > 0 && costPence != null && costPence >= 0 && qty > 0;
     const decisionTone = confidenceLabel?.tone ?? "wait";
 
     return [
@@ -4477,7 +4499,12 @@ export default function Home() {
   }
 
   async function updateDealSessionLine(lineId: string, offerPounds: string) {
-    const dealerOfferPence = offerPounds.trim() ? poundsToPence(offerPounds) : null;
+    const trimmedOffer = offerPounds.trim();
+    const dealerOfferPence = trimmedOffer ? readFormPence(trimmedOffer) : null;
+    if (trimmedOffer && dealerOfferPence == null) {
+      setError(poundsFieldMessage(trimmedOffer) ?? "Enter a smaller amount.");
+      return;
+    }
     setBusy(`deal-line-${lineId}`);
     setError(null);
     setNotice(null);
@@ -4521,7 +4548,11 @@ export default function Home() {
   async function completeDealSession() {
     const sessionId = dealSession?.session?.id;
     if (!sessionId) return;
-    const paidPence = poundsToPence(dealSessionPaid);
+    const paidPence = readFormPence(dealSessionPaid);
+    if (paidPence == null) {
+      setError(poundsFieldMessage(dealSessionPaid) ?? "Enter a smaller amount.");
+      return;
+    }
     if (paidPence <= 0) {
       setError("Enter the total paid for the lot.");
       return;
@@ -4734,7 +4765,7 @@ export default function Home() {
         number: payload.catalog?.number ?? number,
         grade,
         quantity: intakeQuantity,
-        costPence: poundsToPence(cost),
+        costPence: readFormPence(cost) ?? 0,
         listPricePence: stockedListing?.listPrice ?? listedPence,
         channel,
         listingState: stockedListing?.state ?? "DRAFT",
@@ -4779,7 +4810,7 @@ export default function Home() {
     const itemSetName = catalogCard?.setName ?? setNameValue;
     const itemNumber = catalogCard?.number ?? number;
     const itemQuantity = parseIntakeQuantity(quantity) ?? 1;
-    const costPence = poundsToPence(cost);
+    const costPence = readFormPence(cost) ?? 0;
     const mutation = await enqueueOfflineMutation({
       id: mutationId,
       kind: "acquire",
@@ -5015,7 +5046,7 @@ export default function Home() {
     const itemSetName = catalogCard?.setName ?? setNameValue;
     const itemNumber = catalogCard?.number ?? number;
     const itemQuantity = parseIntakeQuantity(quantity) ?? 1;
-    const costPence = poundsToPence(cost);
+    const costPence = readFormPence(cost) ?? 0;
     const mutation = await enqueueOfflineMutation({
       id: mutationId,
       kind: "quick-fill",
@@ -5193,7 +5224,11 @@ export default function Home() {
   }
 
   async function createWatch(targetOverridePence?: number) {
-    const targetPence = targetOverridePence ?? poundsToPence(watchTarget);
+    const targetPence = targetOverridePence ?? readFormPence(watchTarget);
+    if (targetPence == null) {
+      setError(poundsFieldMessage(watchTarget) ?? "Enter a smaller amount.");
+      return;
+    }
     setBusy("watch-create");
     setError(null);
     setNotice(null);
@@ -5261,7 +5296,11 @@ export default function Home() {
 
   async function saveWatchTarget(watch: WatchRecord) {
     const value = watchEdits[watch.id] ?? penceToPounds(watch.targetPence);
-    const targetPence = poundsToPence(value);
+    const targetPence = readFormPence(value);
+    if (targetPence == null) {
+      setError(poundsFieldMessage(value) ?? "Enter a smaller amount.");
+      return;
+    }
     if (targetPence <= 0) {
       setError("Enter a buy target above £0.");
       return;
@@ -5757,7 +5796,8 @@ export default function Home() {
   }
 
   function applySaleChannelPreset(nextChannel: Channel) {
-    const currentGross = poundsToPence(salePrice);
+    const currentGross = readFormPence(salePrice);
+    if (currentGross == null) return;
     const currentItemSubtotal =
       currentGross > 0 ? currentSaleItemSubtotal(currentGross) : 0;
     const nextGross =
@@ -5783,8 +5823,8 @@ export default function Home() {
   function saleUnitReferencePence(): number {
     if (!sellingItem) return 0;
     const quantityForPrice = saleQuantityForShortcuts();
-    const currentTotal = poundsToPence(salePrice);
-    if (currentTotal > 0) {
+    const currentTotal = readFormPence(salePrice);
+    if (currentTotal != null && currentTotal > 0) {
       const itemSubtotal = currentSaleItemSubtotal(currentTotal);
       return Math.round(itemSubtotal / quantityForPrice);
     }
@@ -5909,9 +5949,11 @@ export default function Home() {
     const currentQuantity = saleQuantityForShortcuts();
     setSaleQuantity(value);
     if (!sellingItem || !nextQuantity || nextQuantity > availableToSell(sellingItem)) return;
+    const currentGross = readFormPence(salePrice);
+    if (currentGross == null) return;
     const nextGross = rescaleGrossSaleForQuantity(
       saleChannel,
-      poundsToPence(salePrice),
+      currentGross,
       currentQuantity,
       nextQuantity,
       { grade: sellingItem.grade },
@@ -5920,8 +5962,9 @@ export default function Home() {
   }
 
   function applyCashSale() {
+    const currentGross = readFormPence(salePrice);
+    if (currentGross == null) return;
     setSaleCostsConfirmed(false);
-    const currentGross = poundsToPence(salePrice);
     const itemSubtotal =
       currentGross > 0 ? currentSaleItemSubtotal(currentGross) : currentGross;
     setSaleChannel("IN_PERSON");
@@ -5934,7 +5977,9 @@ export default function Home() {
   }
 
   function resetSaleCosts() {
-    const estimate = estimateSaleCosts(saleChannel, poundsToPence(salePrice), { grade: sellingItem?.grade });
+    const salePricePence = readFormPence(salePrice);
+    if (salePricePence == null) return;
+    const estimate = estimateSaleCosts(saleChannel, salePricePence, { grade: sellingItem?.grade });
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
     setSaleCostsConfirmed(false);
@@ -6156,9 +6201,13 @@ export default function Home() {
   async function addExpense(event: FormEvent) {
     event.preventDefault();
     const description = expenseDescription.trim();
-    const amountPence = poundsToPence(expenseAmount);
+    const amountPence = readFormPence(expenseAmount);
     if (!description) {
       setError("Add a short cost description.");
+      return;
+    }
+    if (amountPence == null) {
+      setError(poundsFieldMessage(expenseAmount) ?? "Enter a smaller amount.");
       return;
     }
     if (amountPence <= 0) {
@@ -6276,6 +6325,11 @@ export default function Home() {
     event.preventDefault();
     const item = inventory.find((row) => row.id === creatingListingItemId);
     if (!item) return;
+    const listPricePence = readFormPence(listingPrice);
+    if (listPricePence == null) {
+      setError(poundsFieldMessage(listingPrice) ?? "Enter a smaller amount.");
+      return;
+    }
     setBusy(`create-listing-${item.id}`);
     setError(null);
     setNotice(null);
@@ -6295,7 +6349,7 @@ export default function Home() {
           itemId: item.id,
           channel: listingChannel,
           state: canActivateDirect ? "ACTIVE" : "DRAFT",
-          listPricePence: poundsToPence(listingPrice),
+          listPricePence,
           externalUrl: trimmedExternalUrl || null,
         }),
       });
@@ -7158,9 +7212,10 @@ export default function Home() {
 
   async function logCheckedCompEntry(event?: FormEvent) {
     event?.preventDefault();
-    const pricePence = parseCheckedCompPriceText(checkedCompLogPrice) ?? poundsToPence(checkedCompLogPrice);
-    if (!Number.isFinite(pricePence) || pricePence <= 0) {
-      setError("Enter a sold price first.");
+    const loggedPrice = poundsToPence(checkedCompLogPrice);
+    const pricePence = parseCheckedCompPriceText(checkedCompLogPrice) ?? (loggedPrice.ok ? loggedPrice.pence : null);
+    if (pricePence == null || !Number.isFinite(pricePence) || pricePence <= 0) {
+      setError(loggedPrice.ok ? "Enter a sold price first." : loggedPrice.message);
       return;
     }
     const card = currentCheckedCompCard();
@@ -7594,6 +7649,7 @@ export default function Home() {
                   onChange={setCheckedCompLogPrice}
                   placeholder="e.g. 24.00"
                 />
+                <PoundsFieldAlert value={checkedCompLogPrice} label="Sold price" />
               </label>
               <label>
                 Sold date
@@ -7845,6 +7901,7 @@ export default function Home() {
           <label>
             What I paid
             <MoneyInput ref={costInputRef} value={cost} onChange={setManualBuyCost} />
+            <PoundsFieldAlert value={cost} label="What I paid" />
             <small>Your purchase cost—not the market comp or listing price.</small>
           </label>
           <label>
@@ -7897,6 +7954,7 @@ export default function Home() {
             <label>
               Your list price
               <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="Use suggestion" />
+              <PoundsFieldAlert value={listPriceOverride} label="Your list price" />
               <small>You choose this. It can be above, below or equal to the comp.</small>
             </label>
             <label>
@@ -9898,7 +9956,7 @@ export default function Home() {
                 <Metric label="Max trade" value={gbp(dealSession.summary.totalMaxTradePence)} />
                 <Metric label="Profit plan" value={gbp(dealSession.summary.totalExpectedProfitPence)} />
               </div>
-              <div className={`target-suggestion ${dealSessionBudgetRemainingPence >= 0 ? "active" : ""}`}>
+              {dealSessionBudgetRemainingPence != null && <div className={`target-suggestion ${dealSessionBudgetRemainingPence >= 0 ? "active" : ""}`}>
                 <div>
                   <span>{dealSessionBudgetRemainingPence >= 0 ? "Remaining budget" : "Over max cash"}</span>
                   <strong>{gbp(Math.abs(dealSessionBudgetRemainingPence))}</strong>
@@ -9910,11 +9968,12 @@ export default function Home() {
                 >
                   Use rounded offer
                 </button>
-              </div>
+              </div>}
               <div className="form-grid">
                 <label>
                   Paid total
                   <MoneyInput value={dealSessionPaid} onChange={setDealSessionPaid} disabled={busy === "deal-session-complete"} />
+                  <PoundsFieldAlert value={dealSessionPaid} label="Paid total" />
                 </label>
                 <label>
                   Suggested offer
@@ -9950,6 +10009,7 @@ export default function Home() {
                 <label>
                   Grade cost
                   <MoneyInput value={gradingCost} onChange={setGradingCost} />
+                  <PoundsFieldAlert value={gradingCost} label="Grade cost" />
                 </label>
               </div>
               <button className="secondary-action" type="button" onClick={lookupGradeEv} disabled={busy === "grade-ev"}>
@@ -9975,6 +10035,7 @@ export default function Home() {
                 <label>
                   Target
                   <MoneyInput value={watchTarget} onChange={setWatchTarget} />
+                  <PoundsFieldAlert value={watchTarget} label="Target" />
                 </label>
                 <label>
                   Target grade
@@ -10039,6 +10100,7 @@ export default function Home() {
               <label>
                 What I paid
                 <MoneyInput ref={costInputRef} value={cost} onChange={setManualBuyCost} />
+                <PoundsFieldAlert value={cost} label="What I paid" />
                 <small>Your purchase cost—not the comp or sell price.</small>
               </label>
               <label>
@@ -10081,6 +10143,7 @@ export default function Home() {
                 <label>
                   Your list price
                   <MoneyInput value={listPriceOverride} onChange={setListPriceOverride} placeholder="Use suggestion" />
+                  <PoundsFieldAlert value={listPriceOverride} label="Your list price" />
                   <small>You always choose the price sent to the marketplace.</small>
                 </label>
                 <label>
@@ -10875,6 +10938,7 @@ export default function Home() {
             <label>
               Actual sale price · buyer total
               <MoneyInput value={salePrice} onChange={(value) => { setSalePrice(value); setSaleCostsConfirmed(false); }} />
+              <PoundsFieldAlert value={salePrice} label="Actual sale price" />
             </label>
             <label>
               Qty sold
@@ -10891,6 +10955,7 @@ export default function Home() {
           <label>
             Buyer postage charged
             <MoneyInput value={buyerPostage} onChange={setBuyerPostage} />
+            <PoundsFieldAlert value={buyerPostage} label="Buyer postage" />
           </label>
           <p className="hint">The postage within the buyer total. Enter £0 for free postage; leave blank if unknown. Unknown splits stay out of sold-price evidence.</p>
           {saleBreakdown && (
@@ -10929,6 +10994,7 @@ export default function Home() {
                   setFees(value);
                 }}
               />
+              <PoundsFieldAlert value={fees} label="Fees" />
             </label>
           </div>
           <label>
@@ -10941,6 +11007,7 @@ export default function Home() {
                 setPostage(value);
               }}
             />
+            <PoundsFieldAlert value={postage} label="My postage" />
           </label>
           {sellingItem && buyerPaidPostagePence(saleChannel, sellingItem.grade) > 0 && (
             <p className="hint sale-assumption">
@@ -10974,11 +11041,11 @@ export default function Home() {
             </div>
           )}
           <div className="sale-submit-row">
-            <button className="primary-action" type="submit" value="done" disabled={busy === `sell-${sellingId}`}>
+            <button className="primary-action" type="submit" value="done" disabled={busy === `sell-${sellingId}` || Boolean(saleAmountMessage)}>
               {busy === `sell-${sellingId}` ? "Saving…" : "Create sale"}
             </button>
             {nextSaleAfterCurrentTarget && (
-              <button className="secondary-action" type="submit" value="next" disabled={busy === `sell-${sellingId}`}>
+              <button className="secondary-action" type="submit" value="next" disabled={busy === `sell-${sellingId}` || Boolean(saleAmountMessage)}>
                 Save + next
               </button>
             )}
@@ -11212,9 +11279,10 @@ function ListingPackSheet({
   const reviewedEbayTitle = ebayTitleDraft.trim();
   const ebayTitleCustomized = reviewedEbayTitle !== suggestedEbayTitle;
   const ebayTitleReady = reviewedEbayTitle.length > 0 && reviewedEbayTitle.length <= 80;
-  const reviewedListPricePence = poundsToPence(ebayListPriceDraft);
-  const ebayPriceReady = reviewedListPricePence >= 99;
-  const effectivePricePence = isEbayListing ? reviewedListPricePence : listing.listPrice ?? 0;
+  const reviewedListPricePence = readFormPence(ebayListPriceDraft);
+  const ebayListPriceMessage = poundsFieldMessage(ebayListPriceDraft);
+  const ebayPriceReady = reviewedListPricePence != null && reviewedListPricePence >= 99;
+  const effectivePricePence = isEbayListing ? reviewedListPricePence ?? 0 : listing.listPrice ?? 0;
   const economics = item
     ? buildListingEconomics({
         channel: listing.channel,
@@ -11393,13 +11461,15 @@ function ListingPackSheet({
           onConfirm={() => onPublish({
             title: reviewedEbayTitle,
             titleCustomized: ebayTitleCustomized,
-            listPricePence: reviewedListPricePence,
+            listPricePence: reviewedListPricePence ?? 0,
           })}
         />
         {(!ebayPublishReady || !ebayTitleReady || !ebayPriceReady) && (
           <p className="hint danger-text">
             {!ebayTitleReady
               ? "Use a title between 1 and 80 characters before publishing."
+              : ebayListPriceMessage
+                ? ebayListPriceMessage
               : !ebayPriceReady
                 ? "Your eBay list price must be at least £0.99."
               : "Publish is blocked until every required eBay readiness check passes."}
@@ -11445,6 +11515,7 @@ function ListingPackSheet({
         <label className={`listing-price-editor ${ebayPriceReady ? "" : "invalid"}`}>
           <span>Exact eBay price</span>
           <MoneyInput value={ebayListPriceDraft} onChange={setEbayListPriceDraft} />
+          <PoundsFieldAlert value={ebayListPriceDraft} label="Exact eBay price" />
           <small>
             Buyers will see {ebayPriceReady ? gbp(reviewedListPricePence) : "this price"}. The comp is guidance; you choose the live price.
           </small>
@@ -11534,7 +11605,7 @@ function ListingPackSheet({
                 onClick={() => onPreflight({
                   title: reviewedEbayTitle,
                   titleCustomized: ebayTitleCustomized,
-                  listPricePence: reviewedListPricePence,
+                  listPricePence: reviewedListPricePence ?? 0,
                 })}
                 disabled={busy || !ebayReadiness.ready || !ebayTitleReady || !ebayPriceReady}
               >
@@ -13333,6 +13404,17 @@ function reviewedCompSnapshot(result: CompResult) {
     outliersRemoved: result.outliersRemoved,
     asOf: result.asOf,
   };
+}
+
+function labeledPoundsMessage(label: string, value: string): string | null {
+  const message = poundsFieldMessage(value);
+  return message ? `${label}: ${message}` : null;
+}
+
+function PoundsFieldAlert({ value, label }: { value: string; label: string }) {
+  const message = labeledPoundsMessage(label, value);
+  if (!message) return null;
+  return <span className="hint danger-text" role="alert">{message}</span>;
 }
 
 function intakeRequestError(payload: any, fallback: string): string {

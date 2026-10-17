@@ -196,6 +196,31 @@ test("camera scan hands the reviewed comp and photo into the stock form", async 
   await expect(page.getByRole("heading", { name: "Listing pack" })).toBeVisible();
 });
 
+test("a very long sale price stays on the form and shows a validation message", async ({ context, page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const ledger = new FixtureDealerLedger();
+  ledger.acquired = true;
+  await mockDealerApis(context, ledger);
+
+  await page.goto("/?view=stock");
+  await page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" }).getByRole("button", { name: "Sell", exact: true }).click();
+
+  const saleSheet = page.locator(".sell-sheet").filter({ has: page.getByRole("heading", { name: "Mark sold" }) });
+  await expect(saleSheet).toBeVisible();
+  const salePrice = saleSheet.getByRole("textbox", { name: /^Actual sale price/ });
+  await salePrice.fill("100000000000000");
+
+  await expect(saleSheet.getByRole("alert")).toContainText("Actual sale price: Enter a smaller amount. This one is too large to record.");
+  await expect(saleSheet.getByRole("button", { name: "Create sale" })).toBeDisabled();
+  await expect(saleSheet).toBeVisible();
+  expect(pageErrors).toEqual([]);
+
+  await salePrice.fill("50.00");
+  await expect(saleSheet.getByRole("alert")).toHaveCount(0);
+  await expect(saleSheet.getByRole("button", { name: "Create sale" })).toBeEnabled();
+});
+
 test("listing workspace shows live stock on arrival and keeps draft and sale actions available", async ({ context, page }) => {
   const ledger = new FixtureDealerLedger();
   ledger.acquired = true;

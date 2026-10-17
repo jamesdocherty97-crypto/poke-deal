@@ -24,15 +24,42 @@ export function roundHalfUpPence(gbp: number): GbpPence {
   return gbpPence(sign * Math.floor(Math.abs(gbp) * 100 + 0.5 + 1e-9));
 }
 
+export const POUNDS_TOO_LARGE_MESSAGE = "Enter a smaller amount. This one is too large to record.";
+
+export type PoundsParse =
+  | { ok: true; pence: GbpPence }
+  | { ok: false; message: string };
+
 /**
  * Form text in pounds, such as "12.50" or "£12.50", to integer pence.
- * Blank text is 0. Text that is not a finite number is 0 so an untouched field does not throw.
+ * Blank text and text that is not a number are 0 so an untouched field does not throw.
+ * Amounts that cannot be a safe integer pence are invalid. This never throws:
+ * sale and buy previews call it while rendering.
  */
-export function poundsToPence(value: string): GbpPence {
+export function poundsToPence(value: string): PoundsParse {
   const normalized = value.replace(/[^0-9.-]/g, "");
+  if (normalized === "" || normalized === "-" || normalized === "." || normalized === "-.") {
+    return { ok: true, pence: gbpPence(0) };
+  }
   const pounds = Number(normalized);
-  if (!Number.isFinite(pounds)) return gbpPence(0);
-  return roundHalfUpPence(pounds);
+  if (Number.isNaN(pounds)) return { ok: true, pence: gbpPence(0) };
+  if (!Number.isFinite(pounds)) return { ok: false, message: POUNDS_TOO_LARGE_MESSAGE };
+  const sign = pounds < 0 ? -1 : 1;
+  const rounded = sign * Math.floor(Math.abs(pounds) * 100 + 0.5 + 1e-9);
+  if (!Number.isSafeInteger(rounded)) return { ok: false, message: POUNDS_TOO_LARGE_MESSAGE };
+  return { ok: true, pence: rounded as GbpPence };
+}
+
+/** Pence for a preview, or null when the text is too large to record. */
+export function readFormPence(value: string): GbpPence | null {
+  const parsed = poundsToPence(value);
+  return parsed.ok ? parsed.pence : null;
+}
+
+/** Message to show beside a money field, or null when the text can be used. */
+export function poundsFieldMessage(value: string): string | null {
+  const parsed = poundsToPence(value);
+  return parsed.ok ? null : parsed.message;
 }
 
 export function penceToPounds(pence: number): string {
