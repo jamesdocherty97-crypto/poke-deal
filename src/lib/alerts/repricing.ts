@@ -1,6 +1,6 @@
 import type { CompResult } from "../domain/types.js";
 import { suggestListPrice, type PricingStrategy } from "../comps/pricing.js";
-import { formatGbp } from "../comps/currency.js";
+import { formatGbp } from "../format/money.js";
 
 export interface RepriceInput {
   itemId: string;

@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { GRADE_VALUES, type CardRef, type CompResult, type Grade, type RawSale } from "../domain/types.js";
-import { fxRateInfo, STATIC_RATES, toGbpPence, type FxRates } from "./currency.js";
+import { fxRateInfo, STATIC_RATES, toGbpPence, type FxRates } from "./fxConvert.js";
 
 // ── Stats helpers (exported for tests) ───────────────────────
 

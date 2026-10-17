@@ -9,7 +9,7 @@ import { CompService } from "./lib/comps/compService.js";
 import type { CompSource } from "./lib/comps/CompSource.js";
 import { cleanToComp, DEFAULT_WINDOW_DAYS } from "./lib/comps/cleaning.js";
 import { sampleRawSales } from "./lib/comps/sources/fixtures.js";
-import { formatGbp } from "./lib/comps/currency.js";
+import { formatGbp } from "./lib/format/money.js";
 import { suggestListPrice } from "./lib/comps/pricing.js";
 import { realizedProfit } from "./lib/comps/pricing.js";
 import {

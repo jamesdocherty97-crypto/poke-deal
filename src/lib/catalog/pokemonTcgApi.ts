@@ -1,5 +1,6 @@
 import type { CardRef } from "../domain/types.js";
-import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../comps/currency.js";
+import { getRates } from "../comps/currency.js";
+import { fxRateInfo, STATIC_RATES, toGbpPence, type FxRates } from "../comps/fxConvert.js";
 import { isApiUnavailableSetId, resolveSetIdForCard } from "./setCatalog.js";
 import type { CatalogCard, CatalogPriceSignal, CatalogSource } from "./types.js";
 import { tokenizeSearchText } from "./fuzzy.js";

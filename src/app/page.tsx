@@ -3,7 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
 import { type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent, type SyntheticEvent, type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
-import { formatGbp as gbp } from "@/lib/format/money";
+import { formatGbp as gbp, penceToPounds, poundsToPence } from "@/lib/format/money";
 import { compressPhotoForUpload, inventoryPhotoUploadPath, preparePhotoForScan } from "@/lib/photos/imageProcessing";
 import {
   orderListingPhotos,
@@ -13272,16 +13272,6 @@ function findSelectedSet(sets: CatalogSet[], value: string): CatalogSet | null {
 
 function formatPct(value: number | null): string {
   return value == null ? "n/a" : `${value.toFixed(1).replace(/\.0$/, "")}%`;
-}
-
-function poundsToPence(value: string): number {
-  const normalized = value.replace(/[^0-9.-]/g, "");
-  const pounds = Number(normalized);
-  return Number.isFinite(pounds) ? Math.round(pounds * 100) : 0;
-}
-
-function penceToPounds(pence: number): string {
-  return (pence / 100).toFixed(2);
 }
 
 function hydrateStockMutationResult(

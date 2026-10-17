@@ -10,7 +10,8 @@ import {
 import type { CompSource, CompSourceContext } from "../CompSource.js";
 import { createAbortScope } from "../../http/abortScope.js";
 import { DEFAULT_WINDOW_DAYS } from "../cleaning.js";
-import { fxRateInfo, getRates, STATIC_RATES, toGbpPence, type FxRates } from "../currency.js";
+import { getRates } from "../currency.js";
+import { fxRateInfo, STATIC_RATES, toGbpPence, type FxRates } from "../fxConvert.js";
 import { detectCardPrintIdentity, requestsFirstEdition, textMentionsFirstEdition } from "../variants.js";
 
 const BASE_URL = "https://api.poketrace.com/v1";

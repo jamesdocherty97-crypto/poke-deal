@@ -8,7 +8,7 @@ Read `README.md`, `DECISIONS.md`, and the relevant domain module before changing
 
 - Store and compare money as integer GBP pence below provider boundaries. Convert external currencies at ingestion.
 - Every comp carries evidence such as sample size, window, and removed outliers. Never surface a bare price as trusted evidence.
-- Keep `src/lib/comps/cleaning.ts` pure and free of database, network, and framework imports.
+- Keep `src/lib/comps/cleaning.ts` pure and free of database, network, and framework imports. Convert money through `src/lib/comps/fxConvert.ts` and `src/lib/format/money.ts`. `src/lib/comps/currency.ts` is only the live FX client.
 - Provider failures degrade to explicit unavailable/empty results; never substitute fixture prices in the app.
 - Keep inventory, listing, and sale domain logic card-agnostic where it already is.
 - Do not weaken the production trusted-browser gate or expose inventory, sales, costs, provider configuration, or secrets to indexing.

@@ -1,5 +1,5 @@
 import type { CardFinish, CardRef, Currency, Game, Language, PrintEdition } from "../domain/types.js";
-import type { FxRateInfo } from "../comps/currency.js";
+import type { FxRateInfo } from "../comps/fxConvert.js";
 
 export interface CatalogPriceSignal {
   source: "tcgplayer" | "cardmarket";
