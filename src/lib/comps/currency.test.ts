@@ -1,13 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  toGbpPence,
-  formatGbp,
-  STATIC_RATES,
-  getRates,
-  parseFxPayload,
-  type FxRateDb,
-} from "./currency.js";
+import { formatGbp } from "../format/money.js";
+import { parseFxPayload, STATIC_RATES, toGbpPence } from "./fxConvert.js";
+import { getRates, type FxRateDb } from "./currency.js";
 
 test("GBP is identity (to pence)", () => {
   assert.equal(toGbpPence(12.5, "GBP"), 1250);

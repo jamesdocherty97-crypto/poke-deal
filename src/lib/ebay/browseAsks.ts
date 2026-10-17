@@ -1,4 +1,5 @@
-import { getRates, toGbpPence, type FxRates } from "../comps/currency.js";
+import { getRates } from "../comps/currency.js";
+import { toGbpPence, type FxRates } from "../comps/fxConvert.js";
 import type { CardRef, Currency, Grade } from "../domain/types.js";
 import { collectorNumbersEquivalent } from "../cards/identity.js";
 import { cardSearchQuery, ebaySoldSearchQuery } from "../dealer/compLinks.js";

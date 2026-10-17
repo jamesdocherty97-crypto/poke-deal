@@ -1,4 +1,4 @@
-import { formatGbp } from "../comps/currency.js";
+import { formatGbp } from "../format/money.js";
 import type { CompResult } from "../domain/types.js";
 
 export interface WatchCheckInput {
