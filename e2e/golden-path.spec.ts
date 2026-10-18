@@ -83,3 +83,15 @@ test("fixture golden path: scan -> progressive confidence receipt -> durable acq
   expect(outcome.events[2].receipt.reconciliation.confidence).toBe("medium");
   expect(outcome.buy.item.costBasisPence).toBe(2500);
 });
+
+test("skip link stays hidden until Tab, then focuses main content", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/privacy");
+  const skip = page.getByRole("link", { name: "Skip to main content" });
+  await expect(skip).toBeHidden();
+  await page.keyboard.press("Tab");
+  await expect(skip).toBeVisible();
+  await expect(skip).toBeInViewport();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main-content")).toBeFocused();
+});
