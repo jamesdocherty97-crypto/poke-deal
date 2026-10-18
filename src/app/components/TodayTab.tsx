@@ -118,6 +118,8 @@ type TodayProps = {
   onAddReviewCheckedComp: (review: ManualCompReview, input: { pricePence: number; soldDate: string; condition?: string; priceBasis: "DISPLAYED_PRICE" | "ITEM_PRICE" | "BUYER_TOTAL" | "BEST_OFFER_UNKNOWN"; sourceUrl: string; note?: string }) => void;
   orderSyncStatus?: OrderSyncStatus | null;
   loading?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
 };
 
 export function TodayTab({
@@ -163,6 +165,8 @@ export function TodayTab({
   onAddReviewCheckedComp,
   orderSyncStatus = null,
   loading = false,
+  loadError = null,
+  onRetry,
 }: TodayProps) {
   const greeting = useTodayGreeting();
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -233,6 +237,16 @@ export function TodayTab({
   }
 
   if (loading) return <section className="workspace today-workspace"><WorkspaceSkeleton label="Loading today's work" rows={3} /></section>;
+  if (loadError) {
+    return (
+      <section className="workspace today-workspace focused-today today-slim">
+        <div className="panel" role="alert">
+          <p>{loadError}</p>
+          <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="workspace today-workspace focused-today today-slim">
