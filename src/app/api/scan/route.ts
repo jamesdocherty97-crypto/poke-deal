@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { MAX_SCAN_BODY_BYTES, readCardImage, ScanError } from "@/lib/scan/cardScan";
+import { assertScanConfigured, MAX_SCAN_BODY_BYTES, readCardImage, ScanError } from "@/lib/scan/cardScan";
 import { completeScanEvent, scanEventDataFromError, scanEventDataFromResult } from "@/lib/scan/scanEvent";
 import { hashScanSession, reserveScanBudget, scanSessionTokenFromRequest } from "@/lib/scan/scanBudget";
 import { readBoundedJson } from "@/lib/http/boundedJson";
@@ -22,6 +22,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
   }
 
+  try {
+    assertScanConfigured();
+  } catch (err) {
+    if (err instanceof ScanError && err.kind === "config") {
+      return NextResponse.json(
+        { error: "Card scan is unavailable right now. Type the card instead.", kind: "config" },
+        { status: 503 },
+      );
+    }
+    throw err;
+  }
+
   const inputKind = cleanInputKind(request.headers.get("x-poke-deal-scan-input"));
   const sessionHash = hashScanSession(scanSessionTokenFromRequest(request));
   const reservation = await reserveScanBudget({
@@ -32,7 +44,7 @@ export async function POST(request: Request) {
   if (!reservation.allowed) {
     const scope = reservation.reason === "session" ? "This device's daily" : "Daily";
     return NextResponse.json(
-      { error: `${scope} scan budget reached — type the card instead (resets 8am UK).`, reason: reservation.reason },
+      { error: `${scope} scan budget reached. Type the card instead (resets 8am UK).`, reason: reservation.reason },
       { status: 429 },
     );
   }

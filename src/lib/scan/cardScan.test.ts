@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseScanIdentity, readCardImage, ScanError, SCAN_PROMPT } from "./cardScan.js";
+import { assertScanConfigured, parseScanIdentity, readCardImage, ScanError, SCAN_PROMPT } from "./cardScan.js";
 
 function geminiReply(json: unknown, usageMetadata?: Record<string, unknown>): Response {
   return new Response(
@@ -177,6 +177,24 @@ test("readCardImage maps 429 to quota ScanError", async () => {
     }),
     (err: unknown) => err instanceof ScanError && err.kind === "quota",
   );
+});
+
+test("assertScanConfigured rejects a missing Gemini key", () => {
+  const original = process.env.GEMINI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  try {
+    assert.throws(
+      () => assertScanConfigured(),
+      (err: unknown) => err instanceof ScanError && err.kind === "config",
+    );
+    assert.throws(
+      () => assertScanConfigured("  "),
+      (err: unknown) => err instanceof ScanError && err.kind === "config",
+    );
+    assert.doesNotThrow(() => assertScanConfigured("test-key"));
+  } finally {
+    if (original !== undefined) process.env.GEMINI_API_KEY = original;
+  }
 });
 
 test("readCardImage requires an api key", async () => {

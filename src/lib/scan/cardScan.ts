@@ -60,6 +60,10 @@ export class ScanError extends Error {
   }
 }
 
+export function assertScanConfigured(apiKey: string | null | undefined = process.env.GEMINI_API_KEY): asserts apiKey is string {
+  if (!apiKey?.trim()) throw new ScanError("GEMINI_API_KEY is not set.", "config");
+}
+
 // OCR is a bounded extraction task, not an agentic reasoning task. Pin the
 // stable low-latency multimodal model so the floating `flash-latest` alias
 // cannot silently move the scan path onto a much slower reasoning model.
@@ -195,8 +199,8 @@ export async function readCardImage(
     signal?: AbortSignal;
   } = {},
 ): Promise<ScanResult> {
-  const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) throw new ScanError("GEMINI_API_KEY is not set.", "config");
+  const apiKey = (options.apiKey ?? process.env.GEMINI_API_KEY)?.trim();
+  assertScanConfigured(apiKey);
   const model = options.model ?? process.env.GEMINI_MODEL?.trim() ?? DEFAULT_MODEL;
   const fetchImpl = options.fetchImpl ?? fetch;
 

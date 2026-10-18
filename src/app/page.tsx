@@ -152,6 +152,7 @@ import { listingEvidenceFromPreview } from "@/lib/dealer/listingEvidence";
 import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@/lib/catalog/cardSearch";
 import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
 import type { ScanIdentity } from "@/lib/scan/cardScan";
+import { scanErrorCopy } from "@/lib/scan/scanErrorCopy";
 import { scanIdentityToQuery, type ScanIdentityMapping, type ScanCompQuery } from "@/lib/scan/scanIdentityMapper";
 import {
   enqueueOfflineMutation,
@@ -3526,7 +3527,11 @@ export default function Home() {
           setScanMessage("Scan budget paused until the daily reset around 8am UK. Typed comp still works.");
           return;
         }
-        throw new Error(payload.error ?? "scan failed");
+        const copy = scanErrorCopy(res.status);
+        if (copy.manual) updateScanMode("manual");
+        setScanMessage(copy.message);
+        setError(copy.message);
+        return;
       }
       const identity = payload.identity as ScanIdentity | undefined;
       if (!identity) throw new Error("Scan returned no card identity.");
@@ -3534,10 +3539,17 @@ export default function Home() {
       await handleScanIdentity(identity, String(payload.model ?? ""));
     } catch (err) {
       if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
+      const message = err instanceof Error ? err.message : "";
+      if (message.startsWith("Scan queued")) {
+        updateScanMode("manual");
+        setScanMessage(message);
+        setError(null);
+        return;
+      }
+      const copy = scanErrorCopy(0);
       updateScanMode("manual");
-      const message = err instanceof Error ? err.message : "scan failed";
-      setScanMessage(message.startsWith("Scan queued") ? message : "Couldn't read it — retake or type.");
-      setError(message.startsWith("Scan queued") ? null : message);
+      setScanMessage(copy.message);
+      setError(copy.message);
     } finally {
       if (scanRequestRef.current === controller) {
         scanRequestRef.current = null;
