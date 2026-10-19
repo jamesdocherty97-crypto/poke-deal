@@ -2735,7 +2735,10 @@ export default function Home() {
           }
         : null;
       const coreFailed = nextInventory === undefined || nextListings === undefined || nextDashboard === undefined;
-      setCoreLoadFailed(coreFailed && !hadCoreFallback);
+      // Keep the alert up until inventory, listings, and dashboard all arrive.
+      // A dashboard stored by a partial attempt must not dismiss it.
+      if (!coreFailed) setCoreLoadFailed(false);
+      else if (!hadCoreFallback) setCoreLoadFailed(true);
       if (mergedBootstrap) {
         latestWorkspaceRef.current = { ...mergedBootstrap, priceHistoryPreviews: mergedBootstrap.priceHistoryPreviews ?? {} };
         const fullyFresh = failures.length === 0;
