@@ -16,13 +16,13 @@ test("502 and 503 say card scan is down and switch to manual", () => {
 });
 
 test("other statuses stay on safe copy and never accept server text", () => {
-  const serverText = "GEMINI_API_KEY is not set. — upstream exploded";
+  const serverText = "GEMINI_API_KEY is not set. \u2014 upstream exploded";
   for (const status of [0, 400, 500, 429]) {
     const copy = scanErrorCopy(status);
     assert.equal(copy.message, UNREADABLE);
     assert.equal(copy.manual, true);
     assert.equal(copy.message.includes(serverText), false);
-    assert.equal(copy.message.includes("—"), false);
+    assert.equal(copy.message.includes("\u2014"), false);
     assert.equal(copy.message.includes("GEMINI"), false);
   }
 });
