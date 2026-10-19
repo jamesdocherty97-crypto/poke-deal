@@ -111,6 +111,103 @@ test("Profit leaves legacy cost blank and saves confirmed snapshots with a requi
   expect(ledger.sale!.salePrice).toBe(5000);
 });
 
+test("Today explains a failed dashboard load instead of an empty business", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  let dashboardFails = true;
+  await mockReliabilityApis(context, ledger);
+  await context.route("**/api/dashboard", (route) => {
+    if (!dashboardFails) return route.fallback();
+    return route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "database unavailable" }),
+    });
+  });
+
+  await page.goto("/privacy");
+  await page.evaluate(async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    await new Promise<void>((resolve) => {
+      const request = indexedDB.deleteDatabase("poke-deal-offline");
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+      request.onblocked = () => resolve();
+    });
+  });
+  await page.goto("/?view=today");
+
+  const loadAlert = page.locator(".today-workspace").getByRole("alert");
+  await expect(loadAlert).toContainText("Couldn't load your stock and sales. Check signal and try again.");
+  await expect(page.getByRole("heading", { name: "Load your existing singles", exact: true })).toHaveCount(0);
+
+  dashboardFails = false;
+  await loadAlert.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Load your existing singles", exact: true })).toBeVisible();
+  await expect(page.locator(".today-workspace").getByRole("alert")).toHaveCount(0);
+});
+
+test("Today keeps the load alert through two failed inventory retries", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  let inventoryFails = true;
+  await mockReliabilityApis(context, ledger);
+  await context.route("**/api/inventory", (route) => {
+    if (route.request().method() !== "GET" || !inventoryFails) return route.fallback();
+    return route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "database unavailable" }),
+    });
+  });
+
+  await page.goto("/privacy");
+  await page.evaluate(async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    await new Promise<void>((resolve) => {
+      const request = indexedDB.deleteDatabase("poke-deal-offline");
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+      request.onblocked = () => resolve();
+    });
+  });
+  await page.goto("/?view=today");
+
+  const loadAlert = page.locator(".today-workspace").getByRole("alert");
+  const emptyBusiness = page.getByRole("heading", { name: "Load your existing singles", exact: true });
+  await expect(loadAlert).toContainText("Couldn't load your stock and sales. Check signal and try again.");
+  await expect(emptyBusiness).toHaveCount(0);
+
+  async function expectAlertAfterFailedRetry() {
+    const inventory = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/inventory" && response.request().method() === "GET" && response.status() === 500;
+    });
+    const dashboard = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/dashboard" && response.request().method() === "GET";
+    });
+    await loadAlert.getByRole("button", { name: "Retry", exact: true }).click();
+    await inventory;
+    await dashboard;
+    await expect(loadAlert).toContainText("Couldn't load your stock and sales. Check signal and try again.");
+    await expect(emptyBusiness).toHaveCount(0);
+  }
+
+  await expectAlertAfterFailedRetry();
+  await expectAlertAfterFailedRetry();
+
+  inventoryFails = false;
+  const inventory = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === "/api/inventory" && response.request().method() === "GET" && response.ok();
+  });
+  await loadAlert.getByRole("button", { name: "Retry", exact: true }).click();
+  await inventory;
+  await expect(emptyBusiness).toBeVisible();
+  await expect(page.locator(".today-workspace").getByRole("alert")).toHaveCount(0);
+});
+
 class ReliabilityLedger {
   items: any[] = [];
   listings: any[] = [];

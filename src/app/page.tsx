@@ -1164,6 +1164,7 @@ export default function Home() {
   const [inventoryLoaded, setInventoryLoaded] = useState(false);
   const [listingsLoaded, setListingsLoaded] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
+  const [coreLoadFailed, setCoreLoadFailed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [manualReviews, setManualReviews] = useState<ManualCompReview[]>([]);
@@ -2605,6 +2606,7 @@ export default function Home() {
   }
 
   async function runRefreshAll(options: RefreshOptions = {}) {
+    const hadCoreFallback = latestWorkspaceRef.current.dashboard != null;
     setRefreshing(true);
     if (options.user) setUserRefreshing(true);
     setError(null);
@@ -2733,6 +2735,11 @@ export default function Home() {
             dealSession: (nextDealSession ?? fallback.dealSession)!,
           }
         : null;
+      const coreFailed = nextInventory === undefined || nextListings === undefined || nextDashboard === undefined;
+      // Keep the alert up until inventory, listings, and dashboard all arrive.
+      // A dashboard stored by a partial attempt must not dismiss it.
+      if (!coreFailed) setCoreLoadFailed(false);
+      else if (!hadCoreFallback) setCoreLoadFailed(true);
       if (mergedBootstrap) {
         latestWorkspaceRef.current = { ...mergedBootstrap, priceHistoryPreviews: mergedBootstrap.priceHistoryPreviews ?? {} };
         const fullyFresh = failures.length === 0;
@@ -8273,6 +8280,8 @@ export default function Home() {
       {view === "today" && (
         <TodayTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
+          loadError={coreLoadFailed ? "Couldn't load your stock and sales. Check signal and try again." : null}
+          onRetry={() => { void runRefreshAll({ user: true }); }}
           launchProgress={launchProgress}
           primaryTodayAction={primaryTodayAction}
           todayActions={todayActions}
