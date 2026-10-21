@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildListingDraftDefaults, buildListingTitle, defaultManualListPricePence } from "./listingDraft.js";
+import { buildListingDraftDefaults, buildListingTitle, chooseDraftListPrice, defaultManualListPricePence, draftListPriceHint } from "./listingDraft.js";
 
 test("buildListingTitle creates descriptive marketplace-ready defaults", () => {
   assert.equal(
@@ -20,6 +20,33 @@ test("defaultManualListPricePence protects a practical gross margin for manually
   assert.equal(defaultManualListPricePence(999), 1349);
   assert.equal(defaultManualListPricePence(1000, 0.5), 1500);
   assert.equal(defaultManualListPricePence(0), 0);
+});
+
+test("chooseDraftListPrice uses the price check when that card has one", () => {
+  assert.deepEqual(chooseDraftListPrice({ costBasisPence: 2500, priceCheckPence: 4200 }), {
+    listPricePence: 4200,
+    source: "price-check",
+  });
+  assert.equal(draftListPriceHint("price-check"), "The suggestion is prefilled. Edit it freely before saving.");
+});
+
+test("chooseDraftListPrice keeps cost plus 35 percent and says so when no price check exists", () => {
+  assert.deepEqual(chooseDraftListPrice({ costBasisPence: 2500, priceCheckPence: null }), {
+    listPricePence: 3375,
+    source: "cost-plus-margin",
+  });
+  assert.equal(
+    draftListPriceHint("cost-plus-margin"),
+    "Starting price is what you paid plus 35%. No price check yet.",
+  );
+});
+
+test("chooseDraftListPrice does not invent a price from an empty or invalid check", () => {
+  for (const priceCheckPence of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, undefined]) {
+    const chosen = chooseDraftListPrice({ costBasisPence: 2500, priceCheckPence });
+    assert.equal(chosen.source, "cost-plus-margin");
+    assert.equal(chosen.listPricePence, 3375);
+  }
 });
 
 test("buildListingDraftDefaults produces title and price from stock context", () => {

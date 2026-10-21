@@ -30,6 +30,31 @@ export function defaultManualListPricePence(costBasisPence: number, minMargin = 
   return Math.round(costBasisPence * (1 + margin));
 }
 
+export type DraftListPriceSource = "price-check" | "cost-plus-margin";
+
+export const COST_PLUS_MARGIN_HINT = "Starting price is what you paid plus 35%. No price check yet.";
+export const PRICE_CHECK_HINT = "The suggestion is prefilled. Edit it freely before saving.";
+
+/** Use a real price-check suggestion when one exists. Otherwise keep cost plus 35%. */
+export function chooseDraftListPrice(input: {
+  costBasisPence: number;
+  priceCheckPence?: number | null;
+}): { listPricePence: number; source: DraftListPriceSource } {
+  const candidate = input.priceCheckPence;
+  if (typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0) {
+    const listPricePence = Math.round(candidate);
+    if (listPricePence > 0) return { listPricePence, source: "price-check" };
+  }
+  return {
+    listPricePence: defaultManualListPricePence(input.costBasisPence),
+    source: "cost-plus-margin",
+  };
+}
+
+export function draftListPriceHint(source: DraftListPriceSource): string {
+  return source === "price-check" ? PRICE_CHECK_HINT : COST_PLUS_MARGIN_HINT;
+}
+
 export function buildListingDraftDefaults(item: ListingDraftItem): {
   title: string;
   listPricePence: number;
