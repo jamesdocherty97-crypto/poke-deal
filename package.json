@@ -35,7 +35,8 @@
     "db:studio": "prisma studio",
     "audit:duplicate-cards": "node --import tsx scripts/audit-duplicate-cards.mts",
     "consolidate:duplicate-cards": "node --import tsx scripts/consolidate-duplicate-cards.mts",
-    "test:e2e:listings": "playwright test --config playwright.listing.config.ts"
+    "test:e2e:listings": "playwright test --config playwright.listing.config.ts",
+    "test:worst-case": "playwright test --config e2e/worst-case/playwright.config.ts e2e/worst-case/worst-case.spec.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.18.0",
