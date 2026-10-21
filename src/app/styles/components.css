@@ -8313,23 +8313,34 @@ label,
   grid-column: 1 / -1;
 }
 
-.mobile-buy-action span,
-.mobile-buy-action small {
+.mobile-buy-action span {
   overflow: hidden;
   color: var(--muted);
   font-size: var(--font-size-micro);
   font-weight: 900;
-  line-height: 1.12;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mobile-buy-action small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--font-size-micro);
+  font-weight: 900;
+  line-height: 1.25;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .mobile-buy-action strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 30px;
-  line-height: 1;
-  text-overflow: ellipsis;
+  font-size: var(--font-size-title-sm);
+  line-height: 1.15;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
@@ -8459,6 +8470,12 @@ label,
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(13, 20, 36, 0.985);
   padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+}
+
+.sell-sheet > .primary-action:not(:disabled),
+.sell-sheet .sale-submit-row > .primary-action:not(:disabled) {
+  background: var(--brand-red);
+  color: var(--color-text-on-accent);
 }
 
 @keyframes sheetIn {
