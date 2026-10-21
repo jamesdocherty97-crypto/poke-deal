@@ -84,6 +84,8 @@ export function InventoryTab({
   onBulkMove,
   onBulkExport,
   loading = false,
+  loadError = null,
+  onRetry = () => {},
 }: {
   visibleInventory: InventoryItemLike[];
   filteredInventory: InventoryItemLike[];
@@ -140,6 +142,8 @@ export function InventoryTab({
   onBulkMove: (items: InventoryItemLike[], location: string) => void;
   onBulkExport: (items: InventoryItemLike[]) => void;
   loading?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkLocation, setBulkLocation] = useState("To list");
@@ -159,6 +163,17 @@ export function InventoryTab({
     });
   }
 
+  if (!loading && loadError) {
+    return (
+      <section className="workspace inventory-workspace">
+        <div className="panel" role="alert">
+          <p>{loadError}</p>
+          <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="workspace inventory-workspace">
       {loading ? <>
@@ -175,11 +190,11 @@ export function InventoryTab({
         <div className="workspace-masthead-copy">
           <span className="workspace-kicker">Collection vault</span>
           <h2 id="inventory-title">Inventory</h2>
-          <p>Scan the collection by card, value and readiness—then move the right stock forward.</p>
+          <p>Scan the collection by card, value and readiness, then move the right stock forward.</p>
         </div>
         <div className="vault-summary" aria-label="Inventory summary">
-          <span><strong>{holdings.length}</strong> holdings</span>
-          <span><strong>{activeInventory.length}</strong> active cards</span>
+          <span><strong>{holdings.length}</strong> {holdings.length === 1 ? "holding" : "holdings"}</span>
+          <span><strong>{activeInventory.length}</strong> {activeInventory.length === 1 ? "active card" : "active cards"}</span>
           <span><strong>{visibleInventory.length}</strong> in view</span>
         </div>
       </section>
@@ -267,7 +282,7 @@ export function InventoryTab({
           </div>
         </details>
       ))}
-      {inventoryFilter === "all" && activeInventory.length === 0 ? (
+      {activeInventory.length === 0 && (inventoryFilter === "all" || inventoryFilter === "needs-action") ? (
         <EmptyState art="stock" text="No active stock. Add your next card from Comp / Buy." />
       ) : filteredInventory.length === 0 ? (
         <EmptyState text={emptyInventoryFilterText(inventoryFilter)} />

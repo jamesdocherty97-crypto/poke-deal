@@ -66,7 +66,7 @@ export function inventoryItemMatchesFilter(item: StockReadinessItem, filter: Inv
 }
 
 export function emptyInventoryFilterText(filter: InventoryFilter): string {
-  if (filter === "needs-action") return "Your active squad is ready — no preparation tasks waiting.";
+  if (filter === "needs-action") return "Your active squad is ready. No preparation tasks waiting.";
   if (filter === "needs-listing") return "Every available card has a live listing.";
   if (filter === "drafts") return "No draft listings waiting.";
   if (filter === "listed") return "No confirmed live listings yet. Drafts are waiting to be published.";

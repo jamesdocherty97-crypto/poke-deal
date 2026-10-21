@@ -2610,6 +2610,7 @@ export default function Home() {
     setRefreshing(true);
     if (options.user) setUserRefreshing(true);
     setError(null);
+    let inlineCoreError = false;
     try {
       // Apply each independent dataset as soon as it arrives. A slow health or
       // portfolio request must not keep Stock, Today, or List blank behind the
@@ -2736,6 +2737,8 @@ export default function Home() {
           }
         : null;
       const coreFailed = nextInventory === undefined || nextListings === undefined || nextDashboard === undefined;
+      const inlineLoadView = requestedView === "today" || requestedView === "inventory" || requestedView === "listings";
+      inlineCoreError = coreFailed && !hadCoreFallback && inlineLoadView;
       // Keep the alert up until inventory, listings, and dashboard all arrive.
       // A dashboard stored by a partial attempt must not dismiss it.
       if (!coreFailed) setCoreLoadFailed(false);
@@ -2758,7 +2761,15 @@ export default function Home() {
       }
       if (options.toast) setNotice("Refreshed.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "refresh failed");
+      if (!inlineCoreError) {
+        const raw = err instanceof Error ? err.message : "refresh failed";
+        const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+        setError(offline
+          ? "You are offline. The last loaded stock is still on screen."
+          : raw === "Failed to fetch"
+            ? "Could not reach the server. Check the connection and try again."
+            : raw);
+      }
     } finally {
       setRefreshing(false);
       if (options.user) setUserRefreshing(false);
@@ -8160,11 +8171,11 @@ export default function Home() {
             <span aria-hidden="true">⌘</span> Quick
           </button>
           <button
-            className={`icon-button ${refreshing ? "is-loading" : ""}`}
+            className={`icon-button ${userRefreshing ? "is-loading" : ""}`}
             type="button"
             onClick={() => void refreshAll({ toast: true, user: true })}
             disabled={refreshing}
-            aria-label={refreshing ? "Refreshing data" : "Refresh data"}
+            aria-label={userRefreshing ? "Refreshing data" : "Refresh data"}
           >
             <span className="refresh-icon" aria-hidden="true">
               ↻
@@ -10530,6 +10541,8 @@ export default function Home() {
       {view === "inventory" && (
         <InventoryTab
           loading={!inventoryLoaded}
+          loadError={coreLoadFailed ? "Couldn't load your stock and sales. Check signal and try again." : null}
+          onRetry={() => { void runRefreshAll({ user: true }); }}
           visibleInventory={visibleInventory}
           filteredInventory={filteredInventory}
           activeInventory={activeInventory}
@@ -10640,6 +10653,8 @@ export default function Home() {
       {view === "listings" && (
         <ListingsTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
+          loadError={coreLoadFailed ? "Couldn't load your stock and sales. Check signal and try again." : null}
+          onRetry={() => { void runRefreshAll({ user: true }); }}
           dashboard={dashboard}
           firstDraftListingTarget={firstDraftListingTarget}
           firstSaleListingTarget={firstSaleListingTarget}
