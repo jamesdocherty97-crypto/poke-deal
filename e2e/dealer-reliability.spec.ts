@@ -208,6 +208,69 @@ test("Today keeps the load alert through two failed inventory retries", async ({
   await expect(page.locator(".today-workspace").getByRole("alert")).toHaveCount(0);
 });
 
+test("empty stock on Needs action says No active stock, not squad is ready", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await page.goto("/?view=stock");
+  const workspace = page.locator(".inventory-workspace");
+  await expect(workspace).toContainText("No active stock. Add your next card from Comp / Buy.", { timeout: 30_000 });
+  await expect(workspace).not.toContainText("squad is ready");
+});
+
+test("Stock 500 on first load shows the alert with Retry, not an empty book", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await failCoreGets(context, ["/api/inventory", "/api/listings", "/api/dashboard"]);
+  await page.goto("/?view=stock");
+  const alert = page.locator(".inventory-workspace [role=alert]");
+  await expect(alert).toContainText("Couldn't load your stock and sales", { timeout: 30_000 });
+  await expect(alert.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  await expect(page.locator(".inventory-workspace")).not.toContainText("No active stock");
+});
+
+test("List 500 on first load shows the alert with Retry", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await failCoreGets(context, ["/api/listings"]);
+  await page.goto("/?view=list");
+  const alert = page.locator(".listings-workspace [role=alert]");
+  await expect(alert.getByRole("button", { name: "Retry", exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(alert).toContainText("Couldn't load your stock and sales");
+});
+
+test("partial inventory success keeps the stock row when listings fail", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  ledger.addPreparedDraft();
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await failCoreGets(context, ["/api/listings"]);
+  await page.goto("/?view=stock");
+  const workspace = page.locator(".inventory-workspace");
+  await expect(workspace.locator(".item-row").filter({ hasText: "Gengar" })).toBeVisible({ timeout: 30_000 });
+  const banner = workspace.locator(".load-banner");
+  await expect(banner).toContainText("Couldn't load listings");
+  await expect(banner.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  await expect(workspace.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
+});
+
+test("partial listings success keeps list rows when sales fail", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  ledger.addPreparedDraft();
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await failCoreGets(context, ["/api/dashboard"]);
+  await page.goto("/?view=list");
+  const workspace = page.locator(".listings-workspace");
+  await expect(workspace.locator(".item-row").filter({ hasText: "Gengar" })).toBeVisible({ timeout: 30_000 });
+  const banner = workspace.locator(".load-banner");
+  await expect(banner).toContainText("Couldn't load sales");
+  await expect(banner.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  await expect(workspace.locator("#listings-title")).toBeVisible();
+});
+
 class ReliabilityLedger {
   items: any[] = [];
   listings: any[] = [];
@@ -259,6 +322,29 @@ class ReliabilityLedger {
     }, listingsByState: { DRAFT: this.listings.filter((listing) => listing.state === "DRAFT").length, ACTIVE: 0, SOLD: this.sale ? 1 : 0, ENDED: 0 },
     recentSales: summary ? [summary] : [], salesToReconcile: provisional ? [summary] : [], salesToReconcileCount: provisional, recentExpenses: [], monthlyPnl: [], staleStock: [] };
   }
+}
+
+async function abortNonLoopback(context: BrowserContext) {
+  await context.route("**/*", (route) => {
+    let host = "";
+    try { host = new URL(route.request().url()).hostname; } catch { host = ""; }
+    if (host === "127.0.0.1" || host === "localhost") return route.fallback();
+    return route.abort();
+  });
+}
+
+async function failCoreGets(context: BrowserContext, pathnames: string[]) {
+  await context.route("**/api/**", (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (route.request().method() === "GET" && pathnames.includes(pathname)) {
+      return route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "database unavailable" }),
+      });
+    }
+    return route.fallback();
+  });
 }
 
 async function mockReliabilityApis(context: BrowserContext, ledger: ReliabilityLedger) {
