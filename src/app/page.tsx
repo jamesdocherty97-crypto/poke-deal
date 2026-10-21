@@ -2816,7 +2816,9 @@ export default function Home() {
         const raw = err instanceof Error ? err.message : "refresh failed";
         const offline = typeof navigator !== "undefined" && navigator.onLine === false;
         setError(offline
-          ? "You are offline. The last loaded stock is still on screen."
+          ? (hadLoadedCore
+            ? "You are offline. The last loaded stock is still on screen."
+            : "You are offline. Stock will load when you are back online.")
           : raw === "Failed to fetch"
             ? "Could not reach the server. Check the connection and try again."
             : raw);
