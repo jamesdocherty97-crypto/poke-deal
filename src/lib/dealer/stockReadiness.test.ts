@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hasLiveListing, inventoryItemMatchesFilter, stockReadiness, stockRowTaskFlags, type StockReadinessItem } from "./stockReadiness.js";
+import { emptyActiveStockText, emptyInventoryFilterText, hasLiveListing, inventoryItemMatchesFilter, stockReadiness, stockRowTaskFlags, type StockReadinessItem } from "./stockReadiness.js";
 
 const item: StockReadinessItem = {
   status: "IN_STOCK", grade: "RAW", condition: "NM", quantity: 1,
@@ -88,6 +88,18 @@ test("a local hold preserves evidence of an external live listing without offeri
   assert.equal(inventoryItemMatchesFilter(pending, "held"), true);
   assert.equal(stockReadiness({ ...pending, status: "SOLD" }).held, false);
   assert.equal(inventoryItemMatchesFilter({ ...pending, status: "SOLD" }, "sold"), true);
+});
+
+test("empty stock copy keeps a real empty book distinct from zero active cards", () => {
+  assert.equal(emptyActiveStockText(), "No active stock. Add your next card from Comp / Buy.");
+  assert.equal(emptyInventoryFilterText("needs-action"), "Your active squad is ready. No preparation tasks waiting.");
+  assert.equal(emptyInventoryFilterText("needs-listing"), "Every available card has a live listing.");
+  assert.equal(emptyInventoryFilterText("drafts"), "No draft listings waiting.");
+  assert.equal(emptyInventoryFilterText("listed"), "No confirmed live listings yet. Drafts are waiting to be published.");
+  assert.equal(emptyInventoryFilterText("needs-photos"), "Your cards have the photos required for their channel.");
+  assert.equal(emptyInventoryFilterText("held"), "No stock is on hold.");
+  assert.equal(emptyInventoryFilterText("sold"), "No sold stock yet.");
+  assert.equal(emptyInventoryFilterText("all"), "No stock in this view.");
 });
 
 test("stock row chips do not repeat a photo task the row already shows", () => {
