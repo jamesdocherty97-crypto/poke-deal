@@ -106,6 +106,7 @@ export function ListingsTab({
   onBulkPack,
   loading = false,
   loadError = null,
+  loadBanner = null,
   onRetry = () => {},
 }: {
   dashboard: Dashboard | null;
@@ -168,6 +169,7 @@ export function ListingsTab({
   onBulkPack: (listings: Listing[], channel: Channel, mode: "download" | "copy") => void;
   loading?: boolean;
   loadError?: string | null;
+  loadBanner?: string | null;
   onRetry?: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -224,6 +226,12 @@ export function ListingsTab({
 
   return (
     <section className="workspace listings-workspace">
+      {loadBanner ? (
+        <div className="load-banner" role="alert">
+          <p>{loadBanner}</p>
+          <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+        </div>
+      ) : null}
       <section className="workspace-masthead market-masthead" aria-labelledby="listings-title">
         <div className="workspace-masthead-copy">
           <span className="workspace-kicker">Trainer’s marketplace</span>

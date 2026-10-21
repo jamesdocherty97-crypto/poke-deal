@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { InventorySort } from "@/lib/dealer/tableControls";
 import { EmptyState, MoneyInput, WorkspaceSkeleton } from "./UiBits";
+import { emptyActiveStockText } from "@/lib/dealer/stockReadiness";
 import { groupInventoryHoldings } from "@/lib/dealer/inventoryGroups";
 
 type InventoryFilter = import("@/lib/dealer/stockReadiness").InventoryFilter;
@@ -85,6 +86,7 @@ export function InventoryTab({
   onBulkExport,
   loading = false,
   loadError = null,
+  loadBanner = null,
   onRetry = () => {},
 }: {
   visibleInventory: InventoryItemLike[];
@@ -143,6 +145,7 @@ export function InventoryTab({
   onBulkExport: (items: InventoryItemLike[]) => void;
   loading?: boolean;
   loadError?: string | null;
+  loadBanner?: string | null;
   onRetry?: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -186,6 +189,12 @@ export function InventoryTab({
       </section>
       <WorkspaceSkeleton label="Loading stock" rows={5} />
       </> : <>
+      {loadBanner ? (
+        <div className="load-banner" role="alert">
+          <p>{loadBanner}</p>
+          <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+        </div>
+      ) : null}
       <section className="workspace-masthead vault-masthead" aria-labelledby="inventory-title">
         <div className="workspace-masthead-copy">
           <span className="workspace-kicker">Collection vault</span>
@@ -283,7 +292,7 @@ export function InventoryTab({
         </details>
       ))}
       {activeInventory.length === 0 && (inventoryFilter === "all" || inventoryFilter === "needs-action") ? (
-        <EmptyState art="stock" text="No active stock. Add your next card from Comp / Buy." />
+        <EmptyState art="stock" text={emptyActiveStockText()} />
       ) : filteredInventory.length === 0 ? (
         <EmptyState text={emptyInventoryFilterText(inventoryFilter)} />
       ) : visibleInventory.length === 0 ? (

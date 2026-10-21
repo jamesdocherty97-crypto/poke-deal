@@ -976,6 +976,29 @@ type NoticeAction = {
   onClick?: () => void;
 };
 
+type CoreSourceState = { inventory: boolean; listings: boolean; dashboard: boolean };
+
+const CORE_LOAD_ALERT = "Couldn't load your stock and sales. Check signal and try again.";
+
+function coreScreenBlocked(screen: "stock" | "list" | "today", failed: CoreSourceState, known: CoreSourceState): boolean {
+  if (screen === "stock") return failed.inventory && !known.inventory;
+  if (screen === "list") return failed.listings && !known.listings;
+  return (failed.inventory && !known.inventory)
+    || (failed.listings && !known.listings)
+    || (failed.dashboard && !known.dashboard);
+}
+
+function coreLoadBannerText(screen: "stock" | "list", failed: CoreSourceState): string | null {
+  const parts: string[] = [];
+  if (failed.inventory) parts.push("stock");
+  if (failed.listings) parts.push("listings");
+  if (failed.dashboard) parts.push("sales");
+  if (parts.length === 0) return null;
+  const named = parts.length === 1 ? parts[0]! : parts.length === 2 ? `${parts[0]} and ${parts[1]}` : `${parts[0]}, ${parts[1]} and ${parts[2]}`;
+  const kept = screen === "stock" ? "Your stock is still shown." : "Your listings are still shown.";
+  return `Couldn't load ${named}. ${kept}`;
+}
+
 export default function Home() {
   const [view, setViewState] = useState<View>("today");
   const [name, setName] = useState("");
@@ -1164,7 +1187,8 @@ export default function Home() {
   const [inventoryLoaded, setInventoryLoaded] = useState(false);
   const [listingsLoaded, setListingsLoaded] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
-  const [coreLoadFailed, setCoreLoadFailed] = useState(false);
+  const [coreFailures, setCoreFailures] = useState<CoreSourceState>({ inventory: false, listings: false, dashboard: false });
+  const [coreKnown, setCoreKnown] = useState<CoreSourceState>({ inventory: false, listings: false, dashboard: false });
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [manualReviews, setManualReviews] = useState<ManualCompReview[]>([]);
@@ -1200,6 +1224,7 @@ export default function Home() {
   const compLookupSequenceRef = useRef(0);
   const cardSuggestionCacheRef = useRef(new Map<string, { cards: CatalogSuggestion[]; cachedAt: number }>());
   const refreshAllRef = useRef<Promise<void> | null>(null);
+  const coreKnownRef = useRef<CoreSourceState>({ inventory: false, listings: false, dashboard: false });
 
   function setNotice(message: string | null, action: NoticeAction | null = null) {
     setNoticeState(message);
@@ -1332,6 +1357,9 @@ export default function Home() {
   useEffect(() => {
     void getOfflineBootstrap<OfflineBootstrapPayload>().then((cached) => {
         if (!cached) return;
+        const known = { inventory: true, listings: true, dashboard: true };
+        coreKnownRef.current = known;
+        setCoreKnown(known);
         latestWorkspaceRef.current = { ...cached.payload, priceHistoryPreviews: cached.payload.priceHistoryPreviews ?? {} };
         setInventory(cached.payload.inventory);
         setPriceHistoryPreviews(cached.payload.priceHistoryPreviews ?? {});
@@ -2606,7 +2634,10 @@ export default function Home() {
   }
 
   async function runRefreshAll(options: RefreshOptions = {}) {
-    const hadCoreFallback = latestWorkspaceRef.current.dashboard != null;
+    const hadLoadedCore = latestWorkspaceRef.current.dashboard != null
+      || coreKnownRef.current.inventory
+      || coreKnownRef.current.listings
+      || coreKnownRef.current.dashboard;
     setRefreshing(true);
     if (options.user) setUserRefreshing(true);
     setError(null);
@@ -2634,21 +2665,33 @@ export default function Home() {
         apply(payload);
       }
 
+      async function settleCore(source: "inventory" | "listings" | "dashboard", task: () => Promise<void>) {
+        try {
+          await task();
+          coreKnownRef.current[source] = true;
+          setCoreFailures((current) => ({ ...current, [source]: false }));
+          setCoreKnown({ ...coreKnownRef.current });
+        } catch (error) {
+          setCoreFailures((current) => ({ ...current, [source]: true }));
+          throw error;
+        }
+      }
+
       const tasks: Array<() => Promise<void>> = [
-        () => load<{ items?: InventoryItem[]; priceHistoryPreviews?: Record<string, CardPriceHistoryPreview> }>("/api/inventory", "inventory", (payload) => {
+        () => settleCore("inventory", () => load<{ items?: InventoryItem[]; priceHistoryPreviews?: Record<string, CardPriceHistoryPreview> }>("/api/inventory", "inventory", (payload) => {
           nextInventory = payload.items ?? [];
           nextPriceHistoryPreviews = payload.priceHistoryPreviews ?? {};
           setInventory(nextInventory);
           setPriceHistoryPreviews(nextPriceHistoryPreviews);
-        }).finally(() => setInventoryLoaded(true)),
-        () => load<{ listings?: Listing[] }>("/api/listings", "listings", (payload) => {
+        })).finally(() => setInventoryLoaded(true)),
+        () => settleCore("listings", () => load<{ listings?: Listing[] }>("/api/listings", "listings", (payload) => {
           nextListings = payload.listings ?? [];
           setListings(nextListings);
-        }).finally(() => setListingsLoaded(true)),
-        () => load<Dashboard>("/api/dashboard", "dashboard", (payload) => {
+        })).finally(() => setListingsLoaded(true)),
+        () => settleCore("dashboard", () => load<Dashboard>("/api/dashboard", "dashboard", (payload) => {
           nextDashboard = payload;
           setDashboard(payload);
-        }).finally(() => setDashboardLoaded(true)),
+        })).finally(() => setDashboardLoaded(true)),
         () => load<PortfolioHistory>("/api/snapshots/portfolio", "snapshot history", (payload) => {
           nextPortfolio = payload;
           setPortfolio(payload);
@@ -2736,13 +2779,21 @@ export default function Home() {
             dealSession: (nextDealSession ?? fallback.dealSession)!,
           }
         : null;
-      const coreFailed = nextInventory === undefined || nextListings === undefined || nextDashboard === undefined;
+      const nextFailures: CoreSourceState = {
+        inventory: nextInventory === undefined,
+        listings: nextListings === undefined,
+        dashboard: nextDashboard === undefined,
+      };
+      if (nextInventory !== undefined) coreKnownRef.current.inventory = true;
+      if (nextListings !== undefined) coreKnownRef.current.listings = true;
+      if (nextDashboard !== undefined) coreKnownRef.current.dashboard = true;
+      setCoreFailures(nextFailures);
+      setCoreKnown({ ...coreKnownRef.current });
+      const anyCoreFailed = nextFailures.inventory || nextFailures.listings || nextFailures.dashboard;
       const inlineLoadView = requestedView === "today" || requestedView === "inventory" || requestedView === "listings";
-      inlineCoreError = coreFailed && !hadCoreFallback && inlineLoadView;
-      // Keep the alert up until inventory, listings, and dashboard all arrive.
-      // A dashboard stored by a partial attempt must not dismiss it.
-      if (!coreFailed) setCoreLoadFailed(false);
-      else if (!hadCoreFallback) setCoreLoadFailed(true);
+      // Hide the raw toast when Stock, List or Today already explains the miss.
+      // A cached book still gets the toast, including the offline sentence.
+      inlineCoreError = anyCoreFailed && !hadLoadedCore && inlineLoadView;
       if (mergedBootstrap) {
         latestWorkspaceRef.current = { ...mergedBootstrap, priceHistoryPreviews: mergedBootstrap.priceHistoryPreviews ?? {} };
         const fullyFresh = failures.length === 0;
@@ -8291,7 +8342,7 @@ export default function Home() {
       {view === "today" && (
         <TodayTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
-          loadError={coreLoadFailed ? "Couldn't load your stock and sales. Check signal and try again." : null}
+          loadError={coreScreenBlocked("today", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
           onRetry={() => { void runRefreshAll({ user: true }); }}
           launchProgress={launchProgress}
           primaryTodayAction={primaryTodayAction}
@@ -10541,7 +10592,8 @@ export default function Home() {
       {view === "inventory" && (
         <InventoryTab
           loading={!inventoryLoaded}
-          loadError={coreLoadFailed ? "Couldn't load your stock and sales. Check signal and try again." : null}
+          loadError={coreScreenBlocked("stock", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
+          loadBanner={coreScreenBlocked("stock", coreFailures, coreKnown) ? null : coreLoadBannerText("stock", coreFailures)}
           onRetry={() => { void runRefreshAll({ user: true }); }}
           visibleInventory={visibleInventory}
           filteredInventory={filteredInventory}
@@ -10653,7 +10705,8 @@ export default function Home() {
       {view === "listings" && (
         <ListingsTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
-          loadError={coreLoadFailed ? "Couldn't load your stock and sales. Check signal and try again." : null}
+          loadError={coreScreenBlocked("list", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
+          loadBanner={coreScreenBlocked("list", coreFailures, coreKnown) ? null : coreLoadBannerText("list", coreFailures)}
           onRetry={() => { void runRefreshAll({ user: true }); }}
           dashboard={dashboard}
           firstDraftListingTarget={firstDraftListingTarget}
