@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { InventorySort } from "@/lib/dealer/tableControls";
 import { EmptyState, LoadRetryButton, MoneyInput, WorkspaceSkeleton } from "./UiBits";
 import { emptyActiveStockText } from "@/lib/dealer/stockReadiness";
@@ -71,6 +71,7 @@ export function InventoryTab({
   createListing,
   closeCreateListing,
   listingPrice,
+  listingPriceHint,
   setListingPrice,
   listingChannel,
   setListingChannel,
@@ -81,6 +82,7 @@ export function InventoryTab({
   listingExternalUrl,
   setListingExternalUrl,
   gbp,
+  sheetTrigger = null,
   onBulkDraft,
   onBulkMove,
   onBulkExport,
@@ -131,7 +133,9 @@ export function InventoryTab({
   createListing: (event: FormEvent<HTMLFormElement>) => void;
   closeCreateListing: () => void;
   listingPrice: string;
+  listingPriceHint: string;
   setListingPrice: (value: string) => void;
+  sheetTrigger?: HTMLElement | null;
   listingChannel: Channel;
   setListingChannel: (value: Channel) => void;
   channels: Channel[];
@@ -150,6 +154,10 @@ export function InventoryTab({
   retrying?: boolean;
   onRetry?: () => void;
 }) {
+  const editTitleId = useId();
+  const createTitleId = useId();
+  const editPriceRef = useRef<HTMLInputElement>(null);
+  const createPriceRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkLocation, setBulkLocation] = useState("To list");
   const selectedItems = useMemo(
@@ -304,15 +312,16 @@ export function InventoryTab({
 
       </>}
       {!loading && editingItemId && (
-        <form className="sell-sheet" onSubmit={saveInventoryItem}>
+        <form className="sell-sheet" role="dialog" aria-modal="true" aria-labelledby={editTitleId} onSubmit={saveInventoryItem}>
+          <SheetFocus trigger={sheetTrigger} onClose={closeInventoryEditor} focusRef={editPriceRef} />
           <div className="panel-heading">
-            <h2>Edit stock</h2>
+            <h2 id={editTitleId} tabIndex={-1}>Edit stock</h2>
             <button className="ghost-button" type="button" onClick={closeInventoryEditor}>Close</button>
           </div>
           <div className="form-grid">
             <label>
               What I paid
-              <MoneyInput value={itemCost} onChange={setItemCost} disabled={busy === `edit-${editingItemId}`} />
+              <MoneyInput ref={editPriceRef} value={itemCost} onChange={setItemCost} disabled={busy === `edit-${editingItemId}`} />
               <small>Your purchase cost or cost basis—not the card comp or sell price.</small>
             </label>
             <label>
@@ -392,10 +401,11 @@ export function InventoryTab({
       )}
 
       {creatingListingItemId && creatingListingItem && (
-        <form className="sell-sheet" onSubmit={createListing}>
+        <form className="sell-sheet" role="dialog" aria-modal="true" aria-labelledby={createTitleId} onSubmit={createListing}>
+          <SheetFocus trigger={sheetTrigger} onClose={closeCreateListing} focusRef={createPriceRef} />
           <div className="panel-heading">
             <div>
-              <h2>Create listing</h2>
+              <h2 id={createTitleId} tabIndex={-1}>Create listing</h2>
               <span className="muted">{creatingListingItem.card.name} · paid {gbp(creatingListingItem.costBasis)}</span>
             </div>
             <button className="ghost-button" type="button" onClick={closeCreateListing}>Close</button>
@@ -403,8 +413,8 @@ export function InventoryTab({
           <div className="form-grid">
             <label>
               Your list price
-              <MoneyInput value={listingPrice} onChange={setListingPrice} />
-              <small>The suggestion is prefilled. Edit it freely before saving.</small>
+              <MoneyInput ref={createPriceRef} value={listingPrice} onChange={setListingPrice} />
+              <small>{listingPriceHint}</small>
             </label>
             <label>
               Channel
@@ -442,6 +452,36 @@ export function InventoryTab({
       )}
     </section>
   );
+}
+
+function SheetFocus({
+  trigger,
+  onClose,
+  focusRef,
+}: {
+  trigger: HTMLElement | null;
+  onClose: () => void;
+  focusRef: { readonly current: HTMLElement | null };
+}) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      focusRef.current?.focus({ preventScroll: true });
+    });
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onCloseRef.current();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKeyDown);
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    };
+  }, [focusRef, trigger]);
+  return null;
 }
 
 function InventoryLotRow({ item, selectedIds, onToggle, renderInventoryRow }: {
