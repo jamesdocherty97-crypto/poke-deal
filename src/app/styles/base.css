@@ -6,6 +6,9 @@ html {
   min-height: 100%;
   scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom));
   background: var(--color-canvas);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 
 body {
@@ -24,6 +27,7 @@ body {
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
 }
 
 .skip-link {
@@ -127,6 +131,15 @@ select,
 textarea {
   font: inherit;
   font-variant-numeric: inherit;
+}
+
+button,
+a,
+summary,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 button {

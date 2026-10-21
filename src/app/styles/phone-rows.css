@@ -77,6 +77,7 @@
 
   .inventory-workspace .vault-summary {
     margin-top: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .inventory-workspace .vault-summary span {
@@ -95,5 +96,18 @@
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+  }
+}
+
+/* iOS zooms the page when a focused field is under 16px. Checkboxes stay small. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  .listing-editor-money input {
+    font-size: 30px !important;
   }
 }

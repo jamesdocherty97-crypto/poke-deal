@@ -1338,7 +1338,6 @@ label,
   text-align: left;
 }
 
-.suggestion-row:hover,
 .suggestion-row:focus,
 .suggestion-row:focus-visible {
   outline: 2px solid rgba(255, 203, 5, 0.42);
@@ -1349,6 +1348,19 @@ label,
     rgba(255, 203, 5, 0.1);
   background-size: 160% 100%;
   animation: suggestion-highlight 0.22s ease-out both;
+}
+
+@media (hover: hover) and (pointer: fine) {
+.suggestion-row:hover {
+  outline: 2px solid rgba(255, 203, 5, 0.42);
+  outline-offset: 1px;
+  border-color: rgba(255, 203, 5, 0.4);
+  background:
+    linear-gradient(90deg, rgba(255, 203, 5, 0.18), rgba(105, 232, 255, 0.06) 42%, rgba(255, 203, 5, 0.08)),
+    rgba(255, 203, 5, 0.1);
+  background-size: 160% 100%;
+  animation: suggestion-highlight 0.22s ease-out both;
+}
 }
 
 .suggestion-row:active {
@@ -1862,9 +1874,14 @@ label,
   text-align: left;
 }
 
-.suggestion-item:hover,
 .suggestion-item:focus {
   background: rgba(255, 203, 5, 0.14);
+}
+
+@media (hover: hover) and (pointer: fine) {
+.suggestion-item:hover {
+  background: rgba(255, 203, 5, 0.14);
+}
 }
 
 .suggestion-item img {
@@ -3872,13 +3889,13 @@ label,
 
 .buy-result-summary span,
 .buy-result-summary small {
-  overflow: hidden;
+  overflow: visible;
   color: var(--muted);
   font-size: var(--font-size-micro);
   font-weight: 900;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .buy-result-summary strong {

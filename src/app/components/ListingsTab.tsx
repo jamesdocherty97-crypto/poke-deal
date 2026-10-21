@@ -105,6 +105,8 @@ export function ListingsTab({
   listingPackSheet,
   onBulkPack,
   loading = false,
+  loadError = null,
+  onRetry = () => {},
 }: {
   dashboard: Dashboard | null;
   firstDraftListingTarget: Listing | null;
@@ -165,6 +167,8 @@ export function ListingsTab({
   listingPackSheet: ReactNode;
   onBulkPack: (listings: Listing[], channel: Channel, mode: "download" | "copy") => void;
   loading?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [packChannel, setPackChannel] = useState<Channel>("EBAY");
@@ -206,6 +210,15 @@ export function ListingsTab({
         </div>
       </section>
       <WorkspaceSkeleton label="Loading listings" rows={5} />
+    </section>
+  );
+
+  if (loadError) return (
+    <section className="workspace listings-workspace">
+      <div className="panel" role="alert">
+        <p>{loadError}</p>
+        <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+      </div>
     </section>
   );
 
