@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { InventorySort } from "@/lib/dealer/tableControls";
-import { EmptyState, MoneyInput, WorkspaceSkeleton } from "./UiBits";
+import { EmptyState, LoadRetryButton, MoneyInput, WorkspaceSkeleton } from "./UiBits";
 import { emptyActiveStockText } from "@/lib/dealer/stockReadiness";
 import { groupInventoryHoldings } from "@/lib/dealer/inventoryGroups";
 
@@ -87,6 +87,7 @@ export function InventoryTab({
   loading = false,
   loadError = null,
   loadBanner = null,
+  retrying = false,
   onRetry = () => {},
 }: {
   visibleInventory: InventoryItemLike[];
@@ -146,6 +147,7 @@ export function InventoryTab({
   loading?: boolean;
   loadError?: string | null;
   loadBanner?: string | null;
+  retrying?: boolean;
   onRetry?: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -171,7 +173,7 @@ export function InventoryTab({
       <section className="workspace inventory-workspace">
         <div className="panel" role="alert">
           <p>{loadError}</p>
-          <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+          <LoadRetryButton busy={retrying} onRetry={onRetry} />
         </div>
       </section>
     );
@@ -192,7 +194,7 @@ export function InventoryTab({
       {loadBanner ? (
         <div className="load-banner" role="alert">
           <p>{loadBanner}</p>
-          <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+          <LoadRetryButton busy={retrying} onRetry={onRetry} />
         </div>
       ) : null}
       <section className="workspace-masthead vault-masthead" aria-labelledby="inventory-title">

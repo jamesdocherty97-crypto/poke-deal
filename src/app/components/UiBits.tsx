@@ -149,6 +149,20 @@ export function EmptyState({ text, art }: { text: string; art?: EmptyStateArt })
   );
 }
 
+export function LoadRetryButton({ busy = false, onRetry }: { busy?: boolean; onRetry?: () => void }) {
+  return (
+    <button
+      type="button"
+      className="primary-button"
+      onClick={onRetry}
+      disabled={busy}
+      aria-busy={busy ? "true" : undefined}
+    >
+      {busy ? "Retrying…" : "Retry"}
+    </button>
+  );
+}
+
 export function WorkspaceSkeleton({ label = "Loading workspace", rows = 4 }: { label?: string; rows?: number }) {
   return (
     <div className="workspace-skeleton" aria-busy="true" aria-label={label}>
