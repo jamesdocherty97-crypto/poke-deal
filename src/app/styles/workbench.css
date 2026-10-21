@@ -394,6 +394,17 @@ body:has(.ebay-publish-overlay) .primary-nav.bottom-nav {
   flex: 0 0 auto;
 }
 
+.no-photo-label {
+  display: block;
+  max-width: 100%;
+  padding: 0 4px;
+  color: var(--color-text-secondary);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
 /* Retire the old two-column dashboard placement rules in one controlled reset. */
 .app-shell .buy-workspace {
   grid-template-columns: minmax(0, 1fr);
@@ -1179,7 +1190,7 @@ textarea:focus-visible {
   box-shadow:0 0 0 4px rgba(13,18,38,.42),0 14px 28px rgba(6,8,18,.34);
   transition:border-color var(--motion-fast),box-shadow var(--motion-fast),transform var(--motion-fast);
 }
-.inventory-workspace .card-thumb.blank { display:block; border-color:var(--color-border-strong); border-style:dashed; background:var(--color-surface-sunken); }
+.inventory-workspace .card-thumb.blank { display:grid; place-items:center; border-width:1.5px; border-color:var(--color-text-tertiary); border-style:dashed; background:var(--color-surface-3); box-shadow:none; color:var(--color-text-secondary); }
 .inventory-workspace .bulk-select-row:focus-within .card-thumb { border-color:rgba(244,240,231,.82); box-shadow:0 0 0 4px color-mix(in srgb,var(--view-accent) 18%,transparent),0 18px 32px rgba(6,8,18,.42); }
 @media (hover: hover) and (pointer: fine) {
 .inventory-workspace .bulk-select-row:hover .card-thumb { border-color:rgba(244,240,231,.82); box-shadow:0 0 0 4px color-mix(in srgb,var(--view-accent) 18%,transparent),0 18px 32px rgba(6,8,18,.42); transform:translateY(-2px); }
@@ -1251,7 +1262,7 @@ textarea:focus-visible {
 .market-list .bulk-select-row { border-radius:10px; }
 .listings-workspace .item-row { display:grid; grid-template-columns:150px minmax(0,1fr); min-height:230px; margin:0; padding:0; border:0; border-radius:10px; overflow:hidden; background:linear-gradient(90deg,var(--color-surface-2) 0 149px,var(--color-border) 149px 150px,var(--color-surface-1) 150px); box-shadow:none; }
 .listings-workspace .card-thumb { width:104px; height:auto; min-height:0; aspect-ratio:var(--card-art-ratio); align-self:start; justify-self:center; margin:24px 0; padding:0; border:1px solid rgba(244,240,231,.62); border-radius:7px; object-fit:contain; object-position:center; background:var(--brand-cream); box-shadow:0 0 0 4px rgba(13,18,38,.42),0 14px 26px rgba(6,8,18,.32); transition:border-color var(--motion-fast),box-shadow var(--motion-fast),transform var(--motion-fast); }
-.listings-workspace .card-thumb.blank { display:block; border-color:var(--color-border-strong); border-style:dashed; background:var(--color-surface-sunken); }
+.listings-workspace .card-thumb.blank { display:grid; place-items:center; border-width:1.5px; border-color:var(--color-text-tertiary); border-style:dashed; background:var(--color-surface-3); box-shadow:none; color:var(--color-text-secondary); }
 .listings-workspace .bulk-select-row:focus-within .card-thumb { border-color:rgba(244,240,231,.82); box-shadow:0 0 0 4px color-mix(in srgb,var(--view-accent) 18%,transparent),0 18px 32px rgba(6,8,18,.4); }
 @media (hover: hover) and (pointer: fine) {
 .listings-workspace .bulk-select-row:hover .card-thumb { border-color:rgba(244,240,231,.82); box-shadow:0 0 0 4px color-mix(in srgb,var(--view-accent) 18%,transparent),0 18px 32px rgba(6,8,18,.4); transform:translateY(-2px); }
