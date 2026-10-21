@@ -8345,7 +8345,8 @@ export default function Home() {
         <TodayTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
           loadError={coreScreenBlocked("today", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
-          onRetry={() => { void runRefreshAll({ user: true }); }}
+          retrying={refreshing}
+          onRetry={() => { void refreshAll({ user: true }); }}
           launchProgress={launchProgress}
           primaryTodayAction={primaryTodayAction}
           todayActions={todayActions}
@@ -10596,7 +10597,8 @@ export default function Home() {
           loading={!inventoryLoaded}
           loadError={coreScreenBlocked("stock", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
           loadBanner={coreScreenBlocked("stock", coreFailures, coreKnown) ? null : coreLoadBannerText("stock", coreFailures)}
-          onRetry={() => { void runRefreshAll({ user: true }); }}
+          retrying={refreshing}
+          onRetry={() => { void refreshAll({ user: true }); }}
           visibleInventory={visibleInventory}
           filteredInventory={filteredInventory}
           activeInventory={activeInventory}
@@ -10709,7 +10711,8 @@ export default function Home() {
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
           loadError={coreScreenBlocked("list", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
           loadBanner={coreScreenBlocked("list", coreFailures, coreKnown) ? null : coreLoadBannerText("list", coreFailures)}
-          onRetry={() => { void runRefreshAll({ user: true }); }}
+          retrying={refreshing}
+          onRetry={() => { void refreshAll({ user: true }); }}
           dashboard={dashboard}
           firstDraftListingTarget={firstDraftListingTarget}
           firstSaleListingTarget={firstSaleListingTarget}

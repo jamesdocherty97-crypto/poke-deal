@@ -7,7 +7,7 @@ import { listingStockAttention } from "@/lib/dealer/saleListingUpdates";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { orderListingPhotos, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { InventoryPhotoTools } from "./InventoryPhotoTools";
-import { CardImage, EmptyState, Metric, WorkspaceSkeleton } from "./UiBits";
+import { CardImage, EmptyState, LoadRetryButton, Metric, WorkspaceSkeleton } from "./UiBits";
 
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
@@ -107,6 +107,7 @@ export function ListingsTab({
   loading = false,
   loadError = null,
   loadBanner = null,
+  retrying = false,
   onRetry = () => {},
 }: {
   dashboard: Dashboard | null;
@@ -170,6 +171,7 @@ export function ListingsTab({
   loading?: boolean;
   loadError?: string | null;
   loadBanner?: string | null;
+  retrying?: boolean;
   onRetry?: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -219,7 +221,7 @@ export function ListingsTab({
     <section className="workspace listings-workspace">
       <div className="panel" role="alert">
         <p>{loadError}</p>
-        <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+        <LoadRetryButton busy={retrying} onRetry={onRetry} />
       </div>
     </section>
   );
@@ -229,7 +231,7 @@ export function ListingsTab({
       {loadBanner ? (
         <div className="load-banner" role="alert">
           <p>{loadBanner}</p>
-          <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+          <LoadRetryButton busy={retrying} onRetry={onRetry} />
         </div>
       ) : null}
       <section className="workspace-masthead market-masthead" aria-labelledby="listings-title">

@@ -271,6 +271,42 @@ test("partial listings success keeps list rows when sales fail", async ({ contex
   await expect(workspace.locator("#listings-title")).toBeVisible();
 });
 
+test("Retry double-tap starts one stock bootstrap", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  let inventoryGets = 0;
+  let holdRetries = false;
+  let releaseHold = () => {};
+  const hold = new Promise<void>((resolve) => { releaseHold = resolve; });
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await context.route("**/api/inventory", async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    inventoryGets += 1;
+    if (holdRetries) await hold;
+    return route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "database unavailable" }),
+    });
+  });
+  await page.goto("/?view=stock");
+  const retry = page.locator(".inventory-workspace").getByRole("button", { name: "Retry", exact: true });
+  await expect(retry).toBeVisible({ timeout: 30_000 });
+  const baseline = inventoryGets;
+  holdRetries = true;
+  await retry.evaluate((button) => {
+    button.click();
+    button.click();
+  });
+  await expect.poll(() => inventoryGets, { timeout: 10_000 }).toBeGreaterThan(baseline);
+  await page.waitForTimeout(400);
+  expect(inventoryGets - baseline).toBe(1);
+  const busy = page.locator(".inventory-workspace").getByRole("button", { name: "Retrying…", exact: true });
+  await expect(busy).toBeDisabled();
+  await expect(busy).toHaveAttribute("aria-busy", "true");
+  releaseHold();
+});
+
 class ReliabilityLedger {
   items: any[] = [];
   listings: any[] = [];
