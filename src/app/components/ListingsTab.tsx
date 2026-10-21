@@ -355,7 +355,7 @@ export function ListingsTab({
       {ebayStatus !== null && !ebayStatus.connected && listings.some((listing) => listing.channel === "EBAY") && (
         <div className="ebay-setup-banner">
           {!ebayStatus.configured ? (
-            <span>eBay credentials not configured - set env vars to enable API automation.</span>
+            <span>eBay is not connected yet. Drafts still work; publish by copy and paste.</span>
           ) : ebayNeedsReconnect ? (
             <>
               <span>Reconnect eBay. Consent now stores the token automatically.</span>
