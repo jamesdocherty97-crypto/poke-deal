@@ -1145,7 +1145,7 @@ textarea:focus-visible {
 .inventory-filter-tabs { display:flex; min-width:0; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; border:0; border-bottom:1px solid var(--color-border); background:transparent; scrollbar-color:var(--color-border-strong) transparent; scrollbar-width:thin; scroll-padding-inline:12px; scroll-snap-type:x proximity; }
 .inventory-filter-tabs::-webkit-scrollbar { display:block; height:3px; }
 .inventory-filter-tabs::-webkit-scrollbar-thumb { border-radius:3px; background:var(--color-border-strong); }
-.inventory-filter-tabs button { display:flex; align-items:center; flex:0 0 auto; gap:7px; min-height:44px; padding:0 13px; border:0; border-radius:0; background:transparent; box-shadow:none; scroll-snap-align:start; white-space:nowrap; }
+.inventory-filter-tabs button { display:flex; align-items:center; flex:0 0 auto; gap:7px; min-height:44px; padding:0 12px; border:0; border-radius:0; background:transparent; box-shadow:none; scroll-snap-align:start; white-space:nowrap; }
 .inventory-filter-tabs button strong { min-width:22px; padding:2px 5px; border-radius:3px; background:var(--color-surface-3); font:700 .7rem/1.2 var(--font-data); }
 .inventory-filter-tabs button.selected { border-bottom:3px solid var(--brand-red); background:var(--color-danger-surface); color:var(--color-danger-text); }
 .inventory-filter-tabs button.selected strong { background:var(--color-danger-surface); }
