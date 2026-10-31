@@ -5,7 +5,8 @@ import type { TodayAction, TodayActionTarget } from "@/lib/dealer/today";
 import type { ManualCompReview } from "@/lib/comps/manualReview";
 import type { OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
 import type { LaunchPlanItem, LaunchProgress, LaunchPlanTarget } from "@/lib/dealer/launchPlan";
-import { buildNextSellingCards, buildSellingMission, formatOrderSyncFreshness, summarizeSellingStock } from "@/lib/dealer/launchPlan";
+import { buildLaunchProgress, buildNextSellingCards, buildSellingMission, formatOrderSyncFreshness, summarizeSellingStock } from "@/lib/dealer/launchPlan";
+import { embeddedListingCounts, presentOperatingSnapshot, todayActionsForRecovery, todayMissionForRecovery, type TodayRecovery } from "@/lib/dealer/todayRecovery";
 import type { StockReadinessItem } from "@/lib/dealer/stockReadiness";
 import type { LaunchReadinessItem, LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { formatGbp as gbp } from "@/lib/format/money";
@@ -119,6 +120,8 @@ type TodayProps = {
   orderSyncStatus?: OrderSyncStatus | null;
   loading?: boolean;
   loadError?: string | null;
+  loadBanner?: string | null;
+  recovery: TodayRecovery;
   retrying?: boolean;
   onRetry?: () => void;
 };
@@ -167,6 +170,8 @@ export function TodayTab({
   orderSyncStatus = null,
   loading = false,
   loadError = null,
+  loadBanner = null,
+  recovery,
   retrying = false,
   onRetry,
 }: TodayProps) {
@@ -176,39 +181,72 @@ export function TodayTab({
   const yesterdayProfitPence = (dashboard?.recentSales ?? [])
     .filter((sale) => dateKey(new Date(sale.soldAt)) === yesterdayKey)
     .reduce((sum, sale) => sum + sale.profitPence, 0);
-  const sellingStock = useMemo(() => stockItems ? summarizeSellingStock(stockItems) : {
-    totalRows: dashboard?.metrics.stockCount ?? 0,
-    availableRows: (dashboard?.metrics.stockCount ?? 0) + activeListingCount,
-    preparationRows: dashboard?.metrics.stockCount ?? 0,
+  const embeddedListings = useMemo(
+    () => embeddedListingCounts(recovery.trustStock ? stockItems ?? [] : []),
+    [recovery.trustStock, stockItems],
+  );
+  const sellingStock = useMemo(() => recovery.trustStock && stockItems ? summarizeSellingStock(stockItems) : {
+    totalRows: recovery.trustStock ? (dashboard?.metrics.stockCount ?? 0) : 0,
+    availableRows: recovery.trustStock ? (dashboard?.metrics.stockCount ?? 0) + (recovery.trustListings ? activeListingCount : 0) : 0,
+    preparationRows: 0,
     preparedDrafts: 0,
-    liveRows: activeListingCount,
+    liveRows: recovery.trustStock && recovery.trustListings ? activeListingCount : 0,
     heldRows: 0,
     removalListings: 0,
-  }, [stockItems, dashboard?.metrics.stockCount, activeListingCount]);
-  const provisionalCosts = dashboard?.salesToReconcileCount
-    ?? dashboard?.metrics.provisionalSaleCount
-    ?? null;
-  const mission = buildSellingMission(sellingStock, dashboard?.metrics.soldCount ?? 0, {
+  }, [activeListingCount, dashboard?.metrics.stockCount, recovery.trustListings, recovery.trustStock, stockItems]);
+  const provisionalCosts = recovery.trustSales
+    ? dashboard?.salesToReconcileCount ?? dashboard?.metrics.provisionalSaleCount ?? null
+    : null;
+  const soldCount = recovery.trustSales ? dashboard?.metrics.soldCount ?? 0 : 0;
+  const mission = todayMissionForRecovery(buildSellingMission(sellingStock, soldCount, {
     unmatchedPaidOrders: orderSyncStatus?.statusKnown ? orderSyncStatus.unmatchedCount : null,
     provisionalCosts,
-  });
+  }), recovery);
   const missionTitle = mission.title;
   const missionDetail = mission.detail;
   const orderFreshness = formatOrderSyncFreshness(orderSyncStatus?.lastSuccessfulSyncAt ?? null);
-  const missionCards = useMemo(() => buildNextSellingCards({
-    missionKind: mission.kind,
-    stockItems,
-    unmatchedPreview: orderSyncStatus?.unmatchedPreview,
-    provisionalPreview: (dashboard?.salesToReconcile ?? []).map((sale) => ({
-      id: sale.id,
-      title: sale.cardName ?? "Sale",
-      detail: [sale.channel, sale.soldAt ? new Date(sale.soldAt).toLocaleDateString("en-GB") : null].filter(Boolean).join(" · ") || "Confirm actual costs",
-    })),
-    limit: 3,
-  }), [mission.kind, stockItems, orderSyncStatus?.unmatchedPreview, dashboard?.salesToReconcile]);
+  const missionCards = useMemo(() => {
+    if (mission.kind === "recovery") return [];
+    return buildNextSellingCards({
+      missionKind: mission.kind,
+      stockItems: recovery.trustStock ? stockItems : undefined,
+      unmatchedPreview: orderSyncStatus?.unmatchedPreview,
+      provisionalPreview: recovery.trustSales ? (dashboard?.salesToReconcile ?? []).map((sale) => ({
+        id: sale.id,
+        title: sale.cardName ?? "Sale",
+        detail: [sale.channel, sale.soldAt ? new Date(sale.soldAt).toLocaleDateString("en-GB") : null].filter(Boolean).join(" · ") || "Confirm actual costs",
+      })) : [],
+      limit: 3,
+    });
+  }, [dashboard?.salesToReconcile, mission.kind, orderSyncStatus?.unmatchedPreview, recovery.trustSales, recovery.trustStock, stockItems]);
   const [doneForToday, setDoneForToday] = useState(false);
   const hasManualReviews = manualReviews.length > 0;
-  const secondaryActions = todayActions
+  const shownLaunchProgress = recovery.questNote || recovery.trustListings
+    ? launchProgress
+    : buildLaunchProgress({
+      stockCount: sellingStock.totalRows,
+      sellableStockCount: sellingStock.availableRows,
+      preparedDrafts: sellingStock.preparedDrafts,
+      draftListings: embeddedListings.drafts,
+      activeListings: sellingStock.liveRows,
+      previouslyLiveListings: sellingStock.liveRows,
+      soldCount,
+      activeWatches: activeWatchCount,
+      operatingExpensePence: recovery.trustSales ? dashboard?.metrics.operatingExpensePence ?? 0 : 0,
+      secondaryCrossCheck: false,
+      alertDelivery: false,
+    });
+  const pulseSnapshot = useMemo(
+    () => presentOperatingSnapshot(operatingSnapshot, recovery, recovery.trustStock ? embeddedListings : null),
+    [embeddedListings, operatingSnapshot, recovery],
+  );
+  const liveStockCount = recovery.trustStock ? sellingStock.liveRows : null;
+  const draftCount = recovery.trustListings
+    ? draftListingCount
+    : recovery.trustStock ? embeddedListings.drafts : null;
+  const soldPulseCount = recovery.trustSales ? soldCount : null;
+  const yesterdayPulse = recovery.trustSales ? yesterdayProfitPence : null;
+  const secondaryActions = todayActionsForRecovery(todayActions, recovery)
     .filter((action) => action.target !== "buy" && action.target !== "watches" && action.target !== "opening-stock")
     .filter((action) => action.target !== mission.target && (action.id !== "first-sale" || sellingStock.liveRows > 0))
     .map((action) => action.id === "first-sale" || action.id === "active-sales"
@@ -219,8 +257,8 @@ export function TodayTab({
     .slice(0, 4);
   const nextLaunchStep = launchPlan.find((item) => item.state !== "done") ?? launchPlan[0] ?? null;
   const readinessAttention = launchReadiness.filter((item) => item.state !== "done").slice(0, 2);
-  const readinessPercent = launchProgress.totalCount > 0
-    ? Math.round((launchProgress.doneCount / launchProgress.totalCount) * 100)
+  const readinessPercent = shownLaunchProgress.totalCount > 0
+    ? Math.round((shownLaunchProgress.doneCount / shownLaunchProgress.totalCount) * 100)
     : 0;
   const readySourceCount = setupSources.filter((source) => source.status === "ready" || source.status === "public" || source.status === "info").length;
   const latestUnreadAlert = useMemo(
@@ -229,8 +267,14 @@ export function TodayTab({
   );
   const saleCard = firstSaleListingTarget?.item ?? null;
   const saleCardImage = saleCard ? listingCardImage(saleCard) : null;
+  const showQuestLog = secondaryActions.length > 0 || hasManualReviews;
+  const showSaleSleeve = Boolean(recovery.trustListings && firstSaleListingTarget && saleCard);
 
   function openMission() {
+    if (mission.target === "retry") {
+      onRetry?.();
+      return;
+    }
     if (mission.target === "opening-stock") onOpeningStockImport();
     else if (mission.target === "drafts") onListingDesk();
     else if (mission.target === "listings") onActiveListings();
@@ -241,7 +285,7 @@ export function TodayTab({
   if (loading) return <section className="workspace today-workspace"><WorkspaceSkeleton label="Loading today's work" rows={3} /></section>;
   if (loadError) {
     return (
-      <section className="workspace today-workspace focused-today today-slim">
+      <section className="workspace today-workspace focused-today today-slim" data-today-recovery="blocked">
         <div className="panel" role="alert">
           <p>{loadError}</p>
           <LoadRetryButton busy={retrying} onRetry={onRetry} />
@@ -251,17 +295,29 @@ export function TodayTab({
   }
 
   return (
-    <section className="workspace today-workspace focused-today today-slim">
+    <section className="workspace today-workspace focused-today today-slim" data-today-recovery={recovery.mode}>
+      {loadBanner ? (
+        <div className="load-banner" role="alert">
+          <p>{loadBanner}</p>
+          <LoadRetryButton busy={retrying} onRetry={onRetry} />
+        </div>
+      ) : null}
       <header className="workspace-masthead today-command" aria-labelledby="today-command-title">
         <div className="today-command-copy">
           <span className="workspace-eyebrow">{greeting}, Trainer · sell owned singles</span>
-          <span className={`today-command-priority ${mission.kind === "removal" || mission.kind === "unmatched-orders" ? "warn" : "good"}`}>Priority one</span>
+          <span className={`today-command-priority ${mission.kind === "removal" || mission.kind === "unmatched-orders" || mission.kind === "recovery" ? "warn" : "good"}`}>Priority one</span>
           <h2 id="today-command-title">{missionTitle}</h2>
           <p>{missionDetail}</p>
           <p className={`today-freshness tone-${orderFreshness.tone}`} role="status">{orderFreshness.label}</p>
           <div className="today-command-actions">
-            <button type="button" className="primary-button" onClick={openMission}>
-              {mission.action}
+            <button
+              type="button"
+              className="primary-button"
+              onClick={openMission}
+              disabled={mission.target === "retry" && retrying}
+              aria-busy={mission.target === "retry" && retrying ? "true" : undefined}
+            >
+              {mission.target === "retry" && retrying ? "Retrying…" : mission.action}
             </button>
             <button type="button" className="ghost-button" onClick={onInventory}>Open stock vault</button>
             <button type="button" className="ghost-button" onClick={() => setDoneForToday((value) => !value)}>
@@ -270,22 +326,28 @@ export function TodayTab({
           </div>
         </div>
 
-        <div className="today-command-progress today-command-progress-compact" aria-label={`First-sale quest: ${launchProgress.label}`}>
+        <div className="today-command-progress today-command-progress-compact" aria-label={recovery.questNote ? "First-sale quest paused" : `First-sale quest: ${shownLaunchProgress.label}`}>
           <div className="today-command-progress-heading">
             <span>First-sale quest</span>
-            <strong>{launchProgress.label}</strong>
+            <strong>{recovery.questNote ? "Paused" : shownLaunchProgress.label}</strong>
           </div>
-          <div
-            className="today-progress-track"
-            role="progressbar"
-            aria-label="First-sale quest"
-            aria-valuemin={0}
-            aria-valuemax={launchProgress.totalCount}
-            aria-valuenow={launchProgress.doneCount}
-          >
-            <span style={{ width: `${readinessPercent}%` }} />
-          </div>
-          <p>{launchProgress.nextLabel}{nextLaunchStep ? ` · ${nextLaunchStep.action}` : ""}</p>
+          {recovery.questNote ? (
+            <p>{recovery.questNote}</p>
+          ) : (
+            <>
+              <div
+                className="today-progress-track"
+                role="progressbar"
+                aria-label="First-sale quest"
+                aria-valuemin={0}
+                aria-valuemax={shownLaunchProgress.totalCount}
+                aria-valuenow={shownLaunchProgress.doneCount}
+              >
+                <span style={{ width: `${readinessPercent}%` }} />
+              </div>
+              <p>{shownLaunchProgress.nextLabel}{recovery.trustListings && recovery.trustStock && recovery.trustSales && nextLaunchStep ? ` · ${nextLaunchStep.action}` : ""}</p>
+            </>
+          )}
         </div>
       </header>
 
@@ -307,8 +369,8 @@ export function TodayTab({
       )}
 
       <div className="today-command-grid">
-        <section className="priority-queue" aria-labelledby="priority-queue-title">
-          <details className="today-more-moves">
+        {(showQuestLog || showSaleSleeve) && <section className="priority-queue" aria-labelledby={showQuestLog ? "priority-queue-title" : undefined}>
+          {showQuestLog && <details className="today-more-moves">
             <summary>
               <span className="workspace-eyebrow">More moves</span>
               <strong id="priority-queue-title">Quest log</strong>
@@ -344,9 +406,9 @@ export function TodayTab({
               </li>
             )}
           </ol>
-          </details>
+          </details>}
 
-          {firstSaleListingTarget && saleCard && (
+          {showSaleSleeve && firstSaleListingTarget && saleCard && (
             <article className="deal-sleeve sale-ready-sleeve">
               <div className="deal-sleeve-art">
                 <CardImage
@@ -370,7 +432,7 @@ export function TodayTab({
               </div>
             </article>
           )}
-        </section>
+        </section>}
 
         <aside className="status-rail" aria-label="Dealer status">
           <section className="dealer-pulse" aria-labelledby="dealer-pulse-title">
@@ -379,27 +441,27 @@ export function TodayTab({
                 <span className="workspace-eyebrow">Live desk</span>
                 <h2 id="dealer-pulse-title">Dealer pulse</h2>
               </div>
-              <span className="system-indicator good">
-                {sellingStock.liveRows} live stock row{sellingStock.liveRows === 1 ? "" : "s"}
+              <span className={`system-indicator ${liveStockCount == null ? "unknown" : "good"}`}>
+                {liveStockCount == null ? "Stock not loaded" : `${liveStockCount} live stock row${liveStockCount === 1 ? "" : "s"}`}
               </span>
             </div>
 
             <div className="dealer-pulse-status" aria-label="Current work counts">
-              <button type="button" onClick={onActiveListings} disabled={activeListingCount === 0}>
-                <strong>{sellingStock.liveRows}</strong><span>live stock</span>
+              <button type="button" onClick={onActiveListings} disabled={liveStockCount == null || liveStockCount === 0}>
+                <CountValue value={liveStockCount} label="Live stock" /><span>live stock</span>
               </button>
-              <button type="button" onClick={onListingDesk} disabled={draftListingCount === 0 && listingsLength === 0}>
-                <strong>{draftListingCount}</strong><span>draft</span>
+              <button type="button" onClick={onListingDesk} disabled={draftCount == null || (draftCount === 0 && (recovery.trustListings ? listingsLength === 0 : true))}>
+                <CountValue value={draftCount} label="Drafts" /><span>draft</span>
               </button>
-              <button type="button" onClick={onProfit}>
-                <strong>{dashboard?.metrics.soldCount ?? 0}</strong><span>sold</span>
+              <button type="button" onClick={onProfit} disabled={soldPulseCount == null}>
+                <CountValue value={soldPulseCount} label="Sold" /><span>sold</span>
               </button>
             </div>
 
             <details className="dealer-tools today-pulse-details">
               <summary>Dealer pulse details</summary>
               <dl className="dealer-pulse-ledger">
-                {operatingSnapshot.map((row) => (
+                {pulseSnapshot.map((row) => (
                   <div className={`dealer-pulse-row ${row.tone}`} key={row.id}>
                     <dt><span>{row.label}</span><small>{row.detail}</small></dt>
                     <dd>{row.value}</dd>
@@ -416,9 +478,9 @@ export function TodayTab({
             )}
 
             <div className="dealer-pulse-actions">
-              <button type="button" onClick={onProfit}>Open profit ledger</button>
-              <button type="button" onClick={activeListingCount > 0 ? onSalesDesk : onInventory}>
-                {activeListingCount > 0 ? "Record a paid sale" : "Open stock vault"}
+              <button type="button" onClick={onProfit} disabled={!recovery.trustSales}>Open profit ledger</button>
+              <button type="button" onClick={recovery.trustListings && activeListingCount > 0 ? onSalesDesk : onInventory}>
+                {recovery.trustListings && activeListingCount > 0 ? "Record a paid sale" : "Open stock vault"}
               </button>
             </div>
 
@@ -454,7 +516,7 @@ export function TodayTab({
 
             <footer className="dealer-pulse-footer">
               <span>Yesterday</span>
-              <strong>{gbp(yesterdayProfitPence)} P&amp;L</strong>
+              <strong>{yesterdayPulse == null ? "Not loaded" : <>{gbp(yesterdayPulse)} P&amp;L</>}</strong>
               {appAlertUnreadCount > 0 && <small>{appAlertUnreadCount} unread alert{appAlertUnreadCount === 1 ? "" : "s"}</small>}
             </footer>
           </section>
@@ -477,6 +539,11 @@ export function TodayTab({
       )}
     </section>
   );
+}
+
+function CountValue({ value, label }: { value: number | null; label: string }) {
+  if (value == null) return <strong className="today-count-unknown" aria-label={`${label} not loaded`}>—</strong>;
+  return <strong>{value}</strong>;
 }
 
 function useTodayGreeting(): string {
