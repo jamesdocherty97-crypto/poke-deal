@@ -211,3 +211,161 @@ body:has(.comp-lookup-alert) .mobile-buy-action {
 .edit-stock-sheet :is(input, select, textarea) {
   scroll-margin-top: 104px;
 }
+
+/*
+ * 390px / iPhone SE polish. The mission title is a flex item capped at 14ch,
+ * which is wider than the card in a wide face such as DejaVu and sticks out
+ * of Today. The buy masthead parks a full card over the scan actions. The
+ * scan sheet's 3:4 preview plus a 96px pad (for a nav the sheet already hides)
+ * push the shutter below a 667px screen. Binder filters must keep the pressed
+ * tab on screen without growing the page.
+ */
+@media (max-width: 430px) {
+  .today-command-copy {
+    min-width: 0;
+    max-width: 100%;
+    padding: 18px 16px 14px;
+  }
+
+  .today-command h2 {
+    max-width: 100%;
+    font-size: 1.65rem;
+    line-height: 1.08;
+    overflow-wrap: anywhere;
+  }
+
+  .today-command-copy > p,
+  .today-freshness {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .today-command-progress-heading {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .buy-masthead {
+    min-height: 0;
+  }
+
+  .buy-masthead .workspace-masthead-copy {
+    max-width: none;
+  }
+
+  .buy-masthead h2 {
+    max-width: calc(100% - 92px);
+    font-size: 1.5rem;
+    overflow-wrap: anywhere;
+  }
+
+  .buy-masthead-art {
+    top: 14px;
+    right: 8px;
+    bottom: auto;
+    width: 84px;
+    min-height: 0;
+    pointer-events: none;
+  }
+
+  .buy-masthead-art::before {
+    width: 88px;
+    height: 88px;
+  }
+
+  .buy-stage-card,
+  .buy-stage-card.brand-art {
+    width: 72px;
+    max-height: 100px;
+  }
+
+  .buy-masthead .masthead-actions {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .buy-masthead .masthead-actions button {
+    width: 100%;
+    min-height: 44px;
+    font-size: 0.82rem;
+  }
+
+  .scan-sheet {
+    width: 100%;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .scan-preview-frame {
+    min-height: 0;
+    height: min(34dvh, 260px);
+    aspect-ratio: auto;
+  }
+
+  .scan-sheet-actions,
+  .scan-sheet-actions:has(.scan-stock-action) {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding-top: 8px;
+    background: linear-gradient(180deg, transparent, var(--color-surface-1) 32%);
+  }
+
+  .scan-sheet-actions:not(:has(.scan-stock-action)):not(:has(.scan-next-action)) {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .scan-upload-button {
+    min-width: 0;
+    min-height: 48px;
+    padding: 8px 10px;
+    line-height: 1.15;
+  }
+
+  .scan-sheet-actions > button:not(.scan-shutter-button):not(.scan-stock-action):not(.scan-retake-action):not(.scan-next-action) {
+    grid-column: 1 / -1;
+  }
+
+  .scan-identity-chips span {
+    display: -webkit-box;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  /* The comp card is the decision. The side-by-side art sits under it and
+     would otherwise push the price below the shutter on a 667px screen. */
+  .scan-sheet.identity:has(.scan-comp-ready) .scan-art-compare {
+    display: none;
+  }
+
+  .scan-ready-checks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scan-ready-checks span,
+  .scan-ready-checks strong {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+  }
+
+  .inventory-workspace .vault-commandbar {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .inventory-workspace .inventory-filter-tabs {
+    max-width: 100%;
+    padding-right: 16px;
+    scroll-padding-inline: 12px;
+    scrollbar-width: none;
+  }
+
+  .inventory-workspace .inventory-filter-tabs::-webkit-scrollbar {
+    display: none;
+    height: 0;
+  }
+}
