@@ -8,7 +8,10 @@ import { expect, test, type Browser, type BrowserContext, type Locator, type Pag
  */
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
-const SHOTS = "/opt/cursor/artifacts/sell-recovery";
+// /opt/cursor is not writable on a Mac (EACCES). Cloud runs can set SELL_RECOVERY_SHOTS.
+const SHOTS = path.resolve(
+  process.env.SELL_RECOVERY_SHOTS?.trim() || path.join(process.cwd(), "test-results", "sell-recovery"),
+);
 const PHOTO = path.join(process.cwd(), "public", "icon-512.png");
 const LEAK = "GEMINI_API_KEY is not set. upstream exploded";
 
