@@ -150,6 +150,34 @@ async function resetStorage(page: Page) {
   });
 }
 
+async function stubScanCamera(context: BrowserContext) {
+  // Headless Chromium has no camera, so getUserMedia is treated as blocked.
+  // The recovery sheet then hides the shutter and upload control this test measures.
+  await context.addInitScript(() => {
+    const openCamera = async () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 16;
+      canvas.height = 16;
+      const paint = canvas.getContext("2d");
+      if (paint) {
+        paint.fillStyle = "#222";
+        paint.fillRect(0, 0, 16, 16);
+      }
+      if (typeof canvas.captureStream === "function") {
+        const stream = canvas.captureStream(5);
+        if (stream.getVideoTracks().length > 0) return stream;
+      }
+      return new MediaStream();
+    };
+    const devices = navigator.mediaDevices;
+    if (devices) {
+      devices.getUserMedia = openCamera;
+      return;
+    }
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: openCamera } });
+  });
+}
+
 async function shoot(page: Page, name: string) {
   fs.mkdirSync(SHOTS, { recursive: true });
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" }).catch(() => undefined);
@@ -182,6 +210,7 @@ async function hitButton(page: Page, name: string) {
 test("scan actions stay tappable and the shutter is on screen at 390 and iPhone SE", async ({ browser, baseURL }) => {
   const context = await phone(browser, baseURL!, 390, 844);
   await mockApis(context);
+  await stubScanCamera(context);
   const page = await context.newPage();
   try {
     await resetStorage(page);
