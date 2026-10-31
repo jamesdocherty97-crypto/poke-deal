@@ -96,6 +96,16 @@
     backdrop-filter: none;
   }
 
+  /*
+   * "Needs action", "All" and "Not live" must leave at least 16px of Drafts
+   * in view at 390. Padding of 12px peeks 26px on the local face and 9px
+   * when CI uses DejaVu Sans. 8px keeps that peek above 16px on both.
+   */
+  .inventory-workspace .inventory-filter-tabs button {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
   .inventory-workspace .vault-summary span {
     padding: 8px 9px;
   }

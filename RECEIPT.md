@@ -64,6 +64,7 @@ Local, this tip:
 - `npm run typecheck`: pass
 - `npm test`: 1103 passed, 0 failed, 2 skipped
 - Playwright `e2e/sell-flow-phone.spec.ts` and `e2e/dealer-reliability.spec.ts`: the A1 to A9 phone specs plus new B1 to B6 layout checks (banner above the row, one-line vault count, list-price hero, field-aligned sheet buttons, dim backdrop, Comp width matching Next, buy bar hidden on the price error, "Cost needed" vs "Add cost")
+- The first CI `ship-gates` run passed audit, unit tests, typecheck and build. `npm run test:e2e` failed one check: the Drafts filter peeked 9px at 390, under the 16px floor. Locally the same row peeked 26px. Forcing DejaVu Sans reproduced the CI width. Phone filter tabs now use 8px of horizontal padding, which leaves a 33px peek in DejaVu Sans.
 
 Argon has **not** been re-scored on this tip. These shots are for that re-score. They are viewport captures at 390×844 and 430×932, before (`497a07d`, same UI as `c0747d0`) and after (this branch). The dev-server Next badge is hidden in the captures.
 
