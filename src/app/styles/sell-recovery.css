@@ -1,0 +1,143 @@
+/* Phone sell-flow recovery. Scan failures and comp misses get a card of
+   exits instead of a shutter or a price hero with nowhere to go. */
+
+.sell-recovery {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 203, 5, 0.42);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(180deg, rgba(255, 203, 5, 0.08), transparent 42%),
+    rgba(8, 12, 24, 0.72);
+  scroll-margin-top: 88px;
+}
+
+.sell-recovery-comp-empty {
+  border-color: rgba(105, 232, 255, 0.4);
+  background:
+    linear-gradient(180deg, rgba(105, 232, 255, 0.08), transparent 46%),
+    rgba(8, 12, 24, 0.72);
+}
+
+.sell-recovery-kicker {
+  margin: 0;
+  color: var(--yellow);
+  font-size: var(--font-size-micro);
+  font-weight: 1000;
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.sell-recovery h3,
+.sell-recovery p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.sell-recovery h3 {
+  color: var(--ink);
+  font-size: 1.15rem;
+  line-height: 1.15;
+}
+
+.sell-recovery p,
+.sell-recovery-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.sell-recovery-note {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.sell-recovery-actions {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sell-recovery-actions button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  text-align: left;
+  white-space: normal;
+}
+
+.sell-recovery-actions button strong,
+.sell-recovery-actions button small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.sell-recovery-actions button strong {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.sell-recovery-actions button small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.sell-recovery-actions button.primary-action {
+  border-color: rgba(255, 203, 5, 0.86);
+  background: linear-gradient(180deg, var(--yellow), var(--color-warning));
+  color: #1b2235;
+}
+
+.sell-recovery-actions button.primary-action small {
+  color: #1b2235;
+}
+
+.sell-recovery-actions button:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.sell-recovery-actions button:disabled {
+  opacity: 0.72;
+}
+
+.scan-sheet.recovering .scan-preview-frame,
+.scan-sheet.recovering .scan-art-compare,
+.scan-sheet.recovering .scan-identity-chips,
+.scan-sheet.recovering .scan-manual-card,
+.scan-sheet.recovering .scan-sheet-actions {
+  display: none;
+}
+
+.scan-sheet.recovering {
+  align-content: start;
+}
+
+@media (min-width: 700px) {
+  .sell-recovery-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sell-recovery-actions button:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sell-recovery-actions button:active {
+    transform: none;
+  }
+}
