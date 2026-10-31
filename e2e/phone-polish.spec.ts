@@ -8,7 +8,9 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "play
  */
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
-const SHOTS = "/opt/cursor/artifacts/phone-polish";
+// Cloud runs can set SHOTS. The default stays in the repo so a Mac is not
+// asked to create /opt/cursor/artifacts (that path is EACCES there).
+const SHOTS = path.resolve(process.env.SHOTS?.trim() || path.join(process.cwd(), "test-results", "phone-polish"));
 const CARD = {
   id: "card-fixture-gengar", tcgApiId: "swsh11tg-TG06", name: "Gengar", setName: "Lost Origin Trainer Gallery",
   setCode: "swsh11tg", number: "TG06/TG30", imageUrl: null, displayImageUrl: null, game: "POKEMON", language: "EN",
@@ -261,15 +263,73 @@ test("Today mission title stays inside the card at 390 and on iPhone SE", async 
       await page.goto("/?view=today");
       const title = page.locator("#today-command-title");
       await expect(title).toBeVisible();
+      // The border box can sit inside the card even while max-width is still
+      // 14ch, because the flex item shrinks. That check passes with the phone
+      // rule deleted. The rule is what replaces the 14ch cap with the card,
+      // drops the 2.65rem face, and keeps the line box from clipping.
       const fit = await title.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const copy = element.parentElement;
+        if (!copy) throw new Error("Mission title has no command copy");
+        const copyStyle = getComputedStyle(copy);
+        const card = element.closest(".today-command");
+        if (!card) throw new Error("Mission title is outside the Today card");
+        const contentWidth = copy.clientWidth - parseFloat(copyStyle.paddingLeft) - parseFloat(copyStyle.paddingRight);
+        const rawMax = style.maxWidth;
+        const maxWidth = rawMax === "none"
+          ? Number.POSITIVE_INFINITY
+          : rawMax.endsWith("%")
+            ? (parseFloat(rawMax) / 100) * contentWidth
+            : parseFloat(rawMax);
+        const zero = document.createElement("span");
+        zero.textContent = "0";
+        zero.style.position = "absolute";
+        zero.style.visibility = "hidden";
+        zero.style.whiteSpace = "pre";
+        zero.style.font = style.font;
+        document.body.appendChild(zero);
+        const fourteenCh = zero.getBoundingClientRect().width * 14;
+        zero.remove();
+        const rootSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const lines = [...range.getClientRects()];
         const rect = element.getBoundingClientRect();
-        const parent = element.parentElement!.getBoundingClientRect();
+        const copyRect = copy.getBoundingClientRect();
+        const cardRect = card.getBoundingClientRect();
+        const furthest = (limit: number) => Math.max(rect.right - limit, ...lines.map((line) => line.right - limit));
         return {
-          pastParent: rect.right - parent.right,
-          pastViewport: rect.right - window.innerWidth,
+          text: element.textContent?.replace(/\s+/g, " ").trim() ?? "",
+          maxWidth,
+          contentWidth,
+          fourteenCh,
+          fontRem: parseFloat(style.fontSize) / rootSize,
+          lineHeightRatio: parseFloat(style.lineHeight) / parseFloat(style.fontSize),
+          overflowWrap: style.overflowWrap,
+          copyMaxWidth: copyStyle.maxWidth,
+          paddingTop: parseFloat(copyStyle.paddingTop),
+          paddingRight: parseFloat(copyStyle.paddingRight),
+          paddingBottom: parseFloat(copyStyle.paddingBottom),
+          paddingLeft: parseFloat(copyStyle.paddingLeft),
+          pastCopy: furthest(copyRect.right),
+          pastCard: furthest(cardRect.right),
+          pastViewport: furthest(window.innerWidth),
         };
       });
-      expect(fit.pastParent).toBeLessThanOrEqual(1);
+      expect(fit.text.length).toBeGreaterThan(14);
+      expect(Math.abs(fit.maxWidth - fit.contentWidth)).toBeLessThanOrEqual(1);
+      expect(Math.abs(fit.maxWidth - fit.fourteenCh)).toBeGreaterThan(1);
+      expect(fit.fontRem).toBeGreaterThanOrEqual(1.5);
+      expect(fit.fontRem).toBeLessThanOrEqual(1.8);
+      expect(fit.lineHeightRatio).toBeGreaterThanOrEqual(1);
+      expect(fit.overflowWrap).toBe("anywhere");
+      expect(fit.copyMaxWidth).not.toBe("none");
+      expect(fit.paddingTop).toBeLessThanOrEqual(20);
+      expect(fit.paddingRight).toBeLessThanOrEqual(18);
+      expect(fit.paddingBottom).toBeLessThanOrEqual(16);
+      expect(fit.paddingLeft).toBeLessThanOrEqual(18);
+      expect(fit.pastCopy).toBeLessThanOrEqual(1);
+      expect(fit.pastCard).toBeLessThanOrEqual(1);
       expect(fit.pastViewport).toBeLessThanOrEqual(1);
       expect(await pageOverflow(page)).toBeLessThanOrEqual(1);
       const action = page.locator(".today-command-actions .primary-button");
