@@ -10,7 +10,7 @@ import type { StockReadinessItem } from "@/lib/dealer/stockReadiness";
 import type { LaunchReadinessItem, LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { ManualReviewQueue } from "./ManualReviewQueue";
-import { CardImage, WorkspaceSkeleton } from "./UiBits";
+import { CardImage, LoadRetryButton, WorkspaceSkeleton } from "./UiBits";
 
 type TodayDashboard = {
   metrics: {
@@ -119,6 +119,7 @@ type TodayProps = {
   orderSyncStatus?: OrderSyncStatus | null;
   loading?: boolean;
   loadError?: string | null;
+  retrying?: boolean;
   onRetry?: () => void;
 };
 
@@ -166,6 +167,7 @@ export function TodayTab({
   orderSyncStatus = null,
   loading = false,
   loadError = null,
+  retrying = false,
   onRetry,
 }: TodayProps) {
   const greeting = useTodayGreeting();
@@ -242,7 +244,7 @@ export function TodayTab({
       <section className="workspace today-workspace focused-today today-slim">
         <div className="panel" role="alert">
           <p>{loadError}</p>
-          <button type="button" className="primary-button" onClick={onRetry}>Retry</button>
+          <LoadRetryButton busy={retrying} onRetry={onRetry} />
         </div>
       </section>
     );

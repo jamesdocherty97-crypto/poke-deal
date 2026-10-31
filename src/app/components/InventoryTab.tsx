@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { InventorySort } from "@/lib/dealer/tableControls";
-import { EmptyState, MoneyInput, WorkspaceSkeleton } from "./UiBits";
+import { EmptyState, LoadRetryButton, MoneyInput, WorkspaceSkeleton } from "./UiBits";
+import { emptyActiveStockText } from "@/lib/dealer/stockReadiness";
 import { groupInventoryHoldings } from "@/lib/dealer/inventoryGroups";
 
 type InventoryFilter = import("@/lib/dealer/stockReadiness").InventoryFilter;
@@ -70,6 +71,7 @@ export function InventoryTab({
   createListing,
   closeCreateListing,
   listingPrice,
+  listingPriceHint,
   setListingPrice,
   listingChannel,
   setListingChannel,
@@ -80,10 +82,15 @@ export function InventoryTab({
   listingExternalUrl,
   setListingExternalUrl,
   gbp,
+  sheetTrigger = null,
   onBulkDraft,
   onBulkMove,
   onBulkExport,
   loading = false,
+  loadError = null,
+  loadBanner = null,
+  retrying = false,
+  onRetry = () => {},
 }: {
   visibleInventory: InventoryItemLike[];
   filteredInventory: InventoryItemLike[];
@@ -126,7 +133,9 @@ export function InventoryTab({
   createListing: (event: FormEvent<HTMLFormElement>) => void;
   closeCreateListing: () => void;
   listingPrice: string;
+  listingPriceHint: string;
   setListingPrice: (value: string) => void;
+  sheetTrigger?: HTMLElement | null;
   listingChannel: Channel;
   setListingChannel: (value: Channel) => void;
   channels: Channel[];
@@ -140,7 +149,15 @@ export function InventoryTab({
   onBulkMove: (items: InventoryItemLike[], location: string) => void;
   onBulkExport: (items: InventoryItemLike[]) => void;
   loading?: boolean;
+  loadError?: string | null;
+  loadBanner?: string | null;
+  retrying?: boolean;
+  onRetry?: () => void;
 }) {
+  const editTitleId = useId();
+  const createTitleId = useId();
+  const editPriceRef = useRef<HTMLInputElement>(null);
+  const createPriceRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkLocation, setBulkLocation] = useState("To list");
   const selectedItems = useMemo(
@@ -159,6 +176,17 @@ export function InventoryTab({
     });
   }
 
+  if (!loading && loadError) {
+    return (
+      <section className="workspace inventory-workspace">
+        <div className="panel" role="alert">
+          <p>{loadError}</p>
+          <LoadRetryButton busy={retrying} onRetry={onRetry} />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="workspace inventory-workspace">
       {loading ? <>
@@ -171,17 +199,29 @@ export function InventoryTab({
       </section>
       <WorkspaceSkeleton label="Loading stock" rows={5} />
       </> : <>
+      {loadBanner ? (
+        <div className="load-banner" role="alert">
+          <p>{loadBanner}</p>
+          <LoadRetryButton busy={retrying} onRetry={onRetry} />
+        </div>
+      ) : null}
       <section className="workspace-masthead vault-masthead" aria-labelledby="inventory-title">
         <div className="workspace-masthead-copy">
           <span className="workspace-kicker">Collection vault</span>
           <h2 id="inventory-title">Inventory</h2>
-          <p>Scan the collection by card, value and readiness—then move the right stock forward.</p>
+          <p>Scan the collection by card, value and readiness, then move the right stock forward.</p>
         </div>
-        <div className="vault-summary" aria-label="Inventory summary">
-          <span><strong>{holdings.length}</strong> holdings</span>
-          <span><strong>{activeInventory.length}</strong> active cards</span>
-          <span><strong>{visibleInventory.length}</strong> in view</span>
-        </div>
+        {holdings.length === activeInventory.length && activeInventory.length === visibleInventory.length ? (
+          <p className="vault-summary vault-summary-line">
+            {holdings.length === 1 ? "1 card in stock" : `${holdings.length} cards in stock`}
+          </p>
+        ) : (
+          <div className="vault-summary" aria-label="Inventory summary">
+            <span><strong>{holdings.length}</strong> {holdings.length === 1 ? "holding" : "holdings"}</span>
+            <span><strong>{activeInventory.length}</strong> {activeInventory.length === 1 ? "active card" : "active cards"}</span>
+            <span><strong>{visibleInventory.length}</strong> in view</span>
+          </div>
+        )}
       </section>
       <section className="vault-commandbar" aria-label="Vault controls">
         <div className="section-heading vault-heading">
@@ -267,8 +307,8 @@ export function InventoryTab({
           </div>
         </details>
       ))}
-      {inventoryFilter === "all" && activeInventory.length === 0 ? (
-        <EmptyState art="stock" text="No active stock. Add your next card from Comp / Buy." />
+      {activeInventory.length === 0 && (inventoryFilter === "all" || inventoryFilter === "needs-action") ? (
+        <EmptyState art="stock" text={emptyActiveStockText()} />
       ) : filteredInventory.length === 0 ? (
         <EmptyState text={emptyInventoryFilterText(inventoryFilter)} />
       ) : visibleInventory.length === 0 ? (
@@ -278,16 +318,17 @@ export function InventoryTab({
 
       </>}
       {!loading && editingItemId && (
-        <form className="sell-sheet" onSubmit={saveInventoryItem}>
+        <form className="sell-sheet edit-stock-sheet" role="dialog" aria-modal="true" aria-labelledby={editTitleId} onSubmit={saveInventoryItem}>
+          <SheetFocus trigger={sheetTrigger} onClose={closeInventoryEditor} focusRef={editPriceRef} alignFocused />
           <div className="panel-heading">
-            <h2>Edit stock</h2>
+            <h2 id={editTitleId} tabIndex={-1}>Edit stock</h2>
             <button className="ghost-button" type="button" onClick={closeInventoryEditor}>Close</button>
           </div>
           <div className="form-grid">
             <label>
               What I paid
-              <MoneyInput value={itemCost} onChange={setItemCost} disabled={busy === `edit-${editingItemId}`} />
-              <small>Your purchase cost or cost basis—not the card comp or sell price.</small>
+              <MoneyInput ref={editPriceRef} value={itemCost} onChange={setItemCost} disabled={busy === `edit-${editingItemId}`} />
+              <small>Your purchase cost or cost basis, not the card comp or sell price.</small>
             </label>
             <label>
               Qty
@@ -366,10 +407,11 @@ export function InventoryTab({
       )}
 
       {creatingListingItemId && creatingListingItem && (
-        <form className="sell-sheet" onSubmit={createListing}>
+        <form className="sell-sheet" role="dialog" aria-modal="true" aria-labelledby={createTitleId} onSubmit={createListing}>
+          <SheetFocus trigger={sheetTrigger} onClose={closeCreateListing} focusRef={createPriceRef} />
           <div className="panel-heading">
             <div>
-              <h2>Create listing</h2>
+              <h2 id={createTitleId} tabIndex={-1}>Create listing</h2>
               <span className="muted">{creatingListingItem.card.name} · paid {gbp(creatingListingItem.costBasis)}</span>
             </div>
             <button className="ghost-button" type="button" onClick={closeCreateListing}>Close</button>
@@ -377,8 +419,8 @@ export function InventoryTab({
           <div className="form-grid">
             <label>
               Your list price
-              <MoneyInput value={listingPrice} onChange={setListingPrice} />
-              <small>The suggestion is prefilled. Edit it freely before saving.</small>
+              <MoneyInput ref={createPriceRef} value={listingPrice} onChange={setListingPrice} />
+              <small>{listingPriceHint}</small>
             </label>
             <label>
               Channel
@@ -416,6 +458,40 @@ export function InventoryTab({
       )}
     </section>
   );
+}
+
+function SheetFocus({
+  trigger,
+  onClose,
+  focusRef,
+  alignFocused = false,
+}: {
+  trigger: HTMLElement | null;
+  onClose: () => void;
+  focusRef: { readonly current: HTMLElement | null };
+  alignFocused?: boolean;
+}) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const node = focusRef.current;
+      node?.focus({ preventScroll: true });
+      if (alignFocused) node?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onCloseRef.current();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKeyDown);
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    };
+  }, [alignFocused, focusRef, trigger]);
+  return null;
 }
 
 function InventoryLotRow({ item, selectedIds, onToggle, renderInventoryRow }: {

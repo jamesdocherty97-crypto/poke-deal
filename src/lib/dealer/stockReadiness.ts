@@ -65,8 +65,13 @@ export function inventoryItemMatchesFilter(item: StockReadinessItem, filter: Inv
   return readiness.held;
 }
 
+/** No active cards at all. A book that still has stock uses emptyInventoryFilterText. */
+export function emptyActiveStockText(): string {
+  return "No active stock. Add your next card from Comp / Buy.";
+}
+
 export function emptyInventoryFilterText(filter: InventoryFilter): string {
-  if (filter === "needs-action") return "Your active squad is ready — no preparation tasks waiting.";
+  if (filter === "needs-action") return "Your active squad is ready. No preparation tasks waiting.";
   if (filter === "needs-listing") return "Every available card has a live listing.";
   if (filter === "drafts") return "No draft listings waiting.";
   if (filter === "listed") return "No confirmed live listings yet. Drafts are waiting to be published.";

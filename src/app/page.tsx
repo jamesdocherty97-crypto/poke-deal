@@ -65,7 +65,7 @@ import {
 import { inventoryItemMatchesFilter, emptyInventoryFilterText, hasLiveListing, stockReadiness, stockRowTaskFlags, type InventoryFilter } from "@/lib/dealer/stockReadiness";
 import { createStockImportBatch, parseStockImportBatch, runStockImportBatch, importBatchProgress, STOCK_IMPORT_BATCH_KEY, type StockImportBatch } from "@/lib/dealer/stockImportBatch";
 import { parseAcquisitionDate } from "@/lib/inventory/acquiredAt";
-import { buildListingDraftDefaults } from "@/lib/dealer/listingDraft";
+import { buildListingDraftDefaults, chooseDraftListPrice, draftListPriceHint, type DraftListPriceSource } from "@/lib/dealer/listingDraft";
 import { normalizeListingUrl } from "@/lib/dealer/listingUrl";
 import { buildLaunchReadiness, type LaunchReadinessTarget } from "@/lib/dealer/launchReadiness";
 import { buildLaunchPlan, buildLaunchProgress, summarizeSellingStock, type LaunchPlanTarget } from "@/lib/dealer/launchPlan";
@@ -178,7 +178,7 @@ import { availableOfflineSaleQuantity, readOfflineSaleStock } from "@/lib/offlin
 import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
 import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
-import { CardImage, EmptyState, Metric, MoneyInput } from "./components/UiBits";
+import { CardImage, EmptyState, LoadRetryButton, Metric, MoneyInput } from "./components/UiBits";
 import { PriceHistorySheet, StockHistorySparkline } from "./components/PriceHistory";
 import { ListingEditor, type ListingEditorPatch } from "./components/ListingEditor";
 
@@ -976,6 +976,30 @@ type NoticeAction = {
   onClick?: () => void;
 };
 
+type CoreSourceState = { inventory: boolean; listings: boolean; dashboard: boolean };
+
+const CORE_LOAD_ALERT = "Couldn't load your stock and sales. Check signal and try again.";
+const COMP_LOOKUP_ALERT = "Couldn't check this price. Check signal and try again.";
+
+function coreScreenBlocked(screen: "stock" | "list" | "today", failed: CoreSourceState, known: CoreSourceState): boolean {
+  if (screen === "stock") return failed.inventory && !known.inventory;
+  if (screen === "list") return failed.listings && !known.listings;
+  return (failed.inventory && !known.inventory)
+    || (failed.listings && !known.listings)
+    || (failed.dashboard && !known.dashboard);
+}
+
+function coreLoadBannerText(screen: "stock" | "list", failed: CoreSourceState): string | null {
+  const parts: string[] = [];
+  if (failed.inventory) parts.push("stock");
+  if (failed.listings) parts.push("listings");
+  if (failed.dashboard) parts.push("sales");
+  if (parts.length === 0) return null;
+  const named = parts.length === 1 ? parts[0]! : parts.length === 2 ? `${parts[0]} and ${parts[1]}` : `${parts[0]}, ${parts[1]} and ${parts[2]}`;
+  const kept = screen === "stock" ? "Your stock is still shown." : "Your listings are still shown.";
+  return `Couldn't load ${named}. ${kept}`;
+}
+
 export default function Home() {
   const [view, setViewState] = useState<View>("today");
   const [name, setName] = useState("");
@@ -1040,6 +1064,7 @@ export default function Home() {
   const [noticeAction, setNoticeAction] = useState<NoticeAction | null>(null);
   const [noticeArt, setNoticeArt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [compLookupError, setCompLookupError] = useState<string | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
   const [sellingListingId, setSellingListingId] = useState<string | null>(null);
   const [inventoryActionSheetId, setInventoryActionSheetId] = useState<string | null>(null);
@@ -1082,6 +1107,7 @@ export default function Home() {
   const [editingListingId, setEditingListingId] = useState<string | null>(null);
   const [creatingListingItemId, setCreatingListingItemId] = useState<string | null>(null);
   const [listingPrice, setListingPrice] = useState("");
+  const [listingPriceSource, setListingPriceSource] = useState<DraftListPriceSource>("cost-plus-margin");
   const [listingState, setListingState] = useState<Exclude<ListingState, "SOLD">>("DRAFT");
   const [listingChannel, setListingChannel] = useState<Channel>("EBAY");
   const [listingExternalUrl, setListingExternalUrl] = useState("");
@@ -1164,7 +1190,8 @@ export default function Home() {
   const [inventoryLoaded, setInventoryLoaded] = useState(false);
   const [listingsLoaded, setListingsLoaded] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
-  const [coreLoadFailed, setCoreLoadFailed] = useState(false);
+  const [coreFailures, setCoreFailures] = useState<CoreSourceState>({ inventory: false, listings: false, dashboard: false });
+  const [coreKnown, setCoreKnown] = useState<CoreSourceState>({ inventory: false, listings: false, dashboard: false });
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [manualReviews, setManualReviews] = useState<ManualCompReview[]>([]);
@@ -1198,8 +1225,12 @@ export default function Home() {
   latestWorkspaceRef.current = { inventory, priceHistoryPreviews, listings, dashboard, portfolio, watches, alerts: appAlerts, alertUnreadCount: appAlertUnreadCount, expenses, systemStatus, dealSession };
   const compLookupRef = useRef<{ id: number; controller: AbortController } | null>(null);
   const compLookupSequenceRef = useRef(0);
+  const compLookupAlertRef = useRef<HTMLDivElement>(null);
+  const lastCompLookupRef = useRef<{ input: LookupInput; preserveCost?: boolean; resultSection?: BuyResultSection } | null>(null);
+  const sheetTriggerRef = useRef<HTMLElement | null>(null);
   const cardSuggestionCacheRef = useRef(new Map<string, { cards: CatalogSuggestion[]; cachedAt: number }>());
   const refreshAllRef = useRef<Promise<void> | null>(null);
+  const coreKnownRef = useRef<CoreSourceState>({ inventory: false, listings: false, dashboard: false });
 
   function setNotice(message: string | null, action: NoticeAction | null = null) {
     setNoticeState(message);
@@ -1332,6 +1363,9 @@ export default function Home() {
   useEffect(() => {
     void getOfflineBootstrap<OfflineBootstrapPayload>().then((cached) => {
         if (!cached) return;
+        const known = { inventory: true, listings: true, dashboard: true };
+        coreKnownRef.current = known;
+        setCoreKnown(known);
         latestWorkspaceRef.current = { ...cached.payload, priceHistoryPreviews: cached.payload.priceHistoryPreviews ?? {} };
         setInventory(cached.payload.inventory);
         setPriceHistoryPreviews(cached.payload.priceHistoryPreviews ?? {});
@@ -1389,6 +1423,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => () => compLookupRef.current?.controller.abort(new DOMException("Page closed", "AbortError")), []);
+
+  useEffect(() => {
+    if (!compLookupError) return;
+    compLookupAlertRef.current?.scrollIntoView({ block: "center" });
+  }, [compLookupError]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -2606,10 +2645,14 @@ export default function Home() {
   }
 
   async function runRefreshAll(options: RefreshOptions = {}) {
-    const hadCoreFallback = latestWorkspaceRef.current.dashboard != null;
+    const hadLoadedCore = latestWorkspaceRef.current.dashboard != null
+      || coreKnownRef.current.inventory
+      || coreKnownRef.current.listings
+      || coreKnownRef.current.dashboard;
     setRefreshing(true);
     if (options.user) setUserRefreshing(true);
     setError(null);
+    let inlineCoreError = false;
     try {
       // Apply each independent dataset as soon as it arrives. A slow health or
       // portfolio request must not keep Stock, Today, or List blank behind the
@@ -2633,21 +2676,33 @@ export default function Home() {
         apply(payload);
       }
 
+      async function settleCore(source: "inventory" | "listings" | "dashboard", task: () => Promise<void>) {
+        try {
+          await task();
+          coreKnownRef.current[source] = true;
+          setCoreFailures((current) => ({ ...current, [source]: false }));
+          setCoreKnown({ ...coreKnownRef.current });
+        } catch (error) {
+          setCoreFailures((current) => ({ ...current, [source]: true }));
+          throw error;
+        }
+      }
+
       const tasks: Array<() => Promise<void>> = [
-        () => load<{ items?: InventoryItem[]; priceHistoryPreviews?: Record<string, CardPriceHistoryPreview> }>("/api/inventory", "inventory", (payload) => {
+        () => settleCore("inventory", () => load<{ items?: InventoryItem[]; priceHistoryPreviews?: Record<string, CardPriceHistoryPreview> }>("/api/inventory", "inventory", (payload) => {
           nextInventory = payload.items ?? [];
           nextPriceHistoryPreviews = payload.priceHistoryPreviews ?? {};
           setInventory(nextInventory);
           setPriceHistoryPreviews(nextPriceHistoryPreviews);
-        }).finally(() => setInventoryLoaded(true)),
-        () => load<{ listings?: Listing[] }>("/api/listings", "listings", (payload) => {
+        })).finally(() => setInventoryLoaded(true)),
+        () => settleCore("listings", () => load<{ listings?: Listing[] }>("/api/listings", "listings", (payload) => {
           nextListings = payload.listings ?? [];
           setListings(nextListings);
-        }).finally(() => setListingsLoaded(true)),
-        () => load<Dashboard>("/api/dashboard", "dashboard", (payload) => {
+        })).finally(() => setListingsLoaded(true)),
+        () => settleCore("dashboard", () => load<Dashboard>("/api/dashboard", "dashboard", (payload) => {
           nextDashboard = payload;
           setDashboard(payload);
-        }).finally(() => setDashboardLoaded(true)),
+        })).finally(() => setDashboardLoaded(true)),
         () => load<PortfolioHistory>("/api/snapshots/portfolio", "snapshot history", (payload) => {
           nextPortfolio = payload;
           setPortfolio(payload);
@@ -2735,11 +2790,21 @@ export default function Home() {
             dealSession: (nextDealSession ?? fallback.dealSession)!,
           }
         : null;
-      const coreFailed = nextInventory === undefined || nextListings === undefined || nextDashboard === undefined;
-      // Keep the alert up until inventory, listings, and dashboard all arrive.
-      // A dashboard stored by a partial attempt must not dismiss it.
-      if (!coreFailed) setCoreLoadFailed(false);
-      else if (!hadCoreFallback) setCoreLoadFailed(true);
+      const nextFailures: CoreSourceState = {
+        inventory: nextInventory === undefined,
+        listings: nextListings === undefined,
+        dashboard: nextDashboard === undefined,
+      };
+      if (nextInventory !== undefined) coreKnownRef.current.inventory = true;
+      if (nextListings !== undefined) coreKnownRef.current.listings = true;
+      if (nextDashboard !== undefined) coreKnownRef.current.dashboard = true;
+      setCoreFailures(nextFailures);
+      setCoreKnown({ ...coreKnownRef.current });
+      const anyCoreFailed = nextFailures.inventory || nextFailures.listings || nextFailures.dashboard;
+      const inlineLoadView = requestedView === "today" || requestedView === "inventory" || requestedView === "listings";
+      // Hide the raw toast when Stock, List or Today already explains the miss.
+      // A cached book still gets the toast, including the offline sentence.
+      inlineCoreError = anyCoreFailed && !hadLoadedCore && inlineLoadView;
       if (mergedBootstrap) {
         latestWorkspaceRef.current = { ...mergedBootstrap, priceHistoryPreviews: mergedBootstrap.priceHistoryPreviews ?? {} };
         const fullyFresh = failures.length === 0;
@@ -2758,7 +2823,17 @@ export default function Home() {
       }
       if (options.toast) setNotice("Refreshed.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "refresh failed");
+      if (!inlineCoreError) {
+        const raw = err instanceof Error ? err.message : "refresh failed";
+        const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+        setError(offline
+          ? (hadLoadedCore
+            ? "You are offline. The last loaded stock is still on screen."
+            : "You are offline. Stock will load when you are back online.")
+          : raw === "Failed to fetch"
+            ? "Could not reach the server. Check the connection and try again."
+            : raw);
+      }
     } finally {
       setRefreshing(false);
       if (options.user) setUserRefreshing(false);
@@ -4130,11 +4205,28 @@ export default function Home() {
     if (input.number !== number) setNumber(input.number);
   }
 
-  async function lookupComp(input: LookupInput, options: { preserveCost?: boolean; resultSection?: BuyResultSection } = {}) {
+  function retryCompLookup() {
+    if (compLookupRef.current) return;
+    const last = lastCompLookupRef.current;
+    if (!last) return;
+    void lookupComp(last.input, {
+      preserveCost: last.preserveCost ?? true,
+      resultSection: last.resultSection,
+      keepError: true,
+    });
+  }
+
+  async function lookupComp(input: LookupInput, options: { preserveCost?: boolean; resultSection?: BuyResultSection; keepError?: boolean } = {}) {
     compLookupRef.current?.controller.abort(new DOMException("Superseded by a newer comp", "AbortError"));
     const requestId = ++compLookupSequenceRef.current;
     const controller = new AbortController();
     compLookupRef.current = { id: requestId, controller };
+    lastCompLookupRef.current = {
+      input,
+      preserveCost: options.preserveCost,
+      resultSection: options.resultSection,
+    };
+    if (!options.keepError) setCompLookupError(null);
     const normalizedInput = normalizeLookupInput(input);
     const identityChanged =
       lookupIdentityKey(normalizedInput) !==
@@ -4227,6 +4319,7 @@ export default function Home() {
       const payload = terminalReceipt as Reconciled | null;
       if (!payload) throw new Error("Comp stream ended before its receipt.");
       setComp(payload);
+      setCompLookupError(null);
       if (payload.psaCert) setPsaResult(payload.psaCert);
       setCardArtUrl(payloadDisplayImage(payload));
       pinRecentSetName(payload.catalog?.setName ?? normalizedInput.setName);
@@ -4248,6 +4341,7 @@ export default function Home() {
           cached: { asOf: cached.cachedAt, ageHours: cached.ageHours },
         };
         setComp(cachedPayload);
+        setCompLookupError(null);
         setBuyResultSection(options.resultSection ?? null);
         setCardArtUrl(payloadDisplayImage(cachedPayload));
         setCompProgressPhase("receipt");
@@ -4256,9 +4350,11 @@ export default function Home() {
       } else {
         if (!navigator.onLine) {
           await queueCompIntent(normalizedInput).catch(() => undefined);
+          setCompLookupError(null);
           setError("No cached receipt for this card. Comp check queued for reconnect.");
         } else {
-          setError(err instanceof Error ? err.message : "lookup failed");
+          setError(null);
+          setCompLookupError(COMP_LOOKUP_ALERT);
         }
       }
     } finally {
@@ -6321,18 +6417,15 @@ export default function Home() {
   }
 
   function openListingCreator(item: InventoryItem) {
-    const defaults = buildListingDraftDefaults({
-      card: item.card,
-      grade: item.grade,
-      costBasis: item.costBasis,
-      condition: item.condition,
-    });
+    const priceCheckPence = stockCompItem?.id === item.id ? stockCompSuggestion?.pricePence : null;
+    const chosen = chooseDraftListPrice({ costBasisPence: item.costBasis, priceCheckPence });
     setCreatingListingItemId(item.id);
     setEditingListingId(null);
     setListingPackId(null);
     setSellingId(null);
     setSellingListingId(null);
-    setListingPrice(penceToPounds(defaults.listPricePence));
+    setListingPrice(penceToPounds(chosen.listPricePence));
+    setListingPriceSource(chosen.source);
     setListingState("DRAFT");
     setListingChannel(item.listings[0]?.channel ?? "EBAY");
     setListingExternalUrl("");
@@ -8098,6 +8191,13 @@ export default function Home() {
     );
   }
 
+  const compLookupAlert = compLookupError ? (
+    <div className="load-banner comp-lookup-alert" role="alert" ref={compLookupAlertRef}>
+      <p>{compLookupError}</p>
+      <LoadRetryButton busy={busy === "lookup"} onRetry={retryCompLookup} />
+    </div>
+  ) : null;
+
   const pullReady = shouldTriggerPullRefresh(pullDistance);
   const pullVisible = userRefreshing || pullDistance > 0;
   const pullOffset = pullVisible ? Math.round(pullRefreshProgress(pullDistance) * 16) : -64;
@@ -8160,11 +8260,11 @@ export default function Home() {
             <span aria-hidden="true">⌘</span> Quick
           </button>
           <button
-            className={`icon-button ${refreshing ? "is-loading" : ""}`}
+            className={`icon-button ${userRefreshing ? "is-loading" : ""}`}
             type="button"
             onClick={() => void refreshAll({ toast: true, user: true })}
             disabled={refreshing}
-            aria-label={refreshing ? "Refreshing data" : "Refresh data"}
+            aria-label={userRefreshing ? "Refreshing data" : "Refresh data"}
           >
             <span className="refresh-icon" aria-hidden="true">
               ↻
@@ -8231,7 +8331,7 @@ export default function Home() {
             onDismiss={() => setNotice(null)}
           />
         )}
-        {error && <Toast tone="danger" message={error} onDismiss={() => setError(null)} />}
+        {error && !compLookupError && <Toast tone="danger" message={error} onDismiss={() => setError(null)} />}
       </div>
 
       {commandPaletteOpen && (
@@ -8280,8 +8380,9 @@ export default function Home() {
       {view === "today" && (
         <TodayTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
-          loadError={coreLoadFailed ? "Couldn't load your stock and sales. Check signal and try again." : null}
-          onRetry={() => { void runRefreshAll({ user: true }); }}
+          loadError={coreScreenBlocked("today", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
+          retrying={refreshing}
+          onRetry={() => { void refreshAll({ user: true }); }}
           launchProgress={launchProgress}
           primaryTodayAction={primaryTodayAction}
           todayActions={todayActions}
@@ -8457,6 +8558,7 @@ export default function Home() {
                   </button>
                 )}
               </div>
+              {compLookupAlert}
               {cardSuggestionsOpen && quickIntake.trim() && (cardSuggestions.length > 0 || typedFallbackSuggestion) && (
                 <div
                   id="smart-card-suggestions"
@@ -8596,7 +8698,7 @@ export default function Home() {
                 </div>
               </div>
             )}
-            {pendingLookup && busy === "lookup" && !headline && (
+            {pendingLookup && busy === "lookup" && !headline && !compLookupError && (
               <div className="lookup-progress-card" aria-live="polite" aria-label="Comp lookup progress">
                 <div className="lookup-progress-heading">
                   <div>
@@ -9283,7 +9385,8 @@ export default function Home() {
               ref={compPanelRef}
               style={selectedCardImage ? ({ "--ambient-card-art": `url("${selectedCardImage}")` } as CSSProperties) : undefined}
             >
-              {busy === "lookup" && (
+              {compLookupAlert}
+              {busy === "lookup" && !compLookupError && (
                 <div className="comp-progress-with-cancel">
                   <ProgressSourceRail sources={compProgressSources} phase={compProgressPhase} />
                   <button type="button" className="ghost-button" onClick={cancelCompLookup}>Cancel lookup</button>
@@ -9306,9 +9409,19 @@ export default function Home() {
                 <div>
                   <span className="workspace-kicker">Dealer decision</span>
                   <p className="eyebrow">
-                    {needsManualComp ? "Manual comp recommended" : "Suggested maximum buy"}
+                    {stockCompItem && stockCompSuggestion
+                      ? "Suggested list price"
+                      : needsManualComp
+                        ? "Manual comp recommended"
+                        : "Suggested maximum buy"}
                   </p>
-                  <h2>{offerCalc?.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}</h2>
+                  <h2>
+                    {stockCompItem && stockCompSuggestion
+                      ? gbp(stockCompSuggestion.pricePence)
+                      : offerCalc?.maxCashOfferPence == null
+                        ? "No auto-offer"
+                        : gbp(offerCalc.maxCashOfferPence)}
+                  </h2>
                   <small>
                     {primaryEvidenceLabel}
                     {comp?.cached ? ` · cached ${comp.cached.ageHours}h` : ""}
@@ -9367,6 +9480,25 @@ export default function Home() {
                 </div>
               </div>
               <div className="buy-result-action-row" aria-label="Buy actions">
+                {stockCompItem ? (
+                  <>
+                    <p className="owned-stock-status">In stock · Paid {gbp(stockCompItem.costBasis)}</p>
+                    {!stockCompListing && (
+                      <button
+                        className="primary-action verdict-owned-action"
+                        type="button"
+                        onClick={(event) => {
+                          sheetTriggerRef.current = event.currentTarget;
+                          setView("inventory");
+                          void listInventoryItem(stockCompItem);
+                        }}
+                        disabled={busy?.startsWith("create-listing-")}
+                      >
+                        {busy?.startsWith("create-listing-") ? "Opening…" : "Draft listing"}
+                      </button>
+                    )}
+                  </>
+                ) : (
                 <button
                   className="primary-action verdict-buy-action"
                   type="button"
@@ -9382,6 +9514,7 @@ export default function Home() {
                         ? "Add to stock"
                         : "Just bought it"}
                 </button>
+                )}
                 <button className="verdict-ebay-action" type="button" aria-label="eBay UK" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
                   eBay UK
                 </button>
@@ -9612,7 +9745,15 @@ export default function Home() {
                       </button>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => void listInventoryItem(stockCompItem)} disabled={busy?.startsWith("create-listing-")}>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        sheetTriggerRef.current = event.currentTarget;
+                        setView("inventory");
+                        void listInventoryItem(stockCompItem);
+                      }}
+                      disabled={busy?.startsWith("create-listing-")}
+                    >
                       Draft listing
                     </button>
                   )}
@@ -10530,6 +10671,10 @@ export default function Home() {
       {view === "inventory" && (
         <InventoryTab
           loading={!inventoryLoaded}
+          loadError={coreScreenBlocked("stock", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
+          loadBanner={coreScreenBlocked("stock", coreFailures, coreKnown) ? null : coreLoadBannerText("stock", coreFailures)}
+          retrying={refreshing}
+          onRetry={() => { void refreshAll({ user: true }); }}
           visibleInventory={visibleInventory}
           filteredInventory={filteredInventory}
           activeInventory={activeInventory}
@@ -10558,6 +10703,7 @@ export default function Home() {
               onCatalogArt={addCatalogArtToInventory}
               onDelete={requestDeleteItem}
               onMoreActions={(target) => setInventoryActionSheetId(target.id)}
+              onRememberSheetTrigger={(element) => { sheetTriggerRef.current = element; }}
               history={priceHistoryByKey[inventoryHistoryKey(item as InventoryItem)]}
               historyPreview={priceHistoryPreviews[inventoryHistoryKey(item as InventoryItem)]}
               onHistory={(target) => void loadPriceHistory(target, true)}
@@ -10589,7 +10735,9 @@ export default function Home() {
           createListing={createListing}
           closeCreateListing={() => setCreatingListingItemId(null)}
           listingPrice={listingPrice}
+          listingPriceHint={draftListPriceHint(listingPriceSource)}
           setListingPrice={setListingPrice}
+          sheetTrigger={sheetTriggerRef.current}
           listingChannel={listingChannel}
           setListingChannel={setListingChannel}
           channels={channels}
@@ -10640,6 +10788,10 @@ export default function Home() {
       {view === "listings" && (
         <ListingsTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
+          loadError={coreScreenBlocked("list", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
+          loadBanner={coreScreenBlocked("list", coreFailures, coreKnown) ? null : coreLoadBannerText("list", coreFailures)}
+          retrying={refreshing}
+          onRetry={() => { void refreshAll({ user: true }); }}
           dashboard={dashboard}
           firstDraftListingTarget={firstDraftListingTarget}
           firstSaleListingTarget={firstSaleListingTarget}
@@ -11109,14 +11261,14 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && headline && buyResultSection === "deal" && (
+      {view === "acquire" && headline && buyResultSection === "deal" && !stockCompItem && (
         <section
           className={`mobile-buy-action ${buyPlan?.tone ?? "warn"}`}
           aria-label="Confirm current stock intake"
         >
           <div>
             <span>{shouldCreateListing ? `${channelLabel(channel)} ${effectiveAcquireListingState === "ACTIVE" ? "active" : "draft"}` : "Stock only"}</span>
-            <strong>{quickStockReady ? `${quickStockQuantity} ready` : "Add cost"}</strong>
+            <strong>{quickStockReady ? `${quickStockQuantity} ready` : "Cost needed"}</strong>
             <small>
               {quickStockReady
                 ? `${effectiveDraftListPricePence != null ? gbp(effectiveDraftListPricePence) : "price in review"}${scanPhotoPayload ? " · scan photo ready" : ""}`
@@ -11148,7 +11300,7 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && !headline && (name.trim() || number.trim()) && (
+      {view === "acquire" && !headline && !compLookupError && busy !== "lookup" && (name.trim() || number.trim()) && (
         <section
           className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`}
           aria-label="Current buy action"
@@ -11915,6 +12067,7 @@ function InventoryRow({
   onCatalogArt,
   onDelete,
   onMoreActions,
+  onRememberSheetTrigger,
   history,
   historyPreview,
   onHistory,
@@ -11930,6 +12083,7 @@ function InventoryRow({
   onCatalogArt: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
   onMoreActions: (item: InventoryItem) => void;
+  onRememberSheetTrigger?: (element: HTMLElement) => void;
   history: CardPriceHistory | null | undefined;
   historyPreview: CardPriceHistoryPreview | undefined;
   onHistory: (item: InventoryItem) => void;
@@ -12099,7 +12253,7 @@ function InventoryRow({
             <span>{listingSummary}{soldNote}</span>
             <span>
               Market comp {marketCompPence != null ? gbp(marketCompPence) : "refresh needed"}
-              {marketCompPence != null ? ` · ${marketCompAgeDays != null && marketCompAgeDays > 90 ? "stale — refresh · " : ""}${marketCompMeta}` : ""}
+              {marketCompPence != null ? ` · ${marketCompAgeDays != null && marketCompAgeDays > 90 ? "stale, refresh · " : ""}${marketCompMeta}` : ""}
             </span>
             {stockNotes && <span>{stockNotes}</span>}
             <button className="stock-history-button" type="button" onClick={() => onHistory(item)} aria-label={`History for ${item.card.name}`}>
@@ -12147,7 +12301,15 @@ function InventoryRow({
           )}
           {primaryAction && (
             <div className="next-action-strip">
-              <button className={`next-action-button ${primaryAction.tone}`} type="button" onClick={primaryAction.onClick} disabled={primaryAction.disabled}>
+              <button
+                className={`next-action-button ${primaryAction.tone}`}
+                type="button"
+                onClick={(event) => {
+                  onRememberSheetTrigger?.(event.currentTarget);
+                  primaryAction.onClick();
+                }}
+                disabled={primaryAction.disabled}
+              >
                 {primaryAction.label}
               </button>
               <span>{primaryAction.detail}</span>
@@ -12164,7 +12326,13 @@ function InventoryRow({
                 Sell
               </button>
             )}
-            <button type="button" onClick={() => onMoreActions(item)}>
+            <button
+              type="button"
+              onClick={(event) => {
+                onRememberSheetTrigger?.(event.currentTarget);
+                onMoreActions(item);
+              }}
+            >
               More actions
             </button>
           </div>

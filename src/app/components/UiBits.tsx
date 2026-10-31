@@ -42,7 +42,25 @@ export function CardImage({
   const [failed, setFailed] = useState<{ key: string; index: number }>({ key: sourceKey, index: 0 });
   const index = failed.key === sourceKey ? failed.index : 0;
   const activeSrc = sources[index];
-  if (!activeSrc) return <span className={fallbackClassName} aria-hidden="true" />;
+  if (!activeSrc) {
+    const photoSlot = fallbackClassName.split(/\s+/).some((token) => token === "card-thumb" || token === "comp-identity-art");
+    if (!photoSlot) return <span className={fallbackClassName} aria-hidden="true" />;
+    // The missing image is not in the tree. If alt already says there is no
+    // photo, keep the visible label decorative and use that alt once.
+    const altCoversMissingPhoto = /no photo/i.test(alt);
+    if (altCoversMissingPhoto) {
+      return (
+        <span className={fallbackClassName} role="img" aria-label={alt}>
+          <span className="no-photo-label" aria-hidden="true">No photo</span>
+        </span>
+      );
+    }
+    return (
+      <span className={fallbackClassName}>
+        <span className="no-photo-label">No photo</span>
+      </span>
+    );
+  }
   const dimensions = imageDimensions(activeSrc);
   const sharedProps = {
     className,
@@ -146,6 +164,20 @@ export function EmptyState({ text, art }: { text: string; art?: EmptyStateArt })
       <img src={emptyStateArtPaths[artKey]} alt="" width={512} height={512} loading="lazy" decoding="async" />
       <span>{text}</span>
     </div>
+  );
+}
+
+export function LoadRetryButton({ busy = false, onRetry }: { busy?: boolean; onRetry?: () => void }) {
+  return (
+    <button
+      type="button"
+      className="primary-button"
+      onClick={onRetry}
+      disabled={busy}
+      aria-busy={busy ? "true" : undefined}
+    >
+      {busy ? "Retrying…" : "Retry"}
+    </button>
   );
 }
 

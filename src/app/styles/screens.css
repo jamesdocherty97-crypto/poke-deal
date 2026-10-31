@@ -264,6 +264,7 @@
 
   .buy-workspace > .lookup-panel {
     max-height: calc(100vh - 112px);
+    max-height: calc(100dvh - 112px);
     overflow-y: auto;
     overscroll-behavior: contain;
   }

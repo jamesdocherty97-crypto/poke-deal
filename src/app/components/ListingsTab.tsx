@@ -7,7 +7,7 @@ import { listingStockAttention } from "@/lib/dealer/saleListingUpdates";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { orderListingPhotos, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
 import { InventoryPhotoTools } from "./InventoryPhotoTools";
-import { CardImage, EmptyState, Metric, WorkspaceSkeleton } from "./UiBits";
+import { CardImage, EmptyState, LoadRetryButton, Metric, WorkspaceSkeleton } from "./UiBits";
 
 type Channel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
 type ItemStatus = "IN_STOCK" | "LISTED" | "SOLD" | "RESERVED";
@@ -105,6 +105,10 @@ export function ListingsTab({
   listingPackSheet,
   onBulkPack,
   loading = false,
+  loadError = null,
+  loadBanner = null,
+  retrying = false,
+  onRetry = () => {},
 }: {
   dashboard: Dashboard | null;
   firstDraftListingTarget: Listing | null;
@@ -165,6 +169,10 @@ export function ListingsTab({
   listingPackSheet: ReactNode;
   onBulkPack: (listings: Listing[], channel: Channel, mode: "download" | "copy") => void;
   loading?: boolean;
+  loadError?: string | null;
+  loadBanner?: string | null;
+  retrying?: boolean;
+  onRetry?: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [packChannel, setPackChannel] = useState<Channel>("EBAY");
@@ -209,8 +217,23 @@ export function ListingsTab({
     </section>
   );
 
+  if (loadError) return (
+    <section className="workspace listings-workspace">
+      <div className="panel" role="alert">
+        <p>{loadError}</p>
+        <LoadRetryButton busy={retrying} onRetry={onRetry} />
+      </div>
+    </section>
+  );
+
   return (
     <section className="workspace listings-workspace">
+      {loadBanner ? (
+        <div className="load-banner" role="alert">
+          <p>{loadBanner}</p>
+          <LoadRetryButton busy={retrying} onRetry={onRetry} />
+        </div>
+      ) : null}
       <section className="workspace-masthead market-masthead" aria-labelledby="listings-title">
         <div className="workspace-masthead-copy">
           <span className="workspace-kicker">Trainer’s marketplace</span>
@@ -332,7 +355,7 @@ export function ListingsTab({
       {ebayStatus !== null && !ebayStatus.connected && listings.some((listing) => listing.channel === "EBAY") && (
         <div className="ebay-setup-banner">
           {!ebayStatus.configured ? (
-            <span>eBay credentials not configured - set env vars to enable API automation.</span>
+            <span>eBay is not connected yet. Drafts still work; publish by copy and paste.</span>
           ) : ebayNeedsReconnect ? (
             <>
               <span>Reconnect eBay. Consent now stores the token automatically.</span>

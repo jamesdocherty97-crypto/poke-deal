@@ -26,7 +26,7 @@
     "typecheck": "tsc -p tsconfig.check.json --noEmit",
     "test:overhaul": "node --import tsx --test src/lib/dealer/inventoryGroups.test.ts src/lib/comps/clientProgress.test.ts src/lib/offline/policy.test.ts src/lib/inventory/saleTransaction.test.ts",
     "test:pricing-redteam": "node --import tsx --test src/lib/comps/redteamPricingBrain.attacks.test.ts",
-    "test:e2e": "PLAYWRIGHT_PORT=${PLAYWRIGHT_PORT:-3110} playwright test e2e/dealer-loop.spec.ts e2e/golden-path.spec.ts e2e/offline-buy.spec.ts e2e/pricing-semantics.spec.ts e2e/dealer-reliability.spec.ts e2e/access-recovery.spec.cts e2e/listing-editor.spec.ts",
+    "test:e2e": "PLAYWRIGHT_PORT=${PLAYWRIGHT_PORT:-3110} playwright test e2e/dealer-loop.spec.ts e2e/golden-path.spec.ts e2e/offline-buy.spec.ts e2e/pricing-semantics.spec.ts e2e/dealer-reliability.spec.ts e2e/sell-flow-phone.spec.ts e2e/access-recovery.spec.cts e2e/listing-editor.spec.ts",
     "test:e2e:access": "playwright test --config playwright.access.config.ts",
     "test:e2e:offline": "PLAYWRIGHT_PORT=3110 playwright test e2e/offline-buy.spec.ts",
     "test:ux": "node --import tsx --test src/lib/offline/policy.test.ts src/lib/offline/clientMutation.test.ts src/lib/comps/clientProgress.test.ts src/app/components/PriceHistory.test.ts",
@@ -35,7 +35,8 @@
     "db:studio": "prisma studio",
     "audit:duplicate-cards": "node --import tsx scripts/audit-duplicate-cards.mts",
     "consolidate:duplicate-cards": "node --import tsx scripts/consolidate-duplicate-cards.mts",
-    "test:e2e:listings": "playwright test --config playwright.listing.config.ts"
+    "test:e2e:listings": "playwright test --config playwright.listing.config.ts",
+    "test:worst-case": "playwright test --config e2e/worst-case/playwright.config.ts e2e/worst-case/worst-case.spec.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.18.0",
@@ -43,7 +44,7 @@
     "next": "15.5.28",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "zod": "^3.23.8"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -60,6 +61,8 @@
     "next": {
       "postcss": "8.5.25",
       "sharp": "0.35.5"
-    }
+    },
+    "undici": "6.29.1",
+    "zod": "4.6.7"
   }
 }

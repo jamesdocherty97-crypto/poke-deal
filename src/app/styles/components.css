@@ -1338,7 +1338,6 @@ label,
   text-align: left;
 }
 
-.suggestion-row:hover,
 .suggestion-row:focus,
 .suggestion-row:focus-visible {
   outline: 2px solid rgba(255, 203, 5, 0.42);
@@ -1349,6 +1348,19 @@ label,
     rgba(255, 203, 5, 0.1);
   background-size: 160% 100%;
   animation: suggestion-highlight 0.22s ease-out both;
+}
+
+@media (hover: hover) and (pointer: fine) {
+.suggestion-row:hover {
+  outline: 2px solid rgba(255, 203, 5, 0.42);
+  outline-offset: 1px;
+  border-color: rgba(255, 203, 5, 0.4);
+  background:
+    linear-gradient(90deg, rgba(255, 203, 5, 0.18), rgba(105, 232, 255, 0.06) 42%, rgba(255, 203, 5, 0.08)),
+    rgba(255, 203, 5, 0.1);
+  background-size: 160% 100%;
+  animation: suggestion-highlight 0.22s ease-out both;
+}
 }
 
 .suggestion-row:active {
@@ -1862,9 +1874,14 @@ label,
   text-align: left;
 }
 
-.suggestion-item:hover,
 .suggestion-item:focus {
   background: rgba(255, 203, 5, 0.14);
+}
+
+@media (hover: hover) and (pointer: fine) {
+.suggestion-item:hover {
+  background: rgba(255, 203, 5, 0.14);
+}
 }
 
 .suggestion-item img {
@@ -3872,13 +3889,13 @@ label,
 
 .buy-result-summary span,
 .buy-result-summary small {
-  overflow: hidden;
+  overflow: visible;
   color: var(--muted);
   font-size: var(--font-size-micro);
   font-weight: 900;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .buy-result-summary strong {
@@ -8296,23 +8313,34 @@ label,
   grid-column: 1 / -1;
 }
 
-.mobile-buy-action span,
-.mobile-buy-action small {
+.mobile-buy-action span {
   overflow: hidden;
   color: var(--muted);
   font-size: var(--font-size-micro);
   font-weight: 900;
-  line-height: 1.12;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mobile-buy-action small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--font-size-micro);
+  font-weight: 900;
+  line-height: 1.25;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .mobile-buy-action strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 30px;
-  line-height: 1;
-  text-overflow: ellipsis;
+  font-size: var(--font-size-title-sm);
+  line-height: 1.15;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
@@ -8438,10 +8466,28 @@ label,
 .sell-sheet .sale-submit-row {
   position: sticky;
   bottom: calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
-  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(13, 20, 36, 0.985);
   padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+}
+
+/* The submit row grows with a negative margin so the inner button lines up
+   with the fields. A direct primary is the button itself, so a negative
+   margin only shifts its 336px box. Keep that button in the field column. */
+.sell-sheet .sale-submit-row {
+  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+}
+
+.sell-sheet > .primary-action {
+  width: 100%;
+  max-width: 100%;
+  margin: var(--space-2) 0 calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+}
+
+.sell-sheet > .primary-action:not(:disabled),
+.sell-sheet .sale-submit-row > .primary-action:not(:disabled) {
+  background: var(--brand-red);
+  color: var(--color-text-on-accent);
 }
 
 @keyframes sheetIn {
