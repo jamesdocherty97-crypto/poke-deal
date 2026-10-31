@@ -1421,6 +1421,40 @@ textarea:focus-visible {
   box-shadow:0 -22px 58px rgba(0,0,0,.46);
 }
 
+.sell-sheet {
+  box-shadow:
+    0 -22px 58px rgba(0, 0, 0, 0.46),
+    0 0 0 100vmax rgba(5, 8, 15, 0.72);
+}
+
+.vault-summary.vault-summary-line {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 12px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--color-text-primary);
+  font: 760 1rem/1.35 var(--font-data);
+  text-transform: none;
+}
+
+.buy-result-action-row .owned-stock-status,
+.buy-result-action-row .verdict-owned-action {
+  grid-column: 1 / -1;
+}
+
+.owned-stock-status {
+  margin: 0;
+  color: var(--color-success);
+  font-weight: 760;
+}
+
+.buy-result-action-row .verdict-owned-action::before {
+  content: none;
+}
+
 .toast-stack { right:24px; bottom:calc(112px + env(safe-area-inset-bottom)); left:auto; width:min(430px,calc(100% - 24px)); }
 .notice { border-color:var(--color-border); background:var(--color-surface-2); color:var(--color-text-primary); box-shadow:var(--shadow-2); }
 
@@ -1612,7 +1646,8 @@ button.ghost-button:disabled,
   .comp-hero h2 { font-size:clamp(2rem, 12vw, 3.4rem); letter-spacing:0; overflow-wrap:anywhere; }
   .buy-result-summary { grid-template-columns:1fr 1fr; }
   .buy-result-action-row { grid-template-columns:1fr 1fr; }
-  .buy-result-action-row .verdict-buy-action { grid-column:1/-1; }
+  .buy-result-action-row .verdict-buy-action,
+  .buy-result-action-row .verdict-pass-action { grid-column:1 / -1; }
 
   .vault-masthead,
   .market-masthead,

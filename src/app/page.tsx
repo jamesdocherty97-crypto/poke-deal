@@ -9409,9 +9409,19 @@ export default function Home() {
                 <div>
                   <span className="workspace-kicker">Dealer decision</span>
                   <p className="eyebrow">
-                    {needsManualComp ? "Manual comp recommended" : "Suggested maximum buy"}
+                    {stockCompItem && stockCompSuggestion
+                      ? "Suggested list price"
+                      : needsManualComp
+                        ? "Manual comp recommended"
+                        : "Suggested maximum buy"}
                   </p>
-                  <h2>{offerCalc?.maxCashOfferPence == null ? "No auto-offer" : gbp(offerCalc.maxCashOfferPence)}</h2>
+                  <h2>
+                    {stockCompItem && stockCompSuggestion
+                      ? gbp(stockCompSuggestion.pricePence)
+                      : offerCalc?.maxCashOfferPence == null
+                        ? "No auto-offer"
+                        : gbp(offerCalc.maxCashOfferPence)}
+                  </h2>
                   <small>
                     {primaryEvidenceLabel}
                     {comp?.cached ? ` · cached ${comp.cached.ageHours}h` : ""}
@@ -9470,6 +9480,25 @@ export default function Home() {
                 </div>
               </div>
               <div className="buy-result-action-row" aria-label="Buy actions">
+                {stockCompItem ? (
+                  <>
+                    <p className="owned-stock-status">In stock · Paid {gbp(stockCompItem.costBasis)}</p>
+                    {!stockCompListing && (
+                      <button
+                        className="primary-action verdict-owned-action"
+                        type="button"
+                        onClick={(event) => {
+                          sheetTriggerRef.current = event.currentTarget;
+                          setView("inventory");
+                          void listInventoryItem(stockCompItem);
+                        }}
+                        disabled={busy?.startsWith("create-listing-")}
+                      >
+                        {busy?.startsWith("create-listing-") ? "Opening…" : "Draft listing"}
+                      </button>
+                    )}
+                  </>
+                ) : (
                 <button
                   className="primary-action verdict-buy-action"
                   type="button"
@@ -9485,6 +9514,7 @@ export default function Home() {
                         ? "Add to stock"
                         : "Just bought it"}
                 </button>
+                )}
                 <button className="verdict-ebay-action" type="button" aria-label="eBay UK" onClick={() => openManualCompLink("EBAY_UK_SOLD")}>
                   eBay UK
                 </button>
@@ -11238,7 +11268,7 @@ export default function Home() {
         >
           <div>
             <span>{shouldCreateListing ? `${channelLabel(channel)} ${effectiveAcquireListingState === "ACTIVE" ? "active" : "draft"}` : "Stock only"}</span>
-            <strong>{quickStockReady ? `${quickStockQuantity} ready` : "Add cost"}</strong>
+            <strong>{quickStockReady ? `${quickStockQuantity} ready` : "Cost needed"}</strong>
             <small>
               {quickStockReady
                 ? `${effectiveDraftListPricePence != null ? gbp(effectiveDraftListPricePence) : "price in review"}${scanPhotoPayload ? " · scan photo ready" : ""}`
@@ -11270,7 +11300,7 @@ export default function Home() {
         </section>
       )}
 
-      {view === "acquire" && !headline && busy !== "lookup" && (name.trim() || number.trim()) && (
+      {view === "acquire" && !headline && !compLookupError && busy !== "lookup" && (name.trim() || number.trim()) && (
         <section
           className={`mobile-buy-action ${buyPlan?.tone ?? deal?.tone ?? "warn"}`}
           aria-label="Current buy action"

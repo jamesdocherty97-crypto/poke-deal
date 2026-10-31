@@ -8466,10 +8466,22 @@ label,
 .sell-sheet .sale-submit-row {
   position: sticky;
   bottom: calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
-  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(13, 20, 36, 0.985);
   padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+}
+
+/* The submit row grows with a negative margin so the inner button lines up
+   with the fields. A direct primary is the button itself, so a negative
+   margin only shifts its 336px box. Keep that button in the field column. */
+.sell-sheet .sale-submit-row {
+  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+}
+
+.sell-sheet > .primary-action {
+  width: 100%;
+  max-width: 100%;
+  margin: var(--space-2) 0 calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
 }
 
 .sell-sheet > .primary-action:not(:disabled),

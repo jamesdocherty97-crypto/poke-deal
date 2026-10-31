@@ -80,6 +80,22 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .inventory-workspace .vault-summary.vault-summary-line {
+    display: block;
+    grid-template-columns: none;
+    border: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  .inventory-workspace .vault-commandbar .vault-heading {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
   .inventory-workspace .vault-summary span {
     padding: 8px 9px;
   }
@@ -97,6 +113,16 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+}
+
+@media (max-width: 759px) {
+  .quick-intake-field:has(.comp-lookup-alert) .quick-intake-actions > button:not(.scan-card-button):not(.quick-next-button) {
+    grid-column: 1 / -1;
+  }
+}
+
+body:has(.comp-lookup-alert) .mobile-buy-action {
+  display: none;
 }
 
 /* iOS zooms the page when a focused field is under 16px. Checkboxes stay small. */

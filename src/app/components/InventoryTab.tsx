@@ -211,11 +211,17 @@ export function InventoryTab({
           <h2 id="inventory-title">Inventory</h2>
           <p>Scan the collection by card, value and readiness, then move the right stock forward.</p>
         </div>
-        <div className="vault-summary" aria-label="Inventory summary">
-          <span><strong>{holdings.length}</strong> {holdings.length === 1 ? "holding" : "holdings"}</span>
-          <span><strong>{activeInventory.length}</strong> {activeInventory.length === 1 ? "active card" : "active cards"}</span>
-          <span><strong>{visibleInventory.length}</strong> in view</span>
-        </div>
+        {holdings.length === activeInventory.length && activeInventory.length === visibleInventory.length ? (
+          <p className="vault-summary vault-summary-line">
+            {holdings.length === 1 ? "1 card in stock" : `${holdings.length} cards in stock`}
+          </p>
+        ) : (
+          <div className="vault-summary" aria-label="Inventory summary">
+            <span><strong>{holdings.length}</strong> {holdings.length === 1 ? "holding" : "holdings"}</span>
+            <span><strong>{activeInventory.length}</strong> {activeInventory.length === 1 ? "active card" : "active cards"}</span>
+            <span><strong>{visibleInventory.length}</strong> in view</span>
+          </div>
+        )}
       </section>
       <section className="vault-commandbar" aria-label="Vault controls">
         <div className="section-heading vault-heading">

@@ -198,6 +198,18 @@ async function buttonContrast(button: Locator) {
   return { ...colors, ratio: contrastRatio(colors.color, colors.backgroundColor) };
 }
 
+async function box(locator: Locator) {
+  return locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, top: rect.top, width: rect.width, height: rect.height };
+  });
+}
+
+function edgesLineUp(field: { left: number; right: number }, button: { left: number; right: number }) {
+  expect(Math.abs(field.left - button.left)).toBeLessThanOrEqual(2);
+  expect(Math.abs(field.right - button.right)).toBeLessThanOrEqual(2);
+}
+
 async function clippedLabels(bar: Locator) {
   return bar.locator("strong, small").evaluateAll((nodes) => nodes.map((node) => ({
     text: node.textContent ?? "",
@@ -322,6 +334,8 @@ test("bottom bar labels stay whole at 390 and 430", async ({ browser, baseURL })
       await page.getByRole("button", { name: "Deal tools", exact: true }).click();
       const deal = page.locator(".mobile-buy-action");
       await expect(deal).toBeVisible();
+      await expect(deal.locator("strong")).toHaveText("Cost needed");
+      await expect(deal.getByRole("button", { name: "Add cost", exact: true })).toBeVisible();
       await expect(deal).toContainText("enter what you paid, then confirm");
       const dealClipped = await clippedLabels(deal);
       expect(dealClipped.filter((row) => row.clipped)).toEqual([]);
@@ -472,6 +486,123 @@ test("an unconnected eBay account explains that drafts still work", async ({ bro
     await page.goto("/?view=list");
     await expect(page.locator(".ebay-setup-banner")).toContainText("eBay is not connected yet. Drafts still work; publish by copy and paste.");
     await expect(page.locator(".ebay-setup-banner")).not.toContainText("env vars");
+  } finally {
+    await context.close();
+  }
+});
+
+test("equal vault counts read as one line and the refresh row has no inner box", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 390, 844);
+  await mockApis(context);
+  await context.route("**/api/listings**", (route) => route.fulfill({
+    status: 500,
+    contentType: "application/json",
+    body: JSON.stringify({ error: "Example data: listings failed" }),
+  }));
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=stock");
+    const banner = page.locator(".load-banner");
+    await expect(banner).toContainText("Couldn't load listings. Your stock is still shown.");
+    const retry = banner.getByRole("button", { name: "Retry", exact: true });
+    await expect(retry).toBeVisible();
+    const retryBox = await box(retry);
+    expect(retryBox.height).toBeGreaterThanOrEqual(44);
+    expect(retryBox.width).toBeGreaterThanOrEqual(44);
+    const row = page.locator(".inventory-workspace .item-row").first();
+    await expect(row).toBeVisible();
+    expect((await box(banner)).top).toBeLessThan((await box(row)).top);
+    await expect(page.locator(".vault-summary-line")).toHaveText("1 card in stock");
+    await expect(page.getByText("holding", { exact: true })).toHaveCount(0);
+    const headingBorder = await page.locator(".vault-heading").evaluate((element) => getComputedStyle(element).borderTopWidth);
+    expect(headingBorder).toBe("0px");
+  } finally {
+    await context.close();
+  }
+});
+
+test("an owned price check leads with the list price and a full-width next card", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 390, 844);
+  await mockApis(context);
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await priceOwnedCard(page);
+    const hero = page.locator(".comp-hero");
+    await expect(hero).toContainText("Suggested list price");
+    await expect(hero).toContainText("£42.00");
+    await expect(hero).not.toContainText("Suggested maximum buy");
+    await expect(page.getByRole("button", { name: "Add to stock", exact: true })).toHaveCount(0);
+    await expect(page.locator(".owned-stock-status")).toContainText("In stock · Paid £25.00");
+    const actions = page.locator(".buy-result-action-row");
+    const draft = actions.getByRole("button", { name: "Draft listing", exact: true });
+    await expect(draft).toBeVisible();
+    const next = actions.getByRole("button", { name: "Next card", exact: true });
+    const rowBox = await box(actions);
+    const nextBox = await box(next);
+    expect(Math.abs(nextBox.width - rowBox.width)).toBeLessThanOrEqual(2);
+    expect(nextBox.left).toBeLessThanOrEqual((await box(draft)).left + 2);
+  } finally {
+    await context.close();
+  }
+});
+
+test("create listing and edit stock buttons line up with the fields over a dimmed sheet", async ({ browser, baseURL }) => {
+  for (const width of [390, 430]) {
+    const context = await phone(browser, baseURL!, width, width === 390 ? 844 : 932);
+    await mockApis(context);
+    const page = await context.newPage();
+    try {
+      await resetStorage(page);
+      await priceOwnedCard(page);
+      await page.locator(".stock-reprice-card").getByRole("button", { name: "Draft listing", exact: true }).click();
+      const creator = page.getByRole("dialog", { name: "Create listing" });
+      const price = creator.getByLabel(/Your list price/);
+      const continueButton = creator.getByRole("button", { name: "Continue to eBay review", exact: true });
+      edgesLineUp(await box(price), await box(continueButton));
+      const shadow = await creator.evaluate((element) => getComputedStyle(element).boxShadow);
+      expect(shadow).toContain("rgba(5, 8, 15, 0.72)");
+      const paddingBottom = await continueButton.evaluate((element) => getComputedStyle(element).paddingBottom);
+      expect(Number.parseFloat(paddingBottom)).toBeGreaterThanOrEqual(16);
+
+      await creator.getByRole("button", { name: "Close", exact: true }).click();
+      const row = page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" }).first();
+      await row.getByRole("button", { name: "More actions", exact: true }).click();
+      await page.getByRole("button", { name: /Edit stock details/ }).click();
+      const editor = page.getByRole("dialog", { name: "Edit stock" });
+      const cert = editor.getByLabel("Cert", { exact: true });
+      const save = editor.getByRole("button", { name: "Save stock", exact: true });
+      edgesLineUp(await box(cert), await box(save));
+      const editorShadow = await editor.evaluate((element) => getComputedStyle(element).boxShadow);
+      expect(editorShadow).toContain("rgba(5, 8, 15, 0.72)");
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test("a failed price check hides the buy bar and gives Comp the same width as Next", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 390, 844);
+  await mockApis(context, { comp: "error" });
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    const row = await stockRow(page);
+    await row.getByRole("button", { name: "Price card", exact: true }).click();
+    const alert = page.locator(".comp-lookup-alert");
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert).toContainText(COMP_LOOKUP_ALERT);
+    await expect(page.locator(".mobile-buy-action")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open UK", exact: true })).toHaveCount(0);
+    const comp = page.getByRole("button", { name: "Comp current card" });
+    const next = page.locator(".quick-intake-actions .quick-next-button");
+    await expect(comp).toBeVisible();
+    await expect(next).toBeVisible();
+    const compBox = await box(comp);
+    const nextBox = await box(next);
+    expect(Math.abs(compBox.width - nextBox.width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(compBox.left - nextBox.left)).toBeLessThanOrEqual(2);
   } finally {
     await context.close();
   }
