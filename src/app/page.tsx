@@ -153,6 +153,15 @@ import { normalizeCatalogCardSearchInput, shouldOfferTypedCardFallback } from "@
 import type { CatalogCard, CatalogPriceSignal } from "@/lib/catalog/types";
 import type { ScanIdentity } from "@/lib/scan/cardScan";
 import { scanErrorCopy } from "@/lib/scan/scanErrorCopy";
+import {
+  resolveCompMissRecovery,
+  resolveScanSheetRecovery,
+  scanBlockFromStatus,
+  scanPrefillNote,
+  type RecoveryActionId,
+  type RecoveryCard,
+  type ScanBlock,
+} from "@/lib/sell/phoneRecovery";
 import { scanIdentityToQuery, type ScanIdentityMapping, type ScanCompQuery } from "@/lib/scan/scanIdentityMapper";
 import {
   enqueueOfflineMutation,
@@ -179,6 +188,7 @@ import { TodayTab } from "./components/TodayTab";
 import { BuyFlowRail, IntakeSessionCard, LastStockedPanel, PsaCertCard } from "./components/BuyComponents";
 import { InventoryPhotoStrip, InventoryPhotoTools } from "./components/InventoryPhotoTools";
 import { CardImage, EmptyState, LoadRetryButton, Metric, MoneyInput } from "./components/UiBits";
+import { SellRecoveryCard } from "./components/SellRecovery";
 import { PriceHistorySheet, StockHistorySparkline } from "./components/PriceHistory";
 import { ListingEditor, type ListingEditorPatch } from "./components/ListingEditor";
 
@@ -1027,6 +1037,7 @@ export default function Home() {
   const [listPriceOverride, setListPriceOverride] = useState("");
   const [loggedCheckedComps, setLoggedCheckedComps] = useState<CheckedCompEntry[]>([]);
   const [checkedCompLogOpen, setCheckedCompLogOpen] = useState(false);
+  const [checkedCompPanelOpen, setCheckedCompPanelOpen] = useState(false);
   const [checkedCompLogPrice, setCheckedCompLogPrice] = useState("");
   const [checkedCompLogSoldDate, setCheckedCompLogSoldDate] = useState(todayInputValue());
   const [checkedCompLogPlatform, setCheckedCompLogPlatform] = useState<CheckedCompPlatform>("ebay-uk");
@@ -1164,6 +1175,7 @@ export default function Home() {
   const [scanEventId, setScanEventId] = useState<string | null>(null);
   const [scanCorrectionKey, setScanCorrectionKey] = useState<string | null>(null);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [scanBlock, setScanBlock] = useState<ScanBlock | null>(null);
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>("needs-action");
   const [inventorySort, setInventorySort] = useState<InventorySort>("newest");
@@ -1985,7 +1997,13 @@ export default function Home() {
     scanMode === "ambiguous"
       ? scanAlternatives.map((card) => catalogDisplayImage(card)).find(Boolean) ?? selectedCardImage
       : selectedCardImage;
-  const scanCompReady = Boolean(scanIdentity && actionableHeadline && scanMode === "identity");
+  const scanCompReady = Boolean(
+    scanIdentity &&
+      actionableHeadline &&
+      scanMode === "identity" &&
+      (headline?.sampleSize ?? 0) > 0 &&
+      (headline?.medianPence ?? 0) > 0,
+  );
   const askEvidence = comp?.askEvidence ?? null;
   const spotlightImage = selectedCardImage;
   const marketBaseline =
@@ -3428,9 +3446,11 @@ export default function Home() {
     if (!navigator.mediaDevices?.getUserMedia) {
       setScanCameraAvailable(false);
       updateScanMode("camera");
+      setScanBlock({ kind: "camera", cause: "missing" });
       setScanMessage("Camera is unavailable here. Choose a photo instead.");
       return;
     }
+    setScanBlock(null);
     stopScanCamera();
     updateScanMode("starting");
     setScanMessage("Opening camera…");
@@ -3463,9 +3483,11 @@ export default function Home() {
       }
     } catch (err) {
       setScanCameraAvailable(false);
-      if (scanModeRef.current === "starting") {
+      if (scanModeRef.current === "starting" || scanModeRef.current === "camera") {
+        const timedOut = err instanceof Error && err.message === "timeout";
         updateScanMode("camera");
-        setScanMessage(err instanceof Error && err.message === "timeout"
+        setScanBlock({ kind: "camera", cause: timedOut ? "timeout" : "blocked" });
+        setScanMessage(timedOut
           ? "Camera did not open after 8 seconds. Upload photo instead."
           : "Camera permission was blocked. Upload photo instead.");
       }
@@ -3487,6 +3509,7 @@ export default function Home() {
     setScanEventId(null);
     setScanCorrectionKey(null);
     setScanMessage(null);
+    setScanBlock(null);
     setScanPhotoPayload(null);
     if (!options.keepPreview) setScanPhotoPreview(null);
   }
@@ -3565,6 +3588,7 @@ export default function Home() {
     const controller = new AbortController();
     scanRequestRef.current = controller;
     updateScanMode("reading");
+    setScanBlock(null);
     setBusy("scan");
     setError(null);
     setScanMessage("Reading card…");
@@ -3582,7 +3606,9 @@ export default function Home() {
       if (!navigator.onLine) {
         await queueScanIntent(scanBody, mutationId, prepared.transmission.width, prepared.transmission.height);
         updateScanMode("manual");
+        setScanBlock({ kind: "queued" });
         setScanMessage("Scan saved on this device. It will be read when signal returns; Quick Fill still works now.");
+        setError(null);
         return;
       }
       let responseReceived = false;
@@ -3604,7 +3630,10 @@ export default function Home() {
       });
       const payload = await readJson(res);
       if (!res.ok) {
-        if (res.status === 429) {
+        const block = scanBlockFromStatus(res.status);
+        setScanBlock(block);
+        setError(null);
+        if (block.kind === "budget") {
           updateScanMode("camera");
           setScanMessage("Scan budget paused until the daily reset around 8am UK. Typed comp still works.");
           return;
@@ -3612,7 +3641,6 @@ export default function Home() {
         const copy = scanErrorCopy(res.status);
         if (copy.manual) updateScanMode("manual");
         setScanMessage(copy.message);
-        setError(copy.message);
         return;
       }
       const identity = payload.identity as ScanIdentity | undefined;
@@ -3624,14 +3652,16 @@ export default function Home() {
       const message = err instanceof Error ? err.message : "";
       if (message.startsWith("Scan queued")) {
         updateScanMode("manual");
+        setScanBlock({ kind: "queued" });
         setScanMessage(message);
         setError(null);
         return;
       }
       const copy = scanErrorCopy(0);
       updateScanMode("manual");
+      setScanBlock({ kind: "unreadable", status: 0 });
       setScanMessage(copy.message);
-      setError(copy.message);
+      setError(null);
     } finally {
       if (scanRequestRef.current === controller) {
         scanRequestRef.current = null;
@@ -3699,6 +3729,7 @@ export default function Home() {
   }
 
   function applyScanMapping(mapping: ScanIdentityMapping) {
+    setScanBlock(null);
     setScanMapping(mapping);
     if (mapping.status === "manual") {
       if (mapping.quickFill) setQuickIntake(mapping.quickFill);
@@ -3760,6 +3791,7 @@ export default function Home() {
   }
 
   function applyScannedCandidate(card: CatalogCard, nextGrade = grade) {
+    setScanBlock(null);
     const lookup: LookupInput = {
       name: card.name,
       setName: card.setName,
@@ -8191,10 +8223,93 @@ export default function Home() {
     );
   }
 
+  const recoveryFacts = {
+    lookupFailed: Boolean(compLookupError),
+    compBusy: busy === "lookup",
+    compPhase: compProgressPhase,
+    sampleSize: headline?.sampleSize ?? null,
+    medianPence: headline?.medianPence ?? null,
+    ambiguous: Boolean(comp?.ambiguous),
+    cardLabel: [name.trim(), setNameValue.trim(), number.trim() ? `#${number.trim()}` : ""].filter(Boolean).join(" ") || null,
+  };
+  const compMissCard = resolveCompMissRecovery({ ...recoveryFacts, surface: "page" });
+  const scanSheetRecovery = scanOpen
+    ? resolveScanSheetRecovery({
+      ...recoveryFacts,
+      surface: "sheet",
+      mode: scanMode,
+      block: scanBlock,
+      detail: scanMessage,
+      identityReady: Boolean(scanIdentity),
+      actionable: scanCompReady,
+    })
+    : null;
+  const scanRecoveryNote = scanSheetRecovery?.kind === "scan-unreadable"
+    ? scanPrefillNote(scanMapping?.status === "manual" ? scanMapping.quickFill : null)
+    : null;
+  const showPageRecovery = !scanOpen && compMissCard;
+  const pageRecoveryRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!showPageRecovery) return;
+    pageRecoveryRef.current?.scrollIntoView({ block: "start" });
+  }, [showPageRecovery, compMissCard?.kind]);
+
+  function runRecoveryAction(card: RecoveryCard, id: RecoveryActionId) {
+    if (id === "retake") {
+      setScanBlock(null);
+      scanNext();
+      return;
+    }
+    if (id === "upload") {
+      scanFileInputRef.current?.click();
+      return;
+    }
+    if (id === "type-card") {
+      if (card.kind === "comp-failed" || card.kind === "comp-empty") {
+        if (scanOpen) closeScanCamera();
+        clearCurrentComp("Type the card to price.");
+        return;
+      }
+      closeScanCamera();
+      setView("acquire");
+      window.setTimeout(() => {
+        quickIntakeRef.current?.scrollIntoView({ block: "center" });
+        quickIntakeRef.current?.focus();
+      }, 60);
+      return;
+    }
+    if (id === "retry-price") {
+      if (lastCompLookupRef.current) retryCompLookup();
+      else runSmartComp();
+      return;
+    }
+    if (id === "uk-solds") {
+      if (scanOpen) closeScanCamera({ preserveResult: true });
+      setView("acquire");
+      setBuyResultSection("log");
+      setCheckedCompPanelOpen(true);
+      openManualCompLink("EBAY_UK_SOLD");
+      window.setTimeout(() => jumpToCheckedComp(), 120);
+      return;
+    }
+    setView("acquire");
+    setBuyResultSection("deal");
+    if (scanOpen) closeScanCamera({ preserveResult: true });
+    window.setTimeout(() => jumpToCostEntry(), 80);
+  }
+
+  const pageRecoveryCard = showPageRecovery && compMissCard ? (
+    <SellRecoveryCard ref={pageRecoveryRef} card={compMissCard} busy={busy === "lookup"} onAction={runRecoveryAction} />
+  ) : null;
+
   const compLookupAlert = compLookupError ? (
-    <div className="load-banner comp-lookup-alert" role="alert" ref={compLookupAlertRef}>
-      <p>{compLookupError}</p>
-      <LoadRetryButton busy={busy === "lookup"} onRetry={retryCompLookup} />
+    <div className="comp-lookup-recovery" ref={compLookupAlertRef}>
+      <div className="load-banner comp-lookup-alert" role="alert">
+        <p>{compLookupError}</p>
+        <LoadRetryButton busy={busy === "lookup"} onRetry={retryCompLookup} />
+      </div>
+      {compMissCard?.kind === "comp-failed" ? pageRecoveryCard : null}
     </div>
   ) : null;
 
@@ -8559,6 +8674,7 @@ export default function Home() {
                 )}
               </div>
               {compLookupAlert}
+              {showPageRecovery && compMissCard?.kind === "comp-empty" ? pageRecoveryCard : null}
               {cardSuggestionsOpen && quickIntake.trim() && (cardSuggestions.length > 0 || typedFallbackSuggestion) && (
                 <div
                   id="smart-card-suggestions"
@@ -9097,7 +9213,11 @@ export default function Home() {
             </details>
             {!headline && hasBuyContext && renderManualCompLinks("compact")}
             {!headline && hasBuyContext && (
-              <details className="panel optional-tool-panel manual-check-panel">
+              <details
+              className="panel optional-tool-panel manual-check-panel"
+              open={checkedCompPanelOpen}
+              onToggle={(event) => setCheckedCompPanelOpen(event.currentTarget.open)}
+            >
                 <summary>
                   <span>Optional</span>
                   <strong>Enter checked price</strong>
@@ -9170,13 +9290,15 @@ export default function Home() {
           </form>
           )}
           {scanOpen && (
-            <section className={`scan-sheet ${scanMode}`} role="dialog" aria-modal="true" aria-label="Scan a card">
+            <section className={`scan-sheet ${scanMode}${scanSheetRecovery ? " recovering" : ""}`} role="dialog" aria-modal="true" aria-label="Scan a card">
               <div className="sheet-drag-handle" aria-hidden="true" />
               <div className="scan-sheet-heading">
                 <div>
                   <span>Camera comp</span>
                   <strong>
-                    {scanMode === "reading"
+                    {scanSheetRecovery
+                      ? "Choose a way forward"
+                      : scanMode === "reading"
                       ? "Reading card…"
                       : scanMode === "ambiguous"
                         ? "Choose exact card"
@@ -9188,7 +9310,11 @@ export default function Home() {
                               ? "Comp ready"
                               : "Scan one card"}
                   </strong>
-                  <small>{scanMessage ?? "Use the rear camera and fill the frame with the printed text."}</small>
+                  <small>
+                    {scanSheetRecovery
+                      ? "Pick one of these to keep going."
+                      : scanMessage ?? "Use the rear camera and fill the frame with the printed text."}
+                  </small>
                 </div>
                 <button className="ghost-button" type="button" onClick={() => closeScanCamera()}>
                   Close
@@ -9301,7 +9427,16 @@ export default function Home() {
                 </div>
               )}
 
-              {scanMode === "manual" && (
+              {scanSheetRecovery && (
+                <SellRecoveryCard
+                  card={scanSheetRecovery}
+                  note={scanRecoveryNote}
+                  busy={busy === "lookup" || busy === "scan"}
+                  onAction={runRecoveryAction}
+                />
+              )}
+
+              {scanMode === "manual" && !scanSheetRecovery && (
                 <div className="scan-manual-card">
                   <strong>{scanMessage ?? "Couldn't read it — retake or type."}</strong>
                   {scanMapping?.status === "manual" && scanMapping.quickFill && (
@@ -9386,6 +9521,7 @@ export default function Home() {
               style={selectedCardImage ? ({ "--ambient-card-art": `url("${selectedCardImage}")` } as CSSProperties) : undefined}
             >
               {compLookupAlert}
+              {showPageRecovery && compMissCard?.kind === "comp-empty" ? pageRecoveryCard : null}
               {busy === "lookup" && !compLookupError && (
                 <div className="comp-progress-with-cancel">
                   <ProgressSourceRail sources={compProgressSources} phase={compProgressPhase} />
