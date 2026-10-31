@@ -158,6 +158,7 @@ export function InventoryTab({
   const createTitleId = useId();
   const editPriceRef = useRef<HTMLInputElement>(null);
   const createPriceRef = useRef<HTMLInputElement>(null);
+  const filterTabsRef = useRef<HTMLDivElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkLocation, setBulkLocation] = useState("To list");
   const selectedItems = useMemo(
@@ -166,6 +167,19 @@ export function InventoryTab({
   );
   const allVisibleSelected = visibleInventory.length > 0 && selectedItems.length === visibleInventory.length;
   const holdings = useMemo(() => groupInventoryHoldings(visibleInventory), [visibleInventory]);
+
+  useEffect(() => {
+    const scroller = filterTabsRef.current;
+    const selected = scroller?.querySelector<HTMLButtonElement>("button.selected");
+    if (!scroller || !selected) return;
+    // Keep the pressed binder filter inside the row. scrollIntoView would also
+    // move the page, so only the horizontal scroller moves.
+    const pad = 12;
+    const start = selected.offsetLeft - scroller.scrollLeft;
+    const end = start + selected.offsetWidth;
+    if (start < pad) scroller.scrollLeft = Math.max(0, scroller.scrollLeft - (pad - start));
+    else if (end > scroller.clientWidth - pad) scroller.scrollLeft += end - (scroller.clientWidth - pad);
+  }, [inventoryFilter]);
 
   function toggleSelected(id: string) {
     setSelectedIds((current) => {
@@ -243,7 +257,7 @@ export function InventoryTab({
           </button>
           </div>
         </div>
-        <div className="inventory-filter-tabs" role="group" aria-label="Inventory filters">
+        <div className="inventory-filter-tabs" ref={filterTabsRef} role="group" aria-label="Inventory filters">
         {inventoryFilters.map((filter) => (
           <button
             key={filter.value}
