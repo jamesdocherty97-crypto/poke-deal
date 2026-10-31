@@ -139,6 +139,7 @@ import {
 } from "@/lib/dealer/saleFees";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayActionTarget } from "@/lib/dealer/today";
+import { todayColdStartRecovery } from "@/lib/dealer/todayRecovery";
 import { addRequestedPrintHints, detectCardPrintIdentity, textMentionsFirstEdition } from "@/lib/comps/variants";
 import { readCompProgress } from "@/lib/comps/clientProgress";
 import type { CompProgressEvent, CompSourceEvent } from "@/lib/comps/progressContract";
@@ -981,12 +982,9 @@ type CoreSourceState = { inventory: boolean; listings: boolean; dashboard: boole
 const CORE_LOAD_ALERT = "Couldn't load your stock and sales. Check signal and try again.";
 const COMP_LOOKUP_ALERT = "Couldn't check this price. Check signal and try again.";
 
-function coreScreenBlocked(screen: "stock" | "list" | "today", failed: CoreSourceState, known: CoreSourceState): boolean {
+function coreScreenBlocked(screen: "stock" | "list", failed: CoreSourceState, known: CoreSourceState): boolean {
   if (screen === "stock") return failed.inventory && !known.inventory;
-  if (screen === "list") return failed.listings && !known.listings;
-  return (failed.inventory && !known.inventory)
-    || (failed.listings && !known.listings)
-    || (failed.dashboard && !known.dashboard);
+  return failed.listings && !known.listings;
 }
 
 function coreLoadBannerText(screen: "stock" | "list", failed: CoreSourceState): string | null {
@@ -2530,6 +2528,18 @@ export default function Home() {
       draftListingCount,
     ],
   );
+  const todayRecovery = useMemo(() => todayColdStartRecovery({
+    inventory: { known: coreKnown.inventory, failed: coreFailures.inventory },
+    listings: { known: coreKnown.listings, failed: coreFailures.listings },
+    dashboard: { known: coreKnown.dashboard, failed: coreFailures.dashboard },
+    stockRowCount: inventory.length,
+    soldCount: dashboard?.metrics.soldCount ?? 0,
+  }), [
+    coreFailures,
+    coreKnown,
+    dashboard?.metrics.soldCount,
+    inventory.length,
+  ]);
   const launchReadiness = useMemo(
     () =>
       systemStatus
@@ -8380,7 +8390,9 @@ export default function Home() {
       {view === "today" && (
         <TodayTab
           loading={!inventoryLoaded || !listingsLoaded || !dashboardLoaded}
-          loadError={coreScreenBlocked("today", coreFailures, coreKnown) ? CORE_LOAD_ALERT : null}
+          loadError={todayRecovery.blockedMessage}
+          loadBanner={todayRecovery.banner}
+          recovery={todayRecovery}
           retrying={refreshing}
           onRetry={() => { void refreshAll({ user: true }); }}
           launchProgress={launchProgress}
