@@ -138,8 +138,12 @@ test("Today explains a failed dashboard load instead of an empty business", asyn
   await page.goto("/?view=today");
 
   const loadAlert = page.locator(".today-workspace").getByRole("alert");
-  await expect(loadAlert).toContainText("Couldn't load your stock and sales. Check signal and try again.");
+  await expect(loadAlert).toContainText("Couldn't load sales. Stock on this device is empty, so this is not a new business.");
   await expect(page.getByRole("heading", { name: "Load your existing singles", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Sales didn't load", exact: true })).toBeVisible();
+  await expect(page.locator(".today-command-progress")).toContainText("Sales have to load before this quest can move.");
+  await expect(page.locator(".dealer-pulse-footer")).toContainText("Not loaded");
+  await expect(page.locator(".dealer-pulse-footer")).not.toContainText("£0.00");
 
   dashboardFails = false;
   await loadAlert.getByRole("button", { name: "Retry", exact: true }).click();
@@ -175,7 +179,8 @@ test("Today keeps the load alert through two failed inventory retries", async ({
 
   const loadAlert = page.locator(".today-workspace").getByRole("alert");
   const emptyBusiness = page.getByRole("heading", { name: "Load your existing singles", exact: true });
-  await expect(loadAlert).toContainText("Couldn't load your stock and sales. Check signal and try again.");
+  await expect(loadAlert).toContainText("Couldn't load stock. No sales are on the loaded ledger, so this is not a new business.");
+  await expect(page.getByRole("heading", { name: "Stock didn't load", exact: true })).toBeVisible();
   await expect(emptyBusiness).toHaveCount(0);
 
   async function expectAlertAfterFailedRetry() {
@@ -190,7 +195,8 @@ test("Today keeps the load alert through two failed inventory retries", async ({
     await loadAlert.getByRole("button", { name: "Retry", exact: true }).click();
     await inventory;
     await dashboard;
-    await expect(loadAlert).toContainText("Couldn't load your stock and sales. Check signal and try again.");
+    await expect(loadAlert).toContainText("Couldn't load stock. No sales are on the loaded ledger, so this is not a new business.");
+    await expect(page.getByRole("heading", { name: "Stock didn't load", exact: true })).toBeVisible();
     await expect(emptyBusiness).toHaveCount(0);
   }
 
@@ -239,6 +245,105 @@ test("List 500 on first load shows the alert with Retry", async ({ context, page
   const alert = page.locator(".listings-workspace [role=alert]");
   await expect(alert.getByRole("button", { name: "Retry", exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(alert).toContainText("Couldn't load your stock and sales");
+});
+
+test("Today keeps a loaded stock mission when sales fail on a cold start", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  ledger.addPreparedDraft();
+  let dashboardFails = true;
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await context.route("**/api/dashboard", (route) => {
+    if (!dashboardFails) return route.fallback();
+    return route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "database unavailable" }),
+    });
+  });
+  await page.goto("/?view=today");
+  const workspace = page.locator(".today-workspace");
+  const banner = workspace.locator(".load-banner");
+  await expect(banner).toContainText("Couldn't load sales. Stock already loaded stays on screen.", { timeout: 30_000 });
+  await expect(workspace.getByRole("heading", { name: "Publish 1 prepared draft", exact: true })).toBeVisible();
+  await expect(workspace.locator(".today-mission-card")).toContainText("Gengar");
+  await expect(workspace.getByRole("heading", { name: "Load your existing singles", exact: true })).toHaveCount(0);
+  await expect(workspace.locator(".today-command-progress")).toContainText("Paused");
+  await expect(workspace.locator(".today-command-progress")).not.toContainText("0/4");
+  await expect(workspace.locator(".dealer-pulse-status button").filter({ hasText: "sold" })).toContainText("—");
+  await expect(workspace.locator(".dealer-pulse-footer")).toContainText("Not loaded");
+  await expect(workspace.locator(".today-action-list")).toHaveCount(0);
+  const retry = banner.getByRole("button", { name: "Retry", exact: true });
+  const retryBox = await retry.boundingBox();
+  expect(retryBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(retryBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+  const missionAction = workspace.getByRole("button", { name: "Open listing desk", exact: true });
+  await missionAction.scrollIntoViewIfNeeded();
+  const actionBox = await missionAction.boundingBox();
+  const viewport = page.viewportSize();
+  expect(actionBox).not.toBeNull();
+  expect(actionBox!.y).toBeGreaterThanOrEqual(0);
+  expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual((viewport?.height ?? 0) - 72);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.setViewportSize({ width: 320, height: 720 });
+  const overflow320 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow320).toBeLessThanOrEqual(1);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  dashboardFails = false;
+  await retry.click();
+  await expect(workspace.getByRole("alert")).toHaveCount(0);
+  await expect(workspace.getByRole("heading", { name: "Publish 1 prepared draft", exact: true })).toBeVisible();
+  await expect(workspace.locator(".dealer-pulse-status button").filter({ hasText: "sold" })).toContainText("0");
+  await expect(workspace.locator(".today-command-progress")).not.toContainText("Paused");
+});
+
+test("Today reviews loaded sales when stock fails on a cold start", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  ledger.addLegacySale();
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await failCoreGets(context, ["/api/inventory"]);
+  await page.goto("/?view=today");
+  const workspace = page.locator(".today-workspace");
+  await expect(workspace.locator(".load-banner")).toContainText("Couldn't load stock. Sales already loaded are still shown.", { timeout: 30_000 });
+  await expect(workspace.getByRole("heading", { name: "Confirm costs on 1 sale", exact: true })).toBeVisible();
+  await expect(workspace.getByRole("heading", { name: "Load your existing singles", exact: true })).toHaveCount(0);
+  await expect(workspace.locator(".today-command-progress")).toContainText("Stock has to load before this quest can move.");
+  await expect(workspace.locator(".dealer-pulse-status button").filter({ hasText: "live stock" })).toContainText("—");
+  await expect(workspace.locator(".dealer-pulse-status button").filter({ hasText: "sold" })).toContainText("1");
+});
+
+test("Today blocks the mission when stock and sales both fail on a cold start", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  ledger.addPreparedDraft();
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await failCoreGets(context, ["/api/inventory", "/api/dashboard"]);
+  await page.goto("/?view=today");
+  const workspace = page.locator(".today-workspace");
+  const alert = workspace.getByRole("alert");
+  await expect(alert).toContainText("Couldn't load your stock and sales. Check signal and try again.", { timeout: 30_000 });
+  await expect(workspace.getByRole("heading", { name: "Publish 1 prepared draft", exact: true })).toHaveCount(0);
+  await expect(workspace.getByRole("heading", { name: "Load your existing singles", exact: true })).toHaveCount(0);
+  await expect(workspace.locator(".load-banner")).toHaveCount(0);
+  await expect(alert.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+});
+
+test("Today names a listings miss and keeps the stock mission", async ({ context, page }) => {
+  const ledger = new ReliabilityLedger();
+  ledger.addPreparedDraft();
+  await abortNonLoopback(context);
+  await mockReliabilityApis(context, ledger);
+  await failCoreGets(context, ["/api/listings"]);
+  await page.goto("/?view=today");
+  const workspace = page.locator(".today-workspace");
+  await expect(workspace.locator(".load-banner")).toContainText("Couldn't load listings. Your stock and sales are still shown.", { timeout: 30_000 });
+  await expect(workspace.getByRole("heading", { name: "Publish 1 prepared draft", exact: true })).toBeVisible();
+  await expect(workspace.locator(".today-command-progress")).not.toContainText("Paused");
+  await expect(workspace.locator(".dealer-pulse-status button").filter({ hasText: "draft" })).toContainText("1");
+  await expect(workspace.getByRole("heading", { name: "Load your existing singles", exact: true })).toHaveCount(0);
 });
 
 test("partial inventory success keeps the stock row when listings fail", async ({ context, page }) => {
