@@ -339,6 +339,11 @@ test("bottom bar labels stay whole at 390 and 430", async ({ browser, baseURL })
       await expect(deal).toContainText("enter what you paid, then confirm");
       const dealClipped = await clippedLabels(deal);
       expect(dealClipped.filter((row) => row.clipped)).toEqual([]);
+      await expect(page.locator(".buy-result-action-row .verdict-buy-action")).toBeHidden();
+      await expect(page.locator(".buy-result-action-row .verdict-pass-action")).toBeHidden();
+      await expect(page.locator(".comp-identity-art.blank")).toContainText("No photo");
+      const navBg = await page.locator(".primary-nav.bottom-nav").evaluate((element) => getComputedStyle(element).backgroundColor);
+      expect(navBg).toBe("rgb(11, 14, 24)");
     } finally {
       await context.close();
     }
@@ -574,6 +579,17 @@ test("create listing and edit stock buttons line up with the fields over a dimme
       const cert = editor.getByLabel("Cert", { exact: true });
       const save = editor.getByRole("button", { name: "Save stock", exact: true });
       edgesLineUp(await box(cert), await box(save));
+      await expect(editor).toContainText("cost basis, not the card comp or sell price.");
+      await expect(editor).not.toContainText("basis\u2014not");
+      const header = editor.locator(".panel-heading");
+      const paid = editor.getByRole("textbox", { name: /What I paid/ });
+      const headerBox = await box(header);
+      const paidBox = await box(paid);
+      expect(paidBox.top).toBeGreaterThanOrEqual(headerBox.top + headerBox.height - 1);
+      const scrollMargin = await paid.evaluate((element) => Number.parseFloat(getComputedStyle(element).scrollMarginTop));
+      expect(scrollMargin).toBeGreaterThanOrEqual(headerBox.height);
+      const headerBg = await header.evaluate((element) => getComputedStyle(element).backgroundColor);
+      expect(headerBg).toBe("rgb(14, 18, 32)");
       const editorShadow = await editor.evaluate((element) => getComputedStyle(element).boxShadow);
       expect(editorShadow).toContain("rgba(5, 8, 15, 0.72)");
     } finally {

@@ -43,7 +43,7 @@ export function CardImage({
   const index = failed.key === sourceKey ? failed.index : 0;
   const activeSrc = sources[index];
   if (!activeSrc) {
-    const photoSlot = fallbackClassName.split(/\s+/).includes("card-thumb");
+    const photoSlot = fallbackClassName.split(/\s+/).some((token) => token === "card-thumb" || token === "comp-identity-art");
     if (!photoSlot) return <span className={fallbackClassName} aria-hidden="true" />;
     // The missing image is not in the tree. If alt already says there is no
     // photo, keep the visible label decorative and use that alt once.

@@ -1091,7 +1091,7 @@ textarea:focus-visible {
 }
 .comp-identity-strip .sleeve-tab { align-self:flex-start; padding:5px 7px; border:1px solid var(--color-warning-border); border-radius:3px; color:var(--brand-yellow); font-size:.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 .comp-identity-art { width:100%; max-width:240px; height:auto; max-height:none; aspect-ratio:var(--card-art-ratio); align-self:center; border:2px solid var(--color-border-strong); border-radius:9px; object-fit:contain; object-position:center; background:var(--color-surface-sunken); box-shadow:0 22px 35px rgba(6,8,18,.4); }
-.comp-identity-art.blank { display:block; background:var(--color-surface-2); border-style:dashed; }
+.comp-identity-art.blank { display:grid; place-items:center; background:var(--color-surface-2); border-style:dashed; }
 .comp-identity-strip > div { display: grid; gap: 4px; }
 .comp-identity-strip > div > span { color:var(--brand-yellow); font-size:.7rem; font-weight:800; text-transform:uppercase; }
 .comp-identity-strip > div > strong { color:var(--color-text-primary); font-size:1.3rem; }

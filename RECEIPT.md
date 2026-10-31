@@ -70,6 +70,13 @@ Argon has **not** been re-scored on this tip. These shots are for that re-score.
 
 Before shots still show the 0 of 6 causes: the 3-up "1 HOLDING / 1 ACTIVE CARD / 1 IN VIEW", "SUGGESTED MAXIMUM BUY £23.00" with green Add to stock, a half-width Next card, "Add cost" as both the bar title and the button.
 
+## Prism rescore on 55ed617: 4 of 6
+
+Argon scored this branch's first tip `55ed617` at 4 of 6. B1 to B4 passed. B5 and B6 were still FIX. The follow-up on this same branch changes only those two:
+
+- **B6.** The Edit stock header is an opaque bar (`#0e1220`, sticky `top: 0`, above the scrolling fields). The focused price uses `scroll-margin-top: 104px`, which is at least the header height, so the field sits below the header instead of under it. The helper now reads "cost basis, not the card comp or sell price."
+- **B5.** While the deal bar is on screen, the in-page Add to stock and Next card controls are not rendered into the gap under that bar. The page bottom padding clears the bar, the nav and a gap. The phone nav is a solid full-width bar (`#0b0e18`, no blur, no glass layer) that meets the deal bar, so page text does not show through it. The dashed comp art slot reads "No photo".
+
 ## Not scored ready
 
 Do not merge and do not deploy from this receipt. CI on the PR head still has to go green, and Prism still has to re-score B1 to B6 on this tip. Scored ready needs CI green, A1 to A9 still true, and Argon at 8 or more on all six screens. Until that re-score, this stays open for review.

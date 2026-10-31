@@ -318,8 +318,8 @@ export function InventoryTab({
 
       </>}
       {!loading && editingItemId && (
-        <form className="sell-sheet" role="dialog" aria-modal="true" aria-labelledby={editTitleId} onSubmit={saveInventoryItem}>
-          <SheetFocus trigger={sheetTrigger} onClose={closeInventoryEditor} focusRef={editPriceRef} />
+        <form className="sell-sheet edit-stock-sheet" role="dialog" aria-modal="true" aria-labelledby={editTitleId} onSubmit={saveInventoryItem}>
+          <SheetFocus trigger={sheetTrigger} onClose={closeInventoryEditor} focusRef={editPriceRef} alignFocused />
           <div className="panel-heading">
             <h2 id={editTitleId} tabIndex={-1}>Edit stock</h2>
             <button className="ghost-button" type="button" onClick={closeInventoryEditor}>Close</button>
@@ -328,7 +328,7 @@ export function InventoryTab({
             <label>
               What I paid
               <MoneyInput ref={editPriceRef} value={itemCost} onChange={setItemCost} disabled={busy === `edit-${editingItemId}`} />
-              <small>Your purchase cost or cost basis—not the card comp or sell price.</small>
+              <small>Your purchase cost or cost basis, not the card comp or sell price.</small>
             </label>
             <label>
               Qty
@@ -464,16 +464,20 @@ function SheetFocus({
   trigger,
   onClose,
   focusRef,
+  alignFocused = false,
 }: {
   trigger: HTMLElement | null;
   onClose: () => void;
   focusRef: { readonly current: HTMLElement | null };
+  alignFocused?: boolean;
 }) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      focusRef.current?.focus({ preventScroll: true });
+      const node = focusRef.current;
+      node?.focus({ preventScroll: true });
+      if (alignFocused) node?.scrollIntoView({ block: "nearest", inline: "nearest" });
     });
     function onKeyDown(event: globalThis.KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -486,7 +490,7 @@ function SheetFocus({
       document.removeEventListener("keydown", onKeyDown);
       if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     };
-  }, [focusRef, trigger]);
+  }, [alignFocused, focusRef, trigger]);
   return null;
 }
 

@@ -106,6 +106,39 @@
     padding-left: 8px;
   }
 
+  /* The deal bar already carries Next and Add cost. Keep the in-page copies
+     out of the gap between that bar and the nav, and clear the page bottom
+     by the bar, the nav and a gap. */
+  body:has(.mobile-buy-action) .app-shell {
+    padding-bottom: calc(200px + env(safe-area-inset-bottom));
+  }
+
+  body:has(.mobile-buy-action) .buy-result-action-row > .verdict-buy-action,
+  body:has(.mobile-buy-action) .buy-result-action-row > .verdict-pass-action {
+    display: none;
+  }
+
+  .primary-nav.bottom-nav {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    min-height: calc(90px + env(safe-area-inset-bottom));
+    align-content: center;
+    border-radius: 20px 20px 0 0;
+    transform: none;
+    padding: 8px 8px max(10px, env(safe-area-inset-bottom));
+    background-color: var(--color-canvas-raised);
+    background-image: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .primary-nav.bottom-nav::before {
+    opacity: 0;
+  }
+
   .inventory-workspace .vault-summary span {
     padding: 8px 9px;
   }
@@ -146,4 +179,35 @@ body:has(.comp-lookup-alert) .mobile-buy-action {
   .listing-editor-money input {
     font-size: 30px !important;
   }
+}
+
+/*
+ * Edit stock: the sticky title must be a solid bar, and the focused price
+ * has to land below it. A negative sticky offset left the field under a
+ * translucent header.
+ */
+.edit-stock-sheet {
+  padding-top: 0;
+}
+
+.edit-stock-sheet > .panel-heading {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  margin: 0 calc(-1 * var(--space-4)) var(--space-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background-color: #0e1220;
+  background-image: none;
+  box-shadow: 0 2px 0 #0e1220;
+  padding: var(--space-4);
+}
+
+[data-theme="light"] .edit-stock-sheet > .panel-heading {
+  background-color: #ffffff;
+  box-shadow: 0 2px 0 #ffffff;
+}
+
+.edit-stock-sheet :is(input, select, textarea) {
+  scroll-margin-top: 104px;
 }
