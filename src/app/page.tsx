@@ -1090,6 +1090,9 @@ export default function Home() {
   const [itemStatus, setItemStatus] = useState<ItemStatus>("IN_STOCK");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const saleSubmittingRef = useRef(false);
+  // React state still shows the previous busy value for a second click in the
+  // same turn. This latch closes that window for purchase commits.
+  const intakeSubmittingRef = useRef(false);
   const [salePrice, setSalePrice] = useState("");
   const [fees, setFees] = useState("");
   const [postage, setPostage] = useState("1.75");
@@ -4788,7 +4791,10 @@ export default function Home() {
 
   async function acquire(event?: FormEvent) {
     event?.preventDefault();
-    if (busy === "acquire") return;
+    if (intakeSubmittingRef.current) return;
+    intakeSubmittingRef.current = true;
+    try {
+    if (busy === "acquire" || busy === "manual-stock") return;
     const intakeQuantity = parseIntakeQuantity(quantity);
     if (!intakeQuantity) {
       setError("Quantity must be a whole number above 0.");
@@ -4950,6 +4956,10 @@ export default function Home() {
     } finally {
       setBusy(null);
     }
+    } finally {
+      // Validation exits release the latch so the typed purchase can be corrected.
+      intakeSubmittingRef.current = false;
+    }
   }
 
   async function queueAcquireMutation(body: Record<string, unknown>, mutationId: string) {
@@ -5008,7 +5018,10 @@ export default function Home() {
   }
 
   async function stockWithoutComp() {
-    if (busy === "manual-stock") return;
+    if (intakeSubmittingRef.current) return;
+    intakeSubmittingRef.current = true;
+    try {
+    if (busy === "manual-stock" || busy === "acquire") return;
     const intakeQuantity = parseIntakeQuantity(quantity);
     if (!intakeQuantity) {
       setError("Quantity must be a whole number above 0.");
@@ -5180,6 +5193,9 @@ export default function Home() {
       }
     } finally {
       setBusy(null);
+    }
+    } finally {
+      intakeSubmittingRef.current = false;
     }
   }
 

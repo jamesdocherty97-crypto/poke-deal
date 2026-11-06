@@ -241,10 +241,82 @@ test("listing workspace shows live stock on arrival and keeps draft and sale act
   await expect(listingRow.getByRole("button", { name: "Record sale" })).toBeVisible();
 });
 
+test("double tap on the phone stock bar sends one purchase", async ({ context, page }) => {
+  const ledger = new FixtureDealerLedger();
+  let releaseAcquire = () => {};
+  const holdAcquire = new Promise<void>((resolve) => {
+    releaseAcquire = resolve;
+  });
+  await mockDealerApis(context, ledger, { holdAcquire });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?view=buy");
+  await page.getByLabel("Smart comp search").fill("Gengar Lost Origin TG06/TG30 RAW £25");
+  await page.getByRole("button", { name: "Comp current card" }).click();
+  await expect(page.getByText("Suggested maximum buy", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Just bought it" }).click();
+  const quickStock = page.locator(".quick-stock-card");
+  await expect(quickStock.getByLabel(/^What I paid/)).toHaveValue("25.00");
+
+  const bar = page.getByRole("region", { name: "Confirm current stock intake" });
+  const addToStock = bar.getByRole("button", { name: "Stock + draft", exact: true });
+  await addToStock.evaluate((button) => {
+    button.click();
+    button.click();
+  });
+
+  await expect.poll(() => ledger.acquirePosts, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(400);
+  expect(ledger.acquirePosts).toBe(1);
+  expect(new Set(ledger.acquireMutationIds).size).toBe(1);
+  await expect(bar.getByRole("button", { name: "Stocking…", exact: true })).toBeDisabled();
+  await expect(quickStock.getByLabel(/^What I paid/)).toHaveValue("25.00");
+  await page.screenshot({ path: "/opt/cursor/artifacts/phone-stock-bar-single-submit.png" });
+  releaseAcquire();
+  await expect.poll(() => ledger.acquired).toBe(true);
+  expect(ledger.acquirePosts).toBe(1);
+});
+
+test("double tap on Stock + eBay draft sends one manual purchase", async ({ context, page }) => {
+  const ledger = new FixtureDealerLedger();
+  let releaseManual = () => {};
+  const holdManualStock = new Promise<void>((resolve) => {
+    releaseManual = resolve;
+  });
+  await mockDealerApis(context, ledger, { holdManualStock });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?view=buy");
+  await page.getByLabel("Smart comp search").fill("Gengar Lost Origin TG06 £9");
+  await page.getByRole("button", { name: "Fill", exact: true }).last().click();
+  const panel = page.locator(".fallback-stock-panel");
+  await expect(panel.getByRole("heading", { name: "Add to stock" })).toBeVisible();
+  await panel.getByLabel(/^What I paid/).fill("9.00");
+  const bar = page.getByRole("region", { name: "Current buy action" });
+  const stock = bar.getByRole("button", { name: "Stock now", exact: true });
+  await stock.evaluate((button) => {
+    button.click();
+    button.click();
+  });
+
+  await expect.poll(() => ledger.manualStockPosts, { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(400);
+  expect(ledger.manualStockPosts).toBe(1);
+  expect(new Set(ledger.manualStockMutationIds).size).toBe(1);
+  await expect(bar.getByRole("button", { name: "Stocking…", exact: true })).toBeDisabled();
+  await expect(panel.getByLabel(/^What I paid/)).toHaveValue("9.00");
+  await page.screenshot({ path: "/opt/cursor/artifacts/phone-manual-stock-single-submit.png" });
+  releaseManual();
+  await expect.poll(() => ledger.acquired).toBe(true);
+  expect(ledger.manualStockPosts).toBe(1);
+});
+
 class FixtureDealerLedger {
   acquired = false;
   sold = false;
   listingState: "DRAFT" | "ACTIVE" | "SOLD" | null = null;
+  acquirePosts = 0;
+  acquireMutationIds: string[] = [];
+  manualStockPosts = 0;
+  manualStockMutationIds: string[] = [];
   acquireMutationId: string | undefined;
   saleMutationId: string | undefined;
   acquireBody: Record<string, unknown> | null = null;
@@ -467,7 +539,7 @@ function reconciled(all: ReturnType<typeof compResult>[]) {
   };
 }
 
-async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedger, options: { criticalReads?: Promise<void> } = {}) {
+async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedger, options: { criticalReads?: Promise<void>; holdAcquire?: Promise<void>; holdManualStock?: Promise<void> } = {}) {
   await context.route("https://vercel.com/api/blob/**", async (route) => {
     if (route.request().method() === "OPTIONS") {
       return route.fulfill({ status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "PUT, OPTIONS", "Access-Control-Allow-Headers": "*" } });
@@ -511,10 +583,13 @@ async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedg
     }
 
     if (url.pathname === "/api/inventory/acquire" && method === "POST") {
+      ledger.acquirePosts += 1;
       ledger.acquireMutationId = request.headers()["x-poke-deal-mutation-id"];
+      ledger.acquireMutationIds.push(ledger.acquireMutationId ?? "");
       ledger.acquireBody = request.postDataJSON() as Record<string, unknown>;
       ledger.acquired = true;
       if (ledger.acquireBody.createListing) ledger.listingState = "DRAFT";
+      if (options.holdAcquire) await options.holdAcquire;
       return json({
         item: ledger.inventoryItem(),
         suggestion: { pricePence: 4499, rationale: "fixture market price" },
@@ -566,7 +641,16 @@ async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedg
       }, 201);
     }
 
-    if (url.pathname === "/api/inventory") return json({ items: ledger.inventoryItem() ? [ledger.inventoryItem()] : [] });
+    if (url.pathname === "/api/inventory" && method === "POST") {
+      ledger.manualStockPosts += 1;
+      const mutationId = request.headers()["x-poke-deal-mutation-id"] ?? "";
+      ledger.manualStockMutationIds.push(mutationId);
+      if (options.holdManualStock) await options.holdManualStock;
+      ledger.acquired = true;
+      const item = ledger.inventoryItem();
+      return json({ item: item ? { ...item, id: `item-manual-${ledger.manualStockPosts}` } : null }, 201);
+    }
+    if (url.pathname === "/api/inventory" && method === "GET") return json({ items: ledger.inventoryItem() ? [ledger.inventoryItem()] : [] });
     if (url.pathname === "/api/listings") return json({ listings: ledger.listingState ? [ledger.listing(true)] : [] });
     if (url.pathname === "/api/dashboard") return json(ledger.dashboard());
     if (url.pathname === "/api/snapshots/portfolio") return json({ points: [], latest: null, previous: null, changePence: null, changePct: null });
