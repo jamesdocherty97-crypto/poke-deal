@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Browser, type BrowserContext, type Page } from "playwright/test";
+import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from "playwright/test";
 
 /**
  * 390px and iPhone SE (375×667) polish for the scan sheet, Today, and binder filters.
@@ -207,6 +207,54 @@ async function hitButton(page: Page, name: string) {
   return target;
 }
 
+async function suggestionCardGeometry(card: Locator) {
+  return card.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error("Suggestion card is not an element");
+    const name = element.querySelector(".suggestion-name");
+    const set = element.querySelector(".suggestion-set");
+    const actions = element.querySelector(".smart-suggestion-actions");
+    const buttons = [...element.querySelectorAll(".smart-suggestion-actions button")];
+    const labelOf = (node: Element) => node.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    const fill = buttons.find((button) => labelOf(button) === "Fill");
+    const comp = buttons.find((button) => labelOf(button) === "Comp");
+    if (!name || !set || !actions || !fill || !comp) {
+      throw new Error("Suggestion card is missing the name, set, or Fill/Comp row");
+    }
+    const box = (node: Element) => {
+      const rect = node.getBoundingClientRect();
+      return { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height };
+    };
+    const style = getComputedStyle(element);
+    const read = (value: string) => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const rect = element.getBoundingClientRect();
+    const paddingLeft = read(style.paddingLeft);
+    const paddingRight = read(style.paddingRight);
+    const borderLeft = read(style.borderLeftWidth);
+    const borderRight = read(style.borderRightWidth);
+    // The action row lives in the grid content box. The card's border box is
+    // wider by its horizontal padding and borders, so a full-width row looks
+    // short if those are left in the comparison.
+    const contentWidth = rect.width - borderLeft - borderRight - paddingLeft - paddingRight;
+    if (!(contentWidth > 0)) throw new Error(`Suggestion card content box is ${contentWidth}`);
+    return {
+      name: box(name),
+      set: box(set),
+      actions: box(actions),
+      fill: box(fill),
+      comp: box(comp),
+      contentWidth,
+      paddingLeft,
+      paddingRight,
+      borderLeft,
+      borderRight,
+      cardWidth: rect.width,
+    };
+  });
+}
+
 test("scan actions stay tappable and the shutter is on screen at 390 and iPhone SE", async ({ browser, baseURL }) => {
   const context = await phone(browser, baseURL!, 390, 844);
   await mockApis(context);
@@ -401,9 +449,23 @@ test("typed card suggestions keep the number and sit above the nav at 390 and iP
       await expect(list).toBeVisible();
       const number = list.locator(".suggestion-number strong").first();
       await expect(number).toHaveText("#TG06/TG30");
+      await expect(list.locator(".suggestion-set strong").first()).toContainText("Lost Origin Trainer Gallery");
+      // The set name is still in the card when it sits in the next column.
+      // It has to start at or below the name and share that left edge.
+      const placed = await suggestionCardGeometry(list.locator(".smart-card-suggestion-card").first());
+      expect(placed.set.top, `set top ${placed.set.top} name bottom ${placed.name.bottom}`).toBeGreaterThanOrEqual(placed.name.bottom - 1);
+      expect(Math.abs(placed.set.left - placed.name.left), `set left ${placed.set.left} name left ${placed.name.left}`).toBeLessThanOrEqual(2);
+      // Fill and Comp can both be 44px and hittable while stacked, or while
+      // the row only covers the text column. Their tops match, and the row
+      // covers the card content box with padding and border removed.
+      const actionTopDelta = Math.abs(placed.fill.top - placed.comp.top);
+      expect(actionTopDelta, `Fill top ${placed.fill.top} Comp top ${placed.comp.top}`).toBeLessThanOrEqual(2);
+      expect(
+        placed.actions.width,
+        `actions ${placed.actions.width} content ${placed.contentWidth} card ${placed.cardWidth} padding ${placed.paddingLeft}+${placed.paddingRight} border ${placed.borderLeft}+${placed.borderRight}`,
+      ).toBeGreaterThanOrEqual(placed.contentWidth - 2);
       const clipped = await number.evaluate((node) => node.scrollWidth > node.clientWidth + 1);
       expect(clipped).toBe(false);
-      await expect(list.locator(".suggestion-set strong").first()).toContainText("Lost Origin Trainer Gallery");
 
       const navTop = await page.locator(".primary-nav.bottom-nav").evaluate((element) => element.getBoundingClientRect().top);
       const inputBox = await page.locator("#quick-intake").boundingBox();
