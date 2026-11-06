@@ -1650,6 +1650,28 @@ export default function Home() {
     };
   }, [name, number, quickIntake, setNameValue, cardSuggestionsOpen]);
 
+  useEffect(() => {
+    if (!cardSuggestionsOpen) return;
+    const list = document.getElementById("smart-card-suggestions");
+    const input = document.getElementById("quick-intake");
+    const nav = document.querySelector<HTMLElement>(".primary-nav.bottom-nav");
+    if (!list || !input || !nav || window.innerWidth > 430) return;
+    if (getComputedStyle(nav).position !== "fixed") return;
+    const navTop = () => nav.getBoundingClientRect().top;
+    // On a short phone the list opens under the bottom nav. Keep the search
+    // field below the header, then stop the list at the nav so the next card peeks.
+    const room = navTop() - list.getBoundingClientRect().top;
+    if (room < 160 && input.getBoundingClientRect().top > 96) {
+      input.style.scrollMarginTop = "84px";
+      input.scrollIntoView({ block: "start", inline: "nearest" });
+    }
+    const fitted = navTop() - list.getBoundingClientRect().top - 12;
+    if (fitted >= 120) list.style.maxHeight = `${Math.floor(fitted)}px`;
+    return () => {
+      list.style.maxHeight = "";
+    };
+  }, [cardSuggestionsOpen, cardSuggestions]);
+
   const sellingItem = useMemo(
     () => inventory.find((item) => item.id === sellingId) ?? null,
     [inventory, sellingId],

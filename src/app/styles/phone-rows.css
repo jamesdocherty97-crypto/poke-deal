@@ -368,4 +368,74 @@ body:has(.comp-lookup-alert) .mobile-buy-action {
     display: none;
     height: 0;
   }
+
+  /*
+   * The typeahead is four fixed columns. At 390 the number column is 64px,
+   * so #TG06/TG30 ellipsizes, and Fill / Comp are 34px. Put the number on
+   * its own width and give the two actions a full-width 44px row.
+   */
+  .card-suggestion-row,
+  .smart-card-suggestion-card {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 2px;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .card-suggestion-row > .suggestion-card-art {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .card-suggestion-row .suggestion-name {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .card-suggestion-row .suggestion-set {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .card-suggestion-row .suggestion-number {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+    justify-items: end;
+  }
+
+  .card-suggestion-row .suggestion-number strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+
+  .smart-card-suggestion-card .suggestion-set small {
+    display: none;
+  }
+
+  .smart-card-suggestion-card .smart-suggestion-actions {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 6px;
+  }
+
+  .smart-card-suggestion-card .smart-suggestion-actions button {
+    min-height: 44px;
+  }
+
+  .acquisition-console .smart-card-suggestions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* A height-capped grid shrinks each card and lets the next card cover Fill and Comp. */
+  .acquisition-console .smart-card-suggestions > .suggestion-row {
+    flex: 0 0 auto;
+  }
 }
