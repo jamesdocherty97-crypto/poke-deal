@@ -241,7 +241,7 @@ test("listing workspace shows live stock on arrival and keeps draft and sale act
   await expect(listingRow.getByRole("button", { name: "Record sale" })).toBeVisible();
 });
 
-test("double tap on the phone stock bar sends one purchase", async ({ context, page }) => {
+test("double tap on the phone stock bar sends one purchase", async ({ context, page }, testInfo) => {
   const ledger = new FixtureDealerLedger();
   let releaseAcquire = () => {};
   const holdAcquire = new Promise<void>((resolve) => {
@@ -264,19 +264,22 @@ test("double tap on the phone stock bar sends one purchase", async ({ context, p
     button.click();
   });
 
-  await expect.poll(() => ledger.acquirePosts, { timeout: 10_000 }).toBeGreaterThan(0);
-  await page.waitForTimeout(400);
-  expect(ledger.acquirePosts).toBe(1);
-  expect(new Set(ledger.acquireMutationIds).size).toBe(1);
-  await expect(bar.getByRole("button", { name: "Stocking…", exact: true })).toBeDisabled();
-  await expect(quickStock.getByLabel(/^What I paid/)).toHaveValue("25.00");
-  await page.screenshot({ path: "/opt/cursor/artifacts/phone-stock-bar-single-submit.png" });
-  releaseAcquire();
-  await expect.poll(() => ledger.acquired).toBe(true);
+  try {
+    await expect.poll(() => ledger.acquirePosts, { timeout: 10_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(400);
+    expect(ledger.acquirePosts).toBe(1);
+    expect(new Set(ledger.acquireMutationIds).size).toBe(1);
+    await expect(bar.getByRole("button", { name: "Stocking…", exact: true })).toBeDisabled();
+    await expect(quickStock.getByLabel(/^What I paid/)).toHaveValue("25.00");
+    await page.screenshot({ path: testInfo.outputPath("phone-stock-bar-single-submit.png") });
+  } finally {
+    releaseAcquire();
+  }
+  await expect.poll(() => ledger.acquireHoldSettled, { timeout: 10_000 }).toBe(1);
   expect(ledger.acquirePosts).toBe(1);
 });
 
-test("double tap on Stock + eBay draft sends one manual purchase", async ({ context, page }) => {
+test("double tap on Stock now sends one manual purchase", async ({ context, page }, testInfo) => {
   const ledger = new FixtureDealerLedger();
   let releaseManual = () => {};
   const holdManualStock = new Promise<void>((resolve) => {
@@ -297,15 +300,18 @@ test("double tap on Stock + eBay draft sends one manual purchase", async ({ cont
     button.click();
   });
 
-  await expect.poll(() => ledger.manualStockPosts, { timeout: 10_000 }).toBeGreaterThan(0);
-  await page.waitForTimeout(400);
-  expect(ledger.manualStockPosts).toBe(1);
-  expect(new Set(ledger.manualStockMutationIds).size).toBe(1);
-  await expect(bar.getByRole("button", { name: "Stocking…", exact: true })).toBeDisabled();
-  await expect(panel.getByLabel(/^What I paid/)).toHaveValue("9.00");
-  await page.screenshot({ path: "/opt/cursor/artifacts/phone-manual-stock-single-submit.png" });
-  releaseManual();
-  await expect.poll(() => ledger.acquired).toBe(true);
+  try {
+    await expect.poll(() => ledger.manualStockPosts, { timeout: 10_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(400);
+    expect(ledger.manualStockPosts).toBe(1);
+    expect(new Set(ledger.manualStockMutationIds).size).toBe(1);
+    await expect(bar.getByRole("button", { name: "Stocking…", exact: true })).toBeDisabled();
+    await expect(panel.getByLabel(/^What I paid/)).toHaveValue("9.00");
+    await page.screenshot({ path: testInfo.outputPath("phone-manual-stock-single-submit.png") });
+  } finally {
+    releaseManual();
+  }
+  await expect.poll(() => ledger.manualHoldSettled, { timeout: 10_000 }).toBe(1);
   expect(ledger.manualStockPosts).toBe(1);
 });
 
@@ -315,8 +321,10 @@ class FixtureDealerLedger {
   listingState: "DRAFT" | "ACTIVE" | "SOLD" | null = null;
   acquirePosts = 0;
   acquireMutationIds: string[] = [];
+  acquireHoldSettled = 0;
   manualStockPosts = 0;
   manualStockMutationIds: string[] = [];
+  manualHoldSettled = 0;
   acquireMutationId: string | undefined;
   saleMutationId: string | undefined;
   acquireBody: Record<string, unknown> | null = null;
@@ -590,6 +598,7 @@ async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedg
       ledger.acquired = true;
       if (ledger.acquireBody.createListing) ledger.listingState = "DRAFT";
       if (options.holdAcquire) await options.holdAcquire;
+      ledger.acquireHoldSettled += 1;
       return json({
         item: ledger.inventoryItem(),
         suggestion: { pricePence: 4499, rationale: "fixture market price" },
@@ -646,6 +655,7 @@ async function mockDealerApis(context: BrowserContext, ledger: FixtureDealerLedg
       const mutationId = request.headers()["x-poke-deal-mutation-id"] ?? "";
       ledger.manualStockMutationIds.push(mutationId);
       if (options.holdManualStock) await options.holdManualStock;
+      ledger.manualHoldSettled += 1;
       ledger.acquired = true;
       const item = ledger.inventoryItem();
       return json({ item: item ? { ...item, id: `item-manual-${ledger.manualStockPosts}` } : null }, 201);
