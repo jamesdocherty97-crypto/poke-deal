@@ -188,6 +188,39 @@ function expectRejected(bytes: Uint8Array, message: string, line?: number): Inve
   return report;
 }
 
+function sourceListingIdsContainingDelimiter(items: readonly InventoryExportItem[]): string[] {
+  const offending: string[] = [];
+  for (const item of items) {
+    for (const listing of item.listings) {
+      if (listing.id.includes(";")) offending.push(listing.id);
+    }
+  }
+  return offending;
+}
+
+// Checks listing.id on the export input, before toInventoryV1Row joins ids.
+// Splitting the serialized listing_ids cell cannot see a ';' that the join consumed.
+function assertSourceListingIdsExcludeDelimiter(items: readonly InventoryExportItem[]): void {
+  const offending = sourceListingIdsContainingDelimiter(items);
+  assert.deepEqual(
+    offending,
+    [],
+    `source listing ids contain ';': ${offending.map((id) => JSON.stringify(id)).join(", ")}`,
+  );
+}
+
+function catchDelimiterAssertion(items: readonly InventoryExportItem[], sourceId: string): void {
+  assert.throws(
+    () => assertSourceListingIdsExcludeDelimiter(items),
+    (error: unknown) => {
+      assert.ok(error instanceof assert.AssertionError);
+      assert.match(error.message, /source listing ids contain ';'/);
+      assert.ok(error.message.includes(JSON.stringify(sourceId)), error.message);
+      return true;
+    },
+  );
+}
+
 function withFirstRow(mutate: (entry: InventoryV1Row) => void): Uint8Array {
   const rows = syntheticItems().map(toInventoryV1Row);
   const source = rows[0];
@@ -536,6 +569,104 @@ Pikachu ex,Surging Sparks,238/191,PSA 10,200,1,eBay,Slabs,,12345678,eBay,240,dra
     { cwd: repoRoot, encoding: "utf8" },
   );
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+test("source listing ids contain no semicolon before serialization", () => {
+  const items = syntheticItems();
+  const sourceIds = items.flatMap((item) => item.listings.map((listing) => listing.id));
+  assert.deepEqual(sourceIds, ["listing_a", "listing_z", "listing_007"]);
+  assert.deepEqual(sourceListingIdsContainingDelimiter(items), []);
+  assertSourceListingIdsExcludeDelimiter(items);
+
+  const nm = items[0];
+  assert.ok(nm);
+  assert.deepEqual(nm.listings.map((listing) => listing.id), ["listing_a", "listing_z"]);
+  const nmRow = toInventoryV1Row(nm);
+  assert.equal(nmRow.listing_ids, `${nm.listings[1]?.id};${nm.listings[0]?.id}`);
+  assert.equal(nmRow.listing_count, "2");
+  assert.deepEqual(nm.listings.map((listing) => listing.id), ["listing_a", "listing_z"]);
+
+  const promo = items[4];
+  assert.ok(promo);
+  assert.equal(toInventoryV1Row(promo).listing_ids, promo.listings[0]?.id);
+
+  const colonId = "ebay-uk:257584212141";
+  const colonItem: InventoryExportItem = {
+    ...nm,
+    listings: [{ id: colonId, createdAt: new Date("2026-04-01T00:00:00.000Z") }],
+  };
+  assertSourceListingIdsExcludeDelimiter([colonItem]);
+  assert.equal(toInventoryV1Row(colonItem).listing_ids, colonId);
+  assert.equal(colonItem.listings[0]?.id, colonId);
+
+  for (const sourceId of ["listing_a;listing_injected", ";", "listing_a;", ";listing_z"]) {
+    const poisoned: InventoryExportItem = {
+      ...nm,
+      listings: [{ id: sourceId, createdAt: new Date("2026-04-01T00:00:00.000Z") }],
+    };
+    assert.deepEqual(sourceListingIdsContainingDelimiter([poisoned]), [sourceId]);
+    catchDelimiterAssertion([poisoned], sourceId);
+    const exported = toInventoryV1Row(poisoned);
+    assert.equal(exported.listing_ids, sourceId);
+    assert.equal(exported.listing_count, "1");
+    assert.equal(poisoned.listings.length, 1);
+    assert.equal(poisoned.listings[0]?.id, sourceId);
+    // A split of the exported cell hides the delimiter, so it is not the check.
+    const splitTokens = exported.listing_ids.split(";");
+    assert.equal(splitTokens.some((token) => token.includes(";")), false);
+    assert.equal(splitTokens.includes(sourceId), false);
+  }
+});
+
+test("inventory-v1 format note keeps listing price, state, and external_ref in the listings export", () => {
+  const moduleSource = fs.readFileSync(new URL("./inventoryV1.ts", import.meta.url), "utf8");
+  const formatNote = moduleSource.slice(0, moduleSource.indexOf("export const INVENTORY_V1_SCHEMA"));
+  assert.match(formatNote, /Listing price, state, and external_ref are intentionally absent/);
+  assert.match(formatNote, /separate existing listings export/);
+  assert.match(formatNote, /GET \/api\/export\/listings/);
+  assert.match(formatNote, /list_price_gbp/);
+  assert.match(formatNote, /suggested_price_gbp/);
+  assert.match(formatNote, /external_ref/);
+  assert.match(formatNote, /joined on item_id/);
+  assert.match(formatNote, /Null and empty string are indistinguishable in CSV/);
+  const columns = INVENTORY_V1_COLUMNS as readonly string[];
+  assert.equal(columns.includes("external_ref"), false);
+  assert.equal(columns.includes("state"), false);
+  assert.equal(columns.includes("list_price_gbp"), false);
+  assert.equal(columns.includes("suggested_price_gbp"), false);
+
+  const unlisted = syntheticItems()[1];
+  assert.ok(unlisted);
+  const fromNull = toInventoryV1Row({
+    ...unlisted,
+    graderCert: null,
+    condition: null,
+    location: null,
+    acquiredFrom: null,
+    acquiredAt: null,
+    card: { ...unlisted.card, number: null, language: null, edition: null, finish: null },
+  });
+  const fromEmpty = toInventoryV1Row({
+    ...unlisted,
+    graderCert: "",
+    condition: "",
+    location: "",
+    acquiredFrom: "",
+    acquiredAt: null,
+    card: { ...unlisted.card, number: "", language: "", edition: "", finish: "" },
+  });
+  assert.equal(fromNull.grader_cert, "");
+  assert.equal(fromEmpty.grader_cert, "");
+  assert.equal(fromNull.condition, fromEmpty.condition);
+  assert.equal(fromNull.location, fromEmpty.location);
+  assert.equal(fromNull.acquired_from, fromEmpty.acquired_from);
+  assert.equal(fromNull.acquired_at, "");
+  assert.equal(fromEmpty.acquired_at, "");
+  assert.equal(fromNull.number, fromEmpty.number);
+  assert.equal(fromNull.language, fromEmpty.language);
+  assert.equal(fromNull.edition, fromEmpty.edition);
+  assert.equal(fromNull.finish, fromEmpty.finish);
+  assert.equal(encodeInventoryV1([fromNull]), encodeInventoryV1([fromEmpty]));
 });
 
 test("T10 collector number 007 stays text", () => {

@@ -2,6 +2,22 @@
 // Every cell is quoted, rows end in CRLF, and there is no BOM.
 // A cell whose first character is = + - @ tab CR or ' gets exactly one leading apostrophe.
 // Decode strips exactly one leading apostrophe from every cell.
+//
+// listing_ids joins source listing ids with ';' after sorting by createdAt, then id.
+// Assumption: a source listing id does not contain ';'. This file does not strip,
+// rename, or reject a delimiter inside a listing id, and the Listing id schema is
+// unchanged. Limitation: a source id that contains ';' is copied verbatim into the
+// joined cell, so splitting that cell is not the original id. The dry-run does not
+// apply a separate id-character rule; a count mismatch can be a side effect of the
+// join, not proof that the source id was checked.
+//
+// Listing price, state, and external_ref are intentionally absent. They remain in
+// the separate existing listings export (GET /api/export/listings, listingsToCsv
+// columns list_price_gbp, suggested_price_gbp, state, external_ref, and listing_id),
+// joined on item_id.
+//
+// Null and empty string are indistinguishable in CSV. Nullable text and timestamps
+// are written as an empty cell, and decoding that cell yields "".
 
 export const INVENTORY_V1_SCHEMA = "inventory-v1";
 
