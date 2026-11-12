@@ -6,8 +6,10 @@ import {
   dealCalc,
   netProceedsAtSalePrice,
   normalizeDealCalcSettings,
+  postageForSalePrice,
   type DealCalcCompInput,
 } from "./dealCalc.js";
+import { ebayUkSellerFeesPence } from "./ebayUkFees.js";
 
 function comp(overrides: Partial<DealCalcCompInput>): DealCalcCompInput {
   return {
@@ -130,4 +132,68 @@ test("D10: sub-£20 postage tier and 50p quote rounding are used", () => {
   assert.equal(result.netProceedsPence, 1063);
   assert.equal(result.maxCashOfferPence, 850);
   assert.equal(result.maxTradeOfferPence, 900);
+});
+
+function legacyFlatNet(salePricePence: number): number {
+  const pct = DEFAULT_DEAL_CALC_SETTINGS.fees.ebayFvfPct + DEFAULT_DEAL_CALC_SETTINGS.fees.promotedPct;
+  return Math.round(salePricePence * (1 - pct / 100))
+    - DEFAULT_DEAL_CALC_SETTINGS.fees.ebayFixedPence
+    - postageForSalePrice(salePricePence)
+    - DEFAULT_DEAL_CALC_SETTINGS.fees.materialsPence;
+}
+
+test("T6 default settings keep today's net proceeds", () => {
+  for (const price of [500, 1999, 5000, 25000]) {
+    assert.equal(netProceedsAtSalePrice(price), legacyFlatNet(price));
+    assert.equal(netProceedsAtSalePrice(price, DEFAULT_DEAL_CALC_SETTINGS), legacyFlatNet(price));
+  }
+});
+
+test("T6 PRIVATE_UK removes only the final value percent and fixed fee", () => {
+  const settings = normalizeDealCalcSettings({ fees: { sellerProfile: "PRIVATE_UK" } });
+  for (const price of [500, 1999, 5000, 25000]) {
+    const promotedOnly = Math.round(price * (1 - DEFAULT_DEAL_CALC_SETTINGS.fees.promotedPct / 100))
+      - postageForSalePrice(price, settings)
+      - settings.fees.materialsPence;
+    assert.equal(netProceedsAtSalePrice(price, settings), promotedOnly);
+    assert.equal(settings.fees.postageTiers[0]?.postagePence, DEFAULT_DEAL_CALC_SETTINGS.fees.postageTiers[0]?.postagePence);
+    assert.equal(settings.fees.materialsPence, DEFAULT_DEAL_CALC_SETTINGS.fees.materialsPence);
+    assert.equal(settings.fees.promotedPct, DEFAULT_DEAL_CALC_SETTINGS.fees.promotedPct);
+    assert.equal(settings.fees.promotedEnabled, true);
+  }
+  const editedLegacyFields = normalizeDealCalcSettings({
+    fees: { sellerProfile: "PRIVATE_UK", ebayFvfPct: 50, ebayFixedPence: 900 },
+  });
+  assert.equal(netProceedsAtSalePrice(5000, editedLegacyFields), netProceedsAtSalePrice(5000, settings));
+});
+
+test("T6 BUSINESS_UK replaces only the final value percent and fixed fee", () => {
+  const settings = normalizeDealCalcSettings({ fees: { sellerProfile: "BUSINESS_UK", vatOnFees: true } });
+  const price = 10000;
+  const sellerFees = ebayUkSellerFeesPence({ profile: "BUSINESS_UK", orderTotalPence: price, vatOnFees: true });
+  const expected = Math.round(price * (1 - settings.fees.promotedPct / 100))
+    - sellerFees
+    - postageForSalePrice(price, settings)
+    - settings.fees.materialsPence;
+  assert.equal(sellerFees, 1398);
+  assert.equal(netProceedsAtSalePrice(price, settings), expected);
+  const withoutVat = normalizeDealCalcSettings({ fees: { sellerProfile: "BUSINESS_UK", vatOnFees: false } });
+  assert.equal(
+    netProceedsAtSalePrice(price, withoutVat),
+    Math.round(price * (1 - withoutVat.fees.promotedPct / 100))
+      - ebayUkSellerFeesPence({ profile: "BUSINESS_UK", orderTotalPence: price, vatOnFees: false })
+      - postageForSalePrice(price, withoutVat)
+      - withoutVat.fees.materialsPence,
+  );
+});
+
+test("T6 missing or unknown seller profiles stay on the legacy flat default", () => {
+  assert.equal(normalizeDealCalcSettings({}).fees.sellerProfile, "LEGACY_FLAT");
+  assert.equal(normalizeDealCalcSettings({}).fees.vatOnFees, true);
+  assert.equal(normalizeDealCalcSettings({ fees: { sellerProfile: "nonsense" } }).fees.sellerProfile, "LEGACY_FLAT");
+  assert.equal(normalizeDealCalcSettings({ fees: { sellerProfile: "nonsense" } }).fees.vatOnFees, true);
+  assert.equal(normalizeDealCalcSettings({ fees: { sellerProfile: "nonsense" } }).fees.ebayFvfPct, 12.8);
+  const business = normalizeDealCalcSettings({ fees: { sellerProfile: "BUSINESS_UK", vatOnFees: false } });
+  assert.equal(business.fees.sellerProfile, "BUSINESS_UK");
+  assert.equal(business.fees.vatOnFees, false);
 });

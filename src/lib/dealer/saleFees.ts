@@ -1,4 +1,7 @@
+import { ebayUkSellerFeesPence, type EbayUkFeeProfile } from "./ebayUkFees.js";
+
 export type SaleChannel = "EBAY" | "CARDMARKET" | "VINTED" | "IN_PERSON";
+export type { EbayUkFeeProfile };
 
 export interface SaleCostEstimate {
   feesPence: number;
@@ -7,6 +10,8 @@ export interface SaleCostEstimate {
 
 export interface SaleCostOptions {
   grade?: string | null;
+  feeProfile?: EbayUkFeeProfile;
+  vatOnFees?: boolean;
 }
 
 export interface SalePriceBreakdown {
@@ -29,7 +34,11 @@ export function estimateSaleCosts(
 
   if (channel === "EBAY") {
     return {
-      feesPence: Math.round(price * 0.128) + (price > 0 ? 30 : 0),
+      feesPence: ebayUkSellerFeesPence({
+        profile: options.feeProfile ?? "LEGACY_FLAT",
+        orderTotalPence: price,
+        vatOnFees: options.vatOnFees,
+      }),
       postagePence: postedSalePostagePence(options.grade),
     };
   }

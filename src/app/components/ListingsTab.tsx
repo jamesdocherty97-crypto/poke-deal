@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { ListingSort, ListingStateFilter } from "@/lib/dealer/tableControls";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
+import { feeProfileLabel, type EbayUkFeeProfile } from "@/lib/dealer/ebayUkFees";
 import { listingStockAttention } from "@/lib/dealer/saleListingUpdates";
 import { formatGbp as gbp } from "@/lib/format/money";
 import { orderListingPhotos, summarizeListingPhotos } from "@/lib/photos/listingPhotoPolicy";
@@ -104,6 +105,8 @@ export function ListingsTab({
   setEbayPublishTarget,
   listingPackSheet,
   onBulkPack,
+  sellerProfile = "LEGACY_FLAT",
+  vatOnFees = true,
   loading = false,
   loadError = null,
   loadBanner = null,
@@ -168,6 +171,8 @@ export function ListingsTab({
   setEbayPublishTarget: (id: string | null) => void;
   listingPackSheet: ReactNode;
   onBulkPack: (listings: Listing[], channel: Channel, mode: "download" | "copy") => void;
+  sellerProfile?: EbayUkFeeProfile;
+  vatOnFees?: boolean;
   loading?: boolean;
   loadError?: string | null;
   loadBanner?: string | null;
@@ -464,6 +469,8 @@ export function ListingsTab({
           listing={listing}
           busy={busy}
           ebayConnected={Boolean(ebayStatus?.connected)}
+          sellerProfile={sellerProfile}
+          vatOnFees={vatOnFees}
           onEdit={openListingEditor}
           onPack={openListingPack}
           onCopy={copyListingCopy}
@@ -788,6 +795,8 @@ function ListingRow({
   listing,
   busy,
   ebayConnected,
+  sellerProfile,
+  vatOnFees,
   onEdit,
   onPack,
   onCopy,
@@ -801,6 +810,8 @@ function ListingRow({
   listing: Listing;
   busy: string | null;
   ebayConnected: boolean;
+  sellerProfile: EbayUkFeeProfile;
+  vatOnFees: boolean;
   onEdit: (listing: Listing) => void;
   onPack: (listing: Listing) => void;
   onCopy: (listing: Listing, channel: Channel) => void;
@@ -821,6 +832,8 @@ function ListingRow({
         grade: listing.item.grade,
         itemPricePence: price,
         costBasisPence: listing.item.costBasis,
+        feeProfile: sellerProfile,
+        vatOnFees,
       })
     : null;
   const isBusy = busy === `listing-${listing.id}`;
@@ -980,6 +993,12 @@ function ListingRow({
                       : listing.state.toLowerCase()}
             </span>
           </div>
+        )}
+        {economics && (
+          <p className="listing-row-fee">
+            {listing.channel === "EBAY" ? "eBay fee" : "Fees"} {gbp(economics.feesPence)} · {feeProfileLabel(economics.feeProfile)}
+            {economics.buyerSeesPence != null ? ` · Buyers see about ${gbp(economics.buyerSeesPence)}` : ""}
+          </p>
         )}
         {endConfirmationOpen && listing.state === "ACTIVE" && (
           <div className="panel" role="region" aria-label={`Remove ${title} listing`}>

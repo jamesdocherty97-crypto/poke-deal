@@ -197,6 +197,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, {
   placeholder?: string;
   name?: string;
   autoComplete?: string;
+  "aria-describedby"?: string;
 }>(function MoneyInput({
   value,
   onChange,
@@ -204,6 +205,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, {
   placeholder,
   name,
   autoComplete,
+  "aria-describedby": ariaDescribedBy,
 }, ref) {
   return (
     <span className="money-input">
@@ -217,6 +219,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, {
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
         placeholder={placeholder}
+        aria-describedby={ariaDescribedBy}
       />
     </span>
   );
