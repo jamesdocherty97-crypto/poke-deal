@@ -6063,7 +6063,11 @@ export default function Home() {
       return;
     }
 
-    applySaleTotalPrice(grossSalePriceForNetPence(saleChannel, netPence, { grade: sellingItem?.grade }));
+    applySaleTotalPrice(grossSalePriceForNetPence(saleChannel, netPence, {
+      grade: sellingItem?.grade,
+      feeProfile: dealSettings.fees.sellerProfile,
+      vatOnFees: dealSettings.fees.vatOnFees,
+    }));
     setNotice("Net payout pasted. Buyer total, fees and your postage cost have been estimated.");
     setError(null);
   }
@@ -6097,6 +6101,8 @@ export default function Home() {
     applySaleTotalPrice(
       breakEvenSalePricePence(saleChannel, sellingItem.costBasis * saleQuantityForShortcuts(), {
         grade: sellingItem.grade,
+        feeProfile: dealSettings.fees.sellerProfile,
+        vatOnFees: dealSettings.fees.vatOnFees,
       }),
     );
   }
@@ -6108,7 +6114,11 @@ export default function Home() {
         saleChannel,
         sellingItem.costBasis * saleQuantityForShortcuts(),
         targetProfitPence,
-        { grade: sellingItem.grade },
+        {
+          grade: sellingItem.grade,
+          feeProfile: dealSettings.fees.sellerProfile,
+          vatOnFees: dealSettings.fees.vatOnFees,
+        },
       ),
     );
   }
@@ -6119,6 +6129,8 @@ export default function Home() {
     applySaleTotalPrice(
       grossSalePriceForProfitPence(saleChannel, costPence, Math.round(costPence * roiPct), {
         grade: sellingItem.grade,
+        feeProfile: dealSettings.fees.sellerProfile,
+        vatOnFees: dealSettings.fees.vatOnFees,
       }),
     );
   }

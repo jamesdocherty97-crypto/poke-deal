@@ -176,6 +176,34 @@ test("breakEvenSalePricePence keeps no-fee channels simple", () => {
   assert.equal(breakEvenSalePricePence("VINTED", 1800), 1800);
 });
 
+test("breakEvenSalePricePence covers cost for a UK business seller with VAT on fees", () => {
+  const costPence = 1000;
+  const options = { feeProfile: "BUSINESS_UK" as const, vatOnFees: true, grade: "RAW" };
+  const legacyTotal = 1382;
+  const legacyCosts = estimateSaleCosts("EBAY", legacyTotal, options);
+  assert.ok(
+    saleNetPence({
+      salePricePence: legacyTotal,
+      feesPence: legacyCosts.feesPence,
+      postagePence: legacyCosts.postagePence,
+    }) < costPence,
+  );
+
+  const price = breakEvenSalePricePence("EBAY", costPence, options);
+  const costs = estimateSaleCosts("EBAY", price, options);
+  const previousCosts = estimateSaleCosts("EBAY", price - 1, options);
+  assert.ok(saleNetPence({
+    salePricePence: price,
+    feesPence: costs.feesPence,
+    postagePence: costs.postagePence,
+  }) >= costPence);
+  assert.ok(saleNetPence({
+    salePricePence: price - 1,
+    feesPence: previousCosts.feesPence,
+    postagePence: previousCosts.postagePence,
+  }) < costPence);
+});
+
 test("T1 LEGACY_FLAT matches the previous 12.8% plus 30p formula", () => {
   for (const total of [0, 1, 99, 675, 1000, 1001, 2500, 10000, 123456]) {
     const legacy = Math.round(total * 0.128) + (total > 0 ? 30 : 0);
@@ -239,6 +267,9 @@ test("T5 buyer protection fees and the private list-price inverse", () => {
     [2000, 150],
     [5000, 270],
     [30000, 1270],
+    [50000, 1670],
+    [400000, 8670],
+    [500000, 8670],
   ];
   for (const [item, fee] of cases) {
     assert.equal(buyerProtectionFeePence(item), fee);
