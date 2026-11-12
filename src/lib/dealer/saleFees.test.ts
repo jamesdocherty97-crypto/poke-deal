@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   BUSINESS_FINAL_VALUE_FEE_PCT,
   buyerProtectionFeePence,
@@ -29,6 +30,7 @@ import {
   saleItemSubtotalPence,
   saleNetPence,
 } from "./saleFees.js";
+import { saleShortcutFeeOptions } from "./saleShortcutOptions.js";
 
 test("estimateSaleCosts applies UK-friendly selling presets", () => {
   assert.deepEqual(estimateSaleCosts("EBAY", 5000), { feesPence: 670, postagePence: 175 });
@@ -300,3 +302,56 @@ test("T7 published rate constants and the date they were checked", () => {
   assert.equal(feeProfileLabel("PRIVATE_UK"), "UK private seller");
   assert.equal(feeProfileLabel("BUSINESS_UK"), "UK business seller");
 });
+
+const SALE_SHORTCUTS = [
+  "pasteSaleNetPrice",
+  "useBreakEvenSalePrice",
+  "applySaleTargetProfit",
+  "applySaleTargetRoi",
+] as const;
+
+test("sale shortcuts pass the chosen seller type through saleShortcutFeeOptions", () => {
+  assert.deepEqual(saleShortcutFeeOptions({ sellerProfile: "LEGACY_FLAT", vatOnFees: true }), {
+    feeProfile: "LEGACY_FLAT",
+    vatOnFees: true,
+  });
+  assert.deepEqual(saleShortcutFeeOptions({ sellerProfile: "PRIVATE_UK", vatOnFees: false }), {
+    feeProfile: "PRIVATE_UK",
+    vatOnFees: false,
+  });
+  assert.deepEqual(saleShortcutFeeOptions({ sellerProfile: "BUSINESS_UK", vatOnFees: true }), {
+    feeProfile: "BUSINESS_UK",
+    vatOnFees: true,
+  });
+
+  const page = readFileSync(new URL("../../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /import \{ saleShortcutFeeOptions \} from "@\/lib\/dealer\/saleShortcutOptions"/);
+  const spreads = page.match(/\.\.\.saleShortcutFeeOptions\(dealSettings\.fees\)/g) ?? [];
+  assert.equal(spreads.length, SALE_SHORTCUTS.length);
+  for (const name of SALE_SHORTCUTS) {
+    const body = functionSource(page, name);
+    assert.equal(
+      (body.match(/\.\.\.saleShortcutFeeOptions\(dealSettings\.fees\)/g) ?? []).length,
+      1,
+      `${name} must spread saleShortcutFeeOptions(dealSettings.fees)`,
+    );
+  }
+});
+
+function functionSource(source: string, name: string): string {
+  const start = source.indexOf(`function ${name}(`);
+  assert.ok(start >= 0, `missing ${name}`);
+  let depth = 0;
+  let opened = false;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") {
+      depth += 1;
+      opened = true;
+    } else if (char === "}") {
+      depth -= 1;
+      if (opened && depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  assert.fail(`unclosed ${name}`);
+}

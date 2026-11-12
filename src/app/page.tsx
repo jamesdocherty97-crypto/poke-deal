@@ -138,6 +138,7 @@ import {
   rescaleGrossSaleForQuantity,
   saleItemSubtotalPence,
 } from "@/lib/dealer/saleFees";
+import { saleShortcutFeeOptions } from "@/lib/dealer/saleShortcutOptions";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayActionTarget } from "@/lib/dealer/today";
 import { addRequestedPrintHints, detectCardPrintIdentity, textMentionsFirstEdition } from "@/lib/comps/variants";
@@ -6065,8 +6066,7 @@ export default function Home() {
 
     applySaleTotalPrice(grossSalePriceForNetPence(saleChannel, netPence, {
       grade: sellingItem?.grade,
-      feeProfile: dealSettings.fees.sellerProfile,
-      vatOnFees: dealSettings.fees.vatOnFees,
+      ...saleShortcutFeeOptions(dealSettings.fees),
     }));
     setNotice("Net payout pasted. Buyer total, fees and your postage cost have been estimated.");
     setError(null);
@@ -6101,8 +6101,7 @@ export default function Home() {
     applySaleTotalPrice(
       breakEvenSalePricePence(saleChannel, sellingItem.costBasis * saleQuantityForShortcuts(), {
         grade: sellingItem.grade,
-        feeProfile: dealSettings.fees.sellerProfile,
-        vatOnFees: dealSettings.fees.vatOnFees,
+        ...saleShortcutFeeOptions(dealSettings.fees),
       }),
     );
   }
@@ -6116,8 +6115,7 @@ export default function Home() {
         targetProfitPence,
         {
           grade: sellingItem.grade,
-          feeProfile: dealSettings.fees.sellerProfile,
-          vatOnFees: dealSettings.fees.vatOnFees,
+          ...saleShortcutFeeOptions(dealSettings.fees),
         },
       ),
     );
@@ -6129,8 +6127,7 @@ export default function Home() {
     applySaleTotalPrice(
       grossSalePriceForProfitPence(saleChannel, costPence, Math.round(costPence * roiPct), {
         grade: sellingItem.grade,
-        feeProfile: dealSettings.fees.sellerProfile,
-        vatOnFees: dealSettings.fees.vatOnFees,
+        ...saleShortcutFeeOptions(dealSettings.fees),
       }),
     );
   }
