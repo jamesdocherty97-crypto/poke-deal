@@ -6,6 +6,7 @@ import { ebayFetch } from "./client.js";
 import { readEbayApiError } from "./errors.js";
 import type { ListingPackInput } from "../dealer/listingPack.js";
 import { buildListingPack, isGradedGrade, normalizeListingRawCondition } from "../dealer/listingPack.js";
+import { ebayCardConditionIds, parseGradedGrade } from "./cardConditionIds.js";
 
 export interface EbayConditionDescriptor {
   name: string;
@@ -48,86 +49,10 @@ export interface EbayInventoryItem {
 const GRADED_CONDITION_ENUM = "LIKE_NEW";
 const UNGRADED_CONDITION_ENUM = "USED_VERY_GOOD";
 
-const PROFESSIONAL_GRADER_IDS: Record<string, string> = {
-  PSA: "275010",
-  BCCG: "275011",
-  BVG: "275012",
-  BGS: "275013",
-  CSG: "275014",
-  CGC: "275015",
-  SGC: "275016",
-  KSA: "275017",
-  GMA: "275018",
-  HGA: "275019",
-  ISA: "2750110",
-  PCA: "2750111",
-  GSG: "2750112",
-  PGS: "2750113",
-  MNT: "2750114",
-  TAG: "2750115",
-  RARE: "2750116",
-  RCG: "2750117",
-  PCG: "2750118",
-  ACE: "2750119",
-  CGA: "2750120",
-  TCG: "2750121",
-  ARK: "2750122",
-};
-const PROFESSIONAL_GRADER_OTHER_ID = "2750123";
-
-const GRADE_VALUE_IDS: Record<string, string> = {
-  "10": "275020",
-  "9.5": "275021",
-  "9": "275022",
-  "8.5": "275023",
-  "8": "275024",
-  "7.5": "275025",
-  "7": "275026",
-  "6.5": "275027",
-  "6": "275028",
-  "5.5": "275029",
-  "5": "2750210",
-  "4.5": "2750211",
-  "4": "2750212",
-  "3.5": "2750213",
-  "3": "2750214",
-  "2.5": "2750215",
-  "2": "2750216",
-  "1.5": "2750217",
-  "1": "2750218",
-};
-
-// eBay category 183454 (Pokemon UK) only supports these 4 of the 7 possible
-// Ungraded Card Condition values (the others are sports-card-only buckets).
-const NEAR_MINT_OR_BETTER_ID = "400010";
-const LIGHTLY_PLAYED_ID = "400015";
-const MODERATELY_PLAYED_ID = "400016";
-const HEAVILY_PLAYED_ID = "400017";
-
-/** Damaged singles use eBay's lowest supported CCG bucket, with DMG retained in copy. */
-function ungradedCardConditionId(conditionText?: string | null): string | null {
-  switch (normalizeListingRawCondition(conditionText)) {
-    case "DMG":
-    case "HP": return HEAVILY_PLAYED_ID;
-    case "MP": return MODERATELY_PLAYED_ID;
-    case "LP": return LIGHTLY_PLAYED_ID;
-    case "NM": return NEAR_MINT_OR_BETTER_ID;
-    default: return null;
-  }
-}
-
 export function validateEbayRawCondition(grade: string, condition?: string | null): string | null {
   return isGradedGrade(grade) || normalizeListingRawCondition(condition)
     ? null
     : "Record the raw card's inspected condition in Stock (NM, LP, MP, HP or DMG) before sending it to eBay.";
-}
-
-/** Parses a grade like "PSA_9_5" -> { grader: "PSA", gradeValue: "9.5" }; "ACE_10" -> { grader: "ACE", gradeValue: "10" }. */
-function parseGradedGrade(grade: string): { grader: string; gradeValue: string } {
-  const parts = grade.split("_");
-  const grader = parts[0] ?? "";
-  const gradeValue = parts.slice(1).join(".");
-  return { grader, gradeValue };
 }
 
 function buildConditionFields(input: ListingPackInput): {
@@ -136,20 +61,21 @@ function buildConditionFields(input: ListingPackInput): {
 } {
   if (isGradedGrade(input.grade)) {
     const { grader, gradeValue } = parseGradedGrade(input.grade);
-    const graderId = PROFESSIONAL_GRADER_IDS[grader] ?? PROFESSIONAL_GRADER_OTHER_ID;
-    const conditionDescriptors: EbayConditionDescriptor[] = [
-      { name: "27501", values: [graderId] },
-    ];
-    const gradeId = GRADE_VALUE_IDS[gradeValue];
-    if (gradeId) conditionDescriptors.push({ name: "27502", values: [gradeId] });
+    const ids = ebayCardConditionIds({ graded: true, grader, gradeValue });
+    const conditionDescriptors: EbayConditionDescriptor[] = [];
+    if (ids.graderId) conditionDescriptors.push({ name: "27501", values: [ids.graderId] });
+    if (ids.gradeId) conditionDescriptors.push({ name: "27502", values: [ids.gradeId] });
     if (input.certNumber) conditionDescriptors.push({ name: "27503", additionalInfo: input.certNumber });
     return { condition: GRADED_CONDITION_ENUM, conditionDescriptors };
   }
-  const conditionId = ungradedCardConditionId(input.condition);
-  if (!conditionId) throw new Error(validateEbayRawCondition(input.grade, input.condition)!);
+  const ids = ebayCardConditionIds({
+    graded: false,
+    rawCondition: normalizeListingRawCondition(input.condition),
+  });
+  if (!ids.cardConditionId) throw new Error(validateEbayRawCondition(input.grade, input.condition)!);
   return {
     condition: UNGRADED_CONDITION_ENUM,
-    conditionDescriptors: [{ name: "40001", values: [conditionId] }],
+    conditionDescriptors: [{ name: "40001", values: [ids.cardConditionId] }],
   };
 }
 

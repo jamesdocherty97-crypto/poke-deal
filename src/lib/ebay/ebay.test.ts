@@ -4,6 +4,7 @@ import { EBAY_RECONNECT_HINT, EBAY_USER_SCOPES, buildAuthUrl, exchangeCodeForTok
 import { ebayJson } from "./client.js";
 import { ebayApiErrorResponseBody, ebayErrorMessage, isEbayPermissionReconnectError } from "./errors.js";
 import { buildInventoryItemPayload, upsertInventoryItem, validateEbayRawCondition } from "./inventoryItem.js";
+import { ebayCardConditionIds, parseGradedGrade } from "./cardConditionIds.js";
 import { buildOfferPayload } from "./offer.js";
 import { buildEbayOfferPreflight, toEbaySku } from "./preflight.js";
 import {
@@ -622,6 +623,67 @@ test("buildInventoryItemPayload produces trading-card condition descriptors for 
   assert.match(item.product.title, /Charizard ex/);
   assert.equal(item.product.aspects["Professional Grader"]?.[0], "PSA");
   assert.equal(item.product.aspects["Grade"]?.[0], "10");
+});
+
+test("ebayCardConditionIds maps 183454 grader, grade and raw-condition IDs", () => {
+  assert.deepEqual(ebayCardConditionIds({ graded: false, rawCondition: "NM" }), {
+    conditionId: "4000",
+    cardConditionId: "400010",
+  });
+  assert.deepEqual(ebayCardConditionIds({ graded: false, rawCondition: "LP" }), {
+    conditionId: "4000",
+    cardConditionId: "400015",
+  });
+  assert.deepEqual(ebayCardConditionIds({ graded: false, rawCondition: "MP" }), {
+    conditionId: "4000",
+    cardConditionId: "400016",
+  });
+  assert.equal(ebayCardConditionIds({ graded: false, rawCondition: "HP" }).cardConditionId, "400017");
+  assert.equal(ebayCardConditionIds({ graded: false, rawCondition: "DMG" }).cardConditionId, "400017");
+  assert.equal(ebayCardConditionIds({ graded: false, rawCondition: null }).cardConditionId, undefined);
+
+  const psa10 = parseGradedGrade("PSA_10");
+  assert.deepEqual(psa10, { grader: "PSA", gradeValue: "10" });
+  assert.deepEqual(ebayCardConditionIds({ graded: true, ...psa10 }), {
+    conditionId: "2750",
+    graderId: "275010",
+    gradeId: "275020",
+  });
+  assert.equal(ebayCardConditionIds({ graded: true, ...parseGradedGrade("PSA_9_5") }).gradeId, "275021");
+  assert.equal(ebayCardConditionIds({ graded: true, ...parseGradedGrade("ACE_10") }).graderId, "2750119");
+  const unknown = ebayCardConditionIds({ graded: true, ...parseGradedGrade("XYZ_9") });
+  assert.equal(unknown.graderId, "2750123");
+  assert.equal(unknown.gradeId, "275022");
+  assert.equal(ebayCardConditionIds({ graded: true, grader: "PSA", gradeValue: "11" }).gradeId, undefined);
+});
+
+test("inventory condition descriptors come from ebayCardConditionIds", () => {
+  const raw = buildInventoryItemPayload(rawInput, 1);
+  const rawIds = ebayCardConditionIds({ graded: false, rawCondition: "NM" });
+  assert.equal(raw.condition, "USED_VERY_GOOD");
+  assert.deepEqual(raw.conditionDescriptors, [{ name: "40001", values: [rawIds.cardConditionId] }]);
+
+  const slab = buildInventoryItemPayload(slabInput, 1);
+  const slabIds = ebayCardConditionIds({ graded: true, ...parseGradedGrade(slabInput.grade) });
+  assert.equal(slab.condition, "LIKE_NEW");
+  assert.deepEqual(slab.conditionDescriptors, [
+    { name: "27501", values: [slabIds.graderId] },
+    { name: "27502", values: [slabIds.gradeId] },
+    { name: "27503", additionalInfo: "84213567" },
+  ]);
+
+  for (const [condition, cardConditionId] of [
+    ["NM", "400010"],
+    ["LP", "400015"],
+    ["MP", "400016"],
+    ["HP", "400017"],
+    ["DMG", "400017"],
+    ["Near Mint", "400010"],
+    ["Damaged", "400017"],
+  ] as const) {
+    const item = buildInventoryItemPayload({ ...rawInput, condition }, 1);
+    assert.deepEqual(item.conditionDescriptors, [{ name: "40001", values: [cardConditionId] }], condition);
+  }
 });
 
 test("buildInventoryItemPayload includes image URL when provided", () => {

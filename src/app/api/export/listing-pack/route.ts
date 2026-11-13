@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import {
   buildListingPackCsv,
+  ebayCsvRowAction,
   type ListingPackChannel,
   type ListingPackInput,
 } from "@/lib/dealer/listingPack";
@@ -86,12 +87,17 @@ export async function GET(request: Request) {
     });
 
     const csv = buildListingPackCsv(inputs);
+    const headers: Record<string, string> = {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="listing-pack-${targetChannel.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv"`,
+    };
+    if (targetChannel === "EBAY") {
+      const drafts = inputs.filter((input) => ebayCsvRowAction(input) === "Draft").length;
+      headers["X-Listing-Pack-Drafts"] = String(drafts);
+    }
     return new NextResponse(csv, {
       status: 200,
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="listing-pack-${targetChannel.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv"`,
-      },
+      headers,
     });
   } catch (err) {
     return NextResponse.json(

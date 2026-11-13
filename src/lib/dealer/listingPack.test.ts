@@ -9,13 +9,17 @@ import {
   buildListingPack,
   buildListingPackCsv,
   ebayCondition,
+  ebayCsvRowAction,
   listingPackCsvHeader,
+  type ListingPackInput,
   listingPackCopyFields,
   normalizeListingRawCondition,
   suggestListPricePence,
   suggestPostage,
 } from "./listingPack.js";
 import { listingEvidenceFromPreview } from "./listingEvidence.js";
+import { buildInventoryItemPayload, type EbayConditionDescriptor } from "../ebay/inventoryItem.js";
+import { GET as listingPackExportGET } from "../../app/api/export/listing-pack/route.js";
 
 const moonbreon = {
   card: { name: "Umbreon VMAX", setName: "Evolving Skies", number: "215/203", rarity: "Secret Rare", language: "EN" },
@@ -399,59 +403,77 @@ test("CSV export has a header and one row per item, with quoting", () => {
   const csv = buildListingPackCsv([quoteCard, slab]);
   const lines = csv.split("\n");
   assert.equal(lines.length, 3); // header + 2
-  assert.match(lines[0]!, /^Action\(SiteID=UK\|Country=GB\|Currency=GBP\|Version=1193\),Category,Title/);
+  assert.match(lines[0]!, /^Action\(SiteID=UK\|Country=GB\|Currency=GBP\|Version=1193\),CustomLabel,Category,Title/);
   assert.match(lines[0]!, /StartPrice/);
   assert.match(lines[1]!, /"Pikachu ""Promo""/);
   assert.match(lines[1]!, /"Scarlet, Violet Promos/);
   assert.match(lines[2]!, /Charizard ex/);
 });
 
-test("default and explicit eBay CSVs preserve the existing File Exchange schema", () => {
-  const expectedHeader = [
-    "Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)",
-    "Category",
-    "Title",
-    "Description",
-    "Condition",
-    "Quantity",
-    "Format",
-    "StartPrice",
-    "PostageService-1:Option",
-    "PostageService-1:Cost",
-    "DispatchTimeMax",
-    "ReturnsAcceptedOption",
-    "CustomLabel",
-    "ItemSpecifics:Game",
-    "ItemSpecifics:Card Name",
-    "ItemSpecifics:Set",
-    "ItemSpecifics:Card Number",
-    "ItemSpecifics:Professional Grader",
-    "ItemSpecifics:Grade",
-    "ItemSpecifics:Certification Number",
-  ].join(",");
+const EBAY_ACTION = "Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)";
+const EBAY_SELLER_HUB_HEADER = [
+  EBAY_ACTION,
+  "CustomLabel",
+  "Category",
+  "Title",
+  "Description",
+  "ConditionID",
+  "CD:27501",
+  "CD:27502",
+  "CDA:27503",
+  "CD:40001",
+  "Quantity",
+  "Format",
+  "Duration",
+  "StartPrice",
+  "PostageService-1:Option",
+  "PostageService-1:Cost",
+  "DispatchTimeMax",
+  "ReturnsAcceptedOption",
+  "C:Game",
+  "C:Card Name",
+  "C:Set",
+  "C:Card Number",
+  "C:Language",
+  "C:Rarity",
+  "C:Edition",
+  "C:Finish",
+].join(",");
 
-  assert.equal(listingPackCsvHeader(), expectedHeader);
-  assert.equal(buildListingPackCsv([]), expectedHeader);
+test("default and explicit eBay CSVs use the Seller Hub File Exchange schema", () => {
+  assert.equal(listingPackCsvHeader(), EBAY_SELLER_HUB_HEADER);
+  assert.equal(listingPackCsvHeader("EBAY"), EBAY_SELLER_HUB_HEADER);
+  assert.equal(buildListingPackCsv([]), EBAY_SELLER_HUB_HEADER);
 
   const implicit = buildListingPackCsv([moonbreon]);
   const explicit = buildListingPackCsv([{ ...moonbreon, channel: "EBAY" }]);
   assert.equal(implicit, explicit);
+  const row = csvRecord(explicit);
   assert.deepEqual(
     {
-      action: csvRecord(explicit)[expectedHeader.split(",")[0]!],
-      category: csvRecord(explicit).Category,
-      format: csvRecord(explicit).Format,
-      startPrice: csvRecord(explicit).StartPrice,
-      postage: csvRecord(explicit)["PostageService-1:Option"],
+      action: row[EBAY_ACTION],
+      category: row.Category,
+      format: row.Format,
+      duration: row.Duration,
+      startPrice: row.StartPrice,
+      postage: row["PostageService-1:Option"],
+      conditionId: row.ConditionID,
+      cardCondition: row["CD:40001"],
+      game: row["C:Game"],
     },
     {
       action: "Add",
       category: "183454",
       format: "FixedPrice",
+      duration: "GTC",
       startPrice: "285.00",
       postage: "UK_RoyalMailFirstClassStandard",
+      conditionId: "4000",
+      cardCondition: "400010",
+      game: "Pokémon TCG",
     },
   );
+  assert.equal(parseCsvLine(explicit.split("\n")[1]!).length, EBAY_SELLER_HUB_HEADER.split(",").length);
 });
 
 test("Cardmarket CSV uses stock-prep fields and Cardmarket condition codes", () => {
@@ -525,4 +547,240 @@ test("CSV export rejects mixed channels instead of labelling rows with the wrong
     () => buildListingPackCsv([moonbreon, { ...slab, channel: "EBAY" }, { ...slab, channel: "IN_PERSON" }]),
     /only contain one channel/,
   );
+});
+
+const pricedRaw = { ...moonbreon, listPricePence: 2500 };
+
+function ebayDescriptorCell(descriptors: EbayConditionDescriptor[] | undefined, name: string): string {
+  const match = descriptors?.find((descriptor) => descriptor.name === name);
+  if (!match) return "";
+  return match.additionalInfo ?? match.values?.[0] ?? "";
+}
+
+test("eBay CSV lists a raw NM single with category 183454 descriptors", () => {
+  const input = { ...pricedRaw, condition: "NM" };
+  const row = csvRecord(buildListingPackCsv([input]));
+  assert.equal(row[EBAY_ACTION], "Add");
+  assert.equal(ebayCsvRowAction(input), "Add");
+  assert.equal(row.ConditionID, "4000");
+  assert.equal(row["CD:40001"], "400010");
+  assert.equal(row["CD:27501"], "");
+  assert.equal(row["CD:27502"], "");
+  assert.equal(row["CDA:27503"], "");
+  assert.equal(row.Duration, "GTC");
+  assert.equal(row.Category, "183454");
+  assert.equal(row.StartPrice, "25.00");
+});
+
+test("eBay CSV maps raw conditions onto the four 183454 card-condition IDs", () => {
+  for (const [condition, cardConditionId] of [
+    ["NM", "400010"],
+    ["LP", "400015"],
+    ["MP", "400016"],
+    ["HP", "400017"],
+    ["DMG", "400017"],
+    ["Near Mint", "400010"],
+    ["Damaged", "400017"],
+  ] as const) {
+    const row = csvRecord(buildListingPackCsv([{ ...pricedRaw, condition }]));
+    assert.equal(row[EBAY_ACTION], "Add", condition);
+    assert.equal(row.ConditionID, "4000", condition);
+    assert.equal(row["CD:40001"], cardConditionId, condition);
+    assert.equal(row["CD:27501"], "", condition);
+    assert.equal(row["CD:27502"], "", condition);
+    assert.equal(row["CDA:27503"], "", condition);
+  }
+});
+
+test("eBay CSV writes graded descriptors and leaves the ungraded column blank", () => {
+  const psa10 = { ...slab, listPricePence: 5000, certNumber: "12345", grade: "PSA_10" };
+  const psaRow = csvRecord(buildListingPackCsv([psa10]));
+  assert.equal(psaRow[EBAY_ACTION], "Add");
+  assert.equal(psaRow.ConditionID, "2750");
+  assert.equal(psaRow["CD:27501"], "275010");
+  assert.equal(psaRow["CD:27502"], "275020");
+  assert.equal(psaRow["CDA:27503"], "12345");
+  assert.equal(psaRow["CD:40001"], "");
+
+  const psa95 = csvRecord(buildListingPackCsv([{ ...psa10, grade: "PSA_9_5" }]));
+  assert.equal(psa95.ConditionID, "2750");
+  assert.equal(psa95["CD:27501"], "275010");
+  assert.equal(psa95["CD:27502"], "275021");
+  assert.equal(psa95["CD:40001"], "");
+
+  const ace = csvRecord(buildListingPackCsv([{ ...psa10, grade: "ACE_10" }]));
+  assert.equal(ace["CD:27501"], "2750119");
+  assert.equal(ace["CD:27502"], "275020");
+
+  const unknown = csvRecord(buildListingPackCsv([{ ...psa10, grade: "XYZ_9" }]));
+  assert.equal(unknown[EBAY_ACTION], "Add");
+  assert.equal(unknown.ConditionID, "2750");
+  assert.equal(unknown["CD:27501"], "2750123");
+  assert.equal(unknown["CD:27502"], "275022");
+  assert.equal(unknown["CDA:27503"], "12345");
+  assert.equal(unknown["CD:40001"], "");
+});
+
+test("eBay CSV descriptors match the inventory payload for the same fixtures", () => {
+  const fixtures: ListingPackInput[] = [
+    { ...pricedRaw, condition: "NM" },
+    { ...pricedRaw, condition: "LP" },
+    { ...pricedRaw, condition: "MP" },
+    { ...pricedRaw, condition: "HP" },
+    { ...pricedRaw, condition: "DMG" },
+    { ...pricedRaw, condition: "Near Mint" },
+    { ...pricedRaw, condition: "Damaged" },
+    { ...slab, listPricePence: 5000, certNumber: "12345", grade: "PSA_10" },
+    { ...slab, listPricePence: 5000, certNumber: "12345", grade: "PSA_9_5" },
+    { ...slab, listPricePence: 5000, certNumber: "12345", grade: "ACE_10" },
+    { ...slab, listPricePence: 5000, certNumber: "12345", grade: "XYZ_9" },
+  ];
+  for (const input of fixtures) {
+    const label = `${input.grade}/${String(input.condition ?? "")}`;
+    const row = csvRecord(buildListingPackCsv([input]));
+    const payload = buildInventoryItemPayload(input, 1);
+    assert.equal(row[EBAY_ACTION], "Add", label);
+    assert.equal(row.ConditionID, payload.condition === "LIKE_NEW" ? "2750" : "4000", label);
+    assert.equal(row["CD:27501"], ebayDescriptorCell(payload.conditionDescriptors, "27501"), label);
+    assert.equal(row["CD:27502"], ebayDescriptorCell(payload.conditionDescriptors, "27502"), label);
+    assert.equal(row["CDA:27503"], ebayDescriptorCell(payload.conditionDescriptors, "27503"), label);
+    assert.equal(row["CD:40001"], ebayDescriptorCell(payload.conditionDescriptors, "40001"), label);
+  }
+});
+
+test("unlistable eBay rows stay in the file as drafts instead of being dropped", () => {
+  const priced = { ...moonbreon, listPricePence: 1200, condition: "NM" };
+  const drafts = [
+    { ...priced, condition: null },
+    { ...priced, condition: "" },
+    { ...priced, condition: "Played-ish" },
+    { ...priced, grade: "PSA_11", certNumber: "999" },
+    { card: moonbreon.card, grade: "RAW", condition: "NM" },
+  ];
+  const inputs = [{ ...priced, condition: "LP" }, ...drafts];
+  const csv = buildListingPackCsv(inputs);
+  assert.equal(csv.split("\n").length, inputs.length + 1);
+  assert.equal(csvRecord(csv, 1)[EBAY_ACTION], "Add");
+  assert.equal(csvRecord(csv, 1).ConditionID, "4000");
+
+  drafts.forEach((input, index) => {
+    const row = csvRecord(csv, index + 2);
+    const label = `${input.grade}/${String(input.condition)}`;
+    assert.equal(row[EBAY_ACTION], "Draft", label);
+    assert.equal(ebayCsvRowAction(input), "Draft", label);
+    assert.equal(row.ConditionID, "", label);
+    assert.equal(row["CD:27501"], "", label);
+    assert.equal(row["CD:27502"], "", label);
+    assert.equal(row["CDA:27503"], "", label);
+    assert.equal(row["CD:40001"], "", label);
+    assert.equal(buildListingPackCsv([input]).split("\n").length, 2, label);
+  });
+
+  assert.equal(csvRecord(csv, 2).StartPrice, "12.00");
+  assert.equal(csvRecord(csv, 3).StartPrice, "12.00");
+  assert.equal(csvRecord(csv, 4).StartPrice, "12.00");
+  assert.equal(csvRecord(csv, 5).StartPrice, "12.00");
+  assert.equal(csvRecord(csv, 6).StartPrice, "");
+});
+
+test("eBay item specifics use C: columns from the listing pack and omit grader columns", () => {
+  const header = listingPackCsvHeader().split(",");
+  for (const column of header) {
+    assert.equal(column.startsWith("ItemSpecifics:"), false, column);
+  }
+  assert.equal(header.includes("C:Professional Grader"), false);
+  assert.equal(header.includes("C:Grade"), false);
+  assert.equal(header.includes("C:Card Condition"), false);
+
+  const printed = {
+    ...slab,
+    card: { ...slab.card, edition: "FIRST_EDITION", finish: "HOLO", language: "JP" },
+  };
+  const specifics = buildItemSpecifics(printed);
+  const row = csvRecord(buildListingPackCsv([printed]));
+  for (const key of ["Game", "Card Name", "Set", "Card Number", "Language", "Rarity", "Edition", "Finish"]) {
+    assert.equal(row[`C:${key}`], specifics[key] ?? "", key);
+  }
+  assert.equal(row["C:Game"], "Pokémon TCG");
+  assert.equal(row["C:Language"], "JP");
+  assert.equal(row["C:Edition"], "1st Edition");
+  assert.equal(row["C:Finish"], "Holo");
+  assert.equal(row["C:Professional Grader"], undefined);
+  assert.equal(specifics["Professional Grader"], "PSA");
+  assert.equal(row["CD:27501"], "275010");
+});
+
+test("eBay CSV titles with a comma, quote and accent round-trip through csvRecord", () => {
+  const input = {
+    card: { name: 'Éclair "Promo", 1', language: "EN" },
+    grade: "RAW",
+    condition: "NM",
+    listPricePence: 500,
+  };
+  const title = buildEbayTitle(input);
+  assert.match(title, /Éclair "Promo", 1/);
+  const row = csvRecord(buildListingPackCsv([input]));
+  assert.equal(row.Title, title);
+  assert.equal(row["C:Card Name"], 'Éclair "Promo", 1');
+});
+
+test("eBay listing-pack export counts draft rows and stays read-only", async () => {
+  const savedUrl = process.env.DATABASE_URL;
+  const globalPrisma = globalThis as { prisma?: unknown };
+  const previousPrisma = globalPrisma.prisma;
+  const rows = [
+    {
+      cardId: "card-nm",
+      grade: "RAW",
+      costBasis: 1000,
+      condition: "NM",
+      graderCert: null,
+      card: { name: "Pikachu", setName: "Base", number: "58/102", rarity: "Common", language: "EN", edition: null, finish: null },
+      listings: [],
+    },
+    {
+      cardId: "card-raw",
+      grade: "RAW",
+      costBasis: 1000,
+      condition: null,
+      graderCert: null,
+      card: { name: "Bulbasaur", setName: "Base", number: "44/102", rarity: "Common", language: "EN", edition: null, finish: null },
+      listings: [],
+    },
+  ];
+  let current = rows;
+  globalPrisma.prisma = {
+    inventoryItem: { findMany: async () => current },
+    priceSnapshot: { findMany: async () => [] },
+    compResult: { findMany: async () => [] },
+  };
+  process.env.DATABASE_URL = savedUrl || "postgresql://example.invalid/poke-deal";
+
+  try {
+    const ebay = await listingPackExportGET(new Request("http://localhost/api/export/listing-pack"));
+    assert.equal(ebay.status, 200);
+    assert.equal(ebay.headers.get("X-Listing-Pack-Drafts"), "1");
+    const ebayCsv = await ebay.text();
+    assert.equal(ebayCsv.split("\n").length, 3);
+    assert.equal(csvRecord(ebayCsv, 1)[EBAY_ACTION], "Add");
+    assert.equal(csvRecord(ebayCsv, 1).ConditionID, "4000");
+    assert.equal(csvRecord(ebayCsv, 2)[EBAY_ACTION], "Draft");
+    assert.equal(csvRecord(ebayCsv, 2).ConditionID, "");
+
+    current = [];
+    const empty = await listingPackExportGET(new Request("http://localhost/api/export/listing-pack?channel=EBAY"));
+    assert.equal(empty.headers.get("X-Listing-Pack-Drafts"), "0");
+    assert.equal(await empty.text(), listingPackCsvHeader("EBAY"));
+
+    current = rows;
+    const cardmarket = await listingPackExportGET(new Request("http://localhost/api/export/listing-pack?channel=CARDMARKET"));
+    assert.equal(cardmarket.headers.get("X-Listing-Pack-Drafts"), null);
+    assert.equal(cardmarket.status, 200);
+    assert.match(await cardmarket.text(), /^Card Name,Expansion,/);
+  } finally {
+    if (savedUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = savedUrl;
+    if (previousPrisma === undefined) delete globalPrisma.prisma;
+    else globalPrisma.prisma = previousPrisma;
+  }
 });

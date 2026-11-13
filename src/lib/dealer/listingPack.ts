@@ -11,6 +11,7 @@
 import { STOCK_IMAGE_DISCLOSURE } from "../photos/listingPhotoPolicy.js";
 import { formatGbp } from "../format/money.js";
 import type { RawCondition } from "../domain/types.js";
+import { ebayCardConditionIds, parseGradedGrade } from "../ebay/cardConditionIds.js";
 
 export interface ListingPackCard {
   name: string;
@@ -421,29 +422,41 @@ export function listingPackCopyFields(pack: ListingPack): ListingPackCopyField[]
   ];
 }
 
-// ── CSV export (eBay-style flat columns) ─────────────────────────────────────
+// ── CSV export ───────────────────────────────────────────────────────────────
+// eBay rows follow Seller Hub File Exchange for category 183454: numeric
+// ConditionID, condition descriptors, and C: item specifics. Grader, grade,
+// cert and card condition travel only as descriptors. Other channels keep
+// their own columns.
+
+const EBAY_ACTION_COLUMN = "Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)" as const;
 
 const EBAY_CSV_COLUMNS = [
-  "Action(SiteID=UK|Country=GB|Currency=GBP|Version=1193)",
+  EBAY_ACTION_COLUMN,
+  "CustomLabel",
   "Category",
   "Title",
   "Description",
-  "Condition",
+  "ConditionID",
+  "CD:27501",
+  "CD:27502",
+  "CDA:27503",
+  "CD:40001",
   "Quantity",
   "Format",
+  "Duration",
   "StartPrice",
   "PostageService-1:Option",
   "PostageService-1:Cost",
   "DispatchTimeMax",
   "ReturnsAcceptedOption",
-  "CustomLabel",
-  "ItemSpecifics:Game",
-  "ItemSpecifics:Card Name",
-  "ItemSpecifics:Set",
-  "ItemSpecifics:Card Number",
-  "ItemSpecifics:Professional Grader",
-  "ItemSpecifics:Grade",
-  "ItemSpecifics:Certification Number",
+  "C:Game",
+  "C:Card Name",
+  "C:Set",
+  "C:Card Number",
+  "C:Language",
+  "C:Rarity",
+  "C:Edition",
+  "C:Finish",
 ] as const;
 
 const CARDMARKET_CSV_COLUMNS = [
@@ -496,31 +509,81 @@ export function listingPackToCsvRow(input: ListingPackInput): string {
   return ebayCsvRow(input);
 }
 
+export function ebayCsvRowAction(input: ListingPackInput): "Add" | "Draft" {
+  return ebayCsvConditionCells(input).action;
+}
+
 function ebayCsvRow(input: ListingPackInput): string {
   const pack = buildListingPack(input);
-  const row = [
-    "Add",
-    "183454",
-    pack.title,
-    pack.description.replace(/\n+/g, " | "),
-    pack.condition,
-    "1",
-    "FixedPrice",
-    (pack.suggestedPricePence / 100).toFixed(2),
-    ebayPostageService(input),
-    (pack.postage.pricePence / 100).toFixed(2),
-    "1",
-    "ReturnsAccepted",
-    buildCustomLabel(input),
-    "Pokemon TCG",
-    input.card.name,
-    input.card.setName ?? "",
-    input.card.number ?? "",
-    pack.itemSpecifics["Professional Grader"] ?? "",
-    pack.itemSpecifics.Grade ?? "",
-    pack.itemSpecifics.Certification ?? "",
-  ];
-  return row.map(csvCell).join(",");
+  const gate = ebayCsvConditionCells(input);
+  const specifics = pack.itemSpecifics;
+  const values: Record<(typeof EBAY_CSV_COLUMNS)[number], string> = {
+    [EBAY_ACTION_COLUMN]: gate.action,
+    CustomLabel: buildCustomLabel(input),
+    Category: "183454",
+    Title: pack.title,
+    Description: pack.description.replace(/\n+/g, " | "),
+    ConditionID: gate.conditionId,
+    "CD:27501": gate.graderId,
+    "CD:27502": gate.gradeId,
+    "CDA:27503": gate.certification,
+    "CD:40001": gate.cardConditionId,
+    Quantity: "1",
+    Format: "FixedPrice",
+    Duration: "GTC",
+    StartPrice: pack.suggestedPricePence > 0 ? (pack.suggestedPricePence / 100).toFixed(2) : "",
+    "PostageService-1:Option": ebayPostageService(input),
+    "PostageService-1:Cost": (pack.postage.pricePence / 100).toFixed(2),
+    DispatchTimeMax: "1",
+    ReturnsAcceptedOption: "ReturnsAccepted",
+    "C:Game": specifics.Game ?? "",
+    "C:Card Name": specifics["Card Name"] ?? "",
+    "C:Set": specifics.Set ?? "",
+    "C:Card Number": specifics["Card Number"] ?? "",
+    "C:Language": specifics.Language ?? "",
+    "C:Rarity": specifics.Rarity ?? "",
+    "C:Edition": specifics.Edition ?? "",
+    "C:Finish": specifics.Finish ?? "",
+  };
+  return EBAY_CSV_COLUMNS.map((column) => csvCell(values[column])).join(",");
+}
+
+interface EbayCsvConditionCells {
+  action: "Add" | "Draft";
+  conditionId: string;
+  graderId: string;
+  gradeId: string;
+  certification: string;
+  cardConditionId: string;
+}
+
+function ebayCsvConditionCells(input: ListingPackInput): EbayCsvConditionCells {
+  const blank: EbayCsvConditionCells = {
+    action: "Draft",
+    conditionId: "",
+    graderId: "",
+    gradeId: "",
+    certification: "",
+    cardConditionId: "",
+  };
+  const graded = isGradedGrade(input.grade);
+  const parsed = graded ? parseGradedGrade(input.grade) : null;
+  const ids = ebayCardConditionIds({
+    graded,
+    grader: parsed?.grader,
+    gradeValue: parsed?.gradeValue,
+    rawCondition: graded ? null : normalizeListingRawCondition(input.condition),
+  });
+  const listable = suggestListPricePence(input) > 0 && (graded ? Boolean(ids.gradeId) : Boolean(ids.cardConditionId));
+  if (!listable) return blank;
+  return {
+    action: "Add",
+    conditionId: ids.conditionId,
+    graderId: graded ? ids.graderId ?? "" : "",
+    gradeId: graded ? ids.gradeId ?? "" : "",
+    certification: graded && input.certNumber ? input.certNumber : "",
+    cardConditionId: graded ? "" : ids.cardConditionId ?? "",
+  };
 }
 
 export function buildListingPackCsv(inputs: ListingPackInput[]): string {
