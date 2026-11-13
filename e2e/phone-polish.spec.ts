@@ -551,3 +551,122 @@ test("binder filters keep a Drafts peek and bring Sold fully into the row at 390
     await context.close();
   }
 });
+
+test("Today scrolls clear of the dock and the sticky header covers the top at 390", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 390, 844);
+  await mockApis(context);
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today");
+    await expect(page.locator(".today-workspace")).toBeVisible();
+    await expect(page.locator("#today-command-title")).toBeVisible();
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" }).catch(() => undefined);
+    const scrolled = await page.evaluate(() => {
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      window.scrollTo(0, maxScroll);
+      return maxScroll;
+    });
+    expect(scrolled).toBeGreaterThan(80);
+
+    const geometry = await page.evaluate(() => {
+      const header = document.querySelector<HTMLElement>(".dealer-deck.topbar");
+      const nav = document.querySelector<HTMLElement>(".primary-nav.bottom-nav");
+      const today = document.querySelector<HTMLElement>(".today-workspace");
+      const shell = document.querySelector<HTMLElement>(".app-shell");
+      if (!header || !nav || !today || !shell) throw new Error("Today shell, header, or dock is missing");
+
+      const headerRect = header.getBoundingClientRect();
+      const navRect = nav.getBoundingClientRect();
+      const todayRect = today.getBoundingClientRect();
+      const headerStyle = getComputedStyle(header);
+      const safeProbe = document.createElement("div");
+      safeProbe.style.paddingBottom = "env(safe-area-inset-bottom)";
+      document.body.append(safeProbe);
+      const safeBottom = Number.parseFloat(getComputedStyle(safeProbe).paddingBottom) || 0;
+      safeProbe.remove();
+
+      const opaque = (color: string) => {
+        const slash = color.match(/\/\s*([0-9.]+)\s*\)/);
+        if (slash) return Number(slash[1]) >= 0.99;
+        const channels = color.match(/rgba?\(([^)]+)\)/i);
+        if (!channels) return false;
+        const parts = channels[1].split(/[,\s/]+/).filter(Boolean);
+        return parts.length < 4 || Number(parts[3]) >= 0.99;
+      };
+
+      const leaks: Array<{ x: number; y: number; name: string }> = [];
+      const gapBottom = Math.max(0, headerRect.top);
+      for (let y = 0; y < gapBottom; y += 1) {
+        for (let x = 0; x < window.innerWidth; x += 8) {
+          const hit = document.elementFromPoint(x, y);
+          if (hit !== header && !header.contains(hit)) {
+            leaks.push({ x, y, name: String(hit?.className || hit?.tagName || "none").slice(0, 80) });
+          }
+        }
+      }
+      for (let x = 0; x < window.innerWidth; x += 8) {
+        const hit = document.elementFromPoint(x, 1);
+        if (hit !== header && !header.contains(hit)) {
+          leaks.push({ x, y: 1, name: String(hit?.className || hit?.tagName || "none").slice(0, 80) });
+        }
+      }
+
+      const buttons = [...today.querySelectorAll("button")].flatMap((button) => {
+        const style = getComputedStyle(button);
+        if (style.display === "none" || style.visibility === "hidden" || style.position === "fixed") return [];
+        const rect = button.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2 || rect.bottom > todayRect.bottom + 1) return [];
+        return [rect.bottom];
+      });
+      const lastButtonBottom = buttons.length > 0 ? Math.max(...buttons) : todayRect.bottom;
+
+      return {
+        headerTop: headerRect.top,
+        headerLeft: headerRect.left,
+        headerRight: headerRect.right,
+        headerBackground: headerStyle.backgroundColor,
+        headerBackdrop: headerStyle.backdropFilter,
+        headerOpaque: opaque(headerStyle.backgroundColor),
+        leaks: leaks.slice(0, 6),
+        leakCount: leaks.length,
+        todayBottom: todayRect.bottom,
+        lastButtonBottom,
+        navTop: navRect.top,
+        navHeight: navRect.height,
+        shellPaddingBottom: Number.parseFloat(getComputedStyle(shell).paddingBottom) || 0,
+        safeBottom,
+        viewportWidth: window.innerWidth,
+      };
+    });
+
+    expect(geometry.leakCount, `content above the sticky header: ${JSON.stringify(geometry.leaks)}`).toBe(0);
+    expect(geometry.headerTop).toBeLessThanOrEqual(0);
+    expect(geometry.headerLeft).toBeLessThanOrEqual(0);
+    expect(geometry.headerRight).toBeGreaterThanOrEqual(geometry.viewportWidth);
+    expect(geometry.headerOpaque, geometry.headerBackground).toBe(true);
+    expect(geometry.headerBackdrop).toBe("none");
+    expect(geometry.todayBottom).toBeLessThanOrEqual(geometry.navTop);
+    expect(geometry.lastButtonBottom).toBeLessThanOrEqual(geometry.navTop);
+    expect(geometry.shellPaddingBottom).toBeGreaterThanOrEqual(geometry.navHeight + geometry.safeBottom - 0.5);
+
+    await page.getByRole("button", { name: "Stock", exact: true }).click();
+    await expect(page.locator(".inventory-workspace")).toBeVisible();
+    const shared = await page.evaluate(() => {
+      const shell = document.querySelector<HTMLElement>(".app-shell");
+      const nav = document.querySelector<HTMLElement>(".primary-nav.bottom-nav");
+      const stock = document.querySelector<HTMLElement>(".inventory-workspace");
+      if (!shell || !nav || !stock) throw new Error("Stock shell or dock is missing");
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      return {
+        paddingBottom: getComputedStyle(shell).paddingBottom,
+        stockBottom: stock.getBoundingClientRect().bottom,
+        navTop: nav.getBoundingClientRect().top,
+      };
+    });
+    expect(Number.parseFloat(shared.paddingBottom)).toBe(geometry.shellPaddingBottom);
+    expect(shared.stockBottom).toBeLessThanOrEqual(shared.navTop);
+  } finally {
+    await context.close();
+  }
+});
