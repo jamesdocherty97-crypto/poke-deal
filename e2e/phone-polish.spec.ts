@@ -82,6 +82,13 @@ function dashboard() {
   };
 }
 
+async function safeArea(page: Page, insets: { top?: number; right?: number; bottom?: number; left?: number }) {
+  const client = await page.context().newCDPSession(page);
+  await client.send("Emulation.setSafeAreaInsetsOverride", {
+    insets: { top: 0, right: 0, bottom: 0, left: 0, ...insets },
+  });
+}
+
 async function phone(browser: Browser, baseURL: string, width: number, height: number) {
   const context = await browser.newContext({
     baseURL, viewport: { width, height }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
@@ -780,6 +787,86 @@ test("phone landscape header is flush and opaque at 844x390", async ({ browser, 
     expect(geometry.backdrop).toBe("none");
     expect(geometry.scrollPad).toBeGreaterThanOrEqual(geometry.height - 0.5);
     expect(geometry.scrollPad - geometry.height).toBeLessThanOrEqual(1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("a 47px top notch keeps the header flush and scroll padding equal to the header", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 390, 844);
+  const page = await context.newPage();
+  await safeArea(page, { top: 47 });
+  await mockApis(context);
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today");
+    await expect(page.locator("#today-command-title")).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 160));
+    const notch = 47;
+    const geometry = await page.evaluate(() => {
+      const header = document.querySelector<HTMLElement>(".dealer-deck.topbar");
+      const mark = document.querySelector<HTMLElement>(".dealer-brand .app-mark");
+      if (!header || !mark) throw new Error("Sticky header is missing");
+      const headerBox = header.getBoundingClientRect();
+      const markBox = mark.getBoundingClientRect();
+      return {
+        top: headerBox.top,
+        height: headerBox.height,
+        paddingTop: Number.parseFloat(getComputedStyle(header).paddingTop) || 0,
+        markTop: markBox.top,
+        scrollPad: Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0,
+      };
+    });
+    expect(geometry.top).toBeLessThanOrEqual(0);
+    expect(geometry.paddingTop).toBeGreaterThanOrEqual(notch);
+    expect(geometry.markTop).toBeGreaterThanOrEqual(notch);
+    expect(Math.abs(geometry.scrollPad - geometry.height)).toBeLessThanOrEqual(1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("landscape side insets keep the header, dock, and page gutter clear of the notch", async ({ browser, baseURL }) => {
+  const width = 780;
+  const height = 400;
+  const left = 47;
+  const right = 34;
+  const context = await phone(browser, baseURL!, width, height);
+  const page = await context.newPage();
+  await safeArea(page, { left, right });
+  await mockApis(context);
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today");
+    await expect(page.locator("#today-command-title")).toBeVisible();
+    const cleared = await page.evaluate(({ left, right, width }) => {
+      const header = document.querySelector<HTMLElement>(".dealer-deck.topbar");
+      const mark = document.querySelector<HTMLElement>(".dealer-brand .app-mark");
+      const today = document.querySelector<HTMLElement>(".today-workspace");
+      const nav = document.querySelector<HTMLElement>(".primary-nav.bottom-nav");
+      const refresh = document.querySelector<HTMLElement>(".utility-nav .icon-button");
+      if (!header || !mark || !today || !nav || !refresh) throw new Error("Landscape shell is missing a notch target");
+      const box = (element: HTMLElement) => element.getBoundingClientRect();
+      return {
+        headerLeft: box(header).left,
+        headerRight: box(header).right,
+        markLeft: box(mark).left,
+        refreshRight: box(refresh).right,
+        todayLeft: box(today).left,
+        todayRight: box(today).right,
+        navLeft: box(nav).left,
+        navRight: box(nav).right,
+        limit: width - right,
+      };
+    }, { left, right, width });
+    expect(cleared.headerLeft).toBeLessThanOrEqual(0);
+    expect(cleared.headerRight).toBeGreaterThanOrEqual(width - 1);
+    expect(cleared.markLeft).toBeGreaterThanOrEqual(left);
+    expect(cleared.refreshRight).toBeLessThanOrEqual(width - right + 0.5);
+    expect(cleared.todayLeft).toBeGreaterThanOrEqual(left);
+    expect(cleared.todayRight).toBeLessThanOrEqual(width - right + 0.5);
+    expect(cleared.navLeft).toBeGreaterThanOrEqual(left);
+    expect(cleared.navRight).toBeLessThanOrEqual(cleared.limit + 0.5);
   } finally {
     await context.close();
   }
