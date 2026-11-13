@@ -1568,17 +1568,35 @@ button.ghost-button:disabled,
 }
 
 @media (max-width: 719px) {
-  html { scroll-padding-top:86px; scroll-padding-bottom:calc(116px + env(safe-area-inset-bottom)); }
+  /*
+   * The dock's min-height already includes the home-indicator inset and sits
+   * flush with the viewport bottom. Clearance adds that inset again, plus a
+   * gap, so the last control can scroll fully above the bar on every tab.
+   * --dock-block is the phone dock's min-height (see phone-rows.css).
+   */
+  :root {
+    --dock-block: calc(90px + env(safe-area-inset-bottom));
+    --dock-clearance: calc(var(--dock-block) + env(safe-area-inset-bottom) + 28px);
+  }
+  html { scroll-padding-top:86px; scroll-padding-bottom:var(--dock-clearance); }
   body { background:var(--color-canvas); }
   body::before { content:none; }
-  .app-shell { width:100%; padding:max(8px,env(safe-area-inset-top)) 10px calc(104px + env(safe-area-inset-bottom)); }
+  .app-shell { width:100%; padding:0 10px var(--dock-clearance); }
   .dealer-deck.topbar {
-    top:max(6px,env(safe-area-inset-top));
+    top:0;
     grid-template-columns:minmax(0,1fr) auto;
-    min-height:60px;
+    width:calc(100% + 20px);
+    min-height:calc(60px + max(8px, env(safe-area-inset-top)));
     gap:8px;
-    padding:7px 8px;
-    border-radius:12px;
+    margin-right:-10px;
+    margin-left:-10px;
+    padding:calc(7px + max(8px, env(safe-area-inset-top))) 18px 7px;
+    border-width:0 0 1px;
+    border-radius:0;
+    background:var(--color-canvas-raised);
+    box-shadow:0 10px 28px rgba(0, 0, 0, 0.35);
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
   }
   .dealer-brand .app-mark { width:39px; height:39px; border-radius:9px; }
   .dealer-brand .eyebrow { font-size:.57rem; }

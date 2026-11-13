@@ -124,7 +124,7 @@
     left: 0;
     width: 100%;
     max-width: none;
-    min-height: calc(90px + env(safe-area-inset-bottom));
+    min-height: var(--dock-block, calc(90px + env(safe-area-inset-bottom)));
     align-content: center;
     border-radius: 20px 20px 0 0;
     transform: none;
