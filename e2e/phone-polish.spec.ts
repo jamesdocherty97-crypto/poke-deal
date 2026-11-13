@@ -787,6 +787,22 @@ test("phone landscape header is flush and opaque at 844x390", async ({ browser, 
     expect(geometry.backdrop).toBe("none");
     expect(geometry.scrollPad).toBeGreaterThanOrEqual(geometry.height - 0.5);
     expect(geometry.scrollPad - geometry.height).toBeLessThanOrEqual(1);
+
+    const notched = await context.newPage();
+    await safeArea(notched, { top: 47 });
+    await notched.goto("/?view=today");
+    await expect(notched.locator("#today-command-title")).toBeVisible();
+    await notched.evaluate(() => window.scrollTo(0, 80));
+    const padded = await notched.evaluate(() => {
+      const header = document.querySelector(".dealer-deck.topbar");
+      if (!header) throw new Error("Sticky header is missing");
+      const height = header.getBoundingClientRect().height;
+      const scrollPad = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+      return { height, scrollPad, extra: scrollPad - height };
+    });
+    expect(Math.abs(padded.scrollPad - padded.height)).toBeLessThanOrEqual(1);
+    expect(padded.extra).toBeLessThan(20);
+    await notched.close();
   } finally {
     await context.close();
   }
@@ -827,46 +843,68 @@ test("a 47px top notch keeps the header flush and scroll padding equal to the he
 });
 
 test("landscape side insets keep the header, dock, and page gutter clear of the notch", async ({ browser, baseURL }) => {
-  const width = 780;
-  const height = 400;
   const left = 47;
   const right = 34;
-  const context = await phone(browser, baseURL!, width, height);
-  const page = await context.newPage();
-  await safeArea(page, { left, right });
+  for (const [width, height] of [[780, 400], [844, 390]] as const) {
+    const context = await phone(browser, baseURL!, width, height);
+    const page = await context.newPage();
+    await safeArea(page, { left, right });
+    await mockApis(context);
+    try {
+      await resetStorage(page);
+      await page.goto("/?view=today");
+      await expect(page.locator("#today-command-title")).toBeVisible();
+      const cleared = await page.evaluate(({ left, right, width }) => {
+        const header = document.querySelector<HTMLElement>(".dealer-deck.topbar");
+        const mark = document.querySelector<HTMLElement>(".dealer-brand .app-mark");
+        const today = document.querySelector<HTMLElement>(".today-workspace");
+        const nav = document.querySelector<HTMLElement>(".primary-nav.bottom-nav");
+        const refresh = document.querySelector<HTMLElement>(".utility-nav .icon-button");
+        if (!header || !mark || !today || !nav || !refresh) throw new Error("Landscape shell is missing a notch target");
+        const box = (element: HTMLElement) => element.getBoundingClientRect();
+        return {
+          headerLeft: box(header).left,
+          headerRight: box(header).right,
+          markLeft: box(mark).left,
+          refreshRight: box(refresh).right,
+          todayLeft: box(today).left,
+          todayRight: box(today).right,
+          navLeft: box(nav).left,
+          navRight: box(nav).right,
+          limit: width - right,
+        };
+      }, { left, right, width });
+      expect(cleared.headerLeft, `${width}x${height}`).toBeLessThanOrEqual(0);
+      expect(cleared.headerRight, `${width}x${height}`).toBeGreaterThanOrEqual(width - 1);
+      expect(cleared.markLeft, `${width}x${height}`).toBeGreaterThanOrEqual(left);
+      expect(cleared.refreshRight, `${width}x${height}`).toBeLessThanOrEqual(width - right + 0.5);
+      expect(cleared.todayLeft, `${width}x${height}`).toBeGreaterThanOrEqual(left);
+      expect(cleared.todayRight, `${width}x${height}`).toBeLessThanOrEqual(width - right + 0.5);
+      expect(cleared.navLeft, `${width}x${height}`).toBeGreaterThanOrEqual(left);
+      expect(cleared.navRight, `${width}x${height}`).toBeLessThanOrEqual(cleared.limit + 0.5);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test("focusing a partly visible control clears the landscape header at 844x390", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 844, 390);
   await mockApis(context);
+  const page = await context.newPage();
   try {
     await resetStorage(page);
     await page.goto("/?view=today");
-    await expect(page.locator("#today-command-title")).toBeVisible();
-    const cleared = await page.evaluate(({ left, right, width }) => {
-      const header = document.querySelector<HTMLElement>(".dealer-deck.topbar");
-      const mark = document.querySelector<HTMLElement>(".dealer-brand .app-mark");
-      const today = document.querySelector<HTMLElement>(".today-workspace");
-      const nav = document.querySelector<HTMLElement>(".primary-nav.bottom-nav");
-      const refresh = document.querySelector<HTMLElement>(".utility-nav .icon-button");
-      if (!header || !mark || !today || !nav || !refresh) throw new Error("Landscape shell is missing a notch target");
-      const box = (element: HTMLElement) => element.getBoundingClientRect();
-      return {
-        headerLeft: box(header).left,
-        headerRight: box(header).right,
-        markLeft: box(mark).left,
-        refreshRight: box(refresh).right,
-        todayLeft: box(today).left,
-        todayRight: box(today).right,
-        navLeft: box(nav).left,
-        navRight: box(nav).right,
-        limit: width - right,
-      };
-    }, { left, right, width });
-    expect(cleared.headerLeft).toBeLessThanOrEqual(0);
-    expect(cleared.headerRight).toBeGreaterThanOrEqual(width - 1);
-    expect(cleared.markLeft).toBeGreaterThanOrEqual(left);
-    expect(cleared.refreshRight).toBeLessThanOrEqual(width - right + 0.5);
-    expect(cleared.todayLeft).toBeGreaterThanOrEqual(left);
-    expect(cleared.todayRight).toBeLessThanOrEqual(width - right + 0.5);
-    expect(cleared.navLeft).toBeGreaterThanOrEqual(left);
-    expect(cleared.navRight).toBeLessThanOrEqual(cleared.limit + 0.5);
+    await expect(page.getByRole("button", { name: "Prepare stock", exact: true })).toBeVisible();
+    const gap = await page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      const button = [...document.querySelectorAll("main button")].find((element) => element.textContent?.replace(/\s+/g, " ").trim() === "Prepare stock");
+      const header = document.querySelector(".dealer-deck.topbar");
+      if (!button || !header) throw new Error("Prepare stock is not in the landscape view");
+      button.focus();
+      return button.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+    });
+    expect(gap).toBeGreaterThanOrEqual(-1);
   } finally {
     await context.close();
   }
