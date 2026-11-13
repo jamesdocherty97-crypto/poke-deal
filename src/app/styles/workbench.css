@@ -856,7 +856,35 @@ textarea:focus-visible {
 }
 
 .today-command-actions button { min-height: 48px; padding: 0 17px; }
+.today-command-actions .today-done-toggle {
+  justify-self: start;
+  width: auto;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text-secondary);
+  font-size: .8rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.today-command-actions .today-done-toggle:hover {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text-primary);
+}
+.today-command-actions .today-done-toggle:focus-visible {
+  outline: 2px solid rgba(105, 232, 255, 0.95);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(105, 232, 255, 0.14);
+}
 .today-command .ghost-button { border-color: var(--color-border-strong); color: var(--color-text-primary); }
+.today-command.quest-complete { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.today-command.quest-complete .today-mission-inline { max-width: none; }
 
 .today-command-progress {
   display: flex;
@@ -938,7 +966,8 @@ textarea:focus-visible {
 .sale-ready-sleeve { display: grid; grid-template-columns: 42% 1fr; overflow: hidden; border: 1px solid transparent; border-radius: 12px; background: linear-gradient(var(--color-surface-1),var(--color-surface-1)) padding-box, var(--brand-holo-gradient) border-box; box-shadow: var(--shadow-2), 0 0 32px rgba(121,189,230,.08); }
 .deal-sleeve-art { display: grid; place-items: center; padding: 24px 12px 24px 22px; background: var(--color-surface-2); }
 .deal-sleeve-card { width: 100%; max-width: 150px; height:auto; aspect-ratio:var(--card-art-ratio); border:1px solid var(--color-border-strong); border-radius:7px; object-fit:contain; object-position:center; background:var(--color-surface-sunken); box-shadow:0 16px 25px rgba(0,0,0,.35); transform:rotate(-1deg); }
-.deal-sleeve-card.blank { display: block; background: var(--color-surface-2); border-style: dashed; }
+.deal-sleeve-card.blank { display: grid; place-items: center; background: var(--color-surface-2); border-style: dashed; }
+.deal-sleeve-card.blank::after { content: "No photo"; color: var(--color-text-secondary); font-size: .72rem; font-weight: 700; }
 .deal-sleeve-ticket { position: relative; display: flex; flex-direction: column; justify-content: center; padding: 24px 22px; color: var(--color-text-primary); }
 .deal-sleeve-ticket::before { position: absolute; top: 18px; bottom: 18px; left: 0; border-left: 1px dashed var(--color-border-strong); content: ""; }
 .deal-sleeve-ticket .workspace-eyebrow { color: var(--brand-yellow); }
@@ -973,6 +1002,7 @@ textarea:focus-visible {
 .readiness-brief-row small,
 .dealer-alert small { color: var(--muted); }
 .dealer-pulse-actions { grid-template-columns: 1fr 1fr; margin-top: 16px; }
+.dealer-pulse-actions:empty { display: none; }
 .dealer-tools { margin-top: 14px; border-top: 1px solid var(--color-border); }
 .dealer-tools summary { padding: 14px 0 0; color: var(--muted); cursor: pointer; }
 .dealer-tools > div { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
@@ -1844,9 +1874,16 @@ button.ghost-button:disabled,
 .today-mission-card small { color: var(--color-text-secondary); font-size: .78rem; }
 .today-mission-card.tone-warn { border-color: color-mix(in srgb, var(--color-warning, #c47b16) 45%, var(--color-border)); }
 .today-mission-card.tone-good { border-color: color-mix(in srgb, var(--color-success, #1f9d63) 40%, var(--color-border)); }
+.today-mission-inline { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; width: 100%; max-width: 46rem; padding: 0; box-sizing: border-box; }
+.today-mission-inline .today-mission-card { flex: 1 1 180px; padding: 8px 12px; }
 .today-more-moves > summary,
-.today-pulse-details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
-.today-more-moves > summary::-webkit-details-marker { display: none; }
+.dealer-tools > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
+.today-more-moves > summary::-webkit-details-marker,
+.dealer-tools > summary::-webkit-details-marker { display: none; }
+.today-more-moves > summary::before,
+.dealer-tools > summary::before { content: "\25B8"; }
+.today-more-moves[open] > summary::before,
+.dealer-tools[open] > summary::before { content: "\25BE"; }
 .today-count-unknown { color: var(--color-text-secondary); }
 @media (max-width: 720px) {
   .today-slim .today-command-actions { display: grid; grid-template-columns: 1fr; }

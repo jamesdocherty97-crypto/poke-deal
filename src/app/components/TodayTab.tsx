@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+// React is referenced by the classic JSX transform used in node:test.
+import React, { useEffect, useMemo, useState } from "react";
 import type { TodayAction, TodayActionTarget } from "@/lib/dealer/today";
 import type { ManualCompReview } from "@/lib/comps/manualReview";
 import type { OperatingSnapshotRow } from "@/lib/dealer/operatingSnapshot";
@@ -21,7 +22,7 @@ type TodayDashboard = {
     provisionalSaleCount?: number;
   };
   recentSales?: Array<{ soldAt: string; profitPence: number }>;
-  salesToReconcile?: Array<{ id: string; cardName?: string; channel?: string; soldAt?: string }>;
+  salesToReconcile?: Array<{ id: string; name?: string; cardName?: string; channel?: string; soldAt?: string }>;
   salesToReconcileCount?: number;
 };
 
@@ -213,7 +214,7 @@ export function TodayTab({
       unmatchedPreview: orderSyncStatus?.unmatchedPreview,
       provisionalPreview: recovery.trustSales ? (dashboard?.salesToReconcile ?? []).map((sale) => ({
         id: sale.id,
-        title: sale.cardName ?? "Sale",
+        title: sale.name ?? sale.cardName ?? "Sale",
         detail: [sale.channel, sale.soldAt ? new Date(sale.soldAt).toLocaleDateString("en-GB") : null].filter(Boolean).join(" · ") || "Confirm actual costs",
       })) : [],
       limit: 3,
@@ -269,6 +270,7 @@ export function TodayTab({
   const saleCardImage = saleCard ? listingCardImage(saleCard) : null;
   const showQuestLog = secondaryActions.length > 0 || hasManualReviews;
   const showSaleSleeve = Boolean(recovery.trustListings && firstSaleListingTarget && saleCard);
+  const questComplete = !recovery.questNote && shownLaunchProgress.totalCount > 0 && shownLaunchProgress.doneCount >= shownLaunchProgress.totalCount;
 
   function openMission() {
     if (mission.target === "retry") {
@@ -302,12 +304,22 @@ export function TodayTab({
           <LoadRetryButton busy={retrying} onRetry={onRetry} />
         </div>
       ) : null}
-      <header className="workspace-masthead today-command" aria-labelledby="today-command-title">
+      <header className={`workspace-masthead today-command${questComplete ? " quest-complete" : ""}`} aria-labelledby="today-command-title">
         <div className="today-command-copy">
           <span className="workspace-eyebrow">{greeting}, Trainer · sell owned singles</span>
           <span className={`today-command-priority ${mission.kind === "removal" || mission.kind === "unmatched-orders" || mission.kind === "recovery" ? "warn" : "good"}`}>Priority one</span>
           <h2 id="today-command-title">{missionTitle}</h2>
           <p>{missionDetail}</p>
+          {!doneForToday && missionCards.length > 0 && (
+            <ul className="today-mission-cards today-mission-inline" aria-label="Mission records">
+              {missionCards.map((card) => (
+                <li key={card.id} className={`today-mission-card tone-${card.tone}`}>
+                  <strong>{card.title}</strong>
+                  <small>{card.detail}</small>
+                </li>
+              ))}
+            </ul>
+          )}
           <p className={`today-freshness tone-${orderFreshness.tone}`} role="status">{orderFreshness.label}</p>
           <div className="today-command-actions">
             <button
@@ -319,14 +331,13 @@ export function TodayTab({
             >
               {mission.target === "retry" && retrying ? "Retrying…" : mission.action}
             </button>
-            <button type="button" className="ghost-button" onClick={onInventory}>Open stock vault</button>
-            <button type="button" className="ghost-button" onClick={() => setDoneForToday((value) => !value)}>
+            <button type="button" className="text-button today-done-toggle" onClick={() => setDoneForToday((value) => !value)}>
               {doneForToday ? "Show mission cards" : "Done for today"}
             </button>
           </div>
         </div>
 
-        <div className="today-command-progress today-command-progress-compact" aria-label={recovery.questNote ? "First-sale quest paused" : `First-sale quest: ${shownLaunchProgress.label}`}>
+        {!questComplete && <div className="today-command-progress today-command-progress-compact" aria-label={recovery.questNote ? "First-sale quest paused" : `First-sale quest: ${shownLaunchProgress.label}`}>
           <div className="today-command-progress-heading">
             <span>First-sale quest</span>
             <strong>{recovery.questNote ? "Paused" : shownLaunchProgress.label}</strong>
@@ -348,25 +359,8 @@ export function TodayTab({
               <p>{shownLaunchProgress.nextLabel}{recovery.trustListings && recovery.trustStock && recovery.trustSales && nextLaunchStep ? ` · ${nextLaunchStep.action}` : ""}</p>
             </>
           )}
-        </div>
+        </div>}
       </header>
-
-      {!doneForToday && missionCards.length > 0 && (
-        <section className="today-mission-rail" aria-label="Mission records">
-          <div className="today-mission-rail-heading">
-            <span className="workspace-eyebrow">This mission</span>
-            <strong>Up to {missionCards.length} record{missionCards.length === 1 ? "" : "s"}</strong>
-          </div>
-          <ul className="today-mission-cards">
-            {missionCards.map((card) => (
-              <li key={card.id} className={`today-mission-card tone-${card.tone}`}>
-                <strong>{card.title}</strong>
-                <small>{card.detail}</small>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <div className="today-command-grid">
         {(showQuestLog || showSaleSleeve) && <section className="priority-queue" aria-labelledby={showQuestLog ? "priority-queue-title" : undefined}>
@@ -477,12 +471,16 @@ export function TodayTab({
               </div>
             )}
 
-            <div className="dealer-pulse-actions">
-              <button type="button" onClick={onProfit} disabled={!recovery.trustSales}>Open profit ledger</button>
-              <button type="button" onClick={recovery.trustListings && activeListingCount > 0 ? onSalesDesk : onInventory}>
-                {recovery.trustListings && activeListingCount > 0 ? "Record a paid sale" : "Open stock vault"}
-              </button>
-            </div>
+            {(mission.target !== "profit" || !showSaleSleeve) && (
+              <div className="dealer-pulse-actions">
+                {mission.target !== "profit" && <button type="button" onClick={onProfit} disabled={!recovery.trustSales}>Open profit ledger</button>}
+                {!showSaleSleeve && (
+                  <button type="button" onClick={recovery.trustListings && activeListingCount > 0 ? onSalesDesk : onInventory}>
+                    {recovery.trustListings && activeListingCount > 0 ? "Record a paid sale" : "Open stock vault"}
+                  </button>
+                )}
+              </div>
+            )}
 
             <details className="dealer-tools">
               <summary>Desk tools</summary>
