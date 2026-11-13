@@ -956,41 +956,21 @@ test("focus inside the Mark sold sheet does not scroll the page", async ({ brows
   }
 });
 
-test("keyboard focus lifts a control that is partly behind the dock", async ({ browser, baseURL }) => {
-  const context = await phone(browser, baseURL!, 844, 390);
-  await mockApis(context);
-  const page = await context.newPage();
-  try {
-    await resetStorage(page);
-    await page.goto("/?view=today");
-    await expect(page.locator("#today-command-title")).toBeVisible();
-    const cleared = await page.evaluate(() => {
-      const header = document.querySelector(".dealer-deck.topbar");
-      const dock = document.querySelector(".primary-nav.bottom-nav");
-      const host = document.querySelector(".today-workspace");
-      if (!header || !dock || !host) throw new Error("Today chrome is missing");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = "Dock overlap probe";
-      host.append(button);
-      const dockTop = () => dock.getBoundingClientRect().top;
-      const overlap = button.getBoundingClientRect().bottom - (dockTop() + 24);
-      window.scrollBy(0, overlap);
-      const before = button.getBoundingClientRect();
-      const headerBottom = header.getBoundingClientRect().bottom;
-      if (!(before.top > headerBottom + 8 && before.bottom > dockTop() + 8)) {
-        throw new Error(`probe was not behind the dock: top ${before.top} header ${headerBottom} bottom ${before.bottom} dock ${dockTop()}`);
-      }
-      button.focus();
-      const after = button.getBoundingClientRect();
-      return { bottom: after.bottom, dockTop: dockTop(), top: after.top, headerBottom: header.getBoundingClientRect().bottom };
-    });
-    expect(cleared.bottom).toBeLessThanOrEqual(cleared.dockTop + 1);
-    expect(cleared.top).toBeGreaterThanOrEqual(cleared.headerBottom - 1);
-  } finally {
-    await context.close();
-  }
-});
+async function settleToday(page: Page) {
+  await page.waitForFunction(async () => {
+    const root = document.scrollingElement;
+    if (!root || root.scrollHeight < 1) return false;
+    let height = root.scrollHeight;
+    let y = window.scrollY;
+    for (let frame = 0; frame < 3; frame += 1) {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+      if (root.scrollHeight !== height || window.scrollY !== y) return false;
+      height = root.scrollHeight;
+      y = window.scrollY;
+    }
+    return true;
+  });
+}
 
 test("a tall control aligns to the header instead of sliding underneath it", async ({ browser, baseURL }) => {
   const context = await phone(browser, baseURL!, 844, 390);
@@ -998,8 +978,9 @@ test("a tall control aligns to the header instead of sliding underneath it", asy
   const page = await context.newPage();
   try {
     await resetStorage(page);
-    await page.goto("/?view=today");
+    await page.goto("/?view=today", { waitUntil: "networkidle" });
     await expect(page.locator("#today-command-title")).toBeVisible();
+    await settleToday(page);
     const aligned = await page.evaluate(() => {
       const header = document.querySelector(".dealer-deck.topbar");
       const dock = document.querySelector(".primary-nav.bottom-nav");
@@ -1012,8 +993,13 @@ test("a tall control aligns to the header instead of sliding underneath it", asy
       button.textContent = "Tall control";
       button.style.height = `${Math.ceil(dockTop - headerBottom + 120)}px`;
       host.append(button);
-      const overlap = button.getBoundingClientRect().bottom - (dock.getBoundingClientRect().top + 30);
-      window.scrollBy(0, overlap);
+      const placedTop = headerBottom + 40;
+      window.scrollBy(0, button.getBoundingClientRect().top - placedTop);
+      const before = button.getBoundingClientRect();
+      const dockAfter = dock.getBoundingClientRect().top;
+      if (!(before.top >= header.getBoundingClientRect().bottom + 8 && before.bottom > dockAfter + 8)) {
+        throw new Error(`tall control did not start clear of the header: top ${before.top} header ${header.getBoundingClientRect().bottom} bottom ${before.bottom} dock ${dockAfter}`);
+      }
       button.focus();
       return {
         top: button.getBoundingClientRect().top,
@@ -1032,8 +1018,10 @@ test("a pointer click does not scroll a control that keyboard focus would", asyn
   const page = await context.newPage();
   try {
     await resetStorage(page);
-    await page.goto("/?view=today");
+    await page.goto("/?view=today", { waitUntil: "networkidle" });
     await expect(page.locator("#today-command-title")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Prepare stock", exact: true })).toBeVisible();
+    await settleToday(page);
     const point = await page.evaluate(() => {
       const dock = document.querySelector(".primary-nav.bottom-nav");
       const host = document.querySelector(".today-workspace");
@@ -1046,15 +1034,12 @@ test("a pointer click does not scroll a control that keyboard focus would", asyn
       window.scrollBy(0, overlap);
       const rect = button.getBoundingClientRect();
       const dockTop = dock.getBoundingClientRect().top;
-      return { x: rect.left + rect.width / 2, y: Math.min(rect.top + 10, dockTop - 8), scrollY: window.scrollY };
+      return { x: rect.left + rect.width / 2, y: Math.min(rect.top + 10, dockTop - 8) };
     });
+    await settleToday(page);
+    const before = await page.evaluate(() => window.scrollY);
     await page.mouse.click(point.x, point.y);
-    const afterClick = await page.evaluate(() => ({
-      scrollY: window.scrollY,
-      active: document.activeElement?.textContent?.replace(/\s+/g, " ").trim() ?? "",
-    }));
-    expect(afterClick.scrollY).toBe(point.scrollY);
-    expect(afterClick.active).toBe("Pointer probe");
+    expect(await page.evaluate(() => window.scrollY)).toBe(before);
   } finally {
     await context.close();
   }

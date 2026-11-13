@@ -29,6 +29,30 @@ function coveredByChrome(target: HTMLElement): boolean {
   return false;
 }
 
+export type StickyFocusRect = { top: number; bottom: number };
+
+/**
+ * Pixels to add to window scroll. Negative moves the control down from under
+ * the header. Positive lifts it off the dock. A control taller than the gap
+ * is aligned to the header instead of being pushed underneath it.
+ */
+export function stickyFocusScrollDeltaForRect(
+  rect: StickyFocusRect,
+  headerBottom: number,
+  dockTop: number | null,
+  viewportHeight: number,
+): number {
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return 0;
+  if (!Number.isFinite(rect.top) || !Number.isFinite(rect.bottom) || rect.bottom <= rect.top) return 0;
+  if (!Number.isFinite(headerBottom)) return 0;
+  const alignToHeader = rect.top - headerBottom;
+  if (rect.top < headerBottom - 1) return alignToHeader;
+  if (dockTop == null || !Number.isFinite(dockTop) || rect.bottom <= dockTop + 1) return 0;
+  const clearDock = rect.bottom - dockTop;
+  if (rect.top - clearDock < headerBottom) return alignToHeader;
+  return clearDock;
+}
+
 /**
  * Pixels to add to window scroll so a focused control clears the sticky header
  * or the dock. Zero when it is already clear, or when it lives in a sheet or
@@ -39,13 +63,10 @@ export function stickyFocusScrollDelta(target: HTMLElement, header: HTMLElement,
   if (header.contains(target) || dock?.contains(target) || coveredByChrome(target)) return 0;
   const rect = target.getBoundingClientRect();
   if (rect.width < 1 || rect.height < 1) return 0;
-  const headerBottom = header.getBoundingClientRect().bottom;
-  const dockTop = dock?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
-  const alignToHeader = rect.top - headerBottom;
-  if (rect.top < headerBottom - 1) return alignToHeader;
-  if (!dock || rect.bottom <= dockTop + 1) return 0;
-  const clearDock = rect.bottom - dockTop;
-  // A control taller than the gap cannot clear the dock without sliding under the header.
-  if (rect.top - clearDock < headerBottom) return alignToHeader;
-  return clearDock;
+  return stickyFocusScrollDeltaForRect(
+    { top: rect.top, bottom: rect.bottom },
+    header.getBoundingClientRect().bottom,
+    dock ? dock.getBoundingClientRect().top : null,
+    window.innerHeight,
+  );
 }
