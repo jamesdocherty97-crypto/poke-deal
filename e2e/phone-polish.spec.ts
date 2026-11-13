@@ -792,7 +792,7 @@ test("phone landscape header is flush and opaque at 844x390", async ({ browser, 
   }
 });
 
-test("a 47px top notch keeps the header flush and adds that inset to scroll padding", async ({ browser, baseURL }) => {
+test("a 47px top notch keeps the header flush and scroll padding equal to the header", async ({ browser, baseURL }) => {
   const context = await phone(browser, baseURL!, 390, 844);
   const page = await context.newPage();
   await safeArea(page, { top: 47 });
@@ -820,7 +820,7 @@ test("a 47px top notch keeps the header flush and adds that inset to scroll padd
     expect(geometry.top).toBeLessThanOrEqual(0);
     expect(geometry.paddingTop).toBeGreaterThanOrEqual(notch);
     expect(geometry.markTop).toBeGreaterThanOrEqual(notch);
-    expect(Math.abs(geometry.scrollPad - (geometry.height + notch))).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.scrollPad - geometry.height)).toBeLessThanOrEqual(1);
   } finally {
     await context.close();
   }

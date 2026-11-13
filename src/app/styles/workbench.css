@@ -1585,7 +1585,7 @@ button.ghost-button:disabled,
     --dock-block: calc(90px + env(safe-area-inset-bottom));
     --dock-clearance: calc(var(--dock-block) + env(safe-area-inset-bottom) + 28px);
   }
-  html { scroll-padding-top:calc(var(--sticky-header-block) + env(safe-area-inset-top)); scroll-padding-bottom:var(--dock-clearance); }
+  html { scroll-padding-top:var(--sticky-header-block); scroll-padding-bottom:var(--dock-clearance); }
   body { background:var(--color-canvas); }
   body::before { content:none; }
   .app-shell { width:100%; padding:0 10px var(--dock-clearance); }
@@ -1806,7 +1806,7 @@ button.ghost-button:disabled,
 /* Phone landscape is wider than 719px, so the portrait bar does not apply and
    the frosted header keeps a sticky offset. Match the portrait bar instead. */
 @media (max-height: 500px) and (min-width: 720px) and (max-width: 1024px) {
-  html { scroll-padding-top: calc(var(--sticky-header-block) + env(safe-area-inset-top)); }
+  html { scroll-padding-top: var(--sticky-header-block); }
   .app-shell {
     --side-inset-left: max(14px, env(safe-area-inset-left));
     --side-inset-right: max(14px, env(safe-area-inset-right));
