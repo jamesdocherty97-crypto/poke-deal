@@ -909,3 +909,153 @@ test("focusing a partly visible control clears the landscape header at 844x390",
     await context.close();
   }
 });
+
+test("focus inside the Mark sold sheet does not scroll the page", async ({ browser, baseURL }) => {
+  for (const [width, height] of [[844, 390], [667, 375]] as const) {
+    const context = await phone(browser, baseURL!, width, height);
+    await mockApis(context);
+    const page = await context.newPage();
+    try {
+      await resetStorage(page);
+      await page.goto("/?view=stock");
+      await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toBeVisible();
+      await page.evaluate(() => {
+        const spacer = document.createElement("div");
+        spacer.setAttribute("data-sheet-scroll-spacer", "");
+        spacer.style.height = "900px";
+        document.querySelector("main")?.append(spacer);
+        window.scrollTo(0, 480);
+      });
+      await page.evaluate(() => {
+        const sell = [...document.querySelectorAll("main button")].find((element) => element.textContent?.replace(/\s+/g, " ").trim() === "Sell");
+        if (!sell) throw new Error("Sell is missing");
+        sell.click();
+      });
+      const sheet = page.locator(".sell-sheet").filter({ has: page.getByRole("heading", { name: "Mark sold" }) });
+      await expect(sheet).toBeVisible();
+      const openedAt = await page.evaluate(() => window.scrollY);
+      const during = await page.evaluate(() => {
+        const sheet = document.querySelector(".sell-sheet");
+        if (!sheet) throw new Error("Mark sold sheet is missing");
+        const fields = [...sheet.querySelectorAll("input, select, textarea, button")].filter((element) => element instanceof HTMLElement);
+        if (fields.length < 2) throw new Error("Mark sold sheet has no fields to cycle");
+        const reads = [window.scrollY];
+        for (const field of fields) {
+          field.focus();
+          reads.push(window.scrollY);
+        }
+        return reads;
+      });
+      expect(during.every((value) => value === openedAt), `${width}x${height} during ${during.join(",")}`).toBe(true);
+      await sheet.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(sheet).toHaveCount(0);
+      expect(await page.evaluate(() => window.scrollY), `${width}x${height} after close`).toBe(openedAt);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test("keyboard focus lifts a control that is partly behind the dock", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 844, 390);
+  await mockApis(context);
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today");
+    await expect(page.locator("#today-command-title")).toBeVisible();
+    const cleared = await page.evaluate(() => {
+      const header = document.querySelector(".dealer-deck.topbar");
+      const dock = document.querySelector(".primary-nav.bottom-nav");
+      const host = document.querySelector(".today-workspace");
+      if (!header || !dock || !host) throw new Error("Today chrome is missing");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Dock overlap probe";
+      host.append(button);
+      const dockTop = () => dock.getBoundingClientRect().top;
+      const overlap = button.getBoundingClientRect().bottom - (dockTop() + 24);
+      window.scrollBy(0, overlap);
+      const before = button.getBoundingClientRect();
+      const headerBottom = header.getBoundingClientRect().bottom;
+      if (!(before.top > headerBottom + 8 && before.bottom > dockTop() + 8)) {
+        throw new Error(`probe was not behind the dock: top ${before.top} header ${headerBottom} bottom ${before.bottom} dock ${dockTop()}`);
+      }
+      button.focus();
+      const after = button.getBoundingClientRect();
+      return { bottom: after.bottom, dockTop: dockTop(), top: after.top, headerBottom: header.getBoundingClientRect().bottom };
+    });
+    expect(cleared.bottom).toBeLessThanOrEqual(cleared.dockTop + 1);
+    expect(cleared.top).toBeGreaterThanOrEqual(cleared.headerBottom - 1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("a tall control aligns to the header instead of sliding underneath it", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 844, 390);
+  await mockApis(context);
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today");
+    await expect(page.locator("#today-command-title")).toBeVisible();
+    const aligned = await page.evaluate(() => {
+      const header = document.querySelector(".dealer-deck.topbar");
+      const dock = document.querySelector(".primary-nav.bottom-nav");
+      const host = document.querySelector(".today-workspace");
+      if (!header || !dock || !host) throw new Error("Today chrome is missing");
+      const headerBottom = header.getBoundingClientRect().bottom;
+      const dockTop = dock.getBoundingClientRect().top;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Tall control";
+      button.style.height = `${Math.ceil(dockTop - headerBottom + 120)}px`;
+      host.append(button);
+      const overlap = button.getBoundingClientRect().bottom - (dock.getBoundingClientRect().top + 30);
+      window.scrollBy(0, overlap);
+      button.focus();
+      return {
+        top: button.getBoundingClientRect().top,
+        headerBottom: header.getBoundingClientRect().bottom,
+      };
+    });
+    expect(Math.abs(aligned.top - aligned.headerBottom)).toBeLessThanOrEqual(1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("a pointer click does not scroll a control that keyboard focus would", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 844, 390);
+  await mockApis(context);
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today");
+    await expect(page.locator("#today-command-title")).toBeVisible();
+    const point = await page.evaluate(() => {
+      const dock = document.querySelector(".primary-nav.bottom-nav");
+      const host = document.querySelector(".today-workspace");
+      if (!dock || !host) throw new Error("Today chrome is missing");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Pointer probe";
+      host.append(button);
+      const overlap = button.getBoundingClientRect().bottom - (dock.getBoundingClientRect().top + 28);
+      window.scrollBy(0, overlap);
+      const rect = button.getBoundingClientRect();
+      const dockTop = dock.getBoundingClientRect().top;
+      return { x: rect.left + rect.width / 2, y: Math.min(rect.top + 10, dockTop - 8), scrollY: window.scrollY };
+    });
+    await page.mouse.click(point.x, point.y);
+    const afterClick = await page.evaluate(() => ({
+      scrollY: window.scrollY,
+      active: document.activeElement?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+    }));
+    expect(afterClick.scrollY).toBe(point.scrollY);
+    expect(afterClick.active).toBe("Pointer probe");
+  } finally {
+    await context.close();
+  }
+});

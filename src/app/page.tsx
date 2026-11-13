@@ -35,7 +35,7 @@ import {
   type QuickHuntCard,
 } from "@/lib/dealer/quickHunts";
 import { parseRecentSetIds, pinRecentSetId } from "@/lib/dealer/recentSets";
-import { stickyFocusScrollDelta, stickyHeaderCoversFocus } from "@/lib/dealer/stickyFocus";
+import { focusCameFromPointer, noteStickyFocusPointerDown, stickyFocusScrollDelta, stickyHeaderCoversFocus } from "@/lib/dealer/stickyFocus";
 import {
   parseRecentComps,
   pinRecentComp,
@@ -1275,6 +1275,11 @@ export default function Home() {
     syncViewFromLocation();
     window.addEventListener("popstate", syncViewFromLocation);
     return () => window.removeEventListener("popstate", syncViewFromLocation);
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("pointerdown", noteStickyFocusPointerDown, true);
+    return () => document.removeEventListener("pointerdown", noteStickyFocusPointerDown, true);
   }, []);
 
   useEffect(() => {
@@ -8408,7 +8413,7 @@ export default function Home() {
       onTouchCancel={finishPullRefresh}
       onFocus={(event) => {
         const target = event.target;
-        if (!(target instanceof HTMLElement) || target === event.currentTarget || !stickyHeaderCoversFocus()) return;
+        if (!(target instanceof HTMLElement) || target === event.currentTarget || !stickyHeaderCoversFocus() || focusCameFromPointer()) return;
         const header = event.currentTarget.querySelector<HTMLElement>(".dealer-deck.topbar");
         if (!header) return;
         const dock = event.currentTarget.querySelector<HTMLElement>(".primary-nav.bottom-nav");
