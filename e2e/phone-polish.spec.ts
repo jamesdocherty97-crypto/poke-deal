@@ -122,7 +122,20 @@ async function mockApis(context: BrowserContext) {
     if (url.pathname === "/api/dashboard") return json(dashboard());
     if (url.pathname === "/api/snapshots/portfolio") return json({ points: [], latest: null, previous: null, changePence: null, changePct: null });
     if (url.pathname === "/api/watches") return json({ watches: [] });
-    if (url.pathname === "/api/alerts/inbox") return json({ alerts: [], unreadCount: 0 });
+    if (url.pathname === "/api/alerts/inbox") return json({
+      unreadCount: 1,
+      alerts: [{
+        id: "alert-fixture-infernape",
+        kind: "EBAY_SALE",
+        title: "eBay sale imported: Infernape",
+        message: "Twilight Masquerade #173/167 sold for £17.49. Fees and seller postage are estimated.",
+        pence: 1749,
+        href: null,
+        delivered: true,
+        readAt: null,
+        createdAt: "2026-11-13T12:00:00.000Z",
+      }],
+    });
     if (url.pathname === "/api/expenses") return json({ expenses: [] });
     if (url.pathname === "/api/system/status") return json({ sources: [], summary: { livePrimaryComps: true, secondaryCrossCheck: true, alertDelivery: false, storedSales: false } });
     if (url.pathname === "/api/deal-sessions") return json({ session: null, summary: { includedCount: 0, excludedCount: 0, totalMaxCashPence: 0, totalMaxTradePence: 0, totalExpectedProceedsPence: 0, totalExpectedProfitPence: 0, suggestedBundleOfferPence: 0, completionReady: false, completionBlockers: [] } });
@@ -582,9 +595,26 @@ test("Today scrolls clear of the dock and the sticky header covers the top at 39
       const headerStyle = getComputedStyle(header);
       const safeProbe = document.createElement("div");
       safeProbe.style.paddingBottom = "env(safe-area-inset-bottom)";
+      safeProbe.style.minHeight = "env(safe-area-inset-top)";
       document.body.append(safeProbe);
-      const safeBottom = Number.parseFloat(getComputedStyle(safeProbe).paddingBottom) || 0;
+      const safeStyle = getComputedStyle(safeProbe);
+      const safeBottom = Number.parseFloat(safeStyle.paddingBottom) || 0;
+      const safeTop = Number.parseFloat(safeStyle.minHeight) || 0;
       safeProbe.remove();
+      let headerRule = "";
+      for (const sheet of document.styleSheets) {
+        let rules: CSSRuleList;
+        try { rules = sheet.cssRules; } catch { continue; }
+        const walk = (list: CSSRuleList) => {
+          for (const rule of list) {
+            if (rule instanceof CSSStyleRule && rule.selectorText === ":root" && rule.style.getPropertyValue("--sticky-header-block")) {
+              headerRule = rule.style.getPropertyValue("--sticky-header-block");
+            }
+            if (rule instanceof CSSGroupingRule) walk(rule.cssRules);
+          }
+        };
+        walk(rules);
+      }
 
       const opaque = (color: string) => {
         const slash = color.match(/\/\s*([0-9.]+)\s*\)/);
@@ -623,8 +653,12 @@ test("Today scrolls clear of the dock and the sticky header covers the top at 39
 
       return {
         headerTop: headerRect.top,
+        headerHeight: headerRect.height,
         headerLeft: headerRect.left,
         headerRight: headerRect.right,
+        scrollPad: Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0,
+        safeTop,
+        headerRule,
         headerBackground: headerStyle.backgroundColor,
         headerBackdrop: headerStyle.backdropFilter,
         headerOpaque: opaque(headerStyle.backgroundColor),
@@ -647,8 +681,28 @@ test("Today scrolls clear of the dock and the sticky header covers the top at 39
     expect(geometry.headerOpaque, geometry.headerBackground).toBe(true);
     expect(geometry.headerBackdrop).toBe("none");
     expect(geometry.todayBottom).toBeLessThanOrEqual(geometry.navTop);
+    const dockGap = geometry.navTop - geometry.todayBottom;
+    expect(dockGap, `dock gap ${dockGap}px`).toBeGreaterThanOrEqual(27);
+    expect(dockGap, `dock gap ${dockGap}px`).toBeLessThanOrEqual(29);
     expect(geometry.lastButtonBottom).toBeLessThanOrEqual(geometry.navTop);
-    expect(geometry.shellPaddingBottom).toBeGreaterThanOrEqual(geometry.navHeight + geometry.safeBottom - 0.5);
+    expect(geometry.shellPaddingBottom).toBeGreaterThanOrEqual(geometry.navHeight + geometry.safeBottom + 28 - 0.5);
+    expect(geometry.shellPaddingBottom).toBeLessThanOrEqual(geometry.navHeight + geometry.safeBottom + 28 + 0.5);
+    expect(geometry.scrollPad).toBeGreaterThanOrEqual(geometry.headerHeight - 0.5);
+    expect(geometry.scrollPad - geometry.headerHeight).toBeLessThanOrEqual(1);
+    expect(geometry.headerRule).toContain("safe-area-inset-top");
+
+    const markRead = page.getByRole("button", { name: "Mark read" });
+    await expect(markRead).toBeVisible();
+    const markBox = await markRead.boundingBox();
+    expect(markBox).not.toBeNull();
+    expect(markBox!.y + markBox!.height).toBeLessThanOrEqual(geometry.navTop);
+    const markHit = await markRead.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return hit === element || element.contains(hit);
+    });
+    expect(markHit).toBe(true);
+    await markRead.click({ trial: true });
 
     await page.getByRole("button", { name: "Stock", exact: true }).click();
     await expect(page.locator(".inventory-workspace")).toBeVisible();
@@ -666,6 +720,66 @@ test("Today scrolls clear of the dock and the sticky header covers the top at 39
     });
     expect(Number.parseFloat(shared.paddingBottom)).toBe(geometry.shellPaddingBottom);
     expect(shared.stockBottom).toBeLessThanOrEqual(shared.navTop);
+  } finally {
+    await context.close();
+  }
+});
+
+test("phone landscape header is flush and opaque at 844x390", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 844, 390);
+  await mockApis(context);
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today");
+    await expect(page.locator("#today-command-title")).toBeVisible();
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" }).catch(() => undefined);
+    const scrolled = await page.evaluate(() => {
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      window.scrollTo(0, Math.max(maxScroll, 120));
+      return maxScroll;
+    });
+    expect(scrolled).toBeGreaterThan(40);
+    const geometry = await page.evaluate(() => {
+      const header = document.querySelector<HTMLElement>(".dealer-deck.topbar");
+      if (!header) throw new Error("Sticky header is missing");
+      const rect = header.getBoundingClientRect();
+      const style = getComputedStyle(header);
+      const opaque = (color: string) => {
+        const slash = color.match(/\/\s*([0-9.]+)\s*\)/);
+        if (slash) return Number(slash[1]) >= 0.99;
+        const channels = color.match(/rgba?\(([^)]+)\)/i);
+        if (!channels) return false;
+        const parts = channels[1].split(/[,\s/]+/).filter(Boolean);
+        return parts.length < 4 || Number(parts[3]) >= 0.99;
+      };
+      const leaks: string[] = [];
+      for (let x = 0; x < window.innerWidth; x += 12) {
+        const hit = document.elementFromPoint(x, 1);
+        if (hit !== header && !header.contains(hit)) leaks.push(String(hit?.className || hit?.tagName || "none").slice(0, 60));
+      }
+      return {
+        top: rect.top,
+        left: rect.left,
+        right: rect.right,
+        height: rect.height,
+        scrollPad: Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0,
+        opaque: opaque(style.backgroundColor),
+        background: style.backgroundColor,
+        backdrop: style.backdropFilter,
+        leaks: leaks.slice(0, 4),
+        leakCount: leaks.length,
+        width: window.innerWidth,
+      };
+    });
+    expect(geometry.leakCount, JSON.stringify(geometry.leaks)).toBe(0);
+    expect(geometry.top).toBeLessThanOrEqual(0);
+    expect(geometry.left).toBeLessThanOrEqual(0);
+    expect(geometry.right).toBeGreaterThanOrEqual(geometry.width);
+    expect(geometry.opaque, geometry.background).toBe(true);
+    expect(geometry.backdrop).toBe("none");
+    expect(geometry.scrollPad).toBeGreaterThanOrEqual(geometry.height - 0.5);
+    expect(geometry.scrollPad - geometry.height).toBeLessThanOrEqual(1);
   } finally {
     await context.close();
   }
