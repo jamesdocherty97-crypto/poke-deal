@@ -316,6 +316,61 @@ export function SettingsTab({
                   Include promoted listing fee
                 </label>
               </div>
+              <fieldset className="settings-seller-type">
+                <legend>eBay seller type</legend>
+                {([
+                  ["LEGACY_FLAT", "Old flat 12.8% + 30p"],
+                  ["PRIVATE_UK", "UK private seller"],
+                  ["BUSINESS_UK", "UK business seller"],
+                ] as const).map(([value, label]) => (
+                  <label key={value}>
+                    <input
+                      type="radio"
+                      name="ebay-seller-type"
+                      value={value}
+                      checked={dealSettings.fees.sellerProfile === value}
+                      onChange={() =>
+                        setDealSettings((settings) =>
+                          normalizeDealCalcSettings({
+                            ...settings,
+                            fees: { ...settings.fees, sellerProfile: value },
+                          }),
+                        )
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
+              {dealSettings.fees.sellerProfile === "LEGACY_FLAT" ? (
+                <p className="settings-fee-note" id="ebay-seller-type-note">
+                  Seller type not chosen. Using the old flat 12.8% + 30p, which no current eBay UK seller pays.
+                </p>
+              ) : (
+                <p className="settings-fee-note" id="ebay-seller-type-note">
+                  Set by seller type
+                </p>
+              )}
+              {dealSettings.fees.sellerProfile === "BUSINESS_UK" && (
+                <div className="settings-toggle-row">
+                  <label>
+                    <input
+                      name="ebay-vat-on-fees"
+                      type="checkbox"
+                      checked={dealSettings.fees.vatOnFees}
+                      onChange={(event) =>
+                        setDealSettings((settings) =>
+                          normalizeDealCalcSettings({
+                            ...settings,
+                            fees: { ...settings.fees, vatOnFees: event.target.checked },
+                          }),
+                        )
+                      }
+                    />
+                    Not VAT registered (add 20% VAT to eBay fees)
+                  </label>
+                </div>
+              )}
               <div className="form-grid settings-field-grid">
                 <label>
                   eBay final value %
@@ -324,6 +379,8 @@ export function SettingsTab({
                     autoComplete="off"
                     inputMode="decimal"
                     value={dealSettings.fees.ebayFvfPct}
+                    disabled={dealSettings.fees.sellerProfile !== "LEGACY_FLAT"}
+                    aria-describedby={dealSettings.fees.sellerProfile === "LEGACY_FLAT" ? undefined : "ebay-seller-type-note"}
                     onChange={(event) =>
                       setDealSettings((settings) =>
                         normalizeDealCalcSettings({
@@ -363,6 +420,8 @@ export function SettingsTab({
                     name="ebay-fixed-fee"
                     autoComplete="off"
                     value={penceToPounds(dealSettings.fees.ebayFixedPence)}
+                    disabled={dealSettings.fees.sellerProfile !== "LEGACY_FLAT"}
+                    aria-describedby={dealSettings.fees.sellerProfile === "LEGACY_FLAT" ? undefined : "ebay-seller-type-note"}
                     onChange={(value) =>
                       setDealSettings((settings) =>
                         normalizeDealCalcSettings({

@@ -1,4 +1,5 @@
 import type { Grade } from "../domain/types.js";
+import { ebayUkSellerFeesPence, isEbayUkFeeProfile, type EbayUkFeeProfile } from "./ebayUkFees.js";
 
 export type DealConfidence = "high" | "medium" | "low";
 export type DealRoute = "flip" | "grade" | "no-quote";
@@ -10,6 +11,8 @@ export interface DealPostageTier {
 
 export interface DealCalcSettings {
   fees: {
+    sellerProfile: EbayUkFeeProfile;
+    vatOnFees: boolean;
     ebayFvfPct: number;
     ebayFixedPence: number;
     promotedPct: number;
@@ -57,7 +60,9 @@ export interface DealCalcOptions {
 }
 
 export type DealCalcSettingsInput = Partial<Omit<DealCalcSettings, "fees" | "confidenceHaircut" | "liquidityHaircut" | "grading">> & {
-  fees?: Partial<DealCalcSettings["fees"]>;
+  fees?: Partial<Omit<DealCalcSettings["fees"], "sellerProfile">> & {
+    sellerProfile?: string;
+  };
   confidenceHaircut?: Partial<DealCalcSettings["confidenceHaircut"]>;
   liquidityHaircut?: Partial<DealCalcSettings["liquidityHaircut"]>;
   grading?: Partial<Omit<DealCalcSettings["grading"], "gradeProbabilities">> & {
@@ -90,6 +95,8 @@ export interface DealCalcResult {
 // review quarterly because platform fees and postage costs move over time.
 export const DEFAULT_DEAL_CALC_SETTINGS: DealCalcSettings = {
   fees: {
+    sellerProfile: "LEGACY_FLAT",
+    vatOnFees: true,
     ebayFvfPct: 12.8,
     ebayFixedPence: 30,
     promotedPct: 2,
@@ -179,9 +186,22 @@ export function dealCalc(
 }
 
 export function netProceedsAtSalePrice(salePricePence: number, settings: DealCalcSettings = DEFAULT_DEAL_CALC_SETTINGS): number {
-  const pct = settings.fees.ebayFvfPct + (settings.fees.promotedEnabled ? settings.fees.promotedPct : 0);
-  const variableAfterFees = Math.round(salePricePence * (1 - pct / 100));
-  return variableAfterFees - settings.fees.ebayFixedPence - postageForSalePrice(salePricePence, settings) - settings.fees.materialsPence;
+  const postage = postageForSalePrice(salePricePence, settings);
+  const materials = settings.fees.materialsPence;
+  const profile = settings.fees.sellerProfile ?? "LEGACY_FLAT";
+  if (profile === "LEGACY_FLAT") {
+    const pct = settings.fees.ebayFvfPct + (settings.fees.promotedEnabled ? settings.fees.promotedPct : 0);
+    const variableAfterFees = Math.round(salePricePence * (1 - pct / 100));
+    return variableAfterFees - settings.fees.ebayFixedPence - postage - materials;
+  }
+  const promotedPct = settings.fees.promotedEnabled ? settings.fees.promotedPct : 0;
+  const afterPromoted = Math.round(salePricePence * (1 - promotedPct / 100));
+  const sellerFees = ebayUkSellerFeesPence({
+    profile,
+    orderTotalPence: salePricePence,
+    vatOnFees: settings.fees.vatOnFees ?? true,
+  });
+  return afterPromoted - sellerFees - postage - materials;
 }
 
 export function postageForSalePrice(salePricePence: number, settings: DealCalcSettings = DEFAULT_DEAL_CALC_SETTINGS): number {
@@ -200,6 +220,7 @@ export function roundOfferDown(valuePence: number): number {
 }
 
 export function normalizeDealCalcSettings(input: DealCalcSettingsInput): DealCalcSettings {
+  const sellerProfile = input.fees?.sellerProfile;
   return {
     ...DEFAULT_DEAL_CALC_SETTINGS,
     ...input,
@@ -209,6 +230,8 @@ export function normalizeDealCalcSettings(input: DealCalcSettingsInput): DealCal
       postageTiers: input.fees?.postageTiers?.length
         ? input.fees.postageTiers
         : DEFAULT_DEAL_CALC_SETTINGS.fees.postageTiers,
+      sellerProfile: isEbayUkFeeProfile(sellerProfile) ? sellerProfile : "LEGACY_FLAT",
+      vatOnFees: typeof input.fees?.vatOnFees === "boolean" ? input.fees.vatOnFees : true,
     },
     confidenceHaircut: {
       ...DEFAULT_DEAL_CALC_SETTINGS.confidenceHaircut,

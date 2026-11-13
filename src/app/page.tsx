@@ -90,6 +90,7 @@ import {
   type ListingPackInput,
 } from "@/lib/dealer/listingPack";
 import { buildListingEconomics } from "@/lib/dealer/listingEconomics";
+import { feeProfileLabel } from "@/lib/dealer/ebayUkFees";
 import {
   buildListingSellFlow,
   buildListingNextAction,
@@ -137,6 +138,7 @@ import {
   rescaleGrossSaleForQuantity,
   saleItemSubtotalPence,
 } from "@/lib/dealer/saleFees";
+import { saleShortcutFeeOptions } from "@/lib/dealer/saleShortcutOptions";
 import { inventorySwipeAction, inventorySwipeOffset } from "@/lib/dealer/swipeActions";
 import { buildTodayActions, type TodayActionTarget } from "@/lib/dealer/today";
 import { addRequestedPrintHints, detectCardPrintIdentity, textMentionsFirstEdition } from "@/lib/comps/variants";
@@ -1692,10 +1694,14 @@ export default function Home() {
     if (!sellingId) return;
     const salePricePence = readFormPence(salePrice);
     if (salePricePence == null) return;
-    const estimate = estimateSaleCosts(saleChannel, salePricePence, { grade: sellingItem?.grade });
+    const estimate = estimateSaleCosts(saleChannel, salePricePence, {
+      grade: sellingItem?.grade,
+      feeProfile: dealSettings.fees.sellerProfile,
+      vatOnFees: dealSettings.fees.vatOnFees,
+    });
     if (!feesTouched) setFees(penceToPounds(estimate.feesPence));
     if (!postageTouched) setPostage(penceToPounds(estimate.postagePence));
-  }, [feesTouched, postageTouched, saleChannel, salePrice, sellingId, sellingItem?.grade]);
+  }, [dealSettings.fees.sellerProfile, dealSettings.fees.vatOnFees, feesTouched, postageTouched, saleChannel, salePrice, sellingId, sellingItem?.grade]);
 
   const inventoryForSelling = useMemo(
     () => inventory.map((item) => ({ ...item, localAvailableQuantity: offlineReservationsLoaded ? availableToSell(item) : null })),
@@ -5933,7 +5939,11 @@ export default function Home() {
     const price = saleListing?.listPrice ?? saleListing?.suggestedPrice ?? item.costBasis;
     const nextChannel = saleListing?.channel ?? "EBAY";
     const grossSalePrice = defaultGrossSalePence(nextChannel, price, { grade: item.grade });
-    const estimate = estimateSaleCosts(nextChannel, grossSalePrice, { grade: item.grade });
+    const estimate = estimateSaleCosts(nextChannel, grossSalePrice, {
+      grade: item.grade,
+      feeProfile: dealSettings.fees.sellerProfile,
+      vatOnFees: dealSettings.fees.vatOnFees,
+    });
     setSellingId(item.id);
     setEditingItemId(null);
     setEditingListingId(null);
@@ -5989,7 +5999,11 @@ export default function Home() {
       currentItemSubtotal > 0
         ? defaultGrossSalePence(nextChannel, currentItemSubtotal, { grade: sellingItem?.grade })
         : currentGross;
-    const estimate = estimateSaleCosts(nextChannel, nextGross, { grade: sellingItem?.grade });
+    const estimate = estimateSaleCosts(nextChannel, nextGross, {
+      grade: sellingItem?.grade,
+      feeProfile: dealSettings.fees.sellerProfile,
+      vatOnFees: dealSettings.fees.vatOnFees,
+    });
     setSaleChannel(nextChannel);
     setBuyerPostage(nextChannel === "IN_PERSON" ? "0.00" : "");
     setSalePrice(penceToPounds(nextGross));
@@ -6018,7 +6032,11 @@ export default function Home() {
 
   function applySaleTotalPrice(totalPence: number) {
     const safeTotal = Math.max(0, Math.round(totalPence));
-    const estimate = estimateSaleCosts(saleChannel, safeTotal, { grade: sellingItem?.grade });
+    const estimate = estimateSaleCosts(saleChannel, safeTotal, {
+      grade: sellingItem?.grade,
+      feeProfile: dealSettings.fees.sellerProfile,
+      vatOnFees: dealSettings.fees.vatOnFees,
+    });
     setSalePrice(penceToPounds(safeTotal));
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
@@ -6062,7 +6080,10 @@ export default function Home() {
       return;
     }
 
-    applySaleTotalPrice(grossSalePriceForNetPence(saleChannel, netPence, { grade: sellingItem?.grade }));
+    applySaleTotalPrice(grossSalePriceForNetPence(saleChannel, netPence, {
+      grade: sellingItem?.grade,
+      ...saleShortcutFeeOptions(dealSettings.fees),
+    }));
     setNotice("Net payout pasted. Buyer total, fees and your postage cost have been estimated.");
     setError(null);
   }
@@ -6096,6 +6117,7 @@ export default function Home() {
     applySaleTotalPrice(
       breakEvenSalePricePence(saleChannel, sellingItem.costBasis * saleQuantityForShortcuts(), {
         grade: sellingItem.grade,
+        ...saleShortcutFeeOptions(dealSettings.fees),
       }),
     );
   }
@@ -6107,7 +6129,10 @@ export default function Home() {
         saleChannel,
         sellingItem.costBasis * saleQuantityForShortcuts(),
         targetProfitPence,
-        { grade: sellingItem.grade },
+        {
+          grade: sellingItem.grade,
+          ...saleShortcutFeeOptions(dealSettings.fees),
+        },
       ),
     );
   }
@@ -6118,6 +6143,7 @@ export default function Home() {
     applySaleTotalPrice(
       grossSalePriceForProfitPence(saleChannel, costPence, Math.round(costPence * roiPct), {
         grade: sellingItem.grade,
+        ...saleShortcutFeeOptions(dealSettings.fees),
       }),
     );
   }
@@ -6164,7 +6190,11 @@ export default function Home() {
   function resetSaleCosts() {
     const salePricePence = readFormPence(salePrice);
     if (salePricePence == null) return;
-    const estimate = estimateSaleCosts(saleChannel, salePricePence, { grade: sellingItem?.grade });
+    const estimate = estimateSaleCosts(saleChannel, salePricePence, {
+      grade: sellingItem?.grade,
+      feeProfile: dealSettings.fees.sellerProfile,
+      vatOnFees: dealSettings.fees.vatOnFees,
+    });
     setFees(penceToPounds(estimate.feesPence));
     setPostage(penceToPounds(estimate.postagePence));
     setSaleCostsConfirmed(false);
@@ -11022,6 +11052,8 @@ export default function Home() {
           pasteListingUrlForListing={(listing) => void pasteListingUrlForListing(listing)}
           patchListing={(listing, patch, message) => void patchListing(listing, patch, message)}
           setEbayPublishTarget={setEbayPublishTarget}
+          sellerProfile={dealSettings.fees.sellerProfile}
+          vatOnFees={dealSettings.fees.vatOnFees}
           onBulkPack={(selected, targetChannel, mode) => void buildBulkListingPack(selected as Listing[], targetChannel, mode)}
           listingPackSheet={
             listingPackTarget && listingPack ? (
@@ -11048,6 +11080,8 @@ export default function Home() {
                 onRequestPublish={() => setEbayPublishTarget(listingPackTarget.id)}
                 onPublish={(review) => void publishEbayListing(listingPackTarget.id, review)}
                 onCancelPublish={() => setEbayPublishTarget(null)}
+                sellerProfile={dealSettings.fees.sellerProfile}
+                vatOnFees={dealSettings.fees.vatOnFees}
                 onClose={() => {
                   if (listingPackTarget.state === "ACTIVE" && listingPackTarget.item?.status === "SOLD") setListingStateFilter("ACTIVE");
                   setListingPackId(null);
@@ -11588,6 +11622,8 @@ function ListingPackSheet({
   onCancelPublish,
   onCopyAndOpen,
   onPasteLiveUrl,
+  sellerProfile = "LEGACY_FLAT",
+  vatOnFees = true,
 }: {
   listing: Listing;
   pack: ListingPack;
@@ -11610,6 +11646,8 @@ function ListingPackSheet({
   onCancelPublish: () => void;
   onCopyAndOpen: () => void;
   onPasteLiveUrl: () => void;
+  sellerProfile?: DealCalcSettings["fees"]["sellerProfile"];
+  vatOnFees?: boolean;
 }) {
   const item = listing.item;
   const specifics = Object.entries(pack.itemSpecifics);
@@ -11637,6 +11675,8 @@ function ListingPackSheet({
         grade: item.grade,
         itemPricePence: isEbayListing ? effectivePricePence : pack.suggestedPricePence,
         costBasisPence: item.costBasis,
+        feeProfile: sellerProfile,
+        vatOnFees,
       })
     : null;
 
@@ -11907,8 +11947,11 @@ function ListingPackSheet({
             <span>Net after sale</span>
             <strong>{gbp(economics.netPence)}</strong>
             <small>
-              Buyer total {gbp(economics.grossPence)} · fees {gbp(economics.feesPence)} · my post {gbp(economics.postagePence)}
+              Buyer total {gbp(economics.grossPence)} · {isEbayListing ? "eBay fee" : "fees"} {gbp(economics.feesPence)} · {feeProfileLabel(economics.feeProfile)} · my post {gbp(economics.postagePence)}
             </small>
+            {economics.buyerSeesPence != null && (
+              <small>Buyers see about {gbp(economics.buyerSeesPence)}</small>
+            )}
           </div>
           <div>
             <span>Cost</span>
