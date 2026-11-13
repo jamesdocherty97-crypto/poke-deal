@@ -787,6 +787,22 @@ test("phone landscape header is flush and opaque at 844x390", async ({ browser, 
     expect(geometry.backdrop).toBe("none");
     expect(geometry.scrollPad).toBeGreaterThanOrEqual(geometry.height - 0.5);
     expect(geometry.scrollPad - geometry.height).toBeLessThanOrEqual(1);
+
+    const notched = await context.newPage();
+    await safeArea(notched, { top: 47 });
+    await notched.goto("/?view=today");
+    await expect(notched.locator("#today-command-title")).toBeVisible();
+    await notched.evaluate(() => window.scrollTo(0, 80));
+    const padded = await notched.evaluate(() => {
+      const header = document.querySelector(".dealer-deck.topbar");
+      if (!header) throw new Error("Sticky header is missing");
+      const height = header.getBoundingClientRect().height;
+      const scrollPad = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+      return { height, scrollPad, extra: scrollPad - height };
+    });
+    expect(Math.abs(padded.scrollPad - padded.height)).toBeLessThanOrEqual(1);
+    expect(padded.extra).toBeLessThan(20);
+    await notched.close();
   } finally {
     await context.close();
   }
@@ -827,46 +843,203 @@ test("a 47px top notch keeps the header flush and scroll padding equal to the he
 });
 
 test("landscape side insets keep the header, dock, and page gutter clear of the notch", async ({ browser, baseURL }) => {
-  const width = 780;
-  const height = 400;
   const left = 47;
   const right = 34;
-  const context = await phone(browser, baseURL!, width, height);
-  const page = await context.newPage();
-  await safeArea(page, { left, right });
+  for (const [width, height] of [[780, 400], [844, 390]] as const) {
+    const context = await phone(browser, baseURL!, width, height);
+    const page = await context.newPage();
+    await safeArea(page, { left, right });
+    await mockApis(context);
+    try {
+      await resetStorage(page);
+      await page.goto("/?view=today");
+      await expect(page.locator("#today-command-title")).toBeVisible();
+      const cleared = await page.evaluate(({ left, right, width }) => {
+        const header = document.querySelector<HTMLElement>(".dealer-deck.topbar");
+        const mark = document.querySelector<HTMLElement>(".dealer-brand .app-mark");
+        const today = document.querySelector<HTMLElement>(".today-workspace");
+        const nav = document.querySelector<HTMLElement>(".primary-nav.bottom-nav");
+        const refresh = document.querySelector<HTMLElement>(".utility-nav .icon-button");
+        if (!header || !mark || !today || !nav || !refresh) throw new Error("Landscape shell is missing a notch target");
+        const box = (element: HTMLElement) => element.getBoundingClientRect();
+        return {
+          headerLeft: box(header).left,
+          headerRight: box(header).right,
+          markLeft: box(mark).left,
+          refreshRight: box(refresh).right,
+          todayLeft: box(today).left,
+          todayRight: box(today).right,
+          navLeft: box(nav).left,
+          navRight: box(nav).right,
+          limit: width - right,
+        };
+      }, { left, right, width });
+      expect(cleared.headerLeft, `${width}x${height}`).toBeLessThanOrEqual(0);
+      expect(cleared.headerRight, `${width}x${height}`).toBeGreaterThanOrEqual(width - 1);
+      expect(cleared.markLeft, `${width}x${height}`).toBeGreaterThanOrEqual(left);
+      expect(cleared.refreshRight, `${width}x${height}`).toBeLessThanOrEqual(width - right + 0.5);
+      expect(cleared.todayLeft, `${width}x${height}`).toBeGreaterThanOrEqual(left);
+      expect(cleared.todayRight, `${width}x${height}`).toBeLessThanOrEqual(width - right + 0.5);
+      expect(cleared.navLeft, `${width}x${height}`).toBeGreaterThanOrEqual(left);
+      expect(cleared.navRight, `${width}x${height}`).toBeLessThanOrEqual(cleared.limit + 0.5);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test("focusing a partly visible control clears the landscape header at 844x390", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 844, 390);
   await mockApis(context);
+  const page = await context.newPage();
   try {
     await resetStorage(page);
     await page.goto("/?view=today");
+    await expect(page.getByRole("button", { name: "Prepare stock", exact: true })).toBeVisible();
+    const gap = await page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      const button = [...document.querySelectorAll("main button")].find((element) => element.textContent?.replace(/\s+/g, " ").trim() === "Prepare stock");
+      const header = document.querySelector(".dealer-deck.topbar");
+      if (!button || !header) throw new Error("Prepare stock is not in the landscape view");
+      button.focus();
+      return button.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+    });
+    expect(gap).toBeGreaterThanOrEqual(-1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("focus inside the Mark sold sheet does not scroll the page", async ({ browser, baseURL }) => {
+  for (const [width, height] of [[844, 390], [667, 375]] as const) {
+    const context = await phone(browser, baseURL!, width, height);
+    await mockApis(context);
+    const page = await context.newPage();
+    try {
+      await resetStorage(page);
+      await page.goto("/?view=stock");
+      await expect(page.locator(".inventory-workspace .item-row").filter({ hasText: "Gengar" })).toBeVisible();
+      await page.evaluate(() => {
+        const spacer = document.createElement("div");
+        spacer.setAttribute("data-sheet-scroll-spacer", "");
+        spacer.style.height = "900px";
+        document.querySelector("main")?.append(spacer);
+        window.scrollTo(0, 480);
+      });
+      await page.evaluate(() => {
+        const sell = [...document.querySelectorAll("main button")].find((element) => element.textContent?.replace(/\s+/g, " ").trim() === "Sell");
+        if (!sell) throw new Error("Sell is missing");
+        sell.click();
+      });
+      const sheet = page.locator(".sell-sheet").filter({ has: page.getByRole("heading", { name: "Mark sold" }) });
+      await expect(sheet).toBeVisible();
+      const openedAt = await page.evaluate(() => window.scrollY);
+      const during = await page.evaluate(() => {
+        const sheet = document.querySelector(".sell-sheet");
+        if (!sheet) throw new Error("Mark sold sheet is missing");
+        const fields = [...sheet.querySelectorAll("input, select, textarea, button")].filter((element) => element instanceof HTMLElement);
+        if (fields.length < 2) throw new Error("Mark sold sheet has no fields to cycle");
+        const reads = [window.scrollY];
+        for (const field of fields) {
+          field.focus();
+          reads.push(window.scrollY);
+        }
+        return reads;
+      });
+      expect(during.every((value) => value === openedAt), `${width}x${height} during ${during.join(",")}`).toBe(true);
+      await sheet.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(sheet).toHaveCount(0);
+      expect(await page.evaluate(() => window.scrollY), `${width}x${height} after close`).toBe(openedAt);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+async function settleToday(page: Page) {
+  await page.waitForFunction(async () => {
+    const root = document.scrollingElement;
+    if (!root || root.scrollHeight < 1) return false;
+    let height = root.scrollHeight;
+    let y = window.scrollY;
+    for (let frame = 0; frame < 3; frame += 1) {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+      if (root.scrollHeight !== height || window.scrollY !== y) return false;
+      height = root.scrollHeight;
+      y = window.scrollY;
+    }
+    return true;
+  });
+}
+
+test("a tall control aligns to the header instead of sliding underneath it", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 844, 390);
+  await mockApis(context);
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today", { waitUntil: "networkidle" });
     await expect(page.locator("#today-command-title")).toBeVisible();
-    const cleared = await page.evaluate(({ left, right, width }) => {
-      const header = document.querySelector<HTMLElement>(".dealer-deck.topbar");
-      const mark = document.querySelector<HTMLElement>(".dealer-brand .app-mark");
-      const today = document.querySelector<HTMLElement>(".today-workspace");
-      const nav = document.querySelector<HTMLElement>(".primary-nav.bottom-nav");
-      const refresh = document.querySelector<HTMLElement>(".utility-nav .icon-button");
-      if (!header || !mark || !today || !nav || !refresh) throw new Error("Landscape shell is missing a notch target");
-      const box = (element: HTMLElement) => element.getBoundingClientRect();
+    await settleToday(page);
+    const aligned = await page.evaluate(() => {
+      const header = document.querySelector(".dealer-deck.topbar");
+      const dock = document.querySelector(".primary-nav.bottom-nav");
+      const host = document.querySelector(".today-workspace");
+      if (!header || !dock || !host) throw new Error("Today chrome is missing");
+      const headerBottom = header.getBoundingClientRect().bottom;
+      const dockTop = dock.getBoundingClientRect().top;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Tall control";
+      button.style.height = `${Math.ceil(dockTop - headerBottom + 120)}px`;
+      host.append(button);
+      const placedTop = headerBottom + 40;
+      window.scrollBy(0, button.getBoundingClientRect().top - placedTop);
+      const before = button.getBoundingClientRect();
+      const dockAfter = dock.getBoundingClientRect().top;
+      if (!(before.top >= header.getBoundingClientRect().bottom + 8 && before.bottom > dockAfter + 8)) {
+        throw new Error(`tall control did not start clear of the header: top ${before.top} header ${header.getBoundingClientRect().bottom} bottom ${before.bottom} dock ${dockAfter}`);
+      }
+      button.focus();
       return {
-        headerLeft: box(header).left,
-        headerRight: box(header).right,
-        markLeft: box(mark).left,
-        refreshRight: box(refresh).right,
-        todayLeft: box(today).left,
-        todayRight: box(today).right,
-        navLeft: box(nav).left,
-        navRight: box(nav).right,
-        limit: width - right,
+        top: button.getBoundingClientRect().top,
+        headerBottom: header.getBoundingClientRect().bottom,
       };
-    }, { left, right, width });
-    expect(cleared.headerLeft).toBeLessThanOrEqual(0);
-    expect(cleared.headerRight).toBeGreaterThanOrEqual(width - 1);
-    expect(cleared.markLeft).toBeGreaterThanOrEqual(left);
-    expect(cleared.refreshRight).toBeLessThanOrEqual(width - right + 0.5);
-    expect(cleared.todayLeft).toBeGreaterThanOrEqual(left);
-    expect(cleared.todayRight).toBeLessThanOrEqual(width - right + 0.5);
-    expect(cleared.navLeft).toBeGreaterThanOrEqual(left);
-    expect(cleared.navRight).toBeLessThanOrEqual(cleared.limit + 0.5);
+    });
+    expect(Math.abs(aligned.top - aligned.headerBottom)).toBeLessThanOrEqual(1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("a pointer click does not scroll a control that keyboard focus would", async ({ browser, baseURL }) => {
+  const context = await phone(browser, baseURL!, 844, 390);
+  await mockApis(context);
+  const page = await context.newPage();
+  try {
+    await resetStorage(page);
+    await page.goto("/?view=today", { waitUntil: "networkidle" });
+    await expect(page.locator("#today-command-title")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Prepare stock", exact: true })).toBeVisible();
+    await settleToday(page);
+    const point = await page.evaluate(() => {
+      const dock = document.querySelector(".primary-nav.bottom-nav");
+      const host = document.querySelector(".today-workspace");
+      if (!dock || !host) throw new Error("Today chrome is missing");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Pointer probe";
+      host.append(button);
+      const overlap = button.getBoundingClientRect().bottom - (dock.getBoundingClientRect().top + 28);
+      window.scrollBy(0, overlap);
+      const rect = button.getBoundingClientRect();
+      const dockTop = dock.getBoundingClientRect().top;
+      return { x: rect.left + rect.width / 2, y: Math.min(rect.top + 10, dockTop - 8) };
+    });
+    await settleToday(page);
+    const before = await page.evaluate(() => window.scrollY);
+    await page.mouse.click(point.x, point.y);
+    expect(await page.evaluate(() => window.scrollY)).toBe(before);
   } finally {
     await context.close();
   }
