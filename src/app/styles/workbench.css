@@ -1757,6 +1757,9 @@ button.ghost-button:disabled,
 
   .profit-masthead { display:flex; }
   .profit-masthead .export-actions { flex-direction:column; }
+  /* Listing/profit CSV export links are 40px in the global workbench rule.
+     Keep 44px tap targets on phones only, so desktop rows stay unchanged. */
+  .export-link { min-height: 44px; }
   .profit-overview { grid-template-columns:1fr; }
   .profit-overview-lead { padding:26px 20px; border-right:0; }
   .profit-overview-lead > strong { font-size:3.5rem; }
