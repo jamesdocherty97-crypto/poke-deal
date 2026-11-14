@@ -1241,16 +1241,17 @@ textarea:focus-visible {
 .inventory-row-meta { display:flex; flex-wrap:wrap; gap:0; margin:8px 0 0; color:var(--muted); font-size:.72rem; }
 .inventory-row-meta span:not(:last-child)::after { margin:0 6px; content:"·"; }
 .inventory-row-money { display:grid; gap:5px; margin:16px 0; padding:12px 0; border-top:1px solid var(--color-border); border-bottom:1px solid var(--color-border); color:var(--color-text-secondary); font-size:.72rem; }
-.stock-history-button { display:flex; align-items:center; align-self:start; min-height:32px; gap:6px; padding:0; border:0; background:transparent; box-shadow:none; color:var(--color-info); }
+/* Stock card controls keep the 44px phone tap target set in components.css; this sheet loads later. */
+.stock-history-button { display:flex; align-items:center; align-self:start; min-height:44px; gap:6px; padding:0; border:0; background:transparent; box-shadow:none; color:var(--color-info); }
 .inventory-row-flags { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
 .inventory-row-flags span { padding:4px 6px; border:1px solid var(--color-warning-border); border-radius:3px; background:var(--color-warning-surface); color:var(--color-warning); font-size:.7rem; font-weight:760; text-transform:uppercase; }
 .next-action-strip { display:flex; align-items:center; gap:10px; margin-top:auto; padding-top:8px; }
-.next-action-strip .next-action-button { min-height:42px; padding:0 12px; }
+.next-action-strip .next-action-button { min-height:44px; padding:0 12px; }
 .next-action-strip > span { color:var(--muted); font-size:.7rem; }
 .listing-live-actions { display:flex; flex:1; flex-wrap:wrap; gap:6px; }
 .listing-live-actions .next-action-button { flex:1 1 124px; }
 .row-primary-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-.row-primary-actions button { min-height:38px; padding:0 10px; font-size:.7rem; }
+.row-primary-actions button { min-height:44px; padding:0 10px; font-size:.7rem; }
 .inventory-holding-group { grid-column:1/-1; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface-1); }
 .inventory-holding-group > summary { display:flex; justify-content:space-between; gap:16px; padding:16px 18px; cursor:pointer; }
 .inventory-holding-group summary span { display:grid; gap:3px; }
