@@ -1045,6 +1045,39 @@ test("a pointer click does not scroll a control that keyboard focus would", asyn
   }
 });
 
+test("Today fold-out headers keep 44px tap targets at 320 and 390", async ({ browser, baseURL }) => {
+  // Today fold-out <summary> rows were 28px (More moves) and 36px (Dealer
+  // pulse details, Desk tools, Optional research). The phone media query
+  // now gives them min-height 44px. Desktop stays 28/36.
+  for (const width of [320, 390]) {
+    const context = await phone(browser, baseURL!, width, 844);
+    await mockApis(context);
+    const page = await context.newPage();
+    try {
+      await resetStorage(page);
+      await page.goto("/?view=today");
+      const folds = [
+        page.locator(".today-more-moves > summary"),
+        page.locator(".today-pulse-details > summary"),
+        page.locator(".dealer-tools > summary").filter({ hasText: "Desk tools" }),
+        page.locator(".dealer-tools > summary").filter({ hasText: "Optional research" }),
+      ];
+      for (const fold of folds) {
+        await expect(fold).toBeVisible();
+        const box = await fold.boundingBox();
+        const label = ((await fold.textContent()) || "fold-out").replace(/\s+/g, " ").trim();
+        expect(box, `${width}px ${label} box`).not.toBeNull();
+        expect(box!.height, `${width}px ${label} height`).toBeGreaterThanOrEqual(44);
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      }
+      expect(await pageOverflow(page)).toBeLessThanOrEqual(1);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test("stock card controls keep 44px tap targets at 320 and 390", async ({ browser, baseURL }) => {
   // workbench.css loads after components.css and used to shrink these to
   // 32px (History), 38px (Price card, Sell, More actions) and 42px (Draft listing).
