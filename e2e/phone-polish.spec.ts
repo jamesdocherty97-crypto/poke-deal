@@ -1078,3 +1078,35 @@ test("stock card controls keep 44px tap targets at 320 and 390", async ({ browse
     }
   }
 });
+
+test("listing export links keep 44px tap targets at 320 and 390", async ({ browser, baseURL }) => {
+  // workbench.css sets .export-link to min-height 40px at every width. The
+  // phone media query now lifts Draft / All listings / eBay pack CSV to 44px.
+  for (const width of [320, 390]) {
+    const context = await phone(browser, baseURL!, width, 844);
+    await mockApis(context);
+    const page = await context.newPage();
+    try {
+      await resetStorage(page);
+      await page.goto("/?view=listings");
+      const exports = page.locator(".export-actions[aria-label='Listing exports']");
+      await expect(exports).toBeVisible();
+      const links = [
+        exports.getByRole("link", { name: "Draft CSV", exact: true }),
+        exports.getByRole("link", { name: "All listings CSV", exact: true }),
+        exports.getByRole("link", { name: "eBay pack CSV", exact: true }),
+      ];
+      for (const link of links) {
+        await expect(link).toBeVisible();
+        const box = await link.boundingBox();
+        expect(box, `${width}px export link box`).not.toBeNull();
+        expect(box!.height, `${width}px ${await link.textContent()} height`).toBeGreaterThanOrEqual(44);
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      }
+      expect(await pageOverflow(page)).toBeLessThanOrEqual(1);
+    } finally {
+      await context.close();
+    }
+  }
+});
