@@ -1611,8 +1611,9 @@ button.ghost-button:disabled,
   .dealer-brand h1 { max-width:150px; font-size:1rem; }
   .utility-nav { gap:5px; }
   .utility-nav .topbar-secondary { display:none; }
+  /* Header Synced / Refresh were 40px on phones. Keep 44px tap targets. Desktop stays 44. */
   .utility-nav .icon-button,
-  .utility-nav .sync-status { width:40px; min-width:40px; min-height:40px; }
+  .utility-nav .sync-status { width:44px; min-width:44px; min-height:44px; }
   .primary-nav.bottom-nav {
     position:fixed;
     z-index:var(--z-nav);
