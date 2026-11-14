@@ -1110,3 +1110,34 @@ test("listing export links keep 44px tap targets at 320 and 390", async ({ brows
     }
   }
 });
+
+test("header Synced and Refresh controls keep 44px tap targets at 320 and 390", async ({ browser, baseURL }) => {
+  // workbench.css shrinks these to 40px inside the phone media query. The
+  // phone rule now keeps them at 44px, matching desktop.
+  for (const width of [320, 390]) {
+    const context = await phone(browser, baseURL!, width, 844);
+    await mockApis(context);
+    const page = await context.newPage();
+    try {
+      await resetStorage(page);
+      await page.goto("/?view=today");
+      const controls = [
+        page.getByRole("button", { name: "Synced", exact: true }),
+        page.getByRole("button", { name: "Refresh data", exact: true }),
+      ];
+      for (const control of controls) {
+        await expect(control).toBeVisible();
+        const box = await control.boundingBox();
+        expect(box, `${width}px header control box`).not.toBeNull();
+        const label = (await control.getAttribute("aria-label")) || (await control.textContent()) || "control";
+        expect(box!.height, `${width}px ${label} height`).toBeGreaterThanOrEqual(44);
+        expect(box!.width, `${width}px ${label} width`).toBeGreaterThanOrEqual(44);
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      }
+      expect(await pageOverflow(page)).toBeLessThanOrEqual(1);
+    } finally {
+      await context.close();
+    }
+  }
+});
