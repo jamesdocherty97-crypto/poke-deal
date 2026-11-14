@@ -1044,3 +1044,37 @@ test("a pointer click does not scroll a control that keyboard focus would", asyn
     await context.close();
   }
 });
+
+test("stock card controls keep 44px tap targets at 320 and 390", async ({ browser, baseURL }) => {
+  // workbench.css loads after components.css and used to shrink these to
+  // 32px (History), 38px (Price card, Sell, More actions) and 42px (Draft listing).
+  for (const width of [320, 390]) {
+    const context = await phone(browser, baseURL!, width, 844);
+    await mockApis(context);
+    const page = await context.newPage();
+    try {
+      await resetStorage(page);
+      await page.goto("/?view=inventory");
+      const row = page.locator("article").filter({ has: page.getByRole("button", { name: "History for Gengar", exact: true }) });
+      await expect(row).toHaveCount(1);
+      const controls = [
+        row.getByRole("button", { name: "History for Gengar", exact: true }),
+        row.locator(".next-action-strip .next-action-button"),
+        row.getByRole("button", { name: "Price card", exact: true }),
+        row.getByRole("button", { name: "Sell", exact: true }),
+        row.getByRole("button", { name: "More actions", exact: true }),
+      ];
+      for (const control of controls) {
+        await expect(control).toBeVisible();
+        const box = await control.boundingBox();
+        expect(box, `${width}px control box`).not.toBeNull();
+        expect(box!.height, `${width}px ${await control.textContent()} height`).toBeGreaterThanOrEqual(44);
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      }
+      expect(await pageOverflow(page)).toBeLessThanOrEqual(1);
+    } finally {
+      await context.close();
+    }
+  }
+});
